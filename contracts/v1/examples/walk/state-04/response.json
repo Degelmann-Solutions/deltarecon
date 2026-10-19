@@ -1,0 +1,90 @@
+{
+  "document": "run_response",
+  "contract_version": "1.0",
+  "stage": "liability_cashflow",
+  "run_id": "walk-run-n-full-run-n1-full-state-4",
+  "outcome": "succeeded",
+  "release": {
+    "label": "N",
+    "references": [
+      {
+        "kind": "code_state",
+        "value": "revision 1d6a0d0cde197b83580e5e17c93192c34572d838"
+      },
+      {
+        "kind": "parameter_set",
+        "value": "revision 1d6a0d0cde197b83580e5e17c93192c34572d838"
+      },
+      {
+        "kind": "input_data",
+        "value": "revision 1d6a0d0cde197b83580e5e17c93192c34572d838"
+      },
+      {
+        "kind": "engine_version",
+        "value": "engine build 2026.10"
+      }
+    ]
+  },
+  "changes": {
+    "enabled": [
+      "f291e79376fd8157cefa009bc06d213711b6490b",
+      "0b2f58ed2d975f2ebd8bc4ac58a1c37d3d62997f",
+      "0767d650b32a037f9a98260a8a7531c7ade3d8af",
+      "a58186a2a54cedfe17ef8ab4c0851a10a18bf59f"
+    ],
+    "manifest": {
+      "path": "changes.json",
+      "sha256": "789c2e1494e9cd9a48994ace0bea0cd02aab0640666c68119fc7aab6f197d96d"
+    }
+  },
+  "selection": {
+    "mode": "full"
+  },
+  "time_basis": {
+    "id": "policy_month"
+  },
+  "quantities": [
+    {
+      "name": "Anzahl Verträge",
+      "unit": "policies"
+    },
+    {
+      "name": "Netto-Cashflow",
+      "unit": "EUR"
+    }
+  ],
+  "model_points": [
+    {
+      "model_point_id": "MP-0001",
+      "first_period": 0,
+      "last_period": 2
+    },
+    {
+      "model_point_id": "MP-0002",
+      "first_period": 0,
+      "last_period": 2
+    },
+    {
+      "model_point_id": "MP-0003",
+      "first_period": 0,
+      "last_period": 1
+    },
+    {
+      "model_point_id": "MP-0004",
+      "first_period": 0,
+      "last_period": 2
+    },
+    {
+      "model_point_id": "MP-0005",
+      "first_period": 0,
+      "last_period": 1
+    }
+  ],
+  "export": {
+    "artifact": {
+      "path": "results.csv",
+      "sha256": "3af60211be1707ed9edb7d510c4f12a2f9cb0f8d5871a9a6f82ec61debe0395c"
+    },
+    "data_rows": 13
+  }
+}

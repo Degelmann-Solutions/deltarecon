@@ -1,0 +1,9 @@
+{
+  "per_quantity": {
+    "Bruttobeitrag": {
+      "upper": { "abs_tol": 0.01, "rel_tol": 0 },
+      "lower": { "abs_tol": 0.01, "rel_tol": 0 },
+      "derivation": "A premium is settled in whole cents, so a change of the gross premium of a model point and policy month below one cent is not a change a person would act on. The bound is absolute and symmetric, without rounding, so that a change of about 0.006 per coordinate stays below it while two such changes in a row exceed it."
+    }
+  }
+}

@@ -1,0 +1,75 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "run-record.schema.json",
+  "title": "Stage contracts version 1: run record",
+  "$ref": "#/$defs/run_record",
+  "$defs": {
+    "role_artifact": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["role", "artifact"],
+      "properties": {
+        "role": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9_]*$"
+        },
+        "artifact": { "$ref": "common.schema.json#/$defs/artifact" }
+      }
+    },
+    "run_record": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "document", "contract_version", "stage", "record_id", "procedure", "outcome",
+        "inputs", "releases", "parameters", "outputs"
+      ],
+      "properties": {
+        "document": { "const": "run_record" },
+        "contract_version": { "$ref": "common.schema.json#/$defs/contract_version" },
+        "stage": { "$ref": "common.schema.json#/$defs/stage" },
+        "record_id": {
+          "description": "The identifier of one execution: record- and a random UUID of version 4.",
+          "type": "string",
+          "pattern": "^record-[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+        },
+        "procedure": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["type"],
+          "properties": {
+            "type": {
+              "type": "string",
+              "pattern": "^[a-z][a-z0-9_]*$"
+            }
+          }
+        },
+        "outcome": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9_]*$"
+        },
+        "recorded_at": {
+          "description": "Optional UTC timestamp, RFC 3339. It is never compared.",
+          "type": "string",
+          "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z$"
+        },
+        "inputs": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "$ref": "#/$defs/role_artifact" }
+        },
+        "releases": {
+          "description": "The release identities the caller supplied, unchanged.",
+          "type": "array",
+          "minItems": 1,
+          "items": { "$ref": "common.schema.json#/$defs/release" }
+        },
+        "parameters": { "$ref": "common.schema.json#/$defs/parameter_inventory" },
+        "outputs": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "$ref": "#/$defs/role_artifact" }
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,75 @@
+{
+  "document": "compare_request",
+  "contract_version": "1.0",
+  "stage": "liability_cashflow",
+  "compare_id": "compare-n-full-vs-subset-changes",
+  "left": {
+    "response": {
+      "path": "full-run.response.json",
+      "sha256": "94e9dbfd9bc5e33349506d8bf1c797bbb45673538169b2544f9e738a9890822c"
+    },
+    "run_record": {
+      "path": "full-run.run-record.json",
+      "sha256": "aa37230288e08a3986b751b4b346671ead1a57c3ae0bdb6e2f5839cceab65349"
+    }
+  },
+  "right": {
+    "response": {
+      "path": "subset-run.response.json",
+      "sha256": "b565fc49e304fb96faa25944306fae67dad165ddf25b188261bb85429f64a98e"
+    },
+    "run_record": {
+      "path": "subset-run.run-record.json",
+      "sha256": "122786eea74e2175924baedf75ab79547840c68e85c5affd26223a54a90cccc9"
+    }
+  },
+  "tolerance": {
+    "per_quantity": {
+      "Bruttobeitrag": {
+        "upper": {
+          "abs_tol": 0,
+          "rel_tol": 0.001
+        },
+        "lower": {
+          "abs_tol": 0,
+          "rel_tol": 0.001
+        },
+        "derivation": "Synthetic example. The two release states apply the instalment surcharge before and after rounding; the difference is at most 0.1 percent of the premium, in either direction."
+      },
+      "Kosten 2. Ordnung ohne Provisionen": {
+        "upper": {
+          "abs_tol": 0.25,
+          "rel_tol": 0
+        },
+        "lower": {
+          "abs_tol": 0,
+          "rel_tol": 0
+        },
+        "derivation": "Synthetic example. The right run rounds the collection cost of each instalment up to a quarter; it can come out higher by at most 0.25 per period and never lower."
+      },
+      "Provisionen": {
+        "decimals": 2,
+        "upper": {
+          "abs_tol": 0,
+          "rel_tol": 0
+        },
+        "lower": {
+          "abs_tol": 0,
+          "rel_tol": 0
+        },
+        "derivation": "Synthetic example. Commissions are settled in whole cents; the two runs differ only beyond the cent."
+      },
+      "Netto-Cashflow": {
+        "upper": {
+          "abs_tol": 0,
+          "rel_tol": 0
+        },
+        "lower": {
+          "abs_tol": 0.25,
+          "rel_tol": 0
+        },
+        "derivation": "Synthetic example. Follows from the bound on the expenses: the net cash flow can come out lower by at most 0.25 per period and never higher."
+      }
+    }
+  }
+}

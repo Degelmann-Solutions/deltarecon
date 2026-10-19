@@ -1,0 +1,29 @@
+{
+  "document": "run_request",
+  "contract_version": "1.0",
+  "stage": "liability_cashflow",
+  "run_id": "run-artifact-missing",
+  "release": {
+    "label": "N",
+    "references": [
+      {
+        "kind": "input_data",
+        "value": "model_points.csv",
+        "artifact": {
+          "path": "release/model_points.csv",
+          "sha256": "7dfb54a154b5dcbedd09760c4de68942d15160461430942025d56a8a6e1fee3c"
+        }
+      },
+      {
+        "kind": "code_state",
+        "value": "revision 1047"
+      }
+    ]
+  },
+  "changes": {
+    "enabled": []
+  },
+  "selection": {
+    "mode": "full"
+  }
+}

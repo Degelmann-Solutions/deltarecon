@@ -1,0 +1,1203 @@
+{
+  "contract_version": "1.0",
+  "cases": [
+    {
+      "id": "full-run",
+      "expected": "accept",
+      "matrix_rows": [
+        "complete-run"
+      ],
+      "rules": [
+        "README.md#stage-identifier",
+        "run.md#run-request",
+        "run.md#run-response",
+        "run.md#result-completeness"
+      ],
+      "shows": "A full run of release N with no change enabled. Request and response agree on stage, release identity, change set, and selection; the response declares the time basis, the quantities with units, and the period range of every model point.",
+      "documents": [
+        {
+          "path": "reference/full-run.request.json",
+          "schema": "run.schema.json"
+        },
+        {
+          "path": "reference/full-run.response.json",
+          "schema": "run.schema.json"
+        }
+      ],
+      "exports": [
+        "reference/full-run.results.csv"
+      ]
+    },
+    {
+      "id": "subset-run",
+      "expected": "accept",
+      "matrix_rows": [
+        "complete-run"
+      ],
+      "rules": [
+        "run.md#selection",
+        "run.md#result-completeness",
+        "changes.md#combination-rules"
+      ],
+      "shows": "A subset run of two model points with four changes enabled. The export holds exactly the two requested model points.",
+      "documents": [
+        {
+          "path": "reference/subset-run.request.json",
+          "schema": "run.schema.json"
+        },
+        {
+          "path": "reference/subset-run.response.json",
+          "schema": "run.schema.json"
+        },
+        {
+          "path": "reference/changes.json",
+          "schema": "changes.schema.json"
+        }
+      ],
+      "exports": [
+        "reference/subset-run.results.csv"
+      ]
+    },
+    {
+      "id": "csv-export",
+      "expected": "accept",
+      "matrix_rows": [
+        "complete-run"
+      ],
+      "rules": [
+        "README.md#csv-profile",
+        "README.md#number-format",
+        "run.md#per-model-point-export",
+        "domain/liability_cashflow.md#quantities"
+      ],
+      "shows": "The per-model-point export: one row per model point and period, one column per quantity, numbers in the number format. Model point MP-0002 starts at period 144.",
+      "documents": [
+        {
+          "path": "reference/full-run.response.json",
+          "schema": "run.schema.json"
+        }
+      ],
+      "exports": [
+        "reference/full-run.results.csv"
+      ]
+    },
+    {
+      "id": "change-manifest",
+      "expected": "accept",
+      "matrix_rows": [
+        "complete-run"
+      ],
+      "rules": [
+        "changes.md#change-entry",
+        "changes.md#combination-rules",
+        "changes.md#text-patch-reference-profile"
+      ],
+      "shows": "A manifest of six changes of all three classes, with one prerequisite and one conflict, realised as text patches against the files under release/.",
+      "documents": [
+        {
+          "path": "reference/changes.json",
+          "schema": "changes.schema.json"
+        }
+      ],
+      "exports": []
+    },
+    {
+      "id": "derived-manifest",
+      "expected": "accept",
+      "matrix_rows": [
+        "derived-manifest"
+      ],
+      "rules": [
+        "changes.md#derived-manifest",
+        "changes.md#revision-profile",
+        "README.md#deterministic-ordering"
+      ],
+      "shows": "A manifest derived from the history between two revisions: four changes of the type revision in history order, each with the change before it as its only prerequisite. One revision carries two classes, one touches no mapped path and has the empty class list, and one is a merge. The engine version differs between the two results and is named in the remainder.",
+      "documents": [
+        {
+          "path": "reference/changes.derived.json",
+          "schema": "changes.schema.json"
+        }
+      ],
+      "exports": []
+    },
+    {
+      "id": "compare-result",
+      "expected": "accept",
+      "matrix_rows": [
+        "coverage-difference",
+        "tolerance-boundary",
+        "parameter-diff"
+      ],
+      "rules": [
+        "compare.md#alignment",
+        "compare.md#coverage-differences",
+        "compare.md#tolerance-rule",
+        "compare.md#compare-result",
+        "compare.md#deviation-file",
+        "compare.md#parameter-diff"
+      ],
+      "shows": "Compares the full run with the subset run under a tolerance profile per quantity; quantities without an entry are compared exactly. MP-0001, period 0: Kosten 2. Ordnung ohne Provisionen 100 against 100.25 lies exactly on its upper bound of 0.25 and is no deviation; Netto-Cashflow 380 against 379.75 lies exactly on its lower bound; Bruttobeitrag 1200 against 1201 is covered by the relative bound; Beitragsverrechnung 400 against 401 has no entry and deviates. MP-0001, period 2: Anzahl Verträge 0.99 against 0.9905 has no entry and deviates. MP-0002, period 145: Provisionen 0.6972 against 0.6974 is rounded to two decimal places on both sides and is no deviation. MP-0002 period 146 is added, MP-0003 is removed, and neither is compared against zero. Every rounding and every bound above zero carries its derivation. The four deviating coordinates are the rows of compare.deviations.csv, which the result references with its byte hash. The parameter diff shows one added, one changed, and one removed parameter.",
+      "documents": [
+        {
+          "path": "reference/compare.request.json",
+          "schema": "compare.schema.json"
+        },
+        {
+          "path": "reference/compare.result.json",
+          "schema": "compare.schema.json"
+        },
+        {
+          "path": "reference/full-run.response.json",
+          "schema": "run.schema.json"
+        },
+        {
+          "path": "reference/subset-run.response.json",
+          "schema": "run.schema.json"
+        },
+        {
+          "path": "reference/full-run.run-record.json",
+          "schema": "run-record.schema.json"
+        },
+        {
+          "path": "reference/subset-run.run-record.json",
+          "schema": "run-record.schema.json"
+        }
+      ],
+      "exports": [
+        "reference/full-run.results.csv",
+        "reference/subset-run.results.csv",
+        "reference/compare.deviations.csv"
+      ]
+    },
+    {
+      "id": "signature-table",
+      "expected": "accept",
+      "matrix_rows": [
+        "signature-table"
+      ],
+      "rules": [
+        "compare.md#signature-table",
+        "compare.md#compare-result",
+        "compare.md#deviation-file",
+        "README.md#deterministic-ordering"
+      ],
+      "shows": "The signature table of the reference comparison, derived from its compare result and its deviation file alone. The four deviations of MP-0001 fall on four quantities, so the table has four rows, in quantity order: Anzahl Verträge, Beitragsverrechnung, garantierte Todesfallleistung, Netto-Cashflow. Each row counts one model point and one coordinate. Netto-Cashflow, -32.5 against -38.5, has right below left: its row holds a largest decrease of -6, relative to 38.5, and no largest increase. The quantities within their tolerance, the added period of MP-0002, and the removed model point MP-0003 give no row. The table holds no timestamp.",
+      "documents": [
+        {
+          "path": "reference/compare.result.json",
+          "schema": "compare.schema.json"
+        },
+        {
+          "path": "reference/compare.signature-table.json",
+          "schema": "compare.schema.json"
+        }
+      ],
+      "exports": [
+        "reference/compare.deviations.csv"
+      ]
+    },
+    {
+      "id": "run-record",
+      "expected": "accept",
+      "matrix_rows": [
+        "complete-run"
+      ],
+      "rules": [
+        "run.md#run-record",
+        "compare.md#replay-criterion"
+      ],
+      "shows": "Three run records in one envelope: two of procedure type run with a parameter inventory, one of procedure type compare that lists the compare result, the deviation file, and the signature table. Each record names its execution by a record id made of record- and a random UUID.",
+      "documents": [
+        {
+          "path": "reference/full-run.run-record.json",
+          "schema": "run-record.schema.json"
+        },
+        {
+          "path": "reference/subset-run.run-record.json",
+          "schema": "run-record.schema.json"
+        },
+        {
+          "path": "reference/compare.run-record.json",
+          "schema": "run-record.schema.json"
+        }
+      ],
+      "exports": []
+    },
+    {
+      "id": "opaque-identity",
+      "expected": "accept",
+      "matrix_rows": [
+        "opaque-release-identity"
+      ],
+      "rules": [
+        "README.md#release-identity",
+        "README.md#artifact-references-and-byte-hashes",
+        "domain/liability_cashflow.md#time-basis",
+        "README.md#vocabulary",
+        "run.md#result-completeness"
+      ],
+      "shows": "A release identity of four opaque references without any byte hash, a time basis of whole valuation years, model points that are output groups, and an export of six of the eleven quantities of the domain reference, in its order. The identifiers contain a comma and are quoted in the export.",
+      "documents": [
+        {
+          "path": "opaque-identity/request.json",
+          "schema": "run.schema.json"
+        },
+        {
+          "path": "opaque-identity/response.json",
+          "schema": "run.schema.json"
+        },
+        {
+          "path": "opaque-identity/run-record.json",
+          "schema": "run-record.schema.json"
+        }
+      ],
+      "exports": [
+        "opaque-identity/results.csv"
+      ]
+    },
+    {
+      "id": "signature-table-tie",
+      "expected": "accept",
+      "matrix_rows": [
+        "signature-table"
+      ],
+      "rules": [
+        "compare.md#signature-table",
+        "compare.md#deviation-file",
+        "README.md#deterministic-ordering"
+      ],
+      "shows": "A comparison of release N with release N+1 under an exact profile, and its signature table. The deviation file holds five rows. Netto-Cashflow deviates on three model points in both directions: three increases of exactly 5, a tie that names MP-0002, period 0, the lowest model point id and then the lowest period; and one decrease of 3 at MP-0001, period 2. Anzahl Verträge deviates once, downwards. Bruttobeitrag does not deviate and gives no row.",
+      "documents": [
+        {
+          "path": "signature-table/compare.request.json",
+          "schema": "compare.schema.json"
+        },
+        {
+          "path": "signature-table/compare.result.json",
+          "schema": "compare.schema.json"
+        },
+        {
+          "path": "signature-table/compare.signature-table.json",
+          "schema": "compare.schema.json"
+        },
+        {
+          "path": "signature-table/left.response.json",
+          "schema": "run.schema.json"
+        },
+        {
+          "path": "signature-table/right.response.json",
+          "schema": "run.schema.json"
+        }
+      ],
+      "exports": [
+        "signature-table/left.results.csv",
+        "signature-table/right.results.csv",
+        "signature-table/compare.deviations.csv"
+      ]
+    },
+    {
+      "id": "signature-table-empty",
+      "expected": "accept",
+      "matrix_rows": [
+        "signature-table"
+      ],
+      "rules": [
+        "compare.md#signature-table",
+        "compare.md#deviation-file",
+        "compare.md#compare-result"
+      ],
+      "shows": "A run compared with itself. The comparison reports no deviation: the deviation file holds the header alone, and the signature table is written with no row.",
+      "documents": [
+        {
+          "path": "signature-empty/compare.request.json",
+          "schema": "compare.schema.json"
+        },
+        {
+          "path": "signature-empty/compare.result.json",
+          "schema": "compare.schema.json"
+        },
+        {
+          "path": "signature-empty/compare.signature-table.json",
+          "schema": "compare.schema.json"
+        },
+        {
+          "path": "signature-empty/run.response.json",
+          "schema": "run.schema.json"
+        }
+      ],
+      "exports": [
+        "signature-empty/run.results.csv",
+        "signature-empty/compare.deviations.csv"
+      ]
+    },
+    {
+      "id": "walk-result",
+      "expected": "accept",
+      "matrix_rows": [
+        "walk"
+      ],
+      "rules": [
+        "localise.md#walk",
+        "localise.md#contribution",
+        "localise.md#walk-result",
+        "changes.md#revision-profile",
+        "README.md#deterministic-ordering"
+      ],
+      "shows": "A walk over the four revisions of the derived manifest of reference/changes.derived.json, which the walk derives again byte for byte as changes.json. State 0 reproduces the older and state 4 the newer recorded result. Revision 1 lowers the lapse rate: both quantities contribute. Revision 2 raises the expense of MP-0001 by 5 and lowers that of MP-0002 by 2.5: Netto-Cashflow has the signed sum -7.5 and the absolute sum 22.5, as the changes partly cancel; the counts do not contribute. Revision 3 touches no class and contributes nothing, so its step has no comparison. Revision 4, a merge of data, changes MP-0003 and adds MP-0004 and MP-0005: the step contributes to every quantity and its compare result lists the added coordinates. The signed sums of each quantity add up to the totals, the deviation between the two recorded results. The engine version differs between the two results and is named in the remainder. The walk result references the manifest, the responses and exports of the states, and the compare results with their deviation files, and no run record.",
+      "documents": [
+        {
+          "path": "walk/walk.result.json",
+          "schema": "localise.schema.json"
+        },
+        {
+          "path": "walk/changes.json",
+          "schema": "changes.schema.json"
+        },
+        {
+          "path": "walk/state-00/response.json",
+          "schema": "run.schema.json"
+        },
+        {
+          "path": "walk/state-01/response.json",
+          "schema": "run.schema.json"
+        },
+        {
+          "path": "walk/state-01/changes.json",
+          "schema": "changes.schema.json"
+        },
+        {
+          "path": "walk/state-02/response.json",
+          "schema": "run.schema.json"
+        },
+        {
+          "path": "walk/state-02/changes.json",
+          "schema": "changes.schema.json"
+        },
+        {
+          "path": "walk/state-03/response.json",
+          "schema": "run.schema.json"
+        },
+        {
+          "path": "walk/state-03/changes.json",
+          "schema": "changes.schema.json"
+        },
+        {
+          "path": "walk/state-04/response.json",
+          "schema": "run.schema.json"
+        },
+        {
+          "path": "walk/state-04/changes.json",
+          "schema": "changes.schema.json"
+        },
+        {
+          "path": "walk/step-01.compare.result.json",
+          "schema": "compare.schema.json"
+        },
+        {
+          "path": "walk/step-02.compare.result.json",
+          "schema": "compare.schema.json"
+        },
+        {
+          "path": "walk/step-04.compare.result.json",
+          "schema": "compare.schema.json"
+        }
+      ],
+      "exports": [
+        "walk/state-00/results.csv",
+        "walk/state-01/results.csv",
+        "walk/state-02/results.csv",
+        "walk/state-03/results.csv",
+        "walk/state-04/results.csv",
+        "walk/step-01.compare.deviations.csv",
+        "walk/step-02.compare.deviations.csv",
+        "walk/step-04.compare.deviations.csv"
+      ]
+    },
+    {
+      "id": "search-result",
+      "expected": "accept",
+      "matrix_rows": [
+        "search"
+      ],
+      "rules": [
+        "localise.md#search",
+        "localise.md#halving",
+        "localise.md#check-against-a-walk",
+        "localise.md#search-result",
+        "README.md#deterministic-ordering"
+      ],
+      "shows": "A search over the four revisions of the walk example for the target Anzahl Verträge in period 0, checked against the walk of walk/, which it holds as a copy in search/walk/. State 0 and state 4 run and reproduce the two recorded results. The interval from state 0 to state 4 differs: revision 4 corrects MP-0003 and adds MP-0004 and MP-0005. The interval from state 0 to state 2 agrees on the target, because the lapse rate of revision 1 first acts after period 0, and it is not divided. The interval from state 2 to state 4 is split at state 3: the interval of revision 3 agrees, and the interval of revision 4 is the one contribution, with the signed sum 3 over the target coordinates. The search runs four states where the walk runs five and saves one run; the steps of the walk, recomputed on the target, show no contribution the search missed. The search result references the manifest, the responses and exports of its states, the kept comparison of its contribution, and the copied walk result, and no run record.",
+      "documents": [
+        {
+          "path": "search/search.result.json",
+          "schema": "localise.schema.json"
+        },
+        {
+          "path": "search/changes.json",
+          "schema": "changes.schema.json"
+        },
+        {
+          "path": "search/interval-03-04.compare.result.json",
+          "schema": "compare.schema.json"
+        },
+        {
+          "path": "search/state-00/response.json",
+          "schema": "run.schema.json"
+        },
+        {
+          "path": "search/state-02/changes.json",
+          "schema": "changes.schema.json"
+        },
+        {
+          "path": "search/state-02/response.json",
+          "schema": "run.schema.json"
+        },
+        {
+          "path": "search/state-03/changes.json",
+          "schema": "changes.schema.json"
+        },
+        {
+          "path": "search/state-03/response.json",
+          "schema": "run.schema.json"
+        },
+        {
+          "path": "search/state-04/changes.json",
+          "schema": "changes.schema.json"
+        },
+        {
+          "path": "search/state-04/response.json",
+          "schema": "run.schema.json"
+        },
+        {
+          "path": "search/walk/changes.json",
+          "schema": "changes.schema.json"
+        },
+        {
+          "path": "search/walk/state-00/response.json",
+          "schema": "run.schema.json"
+        },
+        {
+          "path": "search/walk/state-01/changes.json",
+          "schema": "changes.schema.json"
+        },
+        {
+          "path": "search/walk/state-01/response.json",
+          "schema": "run.schema.json"
+        },
+        {
+          "path": "search/walk/state-02/changes.json",
+          "schema": "changes.schema.json"
+        },
+        {
+          "path": "search/walk/state-02/response.json",
+          "schema": "run.schema.json"
+        },
+        {
+          "path": "search/walk/state-03/changes.json",
+          "schema": "changes.schema.json"
+        },
+        {
+          "path": "search/walk/state-03/response.json",
+          "schema": "run.schema.json"
+        },
+        {
+          "path": "search/walk/state-04/changes.json",
+          "schema": "changes.schema.json"
+        },
+        {
+          "path": "search/walk/state-04/response.json",
+          "schema": "run.schema.json"
+        },
+        {
+          "path": "search/walk/step-01.compare.result.json",
+          "schema": "compare.schema.json"
+        },
+        {
+          "path": "search/walk/step-02.compare.result.json",
+          "schema": "compare.schema.json"
+        },
+        {
+          "path": "search/walk/step-04.compare.result.json",
+          "schema": "compare.schema.json"
+        },
+        {
+          "path": "search/walk/walk.result.json",
+          "schema": "localise.schema.json"
+        }
+      ],
+      "exports": [
+        "search/interval-03-04.compare.deviations.csv",
+        "search/state-00/results.csv",
+        "search/state-02/results.csv",
+        "search/state-03/results.csv",
+        "search/state-04/results.csv",
+        "search/walk/state-00/results.csv",
+        "search/walk/state-01/results.csv",
+        "search/walk/state-02/results.csv",
+        "search/walk/state-03/results.csv",
+        "search/walk/state-04/results.csv",
+        "search/walk/step-01.compare.deviations.csv",
+        "search/walk/step-02.compare.deviations.csv",
+        "search/walk/step-04.compare.deviations.csv"
+      ]
+    },
+    {
+      "id": "empty-selection",
+      "expected": "reject",
+      "level": "schema",
+      "diagnostic": "schema_violation",
+      "matrix_rows": [
+        "malformed-input"
+      ],
+      "rules": [
+        "run.md#selection"
+      ],
+      "shows": "A subset selection without any model point id.",
+      "documents": [
+        {
+          "path": "negative/empty-selection/request.json",
+          "schema": "run.schema.json"
+        }
+      ],
+      "exports": [],
+      "failing": "negative/empty-selection/request.json"
+    },
+    {
+      "id": "duplicate-selection",
+      "expected": "reject",
+      "level": "schema",
+      "diagnostic": "schema_violation",
+      "matrix_rows": [
+        "malformed-input"
+      ],
+      "rules": [
+        "run.md#selection"
+      ],
+      "shows": "A subset selection that names MP-0001 twice.",
+      "documents": [
+        {
+          "path": "negative/duplicate-selection/request.json",
+          "schema": "run.schema.json"
+        }
+      ],
+      "exports": [],
+      "failing": "negative/duplicate-selection/request.json"
+    },
+    {
+      "id": "unsupported-version",
+      "expected": "reject",
+      "level": "schema",
+      "diagnostic": "unsupported_version",
+      "matrix_rows": [
+        "malformed-input"
+      ],
+      "rules": [
+        "README.md#version-compatibility"
+      ],
+      "shows": "A request that declares contract version 2.0 to a version 1 reader.",
+      "documents": [
+        {
+          "path": "negative/unsupported-version/request.json",
+          "schema": "run.schema.json"
+        }
+      ],
+      "exports": [],
+      "failing": "negative/unsupported-version/request.json"
+    },
+    {
+      "id": "duplicate-member",
+      "expected": "reject",
+      "level": "parse",
+      "diagnostic": "duplicate_member",
+      "matrix_rows": [
+        "malformed-input"
+      ],
+      "rules": [
+        "README.md#json-profile"
+      ],
+      "shows": "A request whose object carries the member name stage twice.",
+      "documents": [
+        {
+          "path": "negative/duplicate-member/request.json",
+          "schema": "run.schema.json"
+        }
+      ],
+      "exports": [],
+      "failing": "negative/duplicate-member/request.json"
+    },
+    {
+      "id": "unknown-model-point",
+      "expected": "reject",
+      "level": "semantic",
+      "diagnostic": "unknown_model_point",
+      "matrix_rows": [
+        "malformed-input"
+      ],
+      "rules": [
+        "run.md#selection",
+        "run.md#rejection"
+      ],
+      "shows": "A subset selection names MP-9999, which the release does not hold. The engine rejects the whole request and runs nothing.",
+      "documents": [
+        {
+          "path": "negative/unknown-model-point/request.json",
+          "schema": "run.schema.json"
+        },
+        {
+          "path": "negative/unknown-model-point/response.json",
+          "schema": "run.schema.json"
+        }
+      ],
+      "exports": []
+    },
+    {
+      "id": "duplicate-coordinate",
+      "expected": "reject",
+      "level": "semantic",
+      "diagnostic": "duplicate_coordinate",
+      "matrix_rows": [
+        "malformed-input"
+      ],
+      "rules": [
+        "run.md#per-model-point-export",
+        "run.md#result-completeness"
+      ],
+      "shows": "The export carries the key (MP-0001, 1) on two rows.",
+      "documents": [
+        {
+          "path": "negative/duplicate-coordinate/request.json",
+          "schema": "run.schema.json"
+        },
+        {
+          "path": "negative/duplicate-coordinate/response.json",
+          "schema": "run.schema.json"
+        }
+      ],
+      "exports": [
+        "negative/duplicate-coordinate/results.csv"
+      ]
+    },
+    {
+      "id": "non-finite-value",
+      "expected": "reject",
+      "level": "export_format",
+      "diagnostic": "non_finite_value",
+      "matrix_rows": [
+        "malformed-input"
+      ],
+      "rules": [
+        "README.md#number-format"
+      ],
+      "shows": "The export carries NaN where a number is required. No reader accepts it under the reader grammar.",
+      "documents": [
+        {
+          "path": "negative/non-finite-value/request.json",
+          "schema": "run.schema.json"
+        },
+        {
+          "path": "negative/non-finite-value/response.json",
+          "schema": "run.schema.json"
+        }
+      ],
+      "exports": [
+        "negative/non-finite-value/results.csv"
+      ],
+      "failing": "negative/non-finite-value/results.csv"
+    },
+    {
+      "id": "wrong-stage",
+      "expected": "reject",
+      "level": "semantic",
+      "diagnostic": "stage_mismatch",
+      "matrix_rows": [
+        "inconsistent-result"
+      ],
+      "rules": [
+        "README.md#stage-identifier",
+        "run.md#result-completeness"
+      ],
+      "shows": "The request names stage liability_cashflow and the response names asset_cashflow.",
+      "documents": [
+        {
+          "path": "negative/wrong-stage/request.json",
+          "schema": "run.schema.json"
+        },
+        {
+          "path": "negative/wrong-stage/response.json",
+          "schema": "run.schema.json"
+        }
+      ],
+      "exports": [
+        "negative/wrong-stage/results.csv"
+      ]
+    },
+    {
+      "id": "unrequested-coordinate",
+      "expected": "reject",
+      "level": "semantic",
+      "diagnostic": "unrequested_coordinate",
+      "matrix_rows": [
+        "inconsistent-result"
+      ],
+      "rules": [
+        "run.md#result-completeness"
+      ],
+      "shows": "The request selects MP-0001 only and the export also carries rows of MP-0002. The reader rejects the whole result and does not keep the rows of MP-0001.",
+      "documents": [
+        {
+          "path": "negative/unrequested-coordinate/request.json",
+          "schema": "run.schema.json"
+        },
+        {
+          "path": "negative/unrequested-coordinate/response.json",
+          "schema": "run.schema.json"
+        }
+      ],
+      "exports": [
+        "negative/unrequested-coordinate/results.csv"
+      ]
+    },
+    {
+      "id": "missing-coordinate",
+      "expected": "reject",
+      "level": "semantic",
+      "diagnostic": "missing_coordinate",
+      "matrix_rows": [
+        "inconsistent-result"
+      ],
+      "rules": [
+        "run.md#result-completeness"
+      ],
+      "shows": "The response declares periods 0 to 2 for MP-0001 and the export lacks period 1.",
+      "documents": [
+        {
+          "path": "negative/missing-coordinate/request.json",
+          "schema": "run.schema.json"
+        },
+        {
+          "path": "negative/missing-coordinate/response.json",
+          "schema": "run.schema.json"
+        }
+      ],
+      "exports": [
+        "negative/missing-coordinate/results.csv"
+      ]
+    },
+    {
+      "id": "artifact-missing",
+      "expected": "reject",
+      "level": "semantic",
+      "diagnostic": "artifact_missing",
+      "matrix_rows": [
+        "inconsistent-result"
+      ],
+      "rules": [
+        "README.md#artifact-references-and-byte-hashes",
+        "run.md#rejection"
+      ],
+      "shows": "The release identity references release/model_points.csv with a byte hash and the file is absent.",
+      "documents": [
+        {
+          "path": "negative/artifact-missing/request.json",
+          "schema": "run.schema.json"
+        },
+        {
+          "path": "negative/artifact-missing/response.json",
+          "schema": "run.schema.json"
+        }
+      ],
+      "exports": []
+    },
+    {
+      "id": "artifact-hash-mismatch",
+      "expected": "reject",
+      "level": "semantic",
+      "diagnostic": "artifact_hash_mismatch",
+      "matrix_rows": [
+        "inconsistent-result"
+      ],
+      "rules": [
+        "README.md#artifact-references-and-byte-hashes",
+        "run.md#rejection"
+      ],
+      "shows": "The release identity references release/model_points.csv with a byte hash and the stored bytes have another hash.",
+      "documents": [
+        {
+          "path": "negative/artifact-hash-mismatch/request.json",
+          "schema": "run.schema.json"
+        },
+        {
+          "path": "negative/artifact-hash-mismatch/response.json",
+          "schema": "run.schema.json"
+        }
+      ],
+      "exports": []
+    },
+    {
+      "id": "failed-run",
+      "expected": "failed",
+      "diagnostic": "model_point_failed",
+      "matrix_rows": [
+        "model-point-failure"
+      ],
+      "rules": [
+        "run.md#failure-outcome"
+      ],
+      "shows": "One model point fails in the engine. The outcome is failed, the failing point is named, and no export exists.",
+      "documents": [
+        {
+          "path": "negative/failed-run/request.json",
+          "schema": "run.schema.json"
+        },
+        {
+          "path": "negative/failed-run/response.json",
+          "schema": "run.schema.json"
+        }
+      ],
+      "exports": []
+    },
+    {
+      "id": "no-model-point",
+      "expected": "error",
+      "diagnostic": "no_model_point",
+      "matrix_rows": [
+        "engine-error"
+      ],
+      "rules": [
+        "run.md#error-outcome"
+      ],
+      "shows": "The engine accepted a full request and the restored state holds no model point. The outcome is error; the response repeats release, change set, and selection and carries no export.",
+      "documents": [
+        {
+          "path": "negative/no-model-point/request.json",
+          "schema": "run.schema.json"
+        },
+        {
+          "path": "negative/no-model-point/response.json",
+          "schema": "run.schema.json"
+        }
+      ],
+      "exports": []
+    },
+    {
+      "id": "invalid-model-point-id",
+      "expected": "error",
+      "diagnostic": "invalid_model_point_id",
+      "matrix_rows": [
+        "engine-error"
+      ],
+      "rules": [
+        "run.md#error-outcome"
+      ],
+      "shows": "The restored state yields the empty string as a model point id, which the schema of an id forbids. The id is described in the message and not listed in model_point_ids.",
+      "documents": [
+        {
+          "path": "negative/invalid-model-point-id/request.json",
+          "schema": "run.schema.json"
+        },
+        {
+          "path": "negative/invalid-model-point-id/response.json",
+          "schema": "run.schema.json"
+        }
+      ],
+      "exports": []
+    },
+    {
+      "id": "state-not-readable",
+      "expected": "error",
+      "diagnostic": "state_not_readable",
+      "matrix_rows": [
+        "engine-error"
+      ],
+      "rules": [
+        "run.md#error-outcome"
+      ],
+      "shows": "The engine cannot read a table of the restored state. The message is the kind of error and the last line of its message, with the folder of the restored state written as <scratch>.",
+      "documents": [
+        {
+          "path": "negative/state-not-readable/request.json",
+          "schema": "run.schema.json"
+        },
+        {
+          "path": "negative/state-not-readable/response.json",
+          "schema": "run.schema.json"
+        }
+      ],
+      "exports": []
+    },
+    {
+      "id": "unit-mismatch",
+      "expected": "incompatible",
+      "diagnostic": "unit_mismatch",
+      "matrix_rows": [
+        "incompatible-compare"
+      ],
+      "rules": [
+        "compare.md#compatibility"
+      ],
+      "shows": "The left run declares amounts in EUR and the right run in kEUR. The result is incompatible and carries no deviation list.",
+      "documents": [
+        {
+          "path": "negative/unit-mismatch/compare.request.json",
+          "schema": "compare.schema.json"
+        },
+        {
+          "path": "negative/unit-mismatch/compare.result.json",
+          "schema": "compare.schema.json"
+        },
+        {
+          "path": "negative/unit-mismatch/left.response.json",
+          "schema": "run.schema.json"
+        },
+        {
+          "path": "negative/unit-mismatch/right.response.json",
+          "schema": "run.schema.json"
+        }
+      ],
+      "exports": [
+        "negative/unit-mismatch/left.results.csv",
+        "negative/unit-mismatch/right.results.csv"
+      ]
+    },
+    {
+      "id": "time-basis-mismatch",
+      "expected": "incompatible",
+      "diagnostic": "time_basis_mismatch",
+      "matrix_rows": [
+        "incompatible-compare"
+      ],
+      "rules": [
+        "compare.md#compatibility"
+      ],
+      "shows": "The left run declares the time basis policy_month and the right run valuation_year. The result is incompatible and carries no deviation list.",
+      "documents": [
+        {
+          "path": "negative/time-basis-mismatch/compare.request.json",
+          "schema": "compare.schema.json"
+        },
+        {
+          "path": "negative/time-basis-mismatch/compare.result.json",
+          "schema": "compare.schema.json"
+        },
+        {
+          "path": "negative/time-basis-mismatch/left.response.json",
+          "schema": "run.schema.json"
+        },
+        {
+          "path": "negative/time-basis-mismatch/right.response.json",
+          "schema": "run.schema.json"
+        }
+      ],
+      "exports": [
+        "negative/time-basis-mismatch/left.results.csv",
+        "negative/time-basis-mismatch/right.results.csv"
+      ]
+    },
+    {
+      "id": "unmet-prerequisite",
+      "expected": "reject",
+      "level": "semantic",
+      "diagnostic": "unmet_prerequisite",
+      "matrix_rows": [
+        "change-combination"
+      ],
+      "rules": [
+        "changes.md#combination-rules",
+        "run.md#rejection"
+      ],
+      "shows": "The request enables chg-b without its prerequisite chg-a. The engine rejects the combination and runs nothing. The manifest uses an engine-declared realisation type.",
+      "documents": [
+        {
+          "path": "negative/unmet-prerequisite/changes.json",
+          "schema": "changes.schema.json"
+        },
+        {
+          "path": "negative/unmet-prerequisite/request.json",
+          "schema": "run.schema.json"
+        },
+        {
+          "path": "negative/unmet-prerequisite/response.json",
+          "schema": "run.schema.json"
+        }
+      ],
+      "exports": []
+    },
+    {
+      "id": "change-conflict",
+      "expected": "reject",
+      "level": "semantic",
+      "diagnostic": "change_conflict",
+      "matrix_rows": [
+        "change-combination"
+      ],
+      "rules": [
+        "changes.md#combination-rules",
+        "run.md#rejection"
+      ],
+      "shows": "The request enables chg-a and chg-c, and chg-c declares a conflict with chg-a. The engine rejects the combination and runs nothing. The manifest uses an engine-declared realisation type.",
+      "documents": [
+        {
+          "path": "negative/change-conflict/changes.json",
+          "schema": "changes.schema.json"
+        },
+        {
+          "path": "negative/change-conflict/request.json",
+          "schema": "run.schema.json"
+        },
+        {
+          "path": "negative/change-conflict/response.json",
+          "schema": "run.schema.json"
+        }
+      ],
+      "exports": []
+    },
+    {
+      "id": "authored-revision",
+      "expected": "reject",
+      "level": "schema",
+      "diagnostic": "schema_violation",
+      "matrix_rows": [
+        "change-combination"
+      ],
+      "rules": [
+        "changes.md#revision-profile",
+        "changes.md#change-entry"
+      ],
+      "shows": "An authored manifest, without the member history, that realises a change as a revision. A change of the type revision stands only in a derived manifest, where the chain of prerequisites makes every enabled set of revisions a prefix.",
+      "documents": [
+        {
+          "path": "negative/authored-revision/changes.json",
+          "schema": "changes.schema.json"
+        }
+      ],
+      "exports": [],
+      "failing": "negative/authored-revision/changes.json"
+    },
+    {
+      "id": "non-finite-difference",
+      "expected": "reject",
+      "level": "semantic",
+      "diagnostic": "non_finite_difference",
+      "matrix_rows": [
+        "non-finite-difference"
+      ],
+      "rules": [
+        "compare.md#tolerance-rule",
+        "compare.md#compare-result"
+      ],
+      "shows": "Netto-Cashflow of MP-0001 is -1e308 on the left and 1e308 on the right: both values are finite, their difference is not. The comparison is rejected and names MP-0001; there is no deviation file and no signature table.",
+      "documents": [
+        {
+          "path": "negative/non-finite-difference/compare.request.json",
+          "schema": "compare.schema.json"
+        },
+        {
+          "path": "negative/non-finite-difference/compare.result.json",
+          "schema": "compare.schema.json"
+        },
+        {
+          "path": "negative/non-finite-difference/left.response.json",
+          "schema": "run.schema.json"
+        },
+        {
+          "path": "negative/non-finite-difference/right.response.json",
+          "schema": "run.schema.json"
+        }
+      ],
+      "exports": [
+        "negative/non-finite-difference/left.results.csv",
+        "negative/non-finite-difference/right.results.csv"
+      ]
+    },
+    {
+      "id": "not-a-deviation",
+      "expected": "reject",
+      "level": "semantic",
+      "diagnostic": "not_a_deviation",
+      "matrix_rows": [
+        "deviation-file"
+      ],
+      "rules": [
+        "compare.md#deviation-file"
+      ],
+      "shows": "The deviation file lists MP-0002, period 0, Netto-Cashflow with 150 on both sides. Equal values never deviate.",
+      "documents": [
+        {
+          "path": "negative/not-a-deviation/compare.result.json",
+          "schema": "compare.schema.json"
+        }
+      ],
+      "exports": [
+        "negative/not-a-deviation/compare.deviations.csv"
+      ]
+    },
+    {
+      "id": "deviation-within-tolerance",
+      "expected": "reject",
+      "level": "semantic",
+      "diagnostic": "not_a_deviation",
+      "matrix_rows": [
+        "deviation-file"
+      ],
+      "rules": [
+        "compare.md#deviation-file",
+        "compare.md#tolerance-rule"
+      ],
+      "shows": "The compare result accepts an increase of Netto-Cashflow up to 5. The deviation file lists MP-0002, period 0, Netto-Cashflow 150 against 155: the difference lies exactly on the upper bound and is no deviation, so the row is rejected.",
+      "documents": [
+        {
+          "path": "negative/deviation-within-tolerance/compare.result.json",
+          "schema": "compare.schema.json"
+        }
+      ],
+      "exports": [
+        "negative/deviation-within-tolerance/compare.deviations.csv"
+      ]
+    },
+    {
+      "id": "deviation-unknown-quantity",
+      "expected": "reject",
+      "level": "semantic",
+      "diagnostic": "unknown_quantity",
+      "matrix_rows": [
+        "deviation-file"
+      ],
+      "rules": [
+        "compare.md#deviation-file"
+      ],
+      "shows": "The deviation file names the quantity Provisionen, which the compare result does not declare.",
+      "documents": [
+        {
+          "path": "negative/deviation-unknown-quantity/compare.result.json",
+          "schema": "compare.schema.json"
+        }
+      ],
+      "exports": [
+        "negative/deviation-unknown-quantity/compare.deviations.csv"
+      ]
+    },
+    {
+      "id": "deviation-duplicate-coordinate",
+      "expected": "reject",
+      "level": "semantic",
+      "diagnostic": "duplicate_coordinate",
+      "matrix_rows": [
+        "deviation-file"
+      ],
+      "rules": [
+        "compare.md#deviation-file"
+      ],
+      "shows": "The deviation file lists MP-0002, period 0, Netto-Cashflow on two rows.",
+      "documents": [
+        {
+          "path": "negative/deviation-duplicate-coordinate/compare.result.json",
+          "schema": "compare.schema.json"
+        }
+      ],
+      "exports": [
+        "negative/deviation-duplicate-coordinate/compare.deviations.csv"
+      ]
+    }
+  ]
+}

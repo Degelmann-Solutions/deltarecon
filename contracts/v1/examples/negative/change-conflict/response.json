@@ -1,0 +1,17 @@
+{
+  "document": "run_response",
+  "contract_version": "1.0",
+  "stage": "liability_cashflow",
+  "run_id": "run-change-conflict",
+  "outcome": "rejected",
+  "diagnostics": [
+    {
+      "code": "change_conflict",
+      "message": "The request enables chg-a and chg-c, and chg-c declares a conflict with chg-a.",
+      "change_ids": [
+        "chg-a",
+        "chg-c"
+      ]
+    }
+  ]
+}

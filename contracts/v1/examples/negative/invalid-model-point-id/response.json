@@ -1,0 +1,32 @@
+{
+  "document": "run_response",
+  "contract_version": "1.0",
+  "stage": "liability_cashflow",
+  "run_id": "run-invalid-model-point-id",
+  "outcome": "error",
+  "release": {
+    "label": "N",
+    "references": [
+      {
+        "kind": "code_state",
+        "value": "revision 1047"
+      },
+      {
+        "kind": "input_data",
+        "value": "extract 2026-09-30"
+      }
+    ]
+  },
+  "changes": {
+    "enabled": []
+  },
+  "selection": {
+    "mode": "full"
+  },
+  "diagnostics": [
+    {
+      "code": "invalid_model_point_id",
+      "message": "The release state yields the model point id \"\", which the schema of an id forbids: an id is a non-empty string without a control character."
+    }
+  ]
+}

@@ -1,0 +1,5 @@
+model_point_id,period,Anzahl Verträge,Zahlbeitrag,garantierte Todesfallleistung,Kosten 2. Ordnung ohne Provisionen,Provisionen,Netto-Cashflow
+"TERM 10y, female",1,1200,290000,61000,12000,30000,187000
+"TERM 10y, female",2,1150.5,277000,64000,11500,2960,198540
+"TERM 10y, male",1,900,262000,88000,9000,27000,138000
+"TERM 10y, male",2,861.25,250250,91000,8600,2675,147975

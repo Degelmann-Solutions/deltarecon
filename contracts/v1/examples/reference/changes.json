@@ -1,0 +1,103 @@
+{
+  "document": "change_manifest",
+  "contract_version": "1.0",
+  "stage": "liability_cashflow",
+  "manifest_id": "changes-n-to-n1",
+  "base_release": "N",
+  "changes": [
+    {
+      "id": "chg-lapse-year-1-down",
+      "class": "parameter",
+      "description": "Lower the lapse rate of policy year 1 from 0.06 to 0.05.",
+      "prerequisites": [],
+      "conflicts": [],
+      "realisation": {
+        "type": "text_patch",
+        "format": "unified_diff",
+        "artifact": {
+          "path": "patches/chg-lapse-year-1-down.patch",
+          "sha256": "c6f642c6cdef7447ab470e927e4ff1f0a371a7e63330b4185256ada161d1383f"
+        }
+      }
+    },
+    {
+      "id": "chg-drop-legacy-loading",
+      "class": "parameter",
+      "description": "Remove the unused parameter legacy_loading.",
+      "prerequisites": [],
+      "conflicts": [],
+      "realisation": {
+        "type": "text_patch",
+        "format": "unified_diff",
+        "artifact": {
+          "path": "patches/chg-drop-legacy-loading.patch",
+          "sha256": "ea86efb9baad7feb1017486242995d7431b5cddfaa70ebc54d786ef0e22c3880"
+        }
+      }
+    },
+    {
+      "id": "chg-claim-expense-parameter",
+      "class": "parameter",
+      "description": "Add the parameter claim_expense with value 300.",
+      "prerequisites": [],
+      "conflicts": [],
+      "realisation": {
+        "type": "text_patch",
+        "format": "unified_diff",
+        "artifact": {
+          "path": "patches/chg-claim-expense-parameter.patch",
+          "sha256": "27ea595a7dab07eb4c0be27e5571f86dba26faf688ad85d61240cdb534301c15"
+        }
+      }
+    },
+    {
+      "id": "chg-claim-expense-rule",
+      "class": "code",
+      "description": "Read the claim expense per death from the parameter claim_expense instead of the constant 250.",
+      "prerequisites": [
+        "chg-claim-expense-parameter"
+      ],
+      "conflicts": [],
+      "realisation": {
+        "type": "text_patch",
+        "format": "unified_diff",
+        "artifact": {
+          "path": "patches/chg-claim-expense-rule.patch",
+          "sha256": "195735536df21dc36c28031e8aff2fc9015b701f7cb6e948a04cf5596ef08a9b"
+        }
+      }
+    },
+    {
+      "id": "chg-lapse-year-1-up",
+      "class": "parameter",
+      "description": "Raise the lapse rate of policy year 1 from 0.06 to 0.07.",
+      "prerequisites": [],
+      "conflicts": [
+        "chg-lapse-year-1-down"
+      ],
+      "realisation": {
+        "type": "text_patch",
+        "format": "unified_diff",
+        "artifact": {
+          "path": "patches/chg-lapse-year-1-up.patch",
+          "sha256": "ac2cd62a4fb58b41c73139478ea56818ae5ade45f5a0f47ea7c0ee79c40a95ee"
+        }
+      }
+    },
+    {
+      "id": "chg-sum-assured-mp-0003",
+      "class": "data",
+      "description": "Correct the sum assured of model point MP-0003 to 120000.",
+      "prerequisites": [],
+      "conflicts": [],
+      "realisation": {
+        "type": "text_patch",
+        "format": "unified_diff",
+        "artifact": {
+          "path": "patches/chg-sum-assured-mp-0003.patch",
+          "sha256": "825a7cfc9d0f9993ac2959b56a4107e5c17ce9f8b548c5281a14a5840e1a745a"
+        }
+      }
+    }
+  ]
+}

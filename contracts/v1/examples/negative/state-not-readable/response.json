@@ -1,0 +1,32 @@
+{
+  "document": "run_response",
+  "contract_version": "1.0",
+  "stage": "liability_cashflow",
+  "run_id": "run-state-not-readable",
+  "outcome": "error",
+  "release": {
+    "label": "N",
+    "references": [
+      {
+        "kind": "code_state",
+        "value": "revision 1047"
+      },
+      {
+        "kind": "input_data",
+        "value": "extract 2026-09-30"
+      }
+    ]
+  },
+  "changes": {
+    "enabled": []
+  },
+  "selection": {
+    "mode": "full"
+  },
+  "diagnostics": [
+    {
+      "code": "state_not_readable",
+      "message": "ReadError: the table <scratch>/tables/lapse_table.csv has no column policy_year"
+    }
+  ]
+}

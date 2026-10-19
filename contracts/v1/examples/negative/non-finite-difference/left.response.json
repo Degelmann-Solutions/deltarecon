@@ -1,0 +1,58 @@
+{
+  "document": "run_response",
+  "contract_version": "1.0",
+  "stage": "liability_cashflow",
+  "run_id": "run-n-full",
+  "outcome": "succeeded",
+  "release": {
+    "label": "N",
+    "references": [
+      {
+        "kind": "code_state",
+        "value": "revision 1047"
+      },
+      {
+        "kind": "input_data",
+        "value": "extract 2026-09-30"
+      }
+    ]
+  },
+  "changes": {
+    "enabled": []
+  },
+  "selection": {
+    "mode": "full"
+  },
+  "time_basis": {
+    "id": "policy_month"
+  },
+  "quantities": [
+    {
+      "name": "Anzahl Verträge",
+      "unit": "policies"
+    },
+    {
+      "name": "Netto-Cashflow",
+      "unit": "EUR"
+    }
+  ],
+  "model_points": [
+    {
+      "model_point_id": "MP-0001",
+      "first_period": 0,
+      "last_period": 0
+    },
+    {
+      "model_point_id": "MP-0002",
+      "first_period": 0,
+      "last_period": 0
+    }
+  ],
+  "export": {
+    "artifact": {
+      "path": "left.results.csv",
+      "sha256": "aaeb68583eea5218e2d46870178e0a0b789dd5d5f6d8411f72e35fe01aff9e52"
+    },
+    "data_rows": 2
+  }
+}

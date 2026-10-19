@@ -1,0 +1,88 @@
+{
+  "document": "run_response",
+  "contract_version": "1.0",
+  "stage": "liability_cashflow",
+  "run_id": "run-missing-coordinate",
+  "outcome": "succeeded",
+  "release": {
+    "label": "N",
+    "references": [
+      {
+        "kind": "code_state",
+        "value": "revision 1047"
+      },
+      {
+        "kind": "input_data",
+        "value": "extract 2026-09-30"
+      }
+    ]
+  },
+  "changes": {
+    "enabled": []
+  },
+  "selection": {
+    "mode": "subset",
+    "model_point_ids": [
+      "MP-0001"
+    ]
+  },
+  "time_basis": {
+    "id": "policy_month"
+  },
+  "quantities": [
+    {
+      "name": "Anzahl Verträge",
+      "unit": "policies"
+    },
+    {
+      "name": "Bruttobeitrag",
+      "unit": "EUR"
+    },
+    {
+      "name": "Zahlbeitrag",
+      "unit": "EUR"
+    },
+    {
+      "name": "Beitragsverrechnung",
+      "unit": "EUR"
+    },
+    {
+      "name": "garantierte Todesfallleistung",
+      "unit": "EUR"
+    },
+    {
+      "name": "garantierter Rückkaufswert",
+      "unit": "EUR"
+    },
+    {
+      "name": "garantierte Erlebensfallleistung",
+      "unit": "EUR"
+    },
+    {
+      "name": "Kosten 2. Ordnung ohne Provisionen",
+      "unit": "EUR"
+    },
+    {
+      "name": "Provisionen",
+      "unit": "EUR"
+    },
+    {
+      "name": "Netto-Cashflow",
+      "unit": "EUR"
+    }
+  ],
+  "model_points": [
+    {
+      "model_point_id": "MP-0001",
+      "first_period": 0,
+      "last_period": 2
+    }
+  ],
+  "export": {
+    "artifact": {
+      "path": "results.csv",
+      "sha256": "00363bb7cf9a487a389d9d5693da8b626fbeb2747933a28ce47bfb0d1b497c40"
+    },
+    "data_rows": 2
+  }
+}

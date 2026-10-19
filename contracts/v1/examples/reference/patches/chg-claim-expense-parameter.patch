@@ -1,0 +1,7 @@
+--- parameters.csv
++++ parameters.csv
+@@ -7,3 +7,4 @@
+ renewal_commission_rate,0.01
+ surplus_share,0.9
+ valuation_rate,0.01
++claim_expense,300

@@ -1,0 +1,66 @@
+{
+  "document": "run_request",
+  "contract_version": "1.0",
+  "stage": "liability_cashflow",
+  "run_id": "run-n-subset-changes",
+  "release": {
+    "label": "N",
+    "references": [
+      {
+        "kind": "input_data",
+        "value": "model_points.csv",
+        "artifact": {
+          "path": "release/model_points.csv",
+          "sha256": "7dfb54a154b5dcbedd09760c4de68942d15160461430942025d56a8a6e1fee3c"
+        }
+      },
+      {
+        "kind": "parameter_set",
+        "value": "lapse_table.csv",
+        "artifact": {
+          "path": "release/lapse_table.csv",
+          "sha256": "c681368d4183b28d61af7cbe9d8c3c0840f556307b13da5152bef379f708b606"
+        }
+      },
+      {
+        "kind": "parameter_set",
+        "value": "parameters.csv",
+        "artifact": {
+          "path": "release/parameters.csv",
+          "sha256": "3193e7f0cf6a6b3b4d30642a93d9bf8b682111f825358c8211dfa44a9548aa1b"
+        }
+      },
+      {
+        "kind": "code_state",
+        "value": "projection.rules",
+        "artifact": {
+          "path": "release/projection.rules",
+          "sha256": "bd7fe003be5e9b7eed088ecc2e747676e83e323acbf899e7a9419655f090031f"
+        }
+      },
+      {
+        "kind": "engine_version",
+        "value": "engine build 2026.09"
+      }
+    ]
+  },
+  "changes": {
+    "enabled": [
+      "chg-lapse-year-1-down",
+      "chg-drop-legacy-loading",
+      "chg-claim-expense-parameter",
+      "chg-claim-expense-rule"
+    ],
+    "manifest": {
+      "path": "changes.json",
+      "sha256": "376af893555dd6f6c7e3bf24973a3deae7ad8e2a2d823d1023839d8698696f7a"
+    }
+  },
+  "selection": {
+    "mode": "subset",
+    "model_point_ids": [
+      "MP-0001",
+      "MP-0002"
+    ]
+  }
+}

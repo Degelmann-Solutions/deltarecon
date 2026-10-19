@@ -1,0 +1,21 @@
+{
+  "document": "compare_request",
+  "contract_version": "1.0",
+  "stage": "liability_cashflow",
+  "compare_id": "compare-time-basis-mismatch",
+  "left": {
+    "response": {
+      "path": "left.response.json",
+      "sha256": "adc8a28d79e290b15994d69ff7152577b2407b15ea2f636addfc90bf2ed7a393"
+    }
+  },
+  "right": {
+    "response": {
+      "path": "right.response.json",
+      "sha256": "aba64f60649b412171afc6aa095f05e10153291ecfce287698bb7c2d7e560b3c"
+    }
+  },
+  "tolerance": {
+    "per_quantity": {}
+  }
+}
