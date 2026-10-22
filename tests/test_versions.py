@@ -15,12 +15,14 @@ from degelmann.deltarecon.derive import derive
 from degelmann.deltarecon.documents import (CHANGES_SCHEMA, CONTRACT_VERSION, RECORD_SCHEMA, RUN_REQUEST, Rejection,
                                             check_version, document_bytes, read_document, schema_errors, validator)
 from degelmann.deltarecon.replay import read_recorded_run, replay
+from degelmann.deltarecon.search import search
 from degelmann.deltarecon.walk import walk
 
 from conftest import folder_hashes, written_under
 from test_compare import compare_request, run_side
 from test_run_contract import (POINTS_B, StubEngine, assert_documents_valid, run_stub, stored, stub_regression,
                                stub_release, stub_request, world)  # noqa: F401
+from test_search import CANCEL, CASH
 from test_walk import LINE, WalkStub, build, record
 
 
@@ -147,6 +149,20 @@ def test_1_0_records_are_read_by_derive_and_walk(world):
     # Only the copies of the two records keep their version.
     assert versions(folder / "older") == versions(folder / "newer") == {"1.0"}
     assert len(walked.result["steps"]) == len(LINE) - 1
+
+
+def test_1_0_records_are_read_by_a_search_checked_against_their_walk(world):
+    build(world, CANCEL)
+    with written_under("1.0"):
+        older = record(world, "c0", WalkStub(CANCEL), label="N", contract_version="1.0")
+        newer = record(world, "c4", WalkStub(CANCEL), label="N+1", contract_version="1.0")
+    assert stored(older)["contract_version"] == stored(newer)["contract_version"] == "1.0"
+    assert walk(older, newer, world / "walk", WalkStub(CANCEL), repositories=world).attributed
+    done = search(older, newer, world / "search", WalkStub(CANCEL), repositories=world, walk=world / "walk")
+    assert done.searched and done.result["contract_version"] == "2.0"
+    assert [c["revisions"] for c in done.result["contributions"]] == [["c3"]]
+    assert done.result["missed"] == [{"revision": "c1", "quantity": CASH}, {"revision": "c2", "quantity": CASH}]
+    assert read_document(world / "search" / "search.run-record.json", RECORD_SCHEMA)["contract_version"] == "2.0"
 
 
 # --- no replay of version 1.0 ----------------------------------------------------------------

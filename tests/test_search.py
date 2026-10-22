@@ -375,6 +375,28 @@ def test_a_1_0_walk_folder_whose_manifest_differs_otherwise_is_refused(cancel):
     assert not (world / "search").exists()
 
 
+@pytest.mark.parametrize("version", [["1.0"], "3.0"])
+def test_a_walk_manifest_of_a_version_the_tool_does_not_read_is_refused(cancel, version):
+    world, older, newer = cancel
+    run_walk(world, older, newer, WalkStub(CANCEL))
+    manifest = stored(world / "walk" / "changes.json")
+    manifest["contract_version"] = version
+    (world / "walk" / "changes.json").write_bytes(document_bytes(manifest))
+
+    def rehash(result):
+        result["manifest"]["sha256"] = sha256_file(world / "walk" / "changes.json")
+    rewrite_walk_result(world / "walk", rehash)
+    record = stored(world / "walk" / "walk.run-record.json")  # the record lists the manifest as well
+    for entry in record["inputs"] + record["outputs"]:
+        entry["artifact"]["sha256"] = sha256_file(world / "walk" / entry["artifact"]["path"])
+    (world / "walk" / "walk.run-record.json").write_bytes(document_bytes(record))
+    with pytest.raises(Rejection) as caught:
+        run_search(world, older, newer, WalkStub(CANCEL), walk=world / "walk")
+    assert caught.value.code == "walk_mismatch", caught.value.message
+    assert caught.value.message == "The manifest of the walk is not the one derived again."
+    assert not (world / "search").exists()
+
+
 # x1 moves the cash flow and x3 reverts it; state 2 does not run, so the walk carries x2 and x3 in one
 # step; x4 raises MP-B.
 CARRY = (
