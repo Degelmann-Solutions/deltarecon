@@ -46,7 +46,7 @@ def test_the_tool_writes_2_0_and_reads_1_0_and_2_0():
     check_version({})  # a missing version is a schema fault, found by the schema
 
 
-@pytest.mark.parametrize("version", ["3.0", "1.1", "2.1", "1", 1.0])
+@pytest.mark.parametrize("version", ["3.0", "1.1", "2.1", "1", 1.0, ["2.0"], {"major": 2}])
 def test_another_version_is_rejected_before_the_schema(world, version):
     with pytest.raises(Rejection) as caught:
         check_version({"contract_version": version})

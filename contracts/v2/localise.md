@@ -1,6 +1,6 @@
 # Localise contract
 
-Version 1 of the stage contracts, see [README.md](README.md). The localise
+Version 2 of the stage contracts, see [README.md](README.md). The localise
 contract fixes procedures of the tool that are built on the run, the changes,
 and the compare contracts: the walk, which attributes the deviation between two
 recorded results to the revisions between them, and its document, the walk
@@ -144,7 +144,7 @@ add up to the difference of the two states.
 
 ### Stage step
 
-Localising starts with the stage, then the revisions within it. Version 1 defines
+Localising starts with the stage, then the revisions within it. Version 2 defines
 one stage, so the stage step is trivial: the walk runs in the stage both records
 name, and `stage` of the walk result names it.
 

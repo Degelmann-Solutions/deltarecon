@@ -1,6 +1,6 @@
 # Changes contract
 
-Version 1 of the stage contracts, see [README.md](README.md). The changes
+Version 2 of the stage contracts, see [README.md](README.md). The changes
 contract fixes how the differences between two releases of a stage are listed as
 individually switchable changes, and which combinations a run may enable.
 
@@ -129,7 +129,7 @@ The analysis then cannot separate the changes inside a bundle.
 The realisation says how an engine applies the change. It is a typed, extensible
 member: `type` names the realisation type, and the other members depend on it.
 
-- Version 1 defines two types. `text_patch`, described below, is the reference
+- Version 2 defines two types. `text_patch`, described below, is the reference
   profile. `revision` realises a change as one revision of a versioned model
   state, see [Revision profile](#revision-profile). No engine is required to
   support either.
@@ -194,7 +194,7 @@ state. The engine restores the state after that revision itself.
 { "type": "revision", "source": "git", "revision": "9f2c41d07b6e5a3c8d1f0e2b4a6c8e0f1a3b5c7d" }
 ```
 
-- `source` names the kind of history. Version 1 defines `git`.
+- `source` names the kind of history. Version 2 defines `git`.
 - `revision` is the full identifier of the revision in that history. It is
   opaque to every reader but the engine.
 - A change of this type stands only in a manifest with `history`, see
@@ -326,7 +326,7 @@ from the two results.
 
 A caller may supply several sets of references that a revision does not fix,
 each valid from a named revision. The revision at the boundary and the change
-of the set are one change. Version 1 allows this and does not yet fix its
+of the set are one change. Version 2 allows this and does not yet fix its
 form: no member of a manifest names such a set or the revision it is valid
 from, and no reference implementation exists.
 

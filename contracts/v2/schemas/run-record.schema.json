@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "run-record.schema.json",
-  "title": "Stage contracts version 1: run record",
+  "title": "Stage contracts version 2: run record",
   "$ref": "#/$defs/run_record",
   "$defs": {
     "role_artifact": {

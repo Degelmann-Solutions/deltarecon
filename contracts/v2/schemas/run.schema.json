@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "run.schema.json",
-  "title": "Stage contracts version 1: run request and run response",
+  "title": "Stage contracts version 2: run request and run response",
   "oneOf": [
     { "$ref": "#/$defs/run_request" },
     { "$ref": "#/$defs/run_response_succeeded" },

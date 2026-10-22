@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "common.schema.json",
-  "title": "Stage contracts version 1: shared definitions",
+  "title": "Stage contracts version 2: shared definitions",
   "description": "Shapes shared by the run, changes, compare, localise, and run record documents. This file defines no document of its own.",
   "$defs": {
     "contract_version": {

@@ -1,6 +1,6 @@
 # Run contract
 
-Version 1 of the stage contracts, see [README.md](README.md). The run contract
+Version 2 of the stage contracts, see [README.md](README.md). The run contract
 fixes how a caller asks an engine to run one stage for one release, what the
 engine returns, how the results are exported, and what the run record holds.
 
@@ -36,7 +36,7 @@ Schemas: [schemas/run.schema.json](schemas/run.schema.json) and
 
 A request asks for all quantities the engine exports for the stage, for every
 period of every selected model point. Which quantities these are is the
-engine's declaration in the response, see rule 7. Version 1 has no member to
+engine's declaration in the response, see rule 7. Version 2 has no member to
 choose quantities or periods.
 
 Schema assertions: all members above are present; `contract_version` is `2.0`;
@@ -305,7 +305,7 @@ envelope for every deterministic procedure, not only for a stage run:
 | Member | Meaning |
 |---|---|
 | `record_id` | The identifier of this execution of the procedure: `record-` followed by a random UUID of version 4 in lower-case hexadecimal, as in the example. The writer generates it anew for every execution of every procedure and never repeats it. |
-| `procedure.type` | The procedure that ran. Version 1 registers `run`, `compare`, `walk`, and `search`, see [localise.md](localise.md#run-record-of-a-walk) and [localise.md](localise.md#run-record-of-a-search). Other procedures use their own type name. |
+| `procedure.type` | The procedure that ran. Version 2 registers `run`, `compare`, `walk`, and `search`, see [localise.md](localise.md#run-record-of-a-walk) and [localise.md](localise.md#run-record-of-a-search). Other procedures use their own type name. |
 | `outcome` | The outcome the procedure reported. |
 | `recorded_at` | Optional time of recording, in UTC. It is information only and is never compared. |
 | `inputs` | The documents handed to the procedure, each with a role and a byte hash. |

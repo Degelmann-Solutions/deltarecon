@@ -110,7 +110,8 @@ def parse_document(data: bytes) -> dict:
 
 def check_version(document: dict) -> None:
     """Reject every contract version but the ones this reader reads, before any schema."""
-    if "contract_version" in document and document["contract_version"] not in SCHEMA_FOLDERS:
+    version = document.get("contract_version", CONTRACT_VERSION)
+    if not isinstance(version, str) or version not in SCHEMA_FOLDERS:
         raise Rejection(
             "unsupported_version",
             f"This reader implements the contract versions {' and '.join(SCHEMA_FOLDERS)} only, "

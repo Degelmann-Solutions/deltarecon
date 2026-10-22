@@ -1,6 +1,6 @@
 # Compare contract
 
-Version 1 of the stage contracts, see [README.md](README.md). The compare
+Version 2 of the stage contracts, see [README.md](README.md). The compare
 contract fixes how the results of two runs of one stage are compared coordinate
 by coordinate, how the deviations are condensed into a signature table, how the
 parameters of the two runs are compared, and when a run counts as reproduced.
@@ -216,7 +216,7 @@ asymmetry and a rounding step.
 
 Not in version 2: a tolerance per tariff, per model point, or per period, and a
 store of explained, accepted deviations per coordinate that a later comparison
-subtracts instead of tolerating them. Version 1 sets a tolerance per quantity
+subtracts instead of tolerating them. Version 2 sets a tolerance per quantity
 only.
 
 ## Compare result

@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "compare.schema.json",
-  "title": "Stage contracts version 1: compare request, compare result, and signature table",
+  "title": "Stage contracts version 2: compare request, compare result, and signature table",
   "oneOf": [
     { "$ref": "#/$defs/compare_request" },
     { "$ref": "#/$defs/compare_result_compared" },

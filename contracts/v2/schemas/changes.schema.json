@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "changes.schema.json",
-  "title": "Stage contracts version 1: change manifest",
+  "title": "Stage contracts version 2: change manifest",
   "$ref": "#/$defs/change_manifest",
   "$defs": {
     "change_manifest": {
@@ -72,7 +72,7 @@
       }
     },
     "history_source": {
-      "description": "The kind of history. Version 1 defines git.",
+      "description": "The kind of history. Version 2 defines git.",
       "const": "git"
     },
     "reference_kind": {

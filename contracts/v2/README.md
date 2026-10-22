@@ -64,7 +64,7 @@ Each contract file separates two kinds of statement:
 
 ## Stage identifier
 
-A stage identifier is a lower-case name that matches `^[a-z][a-z0-9_]*$`. Version 1
+A stage identifier is a lower-case name that matches `^[a-z][a-z0-9_]*$`. Version 2
 defines one stage:
 
 | Stage identifier | Domain reference |
@@ -248,7 +248,7 @@ A release is identified by a label and a set of opaque references:
 - `label` is the caller's name for the release.
 - Each reference has a `kind` and a `value`. The value is opaque: only the caller
   and the engine know how to resolve it.
-- Version 1 registers four kinds: `input_data`, `parameter_set`, `code_state`, and
+- Version 2 registers four kinds: `input_data`, `parameter_set`, `code_state`, and
   `engine_version`. Other kinds are allowed. A release may hold several
   references of one kind. A derived change manifest that names a kind in its
   remainder lists all references of that kind, see

@@ -619,7 +619,7 @@ def same_manifest(path: Path, manifest: dict) -> bool:
         version = parse_document(data).get("contract_version")
     except Rejection:
         return False
-    return version in SCHEMA_FOLDERS and data == document_bytes({**manifest, "contract_version": version})
+    return isinstance(version, str) and version in SCHEMA_FOLDERS and data == document_bytes({**manifest, "contract_version": version})
 
 
 def read_walk_folder(folder: Path | str, prepared: Prepared) -> WalkFolder:

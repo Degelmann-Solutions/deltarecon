@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "localise.schema.json",
-  "title": "Stage contracts version 1: walk result and search result",
+  "title": "Stage contracts version 2: walk result and search result",
   "properties": { "document": { "enum": ["walk_result", "search_result"] } },
   "if": { "properties": { "document": { "const": "walk_result" } } },
   "then": { "$ref": "#/$defs/walk_result" },
