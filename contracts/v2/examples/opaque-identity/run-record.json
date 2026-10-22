@@ -1,0 +1,71 @@
+{
+  "document": "run_record",
+  "contract_version": "2.0",
+  "stage": "liability_cashflow",
+  "record_id": "record-8e3f1a6c-5b2d-4c97-9a04-e1f6b3d7c582",
+  "procedure": {
+    "type": "run"
+  },
+  "outcome": "succeeded",
+  "recorded_at": "2026-10-03T09:00:00Z",
+  "inputs": [
+    {
+      "role": "request",
+      "artifact": {
+        "path": "request.json",
+        "sha256": "9cf762bef8fe59ace694b23eba014dc60efc38211d3ef7930d0193d1f12947d9"
+      }
+    }
+  ],
+  "releases": [
+    {
+      "label": "2026Q3",
+      "references": [
+        {
+          "kind": "input_data",
+          "value": "portfolio extract 2026-09-30, run group 17"
+        },
+        {
+          "kind": "parameter_set",
+          "value": "assumption set 2026Q3 revision 4"
+        },
+        {
+          "kind": "code_state",
+          "value": "workspace revision 8841"
+        },
+        {
+          "kind": "engine_version",
+          "value": "12.4.1"
+        }
+      ]
+    }
+  ],
+  "parameters": [
+    {
+      "name": "lapse_scaling",
+      "type": "scalar",
+      "value": 1
+    },
+    {
+      "name": "valuation_date",
+      "type": "scalar",
+      "value": "2026-09-30"
+    }
+  ],
+  "outputs": [
+    {
+      "role": "response",
+      "artifact": {
+        "path": "response.json",
+        "sha256": "5343d0c1e2edd3064f29b4f2fc4a9f60f35ee4d948e281b9dd6f3a40e3829871"
+      }
+    },
+    {
+      "role": "export",
+      "artifact": {
+        "path": "results.csv",
+        "sha256": "8f58de3acb8cfecad78764403245aa8eab2d5d8d1b15b62e13959adb42fb6a33"
+      }
+    }
+  ]
+}

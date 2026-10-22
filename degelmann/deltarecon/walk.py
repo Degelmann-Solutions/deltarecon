@@ -1,4 +1,4 @@
-"""The walk of ``contracts/v1/localise.md``: every state between two recorded results.
+"""The walk of ``contracts/v2/localise.md``: every state between two recorded results.
 
 A walk reads the records of two succeeded runs without enabled changes, the older one
 first, derives the change manifest of the history between the revisions they name, runs
@@ -52,8 +52,8 @@ from pathlib import Path
 from . import changes as changes_contract
 from .compare import COMPARE_REQUEST, CheckedRun, CompareResult, compare, compare_runs, read_tolerance
 from .derive import CLASS_ORDER, build_manifest, read_derive_input, remainder
-from .documents import (CONTRACT_VERSION, RECORD_SCHEMA, RUN_REQUEST, RUN_SCHEMA, Rejection, artifact_reference,
-                        check_artifact, document_bytes, new_record_id, parse_document, read_document,
+from .documents import (CONTRACT_VERSION, RECORD_SCHEMA, RUN_REQUEST, RUN_SCHEMA, SCHEMA_FOLDERS, Rejection,
+                        artifact_reference, check_artifact, document_bytes, new_record_id, parse_document, read_document,
                         schema_errors, sha256_file, write_document, write_new)
 from .replay import RecordedRun, check_response
 from .run import Engine, RunResult, UsageError, recorded_now, repositories_folder, run_request
@@ -397,7 +397,7 @@ class States:
                         "state": to_k, "revisions": revisions, "quantity": name})
                 else:
                     contribution[member] = value
-            if name in rows:
+            if flag and name in rows:  # a quantity that does not contribute holds no signature row
                 contribution["signature"] = rows[name]
             entries.append(contribution)
         return entries
@@ -610,6 +610,18 @@ def _closure(folder: Path, starts: list[str]) -> list[str]:
     return sorted(seen)
 
 
+def same_manifest(path: Path, manifest: dict) -> bool:
+    """Whether the stored manifest at ``path`` is ``manifest`` byte for byte, apart from its contract
+    version: a walk folder written under an earlier version the tool reads holds the same manifest
+    with that version."""
+    data = path.read_bytes()
+    try:
+        version = parse_document(data).get("contract_version")
+    except Rejection:
+        return False
+    return isinstance(version, str) and version in SCHEMA_FOLDERS and data == document_bytes({**manifest, "contract_version": version})
+
+
 def read_walk_folder(folder: Path | str, prepared: Prepared) -> WalkFolder:
     """A walk folder that passes the reader rules of ``localise.md`` and is a reference for a
     search of ``prepared``: the same records, manifest, tolerance profile, and held kinds, and
@@ -651,7 +663,7 @@ def read_walk_folder(folder: Path | str, prepared: Prepared) -> WalkFolder:
             raise _mismatch(f"The walk was not started from the {role.split('_')[0]} record of the search.")
     manifest_path = folder / result["manifest"]["path"]
     if (not manifest_path.is_file() or sha256_file(manifest_path) != result["manifest"]["sha256"]
-            or manifest_path.read_bytes() != document_bytes(prepared.manifest)):
+            or not same_manifest(manifest_path, prepared.manifest)):
         raise _mismatch("The manifest of the walk is not the one derived again.")
     if result["tolerance"] != prepared.profile:
         raise _mismatch("The walk has another tolerance profile.")
@@ -696,6 +708,6 @@ def read_walk_folder(folder: Path | str, prepared: Prepared) -> WalkFolder:
                             "would use.")
         if "manifest" in changes:  # the enabled revisions are those of the manifest derived again
             state_manifest = (folder / state_folder / changes["manifest"]["path"]).resolve()
-            if not state_manifest.is_file() or state_manifest.read_bytes() != document_bytes(prepared.manifest):
+            if not state_manifest.is_file() or not same_manifest(state_manifest, prepared.manifest):
                 raise _mismatch(f"State {k} of the walk ran on another manifest than the one derived again.")
     return WalkFolder(folder, result, record, _closure(folder, starts))

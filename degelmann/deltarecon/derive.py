@@ -1,4 +1,4 @@
-"""The derived change manifest of ``contracts/v1/changes.md``.
+"""The derived change manifest of ``contracts/v2/changes.md``.
 
 A derivation reads the records of two succeeded runs without enabled changes, the older
 one first, asks the engine for the history between the revisions their release identities

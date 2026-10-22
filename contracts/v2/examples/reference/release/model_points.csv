@@ -1,0 +1,4 @@
+model_point_id,issue_age,sex,sum_assured,policy_term_years,completed_years
+MP-0001,35,M,300000,25,0
+MP-0002,40,F,250000,20,12
+MP-0003,50,M,100000,10,0

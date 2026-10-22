@@ -1,0 +1,47 @@
+{
+  "document": "compare_result",
+  "contract_version": "2.0",
+  "stage": "liability_cashflow",
+  "compare_id": "compare-n-vs-n1",
+  "outcome": "compared",
+  "left": {
+    "run_id": "run-n-full",
+    "release_label": "N"
+  },
+  "right": {
+    "run_id": "run-n1-full",
+    "release_label": "N+1"
+  },
+  "tolerance": {
+    "per_quantity": {}
+  },
+  "time_basis": {
+    "id": "policy_month"
+  },
+  "quantities": [
+    {
+      "name": "Anzahl Verträge",
+      "unit": "policies"
+    },
+    {
+      "name": "Bruttobeitrag",
+      "unit": "EUR"
+    },
+    {
+      "name": "Netto-Cashflow",
+      "unit": "EUR"
+    }
+  ],
+  "compared_coordinates": 21,
+  "deviations": {
+    "path": "compare.deviations.csv",
+    "sha256": "7e327075bd109370741de4e716bf15fe9f3a86f0ae388bdb3a1fe7e052fc17f4"
+  },
+  "deviating_model_points": [
+    "MP-0001",
+    "MP-0002",
+    "MP-0003"
+  ],
+  "added": [],
+  "removed": []
+}

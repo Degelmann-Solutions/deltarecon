@@ -1,0 +1,13 @@
+{
+  "document": "compare_result",
+  "contract_version": "2.0",
+  "stage": "liability_cashflow",
+  "compare_id": "compare-unit-mismatch",
+  "outcome": "incompatible",
+  "diagnostics": [
+    {
+      "code": "unit_mismatch",
+      "message": "The left run declares amounts in EUR and the right run in kEUR."
+    }
+  ]
+}

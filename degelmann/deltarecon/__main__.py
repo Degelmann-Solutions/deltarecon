@@ -28,7 +28,8 @@ and the repeated run, and writes ``replay-compare.request.json``,
 ``replay-compare.result.json``, ``replay-compare.deviations.csv`` when the runs are
 compared, and ``replay-record.json``. A recorded run with the outcome ``error`` is
 repeated and its response compared byte for byte; nothing else is compared. The engine
-version of the record must be the present one.
+version of the record must be the present one. A run record written under contract version
+1.0 is not replayed; it is rejected with ``unsupported_version``.
 
 ``compare`` compares the two runs a compare request names and writes
 ``compare.result.json`` beside the request, ``compare.deviations.csv`` and
@@ -62,8 +63,10 @@ rejected with their diagnostic code, and nothing is written.
 the states it needs: state 0 and the last state, checked against the two records, and then
 the states that halve the history for a target into the new folder ``--output``. The target
 is every coordinate, or the quantities ``--quantity NAME`` (repeatable) names in the periods
-``--periods FIRST-LAST`` (inclusive, counted from the valuation date). It writes ``search.result.json``: the contributions per
-revision and quantity, the intervals judged, its runs, and the runs saved against a walk.
+``--periods FIRST-LAST`` (inclusive, counted from the valuation date); a list that names every
+quantity, without periods, is every coordinate. It writes ``search.result.json``: the contributions per
+revision and quantity, with the signature row of each quantity it contributes to when there is no
+target, the intervals judged, its runs, and the runs saved against a walk.
 With ``--walk FOLDER``, a walk folder of the same two records, it copies the walk into
 ``walk/`` and names the contributions it missed. A search does not see contributions that
 cancel within one interval. A walk that does not attribute every revision or does not fit the

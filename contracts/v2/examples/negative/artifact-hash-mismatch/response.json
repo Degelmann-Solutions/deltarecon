@@ -1,0 +1,13 @@
+{
+  "document": "run_response",
+  "contract_version": "2.0",
+  "stage": "liability_cashflow",
+  "run_id": "run-artifact-hash-mismatch",
+  "outcome": "rejected",
+  "diagnostics": [
+    {
+      "code": "artifact_hash_mismatch",
+      "message": "release/model_points.csv does not match the release identity."
+    }
+  ]
+}

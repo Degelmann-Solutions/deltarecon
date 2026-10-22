@@ -1,0 +1,46 @@
+{
+  "document": "change_manifest",
+  "contract_version": "2.0",
+  "stage": "liability_cashflow",
+  "manifest_id": "changes-change-conflict",
+  "base_release": "N",
+  "changes": [
+    {
+      "id": "chg-a",
+      "class": "parameter",
+      "description": "Add the parameter claim_expense.",
+      "prerequisites": [],
+      "conflicts": [],
+      "realisation": {
+        "type": "engine_switch",
+        "switch": "RC-2041"
+      }
+    },
+    {
+      "id": "chg-b",
+      "class": "code",
+      "description": "Read the claim expense from the parameter claim_expense.",
+      "prerequisites": [
+        "chg-a"
+      ],
+      "conflicts": [],
+      "realisation": {
+        "type": "engine_switch",
+        "switch": "RC-2042"
+      }
+    },
+    {
+      "id": "chg-c",
+      "class": "parameter",
+      "description": "Add the parameter claim_expense with another value.",
+      "prerequisites": [],
+      "conflicts": [
+        "chg-a"
+      ],
+      "realisation": {
+        "type": "engine_switch",
+        "switch": "RC-2043"
+      }
+    }
+  ]
+}

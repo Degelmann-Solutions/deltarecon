@@ -1,0 +1,7 @@
+model_point_id,period,Anzahl Verträge,Bruttobeitrag,Zahlbeitrag,Beitragsverrechnung,garantierte Todesfallleistung,garantierter Rückkaufswert,garantierte Erlebensfallleistung,Kosten 2. Ordnung ohne Provisionen,Provisionen,Netto-Cashflow
+MP-0001,0,1,1201,800,401,20,0,0,100.25,300,379.75
+MP-0001,1,0.995,0,0,0,36,0,0,2.5,0,-38.5
+MP-0001,2,0.9905,0,0,0,30,0,0,2.5,0,-32.5
+MP-0002,144,1,100,70,30,40,0,0,3,0.7,26.3
+MP-0002,145,0.996,99.6,69.72,29.88,40,0,0,3,0.6974,26.0226
+MP-0002,146,0.992,99.2,69.44,29.76,40,0,0,3,0.6944,25.7456

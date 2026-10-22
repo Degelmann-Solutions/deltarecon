@@ -1,0 +1,9 @@
+name,value
+acquisition_cost,500
+collection_cost_rate,0.02
+legacy_loading,0
+maintenance_cost,30
+mortality_basis,proxy_table_a
+renewal_commission_rate,0.01
+surplus_share,0.9
+valuation_rate,0.01

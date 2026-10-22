@@ -1,0 +1,13 @@
+{
+  "document": "run_response",
+  "contract_version": "2.0",
+  "stage": "liability_cashflow",
+  "run_id": "run-artifact-missing",
+  "outcome": "rejected",
+  "diagnostics": [
+    {
+      "code": "artifact_missing",
+      "message": "The file release/model_points.csv is absent."
+    }
+  ]
+}

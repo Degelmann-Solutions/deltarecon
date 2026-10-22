@@ -1,0 +1,334 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "compare.schema.json",
+  "title": "Stage contracts version 2: compare request, compare result, and signature table",
+  "oneOf": [
+    { "$ref": "#/$defs/compare_request" },
+    { "$ref": "#/$defs/compare_result_compared" },
+    { "$ref": "#/$defs/compare_result_not_compared" },
+    { "$ref": "#/$defs/signature_table" }
+  ],
+  "$defs": {
+    "tolerance_pair": {
+      "description": "One bound of a tolerance: an absolute and a relative part, both required and non-negative.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["abs_tol", "rel_tol"],
+      "properties": {
+        "abs_tol": { "type": "number", "minimum": 0 },
+        "rel_tol": { "type": "number", "minimum": 0 }
+      }
+    },
+    "tolerance_entry": {
+      "description": "The tolerance of one quantity: optional rounding to a number of decimal places, an upper bound for right above left, a lower bound for right below left, and the derivation. The derivation is required as soon as the entry rounds or a part is above zero.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["upper", "lower"],
+      "properties": {
+        "decimals": { "type": "integer", "minimum": 0, "maximum": 15 },
+        "upper": { "$ref": "#/$defs/tolerance_pair" },
+        "lower": { "$ref": "#/$defs/tolerance_pair" },
+        "derivation": { "type": "string", "minLength": 1 }
+      },
+      "anyOf": [
+        { "required": ["derivation"] },
+        {
+          "not": { "required": ["decimals"] },
+          "properties": {
+            "upper": { "properties": { "abs_tol": { "const": 0 }, "rel_tol": { "const": 0 } } },
+            "lower": { "properties": { "abs_tol": { "const": 0 }, "rel_tol": { "const": 0 } } }
+          }
+        }
+      ]
+    },
+    "tolerance": {
+      "description": "The tolerance profile of a comparison. There is no general tolerance and no default: a quantity without an entry is compared exactly.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["per_quantity"],
+      "properties": {
+        "per_quantity": {
+          "type": "object",
+          "propertyNames": { "pattern": "^[^\\u0000-\\u001f]+$" },
+          "additionalProperties": { "$ref": "#/$defs/tolerance_entry" }
+        }
+      }
+    },
+    "side_input": {
+      "description": "One side of a comparison: the run response and, for the parameter diff, the run record.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["response"],
+      "properties": {
+        "response": { "$ref": "common.schema.json#/$defs/artifact" },
+        "run_record": { "$ref": "common.schema.json#/$defs/artifact" }
+      }
+    },
+    "side_identity": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["run_id", "release_label"],
+      "properties": {
+        "run_id": { "$ref": "common.schema.json#/$defs/id" },
+        "release_label": { "$ref": "common.schema.json#/$defs/id" }
+      }
+    },
+    "compare_request": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["document", "contract_version", "stage", "compare_id", "left", "right", "tolerance"],
+      "properties": {
+        "document": { "const": "compare_request" },
+        "contract_version": { "$ref": "common.schema.json#/$defs/contract_version" },
+        "stage": { "$ref": "common.schema.json#/$defs/stage" },
+        "compare_id": { "$ref": "common.schema.json#/$defs/id" },
+        "left": { "$ref": "#/$defs/side_input" },
+        "right": { "$ref": "#/$defs/side_input" },
+        "tolerance": { "$ref": "#/$defs/tolerance" }
+      }
+    },
+    "engine_versions": {
+      "description": "The values of the engine_version references of the two run records, present when they differ.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["left", "right"],
+      "properties": {
+        "left": { "$ref": "common.schema.json#/$defs/id" },
+        "right": { "$ref": "common.schema.json#/$defs/id" }
+      }
+    },
+    "table_row_change": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["key", "change", "new"],
+          "properties": {
+            "key": { "$ref": "common.schema.json#/$defs/scalar_tuple" },
+            "change": { "const": "added" },
+            "new": { "$ref": "common.schema.json#/$defs/scalar_tuple" }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["key", "change", "old"],
+          "properties": {
+            "key": { "$ref": "common.schema.json#/$defs/scalar_tuple" },
+            "change": { "const": "removed" },
+            "old": { "$ref": "common.schema.json#/$defs/scalar_tuple" }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["key", "change", "old", "new"],
+          "properties": {
+            "key": { "$ref": "common.schema.json#/$defs/scalar_tuple" },
+            "change": { "const": "changed" },
+            "old": { "$ref": "common.schema.json#/$defs/scalar_tuple" },
+            "new": { "$ref": "common.schema.json#/$defs/scalar_tuple" }
+          }
+        }
+      ]
+    },
+    "parameter_change": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["name", "change", "new"],
+          "properties": {
+            "name": { "$ref": "common.schema.json#/$defs/id" },
+            "change": { "const": "added" },
+            "new": { "$ref": "common.schema.json#/$defs/parameter" }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["name", "change", "old"],
+          "properties": {
+            "name": { "$ref": "common.schema.json#/$defs/id" },
+            "change": { "const": "removed" },
+            "old": { "$ref": "common.schema.json#/$defs/parameter" }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["name", "change", "type", "old", "new"],
+          "properties": {
+            "name": { "$ref": "common.schema.json#/$defs/id" },
+            "change": { "const": "changed" },
+            "type": { "const": "scalar" },
+            "old": { "$ref": "common.schema.json#/$defs/scalar" },
+            "new": { "$ref": "common.schema.json#/$defs/scalar" }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["name", "change", "type", "rows"],
+          "properties": {
+            "name": { "$ref": "common.schema.json#/$defs/id" },
+            "change": { "const": "changed" },
+            "type": { "const": "keyed_table" },
+            "rows": {
+              "type": "array",
+              "minItems": 1,
+              "items": { "$ref": "#/$defs/table_row_change" }
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["name", "change", "old", "new"],
+          "properties": {
+            "name": { "$ref": "common.schema.json#/$defs/id" },
+            "change": { "const": "replaced" },
+            "old": { "$ref": "common.schema.json#/$defs/parameter" },
+            "new": { "$ref": "common.schema.json#/$defs/parameter" }
+          }
+        }
+      ]
+    },
+    "compare_result_compared": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "document", "contract_version", "stage", "compare_id", "outcome", "left", "right",
+        "tolerance", "time_basis", "quantities", "compared_coordinates", "deviations",
+        "deviating_model_points", "added", "removed"
+      ],
+      "properties": {
+        "document": { "const": "compare_result" },
+        "contract_version": { "$ref": "common.schema.json#/$defs/contract_version" },
+        "stage": { "$ref": "common.schema.json#/$defs/stage" },
+        "compare_id": { "$ref": "common.schema.json#/$defs/id" },
+        "outcome": { "const": "compared" },
+        "left": { "$ref": "#/$defs/side_identity" },
+        "right": { "$ref": "#/$defs/side_identity" },
+        "engine_version": { "$ref": "#/$defs/engine_versions" },
+        "tolerance": { "$ref": "#/$defs/tolerance" },
+        "time_basis": { "$ref": "common.schema.json#/$defs/time_basis" },
+        "quantities": { "$ref": "common.schema.json#/$defs/quantities" },
+        "compared_coordinates": { "type": "integer", "minimum": 0 },
+        "deviations": {
+          "description": "The deviation file: one row per deviating coordinate, by artifact reference.",
+          "$ref": "common.schema.json#/$defs/artifact"
+        },
+        "deviating_model_points": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": { "$ref": "common.schema.json#/$defs/id" }
+        },
+        "added": {
+          "description": "Coordinates present only on the right side, as period ranges covering every quantity.",
+          "type": "array",
+          "items": { "$ref": "common.schema.json#/$defs/period_range" }
+        },
+        "removed": {
+          "description": "Coordinates present only on the left side, as period ranges covering every quantity.",
+          "type": "array",
+          "items": { "$ref": "common.schema.json#/$defs/period_range" }
+        },
+        "parameter_diff": {
+          "description": "Present when both sides supplied a run record.",
+          "type": "array",
+          "items": { "$ref": "#/$defs/parameter_change" }
+        }
+      }
+    },
+    "compare_result_not_compared": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["document", "contract_version", "stage", "compare_id", "outcome", "diagnostics"],
+      "properties": {
+        "document": { "const": "compare_result" },
+        "contract_version": { "$ref": "common.schema.json#/$defs/contract_version" },
+        "stage": { "$ref": "common.schema.json#/$defs/stage" },
+        "compare_id": { "$ref": "common.schema.json#/$defs/id" },
+        "outcome": { "enum": ["incompatible", "rejected"] },
+        "engine_version": { "$ref": "#/$defs/engine_versions" },
+        "diagnostics": { "$ref": "common.schema.json#/$defs/diagnostics" }
+      },
+      "if": { "properties": { "outcome": { "const": "incompatible" } } },
+      "then": { "not": { "required": ["engine_version"] } }
+    },
+    "signature_extreme": {
+      "description": "The coordinate with the largest increase or the largest decrease of one quantity: the absolute difference right minus left of the exported values, signed, and that difference divided by the larger of the two magnitudes.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["model_point_id", "period", "absolute", "relative"],
+      "properties": {
+        "model_point_id": { "$ref": "common.schema.json#/$defs/id" },
+        "period": { "$ref": "common.schema.json#/$defs/period" },
+        "absolute": { "type": "number" },
+        "relative": { "type": "number" }
+      }
+    },
+    "signature_row": {
+      "description": "The deviations of one quantity of the stage. The largest increase is present when a coordinate has right above left, the largest decrease when a coordinate has right below left.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "stage", "quantity", "deviating_model_points", "deviating_coordinates",
+        "right_above_left", "right_below_left", "first_period", "last_period"
+      ],
+      "properties": {
+        "stage": { "$ref": "common.schema.json#/$defs/stage" },
+        "quantity": { "type": "string", "pattern": "^[^\\u0000-\\u001f]+$" },
+        "deviating_model_points": { "type": "integer", "minimum": 1 },
+        "deviating_coordinates": { "type": "integer", "minimum": 1 },
+        "right_above_left": { "type": "integer", "minimum": 0 },
+        "right_below_left": { "type": "integer", "minimum": 0 },
+        "first_period": { "$ref": "common.schema.json#/$defs/period" },
+        "last_period": { "$ref": "common.schema.json#/$defs/period" },
+        "largest_increase": {
+          "allOf": [
+            { "$ref": "#/$defs/signature_extreme" },
+            { "properties": { "absolute": { "exclusiveMinimum": 0 }, "relative": { "exclusiveMinimum": 0 } } }
+          ]
+        },
+        "largest_decrease": {
+          "allOf": [
+            { "$ref": "#/$defs/signature_extreme" },
+            { "properties": { "absolute": { "exclusiveMaximum": 0 }, "relative": { "exclusiveMaximum": 0 } } }
+          ]
+        }
+      },
+      "allOf": [
+        {
+          "if": { "properties": { "right_above_left": { "const": 0 } } },
+          "then": { "not": { "required": ["largest_increase"] } },
+          "else": { "required": ["largest_increase"] }
+        },
+        {
+          "if": { "properties": { "right_below_left": { "const": 0 } } },
+          "then": { "not": { "required": ["largest_decrease"] } },
+          "else": { "required": ["largest_decrease"] }
+        }
+      ]
+    },
+    "signature_table": {
+      "description": "The deviation signature table of one compare result with the outcome compared: one row per quantity that deviates, in quantity order. It holds no timestamp.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["document", "contract_version", "stage", "compare_id", "left", "right", "rows"],
+      "properties": {
+        "document": { "const": "signature_table" },
+        "contract_version": { "$ref": "common.schema.json#/$defs/contract_version" },
+        "stage": { "$ref": "common.schema.json#/$defs/stage" },
+        "compare_id": { "$ref": "common.schema.json#/$defs/id" },
+        "left": { "$ref": "#/$defs/side_identity" },
+        "right": { "$ref": "#/$defs/side_identity" },
+        "rows": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/signature_row" }
+        }
+      }
+    }
+  }
+}

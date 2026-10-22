@@ -1,0 +1,21 @@
+{
+  "document": "compare_request",
+  "contract_version": "2.0",
+  "stage": "liability_cashflow",
+  "compare_id": "compare-non-finite-difference",
+  "left": {
+    "response": {
+      "path": "left.response.json",
+      "sha256": "75b350b2aee9cec3f0b963294c8e62a2c1020af54b50e819ee9ac5d42ab58ea7"
+    }
+  },
+  "right": {
+    "response": {
+      "path": "right.response.json",
+      "sha256": "e88b3256d3fe9496fe7981fb25da823c7b2c5405bff9d542f3a1e1cc0d9c228c"
+    }
+  },
+  "tolerance": {
+    "per_quantity": {}
+  }
+}
