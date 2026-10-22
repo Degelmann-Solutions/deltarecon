@@ -1,0 +1,165 @@
+{
+  "document": "run_record",
+  "contract_version": "2.0",
+  "stage": "liability_cashflow",
+  "record_id": "record-6f1c2d3e-4a5b-4c6d-8e7f-0a1b2c3d4e5f",
+  "procedure": {
+    "type": "run"
+  },
+  "outcome": "succeeded",
+  "recorded_at": "2026-10-03T09:00:00Z",
+  "inputs": [
+    {
+      "role": "request",
+      "artifact": {
+        "path": "full-run.request.json",
+        "sha256": "3af519ab169e99d87d985fe4c0c4df71dcc6617bb3b5af81c9832671a00878bd"
+      }
+    }
+  ],
+  "releases": [
+    {
+      "label": "N",
+      "references": [
+        {
+          "kind": "input_data",
+          "value": "model_points.csv",
+          "artifact": {
+            "path": "release/model_points.csv",
+            "sha256": "7dfb54a154b5dcbedd09760c4de68942d15160461430942025d56a8a6e1fee3c"
+          }
+        },
+        {
+          "kind": "parameter_set",
+          "value": "lapse_table.csv",
+          "artifact": {
+            "path": "release/lapse_table.csv",
+            "sha256": "c681368d4183b28d61af7cbe9d8c3c0840f556307b13da5152bef379f708b606"
+          }
+        },
+        {
+          "kind": "parameter_set",
+          "value": "parameters.csv",
+          "artifact": {
+            "path": "release/parameters.csv",
+            "sha256": "3193e7f0cf6a6b3b4d30642a93d9bf8b682111f825358c8211dfa44a9548aa1b"
+          }
+        },
+        {
+          "kind": "code_state",
+          "value": "projection.rules",
+          "artifact": {
+            "path": "release/projection.rules",
+            "sha256": "bd7fe003be5e9b7eed088ecc2e747676e83e323acbf899e7a9419655f090031f"
+          }
+        },
+        {
+          "kind": "engine_version",
+          "value": "engine build 2026.09"
+        }
+      ]
+    }
+  ],
+  "parameters": [
+    {
+      "name": "acquisition_cost",
+      "type": "scalar",
+      "value": 500
+    },
+    {
+      "name": "collection_cost_rate",
+      "type": "scalar",
+      "value": 0.02
+    },
+    {
+      "name": "lapse_table",
+      "type": "keyed_table",
+      "key_columns": [
+        "policy_year"
+      ],
+      "value_columns": [
+        "lapse_rate"
+      ],
+      "rows": [
+        {
+          "key": [
+            1
+          ],
+          "values": [
+            0.06
+          ]
+        },
+        {
+          "key": [
+            2
+          ],
+          "values": [
+            0.04
+          ]
+        },
+        {
+          "key": [
+            3
+          ],
+          "values": [
+            0.04
+          ]
+        },
+        {
+          "key": [
+            4
+          ],
+          "values": [
+            0.03
+          ]
+        }
+      ]
+    },
+    {
+      "name": "legacy_loading",
+      "type": "scalar",
+      "value": 0
+    },
+    {
+      "name": "maintenance_cost",
+      "type": "scalar",
+      "value": 30
+    },
+    {
+      "name": "mortality_basis",
+      "type": "scalar",
+      "value": "proxy_table_a"
+    },
+    {
+      "name": "renewal_commission_rate",
+      "type": "scalar",
+      "value": 0.01
+    },
+    {
+      "name": "surplus_share",
+      "type": "scalar",
+      "value": 0.9
+    },
+    {
+      "name": "valuation_rate",
+      "type": "scalar",
+      "value": 0.01
+    }
+  ],
+  "outputs": [
+    {
+      "role": "response",
+      "artifact": {
+        "path": "full-run.response.json",
+        "sha256": "dc6886e42311a71f323662b11ad01828041f6fcd30d26aecfa3366dd45c57ce2"
+      }
+    },
+    {
+      "role": "export",
+      "artifact": {
+        "path": "full-run.results.csv",
+        "sha256": "c2174a0d56248bb9e6df01e59a93f02335631c37bfeda63d2625e7d74bcab4cc"
+      }
+    }
+  ]
+}

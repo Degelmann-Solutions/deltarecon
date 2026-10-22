@@ -1,10 +1,14 @@
 """Replay of a recorded run.
 
-A replay checks the run record (rules 15 to 17 of ``contracts/v1/run.md``) and the
+A replay checks the run record (rules 15 to 17 of ``contracts/v2/run.md``) and the
 recorded result (rules 6 to 13), repeats the run in the folder ``replay/`` beside the
 record, and compares the recorded run, as the left side, with the repeated run, as the
-right side, through the compare procedure of ``contracts/v1/compare.md``. Without a
+right side, through the compare procedure of ``contracts/v2/compare.md``. Without a
 tolerance profile the comparison is exact.
+
+- A run record written under contract version 1.0 is read by ``regression``, ``derive``,
+  ``walk``, and ``search``, but it is not replayed: the replay rejects it with
+  ``unsupported_version`` (``contracts/v2/README.md``, "Version compatibility").
 
 - The replay writes ``replay-compare.request.json``, ``replay-compare.result.json``, and,
   when the outcome of the comparison is ``compared``, ``replay-compare.deviations.csv``
@@ -214,6 +218,10 @@ def replay(record_path: Path, engine: Engine, repositories: Path | None = None,
         raise UsageError(f"no tolerance file at {tolerance}")
 
     recorded = read_recorded_run(record_path, engine.stages, allow_error=True)
+    if recorded.record["contract_version"] != CONTRACT_VERSION:
+        raise Rejection("unsupported_version",
+                        f"The replay repeats only runs recorded under contract version {CONTRACT_VERSION}, "
+                        f"not {recorded.record['contract_version']}.")
     record, request, manifest = recorded.record, recorded.request, recorded.manifest
     request_ref, manifest_ref = recorded.request_ref, recorded.manifest_ref
     failed_before = recorded.response["outcome"] == "error"

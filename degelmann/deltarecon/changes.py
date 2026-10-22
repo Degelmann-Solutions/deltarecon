@@ -1,6 +1,6 @@
 """The changes contract: manifest rules, combination rules, and the text-patch profile.
 
-Rule numbers refer to ``contracts/v1/changes.md``. A patch is a strict unified diff: a
+Rule numbers refer to ``contracts/v2/changes.md``. A patch is a strict unified diff: a
 hunk applies only where its context and removed lines match exactly and in one place.
 """
 from __future__ import annotations

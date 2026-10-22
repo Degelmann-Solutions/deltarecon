@@ -80,7 +80,7 @@ def test_linear_history_gives_one_chained_change_per_revision(world):
     assert list(manifest) == ["document", "contract_version", "stage", "manifest_id", "base_release",
                               "history", "changes"]
     assert (manifest["document"], manifest["contract_version"], manifest["stage"]) == (
-        "change_manifest", "1.0", "liability_cashflow")
+        "change_manifest", "2.0", "liability_cashflow")
     assert manifest["manifest_id"] == "history-r0-r3" and manifest["base_release"] == "N"
     assert manifest["history"] == {"source": "git", "from": "r0", "to": "r3",
                                    "determines": ["input_data", "release_folder"], "remainder": []}

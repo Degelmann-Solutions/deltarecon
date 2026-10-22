@@ -1,0 +1,13 @@
+{
+  "document": "compare_result",
+  "contract_version": "2.0",
+  "stage": "liability_cashflow",
+  "compare_id": "compare-time-basis-mismatch",
+  "outcome": "incompatible",
+  "diagnostics": [
+    {
+      "code": "time_basis_mismatch",
+      "message": "The left run declares the time basis policy_month and the right run valuation_year."
+    }
+  ]
+}

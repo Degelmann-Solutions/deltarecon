@@ -1,0 +1,52 @@
+{
+  "document": "compare_result",
+  "contract_version": "2.0",
+  "stage": "liability_cashflow",
+  "compare_id": "walk-run-n-full-run-n1-full-step-1",
+  "outcome": "compared",
+  "left": {
+    "run_id": "walk-run-n-full-run-n1-full-state-0",
+    "release_label": "N"
+  },
+  "right": {
+    "run_id": "walk-run-n-full-run-n1-full-state-1",
+    "release_label": "N"
+  },
+  "tolerance": {
+    "per_quantity": {}
+  },
+  "time_basis": {
+    "id": "policy_month"
+  },
+  "quantities": [
+    {
+      "name": "Anzahl Verträge",
+      "unit": "policies"
+    },
+    {
+      "name": "Netto-Cashflow",
+      "unit": "EUR"
+    }
+  ],
+  "compared_coordinates": 16,
+  "deviations": {
+    "path": "step-01.compare.deviations.csv",
+    "sha256": "c94017ef15fc7773d152c6829a31b718b681497f34aa1cbc176fff8a23996dde"
+  },
+  "deviating_model_points": [
+    "MP-0001",
+    "MP-0002",
+    "MP-0003"
+  ],
+  "added": [],
+  "removed": [],
+  "parameter_diff": [
+    {
+      "name": "lapse_rate",
+      "change": "changed",
+      "type": "scalar",
+      "old": 0.06,
+      "new": 0.05
+    }
+  ]
+}

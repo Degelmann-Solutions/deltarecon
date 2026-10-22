@@ -15,6 +15,7 @@ import os
 import subprocess
 import sys
 import threading
+from contextlib import contextmanager
 from pathlib import Path
 
 import pytest
@@ -72,6 +73,23 @@ def require_clone(clone: Path = CLONE, revision: str = RELEASE_N) -> None:
     if not found or found.returncode != 0:
         pytest.exit(f"The tests read the reference model from a clone at {clone} that holds the commit "
                     f"{revision}. Create it with: git clone {REPOSITORY_URL} {clone}", returncode=1)
+
+
+# The modules that stamp the contract version on the documents they write.
+WRITER_MODULES = ("run", "compare", "signature", "derive", "walk", "search", "replay", "regression", "__main__")
+
+
+@contextmanager
+def written_under(version: str):
+    """The tool writes ``version`` instead of its own contract version while the block runs.
+
+    It gives genuine documents of an earlier version, with consistent hashes, without editing JSON by
+    hand. Reading is not changed: every document is still read against the schemas of its version.
+    """
+    with pytest.MonkeyPatch.context() as patch:
+        for name in WRITER_MODULES:
+            patch.setattr(f"degelmann.deltarecon.{name}.CONTRACT_VERSION", version)
+        yield
 
 
 def pytest_sessionstart(session):

@@ -1,0 +1,209 @@
+{
+  "document": "search_result",
+  "contract_version": "2.0",
+  "stage": "liability_cashflow",
+  "search_id": "search-run-n-full-run-n1-full",
+  "walk": {
+    "walk_id": "walk-run-n-full-run-n1-full",
+    "result": {
+      "path": "walk/walk.result.json",
+      "sha256": "d63060279614efe37b408e8147f6d1322999076d0cd35273e80d22c4840a927f"
+    }
+  },
+  "manifest": {
+    "path": "changes.json",
+    "sha256": "3cc8e09581d727679d3d25d60b6e8af70dde5e577eff50170350ee2374932e57"
+  },
+  "older": {
+    "run_id": "run-n-full",
+    "release_label": "N"
+  },
+  "newer": {
+    "run_id": "run-n1-full",
+    "release_label": "N+1"
+  },
+  "tolerance": {
+    "per_quantity": {}
+  },
+  "held": [],
+  "remainder": [
+    {
+      "kind": "engine_version",
+      "from": [
+        {
+          "kind": "engine_version",
+          "value": "engine build 2026.09"
+        }
+      ],
+      "to": [
+        {
+          "kind": "engine_version",
+          "value": "engine build 2026.10"
+        }
+      ]
+    }
+  ],
+  "ends": {
+    "zero": {
+      "state": 0,
+      "outcome": "reproduced"
+    },
+    "n": {
+      "state": 4,
+      "outcome": "reproduced"
+    }
+  },
+  "states": [
+    {
+      "state": 0,
+      "run_id": "search-run-n-full-run-n1-full-state-0",
+      "outcome": "succeeded",
+      "response": {
+        "path": "state-00/response.json",
+        "sha256": "75879564ead228a328480399c3be56891cf2b9dbcdeddefc553584d2226d058e"
+      },
+      "export": {
+        "path": "state-00/results.csv",
+        "sha256": "3d156041948bc96dec7aa7011981cb1b40d13ad780a2767adaf6f40581dc4dfc"
+      }
+    },
+    {
+      "state": 2,
+      "revision": "0b2f58ed2d975f2ebd8bc4ac58a1c37d3d62997f",
+      "run_id": "search-run-n-full-run-n1-full-state-2",
+      "outcome": "succeeded",
+      "response": {
+        "path": "state-02/response.json",
+        "sha256": "3cc5fc1252911fb1484fd825bc8a2c458f208c6ab158c267dc17a44e8fb87f4a"
+      },
+      "export": {
+        "path": "state-02/results.csv",
+        "sha256": "44b712c061bd81abbb0d4268780cc82ab04dc9d38c82e9ee1c8df4e1bc6eaa33"
+      }
+    },
+    {
+      "state": 3,
+      "revision": "0767d650b32a037f9a98260a8a7531c7ade3d8af",
+      "run_id": "search-run-n-full-run-n1-full-state-3",
+      "outcome": "succeeded",
+      "response": {
+        "path": "state-03/response.json",
+        "sha256": "e006fba34135b79302598890165dc0e8198c87005dfe63ca90ea6243dd9da7b5"
+      },
+      "export": {
+        "path": "state-03/results.csv",
+        "sha256": "44b712c061bd81abbb0d4268780cc82ab04dc9d38c82e9ee1c8df4e1bc6eaa33"
+      }
+    },
+    {
+      "state": 4,
+      "revision": "a58186a2a54cedfe17ef8ab4c0851a10a18bf59f",
+      "run_id": "search-run-n-full-run-n1-full-state-4",
+      "outcome": "succeeded",
+      "response": {
+        "path": "state-04/response.json",
+        "sha256": "58493e1faf09ade2c0d81d76830634471d2a28255719b338631f119809c7995d"
+      },
+      "export": {
+        "path": "state-04/results.csv",
+        "sha256": "3af60211be1707ed9edb7d510c4f12a2f9cb0f8d5871a9a6f82ec61debe0395c"
+      }
+    }
+  ],
+  "target": {
+    "quantities": [
+      "Anzahl Verträge"
+    ],
+    "periods": {
+      "first": 0,
+      "last": 0
+    }
+  },
+  "intervals": [
+    {
+      "from_state": 0,
+      "to_state": 4,
+      "revisions": [
+        "f291e79376fd8157cefa009bc06d213711b6490b",
+        "0b2f58ed2d975f2ebd8bc4ac58a1c37d3d62997f",
+        "0767d650b32a037f9a98260a8a7531c7ade3d8af",
+        "a58186a2a54cedfe17ef8ab4c0851a10a18bf59f"
+      ],
+      "differs": [
+        "Anzahl Verträge"
+      ]
+    },
+    {
+      "from_state": 0,
+      "to_state": 2,
+      "revisions": [
+        "f291e79376fd8157cefa009bc06d213711b6490b",
+        "0b2f58ed2d975f2ebd8bc4ac58a1c37d3d62997f"
+      ],
+      "differs": []
+    },
+    {
+      "from_state": 2,
+      "to_state": 4,
+      "revisions": [
+        "0767d650b32a037f9a98260a8a7531c7ade3d8af",
+        "a58186a2a54cedfe17ef8ab4c0851a10a18bf59f"
+      ],
+      "differs": [
+        "Anzahl Verträge"
+      ]
+    },
+    {
+      "from_state": 2,
+      "to_state": 3,
+      "revisions": [
+        "0767d650b32a037f9a98260a8a7531c7ade3d8af"
+      ],
+      "differs": []
+    },
+    {
+      "from_state": 3,
+      "to_state": 4,
+      "revisions": [
+        "a58186a2a54cedfe17ef8ab4c0851a10a18bf59f"
+      ],
+      "differs": [
+        "Anzahl Verträge"
+      ]
+    }
+  ],
+  "contributions": [
+    {
+      "from_state": 3,
+      "to_state": 4,
+      "revisions": [
+        "a58186a2a54cedfe17ef8ab4c0851a10a18bf59f"
+      ],
+      "compare": {
+        "result": {
+          "path": "interval-03-04.compare.result.json",
+          "sha256": "f4bb0536ffc4c32fa335bdc2e4ac42bb9cd2ea5b8574c0e25bcbf852d4b9e37f"
+        },
+        "deviations": {
+          "path": "interval-03-04.compare.deviations.csv",
+          "sha256": "1911d27d19469209a99cc6a8032e02231d52da94ace41d7908d6b10926939c95"
+        }
+      },
+      "contributions": [
+        {
+          "quantity": "Anzahl Verträge",
+          "contributes": true,
+          "sum": 3.0,
+          "absolute_sum": 3.0
+        }
+      ]
+    }
+  ],
+  "runs": {
+    "walk": 5,
+    "search": 4,
+    "saved": 1
+  },
+  "missed": [],
+  "findings": []
+}

@@ -1,0 +1,128 @@
+{
+  "document": "run_record",
+  "contract_version": "2.0",
+  "stage": "liability_cashflow",
+  "record_id": "record-c4d8a2f7-1e9b-4a36-b5c0-7d2e6f8a9b13",
+  "procedure": {
+    "type": "compare"
+  },
+  "outcome": "compared",
+  "recorded_at": "2026-10-03T09:05:00Z",
+  "inputs": [
+    {
+      "role": "request",
+      "artifact": {
+        "path": "compare.request.json",
+        "sha256": "132f092032af1a851e0a16097b6c49cc2e9edcd28613290c9c27b7144475ade7"
+      }
+    }
+  ],
+  "releases": [
+    {
+      "label": "N",
+      "references": [
+        {
+          "kind": "input_data",
+          "value": "model_points.csv",
+          "artifact": {
+            "path": "release/model_points.csv",
+            "sha256": "7dfb54a154b5dcbedd09760c4de68942d15160461430942025d56a8a6e1fee3c"
+          }
+        },
+        {
+          "kind": "parameter_set",
+          "value": "lapse_table.csv",
+          "artifact": {
+            "path": "release/lapse_table.csv",
+            "sha256": "c681368d4183b28d61af7cbe9d8c3c0840f556307b13da5152bef379f708b606"
+          }
+        },
+        {
+          "kind": "parameter_set",
+          "value": "parameters.csv",
+          "artifact": {
+            "path": "release/parameters.csv",
+            "sha256": "3193e7f0cf6a6b3b4d30642a93d9bf8b682111f825358c8211dfa44a9548aa1b"
+          }
+        },
+        {
+          "kind": "code_state",
+          "value": "projection.rules",
+          "artifact": {
+            "path": "release/projection.rules",
+            "sha256": "bd7fe003be5e9b7eed088ecc2e747676e83e323acbf899e7a9419655f090031f"
+          }
+        },
+        {
+          "kind": "engine_version",
+          "value": "engine build 2026.09"
+        }
+      ]
+    },
+    {
+      "label": "N",
+      "references": [
+        {
+          "kind": "input_data",
+          "value": "model_points.csv",
+          "artifact": {
+            "path": "release/model_points.csv",
+            "sha256": "7dfb54a154b5dcbedd09760c4de68942d15160461430942025d56a8a6e1fee3c"
+          }
+        },
+        {
+          "kind": "parameter_set",
+          "value": "lapse_table.csv",
+          "artifact": {
+            "path": "release/lapse_table.csv",
+            "sha256": "c681368d4183b28d61af7cbe9d8c3c0840f556307b13da5152bef379f708b606"
+          }
+        },
+        {
+          "kind": "parameter_set",
+          "value": "parameters.csv",
+          "artifact": {
+            "path": "release/parameters.csv",
+            "sha256": "3193e7f0cf6a6b3b4d30642a93d9bf8b682111f825358c8211dfa44a9548aa1b"
+          }
+        },
+        {
+          "kind": "code_state",
+          "value": "projection.rules",
+          "artifact": {
+            "path": "release/projection.rules",
+            "sha256": "bd7fe003be5e9b7eed088ecc2e747676e83e323acbf899e7a9419655f090031f"
+          }
+        },
+        {
+          "kind": "engine_version",
+          "value": "engine build 2026.09"
+        }
+      ]
+    }
+  ],
+  "parameters": [],
+  "outputs": [
+    {
+      "role": "result",
+      "artifact": {
+        "path": "compare.result.json",
+        "sha256": "4fdda1ede9f71b808e56beb8ce174fddd0f8f141ab69897cebe7ba9bfd809244"
+      }
+    },
+    {
+      "role": "deviations",
+      "artifact": {
+        "path": "compare.deviations.csv",
+        "sha256": "6a71ec4a393849be82d34b622a72766c61d866f2a283fee6d51aab80a47d1d9f"
+      }
+    },
+    {
+      "role": "signature_table",
+      "artifact": {
+        "path": "compare.signature-table.json",
+        "sha256": "735bb19e99b3e741c587df06a5b8b839df843cf18c029f4c23989920971629a1"
+      }
+    }
+  ]
+}

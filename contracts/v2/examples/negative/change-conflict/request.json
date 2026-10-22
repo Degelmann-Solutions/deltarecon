@@ -1,0 +1,32 @@
+{
+  "document": "run_request",
+  "contract_version": "2.0",
+  "stage": "liability_cashflow",
+  "run_id": "run-change-conflict",
+  "release": {
+    "label": "N",
+    "references": [
+      {
+        "kind": "code_state",
+        "value": "revision 1047"
+      },
+      {
+        "kind": "input_data",
+        "value": "extract 2026-09-30"
+      }
+    ]
+  },
+  "changes": {
+    "enabled": [
+      "chg-a",
+      "chg-c"
+    ],
+    "manifest": {
+      "path": "changes.json",
+      "sha256": "55cf7bfa286a78ecd1cdc247d06dccf368a0d6eb2df7e67a960cebb537b3ae6d"
+    }
+  },
+  "selection": {
+    "mode": "full"
+  }
+}

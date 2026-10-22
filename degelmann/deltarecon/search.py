@@ -1,4 +1,4 @@
-"""The search of ``contracts/v1/localise.md``: halving the history between two recorded results.
+"""The search of ``contracts/v2/localise.md``: halving the history between two recorded results.
 
 A search starts, as the walk does, from the records of two succeeded runs without enabled
 changes, the older one first, and needs no walk. Its checks before the first run are those
@@ -19,6 +19,9 @@ and periods asked about, by default every coordinate.
   that runs, ``m + 1``, ``m - 1``, ``m + 2``, and so on. A state runs at most once.
 - An interval of one revision that differs, or an interval in which no inner state runs,
   is a contribution: its sums run over the target's coordinates, exactly as in the walk.
+  Without a target, or with a target that names every quantity and no period range, a
+  contribution holds the signature row of each quantity it contributes to, and none for a
+  quantity it does not contribute to.
   An interval that differs for a quantity while neither half differs for it is the finding
   ``interval_not_resolved``.
 
@@ -65,7 +68,7 @@ class Target:
 
     quantities: tuple[str, ...]
     periods: tuple[int, int] | None = None
-    narrowed: bool = False  # a quantity or a period range was asked for
+    narrowed: bool = False  # a proper subset of the quantities or a period range was asked for
     offsets: dict[str, int] | None = field(default=None, compare=False, repr=False)
 
     def document(self) -> dict:
@@ -117,7 +120,10 @@ def read_target(quantities, periods: str | None, prepared: Prepared) -> Target:
     offsets = (first_periods(prepared.older.values)
                if span is not None and prepared.older.response["time_basis"]["id"] == ISSUE_ORIGIN else None)
     chosen = tuple(name for name in names if name in asked) if asked else tuple(names)
-    target = Target(chosen, span, bool(asked) or span is not None, offsets)
+    # A quantity list that names every quantity, without a period range, narrows nothing: the
+    # search is the one without a target and keeps the signature rows of its contributions.
+    narrowed = set(chosen) != set(names) or span is not None
+    target = Target(chosen, span, narrowed, offsets)
     if span is not None and not any(target.within(run.values) for run in (prepared.older, prepared.newer)):
         raise UsageError(f"neither recorded export has a coordinate in the projection periods {periods}")
     return target

@@ -1,8 +1,12 @@
 """JSON documents of the stage contracts: reading, checking, hashing, and writing.
 
-Reading follows the order of ``contracts/v1/README.md``: the JSON profile, the contract
+Reading follows the order of ``contracts/v2/README.md``: the JSON profile, the contract
 version, and then the schema. Every broken rule raises a :class:`Rejection` that carries
 the diagnostic of the contract.
+
+The tool writes contract version 2.0 and reads 1.0 and 2.0. A document is checked against
+the schemas of its own version: a 1.0 document against ``contracts/v1/schemas``, a 2.0
+document against ``contracts/v2/schemas``.
 """
 from __future__ import annotations
 
@@ -15,8 +19,10 @@ from pathlib import Path
 from jsonschema import Draft202012Validator
 from referencing import Registry, Resource
 
-CONTRACT_VERSION = "1.0"
-SCHEMAS = Path(__file__).resolve().parents[2] / "contracts" / "v1" / "schemas"
+CONTRACT_VERSION = "2.0"
+CONTRACTS = Path(__file__).resolve().parents[2] / "contracts"
+# The versions a reader accepts, each with the schemas of its pack.
+SCHEMA_FOLDERS = {"1.0": CONTRACTS / "v1" / "schemas", "2.0": CONTRACTS / "v2" / "schemas"}
 SCHEMA_NAMES = ["common", "run", "changes", "compare", "localise", "run-record"]
 
 RUN_SCHEMA = "run.schema.json"
@@ -103,27 +109,47 @@ def parse_document(data: bytes) -> dict:
 
 
 def check_version(document: dict) -> None:
-    """Reject every contract version but the implemented one, before any schema."""
-    if "contract_version" in document and document["contract_version"] != CONTRACT_VERSION:
+    """Reject every contract version but the ones this reader reads, before any schema."""
+    if "contract_version" in document and document["contract_version"] not in SCHEMA_FOLDERS:
         raise Rejection(
             "unsupported_version",
-            f"This reader implements contract version {CONTRACT_VERSION} only, "
+            f"This reader implements the contract versions {' and '.join(SCHEMA_FOLDERS)} only, "
             f"not {json.dumps(document['contract_version'], ensure_ascii=False)[:40]}.")
+
+
+def document_version(document) -> str:
+    """The contract version whose schemas check ``document``: its own when this reader reads it,
+    otherwise the version the tool writes."""
+    version = document.get("contract_version") if isinstance(document, dict) else None
+    return version if isinstance(version, str) and version in SCHEMA_FOLDERS else CONTRACT_VERSION
 
 
 # --- schemas ------------------------------------------------------------------------
 
 
+def load_schemas(version: str | None = None) -> dict[str, dict]:
+    """The schemas of one contract version, by file name; by default those of the version the tool
+    writes."""
+    return _schemas(version or CONTRACT_VERSION)
+
+
 @lru_cache(maxsize=None)
-def load_schemas() -> dict[str, dict]:
-    return {f"{name}.schema.json": json.loads((SCHEMAS / f"{name}.schema.json").read_text("utf-8"))
+def _schemas(version: str) -> dict[str, dict]:
+    folder = SCHEMA_FOLDERS[version]
+    return {f"{name}.schema.json": json.loads((folder / f"{name}.schema.json").read_text("utf-8"))
             for name in SCHEMA_NAMES}
 
 
+def validator(schema: str, version: str | None = None) -> Draft202012Validator:
+    """A validator for a schema file, or for one definition ``<file>#/$defs/<name>``, of one
+    contract version; by default the version the tool writes. The schema ids are bare file
+    names, so each version has a registry of its own."""
+    return _validator(schema, version or CONTRACT_VERSION)
+
+
 @lru_cache(maxsize=None)
-def validator(schema: str) -> Draft202012Validator:
-    """A validator for a schema file, or for one definition ``<file>#/$defs/<name>``."""
-    schemas = load_schemas()
+def _validator(schema: str, version: str) -> Draft202012Validator:
+    schemas = _schemas(version)
     registry = Registry().with_resources(
         (name, Resource.from_contents(content)) for name, content in schemas.items())
     if "#" in schema:
@@ -132,8 +158,8 @@ def validator(schema: str) -> Draft202012Validator:
 
 
 def schema_errors(document, schema: str) -> list[str]:
-    """Schema violations as text, in a stable order."""
-    errors = sorted(validator(schema).iter_errors(document),
+    """Schema violations as text, in a stable order, under the schemas of the document's version."""
+    errors = sorted(validator(schema, document_version(document)).iter_errors(document),
                     key=lambda e: ([str(p) for p in e.absolute_path], e.message))
     return [f"{'/'.join(str(p) for p in e.absolute_path) or '(document)'}: {e.message}"[:300]
             for e in errors]

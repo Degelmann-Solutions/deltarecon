@@ -1,4 +1,4 @@
-"""The search of ``contracts/v1/localise.md``: ``degelmann/deltarecon/search.py`` and its check against the walk.
+"""The search of ``contracts/v2/localise.md``: ``degelmann/deltarecon/search.py`` and its check against the walk.
 
 The core is tested on the stub engine of ``test_walk.py``: a revision of the stub is a folder,
 and ``line`` is its main line. The quantities of the stub are ``Anzahl Verträge``, the
@@ -26,7 +26,8 @@ from degelmann.deltarecon.run import STAGE_QUANTITIES, UsageError, run_request
 from degelmann.deltarecon.search import Target, read_target, restrict, search, walk_changes
 from degelmann.deltarecon.walk import prepare, read_walk_folder, walk
 
-from conftest import PRODUCT_FOLDER, ROOT, clone_state, commit, export_coordinates, throwaway, write_files
+from conftest import (PRODUCT_FOLDER, ROOT, clone_state, commit, export_coordinates, throwaway, write_files,
+                      written_under)
 from test_run_contract import PARAMS, POINTS, StubEngine, folder_hashes, stored, stub_request, world  # noqa: F401
 from test_walk import LINE, PARAMS_RATE, POINTS_B, POINTS_E, TwoStages, WalkStub, build, record
 
@@ -288,6 +289,90 @@ def test_a_quantity_that_cancels_in_a_parent_interval_is_not_judged_in_its_halve
     assert not count["contributes"] and count["sum"] != 0
     # The walk shows that t2 and t3 change the count, so both are missed for it.
     assert result["missed"] == [{"revision": "t2", "quantity": COUNT}, {"revision": "t3", "quantity": COUNT}]
+
+
+# The count moves with s1 and back with s3, so it cancels over the outer interval (0, 3); the cash flow
+# moves with every revision, and so does it over (0, 3). s3 writes the old base of MP-B as 2.0, so that
+# the input data of the two ends differ and move with the states.
+CANCEL_COUNT = (
+    ("s0", "The base.\n", (), POINTS, PARAMS),
+    ("s1", "Raise MP-B\n", ("data",), POINTS_B, PARAMS),
+    ("s2", "Raise the rate\n", ("parameter",), POINTS_B, PARAMS_RATE),
+    ("s3", "Lower MP-B again\n", ("data",), POINTS.replace("MP-B,0,2,2", "MP-B,0,2,2.0"), PARAMS_RATE),
+)
+
+
+def every_contribution(result: dict) -> list[dict]:
+    return [c for entry in result["contributions"] for c in entry["contributions"]]
+
+
+def test_a_contribution_holds_a_signature_row_only_for_a_quantity_it_contributes_to(world):
+    """R1: an un-narrowed search and a search that names every quantity judge the halves of (0, 3) for
+    the cash flow alone; the count moves with s1 as well, and its row of the signature table is not
+    attached."""
+    build(world, CANCEL_COUNT)
+    engine = WalkStub(CANCEL_COUNT)
+    older, newer = record(world, "s0", engine, label="N"), record(world, "s3", engine, label="N+1")
+    plain = run_search(world, older, newer, WalkStub(CANCEL_COUNT)).result
+    named = run_search(world, older, newer, WalkStub(CANCEL_COUNT), output="named",
+                       quantities=[CASH, COUNT]).result
+    assert plain["intervals"][0] == {"from_state": 0, "to_state": 3, "revisions": ["s1", "s2", "s3"],
+                                     "differs": [CASH]}
+    assert [c["revisions"] for c in plain["contributions"]] == [["s1"], ["s2"], ["s3"]]
+    for result in (plain, named):
+        assert_search_folder_valid(world / ("search" if result is plain else "named"))
+        assert all(("signature" in c) == c["contributes"] for c in every_contribution(result))
+    s1 = plain["contributions"][0]
+    count, cash = s1["contributions"]
+    assert count["quantity"] == COUNT and not count["contributes"] and count["sum"] != 0
+    assert "signature" not in count and cash["contributes"] and "signature" in cash
+    # Naming every quantity narrows nothing: the same contributions, signature rows included.
+    assert named["contributions"] == plain["contributions"]
+    assert named["target"] == plain["target"] == {"quantities": [COUNT, CASH]}
+    assert named == plain
+
+
+def test_only_a_proper_subset_of_the_quantities_or_a_period_range_narrows_the_target(history):
+    world, older, newer = history
+    prepared = prepare(older, newer, WalkStub(HISTORY), world, None, "search")
+    assert not read_target([], None, prepared).narrowed
+    assert not read_target([COUNT, CASH], None, prepared).narrowed
+    assert not read_target([CASH, COUNT, CASH], None, prepared).narrowed
+    assert read_target([COUNT], None, prepared).narrowed
+    assert read_target([COUNT, CASH], "0-2", prepared).narrowed
+    # A narrowed search holds no signature row, as before.
+    result = run_search(world, older, newer, WalkStub(HISTORY), quantities=[CASH]).result
+    assert result["contributions"] and not any("signature" in c for c in every_contribution(result))
+    assert all(c["quantity"] == CASH for c in every_contribution(result))
+
+
+def test_a_walk_folder_written_under_1_0_is_a_reference(cancel):
+    world, older, newer = cancel
+    with written_under("1.0"):
+        run_walk(world, older, newer, WalkStub(CANCEL))
+    walked = world / "walk"
+    assert stored(walked / "walk.result.json")["contract_version"] == "1.0"
+    assert stored(walked / "changes.json")["contract_version"] == "1.0"
+    assert stored(walked / "state-02" / "changes.json")["contract_version"] == "1.0"
+    run_walk(world, older, newer, WalkStub(CANCEL), output="walk-2")
+    result = run_search(world, older, newer, WalkStub(CANCEL), walk=walked).result
+    again = run_search(world, older, newer, WalkStub(CANCEL), output="search-2", walk=world / "walk-2").result
+    assert result["contract_version"] == "2.0"
+    assert result["missed"] == again["missed"] == [{"revision": "c1", "quantity": CASH},
+                                                   {"revision": "c2", "quantity": CASH}]
+    # The copy of the walk keeps its bytes and its version.
+    assert (world / "search" / "walk" / "walk.result.json").read_bytes() == (walked / "walk.result.json").read_bytes()
+
+
+def test_a_1_0_walk_folder_whose_manifest_differs_otherwise_is_refused(cancel):
+    world, older, newer = cancel
+    with written_under("1.0"):
+        run_walk(world, older, newer, WalkStub(CANCEL))
+    rewrite_state(world / "walk", 2, edit_manifest=redescribe)
+    with pytest.raises(Rejection) as caught:
+        run_search(world, older, newer, WalkStub(CANCEL), walk=world / "walk")
+    assert caught.value.code == "walk_mismatch", caught.value.message
+    assert not (world / "search").exists()
 
 
 # x1 moves the cash flow and x3 reverts it; state 2 does not run, so the walk carries x2 and x3 in one

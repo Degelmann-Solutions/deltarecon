@@ -1,0 +1,33 @@
+{
+  "document": "run_request",
+  "contract_version": "2.0",
+  "stage": "liability_cashflow",
+  "run_id": "run-2026q3-full",
+  "release": {
+    "label": "2026Q3",
+    "references": [
+      {
+        "kind": "input_data",
+        "value": "portfolio extract 2026-09-30, run group 17"
+      },
+      {
+        "kind": "parameter_set",
+        "value": "assumption set 2026Q3 revision 4"
+      },
+      {
+        "kind": "code_state",
+        "value": "workspace revision 8841"
+      },
+      {
+        "kind": "engine_version",
+        "value": "12.4.1"
+      }
+    ]
+  },
+  "changes": {
+    "enabled": []
+  },
+  "selection": {
+    "mode": "full"
+  }
+}

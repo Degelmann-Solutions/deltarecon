@@ -1,9 +1,9 @@
 """The per-model-point export and the deviation file: CSV profile, number format, and rules.
 
 The writer writes the writer form in deterministic order. The reader accepts the reader
-grammar of ``contracts/v1/README.md``. ``check_export`` applies rules 9 to 13 of
-``contracts/v1/run.md`` to a succeeded response and its export; ``read_deviations``
-applies rules 9 to 13 of ``contracts/v1/compare.md`` to a deviation file.
+grammar of ``contracts/v2/README.md``. ``check_export`` applies rules 9 to 13 of
+``contracts/v2/run.md`` to a succeeded response and its export; ``read_deviations``
+applies rules 9 to 13 of ``contracts/v2/compare.md`` to a deviation file.
 """
 from __future__ import annotations
 

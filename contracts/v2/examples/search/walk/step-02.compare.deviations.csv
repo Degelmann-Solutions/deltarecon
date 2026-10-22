@@ -1,0 +1,7 @@
+model_point_id,period,quantity,left,right
+MP-0001,0,Netto-Cashflow,75,70
+MP-0001,1,Netto-Cashflow,70,65
+MP-0001,2,Netto-Cashflow,65,60
+MP-0002,0,Netto-Cashflow,140,142.5
+MP-0002,1,Netto-Cashflow,132,134.5
+MP-0002,2,Netto-Cashflow,124,126.5

@@ -1,8 +1,10 @@
-"""Stage contracts version 1: schemas, examples, hashes, number format and neutrality.
+"""Stage contracts version 2: schemas, examples, hashes, number format and neutrality.
 
-The tests check the published pack under ``contracts/v1``. They validate the examples
+The tests check the published pack under ``contracts/v2``. They validate the examples
 against the schemas and check the stored bytes. They do not implement a contract reader:
-the semantic reader rules are normative text, shown by indexed examples.
+the semantic reader rules are normative text, shown by indexed examples. The pack of
+version 1.0 under ``contracts/v1`` stays published; its examples still validate under its
+own schemas, which the tool uses to read 1.0 documents.
 """
 from __future__ import annotations
 
@@ -20,12 +22,13 @@ from degelmann.deltarecon.export import (INTEGER, READER_INTEGER, export_errors,
                                is_profile_number, is_readable_number)
 
 ROOT = Path(__file__).resolve().parent.parent
-PACK = ROOT / "contracts" / "v1"
+PACK = ROOT / "contracts" / "v2"
+V1_PACK = ROOT / "contracts" / "v1"
 SCHEMAS = PACK / "schemas"
 EXAMPLES = PACK / "examples"
 TEXT_FILES = ["README.md", "run.md", "changes.md", "compare.md", "localise.md", "domain/liability_cashflow.md"]
 
-# The rows of the behaviour matrix in contracts/v1/README.md.
+# The rows of the behaviour matrix in contracts/v2/README.md.
 MATRIX_ROWS = {
     "complete-run", "malformed-input", "opaque-release-identity", "inconsistent-result",
     "model-point-failure", "incompatible-compare", "coverage-difference",
@@ -513,7 +516,7 @@ def test_localise_contract_is_no_stage_contract_and_names_its_findings():
 
 def test_index_names_every_case_once_and_completely():
     index = json.loads((EXAMPLES / "index.json").read_text("utf-8"))
-    assert index["contract_version"] == "1.0"
+    assert index["contract_version"] == "2.0"
     assert len(case_ids()) == len(set(case_ids()))
     for example in cases():
         assert example["expected"] in {"accept", "reject", "failed", "error", "incompatible"}, example["id"]
@@ -608,6 +611,40 @@ def test_example_documents_match_their_expected_outcome(case_id):
             assert not errors, f"{document['path']}: {errors[0].message}"
     if level in {"schema", "parse"}:
         assert failing in [d["path"] for d in example["documents"]]
+
+
+@pytest.mark.parametrize("case_id", [c["id"] for c in json.loads(
+    (V1_PACK / "examples" / "index.json").read_text("utf-8"))["cases"]])
+def test_the_1_0_examples_still_match_their_outcome_under_the_1_0_schemas(case_id):
+    """The 1.0 pack stays as published: its documents validate, or fail, under its own schemas,
+    the schemas the tool reads a 1.0 document with, and its artifact references resolve."""
+    examples = V1_PACK / "examples"
+    example = next(c for c in json.loads((examples / "index.json").read_text("utf-8"))["cases"]
+                   if c["id"] == case_id)
+    assert load_schemas("1.0") == {path.name: json.loads(path.read_text("utf-8"))
+                                   for path in (V1_PACK / "schemas").iterdir()}
+    level, failing = example.get("level"), example.get("failing")
+    for document in example["documents"]:
+        path = examples / document["path"]
+        if level == "parse" and document["path"] == failing:
+            continue
+        value = strict_json(path)
+        errors = list(validator(document["schema"], "1.0").iter_errors(value))
+        if level == "schema" and document["path"] == failing:
+            assert errors, document["path"]
+        else:
+            assert not errors, f"{document['path']}: {errors[0].message}"
+            assert value.get("contract_version", "1.0") == "1.0"
+
+
+def test_the_two_versions_have_their_own_schemas():
+    """A 1.0 document passes the 1.0 schemas and fails the 2.0 schemas, and the reverse."""
+    for version, other in (("1.0", "2.0"), ("2.0", "1.0")):
+        pack = ROOT / "contracts" / f"v{version[0]}"
+        request = strict_json(pack / "examples" / "reference" / "full-run.request.json")
+        assert request["contract_version"] == version
+        assert not list(validator("run.schema.json", version).iter_errors(request))
+        assert list(validator("run.schema.json", other).iter_errors(request))
 
 
 def test_schema_level_cases_exist():

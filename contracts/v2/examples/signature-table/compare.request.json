@@ -1,0 +1,21 @@
+{
+  "document": "compare_request",
+  "contract_version": "2.0",
+  "stage": "liability_cashflow",
+  "compare_id": "compare-n-vs-n1",
+  "left": {
+    "response": {
+      "path": "left.response.json",
+      "sha256": "176a8412e1fef70d7cdea44fad3820c8415eec3e874acd587445d83879eccda4"
+    }
+  },
+  "right": {
+    "response": {
+      "path": "right.response.json",
+      "sha256": "1c87a6e907f6362e24628b050859ebe76d77365564d95ba4adfef79449a7e3a5"
+    }
+  },
+  "tolerance": {
+    "per_quantity": {}
+  }
+}

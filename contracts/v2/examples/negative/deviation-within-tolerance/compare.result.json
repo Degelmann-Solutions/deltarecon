@@ -1,0 +1,58 @@
+{
+  "document": "compare_result",
+  "contract_version": "2.0",
+  "stage": "liability_cashflow",
+  "compare_id": "compare-deviation-within-tolerance",
+  "outcome": "compared",
+  "left": {
+    "run_id": "run-n-full",
+    "release_label": "N"
+  },
+  "right": {
+    "run_id": "run-n1-full",
+    "release_label": "N+1"
+  },
+  "tolerance": {
+    "per_quantity": {
+      "Netto-Cashflow": {
+        "upper": {
+          "abs_tol": 5,
+          "rel_tol": 0
+        },
+        "lower": {
+          "abs_tol": 0,
+          "rel_tol": 0
+        },
+        "derivation": "Synthetic profile: an increase of the net cash flow up to 5 EUR is accepted."
+      }
+    }
+  },
+  "time_basis": {
+    "id": "policy_month"
+  },
+  "quantities": [
+    {
+      "name": "Anzahl Verträge",
+      "unit": "policies"
+    },
+    {
+      "name": "Bruttobeitrag",
+      "unit": "EUR"
+    },
+    {
+      "name": "Netto-Cashflow",
+      "unit": "EUR"
+    }
+  ],
+  "compared_coordinates": 21,
+  "deviations": {
+    "path": "compare.deviations.csv",
+    "sha256": "444f7afe038151271e3f6a33b087e2ef9a3363f4c7053984d14b2b54bb4941c4"
+  },
+  "deviating_model_points": [
+    "MP-0001",
+    "MP-0002"
+  ],
+  "added": [],
+  "removed": []
+}

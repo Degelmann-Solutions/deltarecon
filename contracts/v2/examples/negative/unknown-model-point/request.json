@@ -1,0 +1,29 @@
+{
+  "document": "run_request",
+  "contract_version": "2.0",
+  "stage": "liability_cashflow",
+  "run_id": "run-unknown-model-point",
+  "release": {
+    "label": "N",
+    "references": [
+      {
+        "kind": "code_state",
+        "value": "revision 1047"
+      },
+      {
+        "kind": "input_data",
+        "value": "extract 2026-09-30"
+      }
+    ]
+  },
+  "changes": {
+    "enabled": []
+  },
+  "selection": {
+    "mode": "subset",
+    "model_point_ids": [
+      "MP-0001",
+      "MP-9999"
+    ]
+  }
+}

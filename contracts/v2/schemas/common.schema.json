@@ -1,0 +1,265 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "common.schema.json",
+  "title": "Stage contracts version 1: shared definitions",
+  "description": "Shapes shared by the run, changes, compare, localise, and run record documents. This file defines no document of its own.",
+  "$defs": {
+    "contract_version": {
+      "description": "Version of the stage contracts the document follows.",
+      "const": "2.0"
+    },
+    "stage": {
+      "description": "Stage identifier, for example liability_cashflow.",
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9_]*$"
+    },
+    "id": {
+      "description": "Opaque identifier: a non-empty string without control characters.",
+      "type": "string",
+      "minLength": 1,
+      "pattern": "^[^\\u0000-\\u001f]+$"
+    },
+    "text": {
+      "type": "string",
+      "minLength": 1
+    },
+    "period": {
+      "description": "Period index on the declared time basis.",
+      "type": "integer"
+    },
+    "sha256": {
+      "description": "SHA-256 of the exact stored bytes, lower-case hexadecimal.",
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "artifact": {
+      "description": "Reference to an artifact stored as a file. The path is relative to the directory of the document that carries the reference.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "sha256"],
+      "properties": {
+        "path": {
+          "type": "string",
+          "pattern": "^(?!/)(?!.*(?:^|/)\\.{1,2}(?:/|$))[^\\\\\\u0000-\\u001f]+$"
+        },
+        "sha256": { "$ref": "#/$defs/sha256" }
+      }
+    },
+    "release_reference": {
+      "description": "One opaque reference of a release identity. The artifact member is present only when the reference points to an artifact stored as a file.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "value"],
+      "properties": {
+        "kind": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9_]*$"
+        },
+        "value": { "$ref": "#/$defs/id" },
+        "artifact": { "$ref": "#/$defs/artifact" }
+      }
+    },
+    "release": {
+      "description": "Release identity: a label and a set of kinded opaque references.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["label", "references"],
+      "properties": {
+        "label": { "$ref": "#/$defs/id" },
+        "references": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": { "$ref": "#/$defs/release_reference" }
+        }
+      }
+    },
+    "change_set": {
+      "description": "Enabled change set. The manifest is required as soon as one change is enabled.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["enabled"],
+      "properties": {
+        "enabled": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": { "$ref": "#/$defs/id" }
+        },
+        "manifest": { "$ref": "#/$defs/artifact" },
+        "hold": {
+          "description": "The kinds of release reference the engine holds at the release of the request while changes of the type revision are enabled.",
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9_]*$"
+          }
+        }
+      },
+      "if": {
+        "properties": { "enabled": { "minItems": 1 } }
+      },
+      "then": {
+        "required": ["manifest"]
+      }
+    },
+    "selection": {
+      "description": "Portfolio selection: every model point of the release, or a named subset.",
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["mode"],
+          "properties": {
+            "mode": { "const": "full" }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["mode", "model_point_ids"],
+          "properties": {
+            "mode": { "const": "subset" },
+            "model_point_ids": {
+              "type": "array",
+              "minItems": 1,
+              "uniqueItems": true,
+              "items": { "$ref": "#/$defs/id" }
+            }
+          }
+        }
+      ]
+    },
+    "time_basis": {
+      "description": "Declared time basis of the period index. The identifier is defined in a domain reference.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id"],
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9_]*$"
+        }
+      }
+    },
+    "quantities": {
+      "description": "Exported quantities with their units, in export column order.",
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["name", "unit"],
+        "properties": {
+          "name": {
+            "type": "string",
+            "pattern": "^[^\\u0000-\\u001f]+$"
+          },
+          "unit": { "$ref": "#/$defs/id" }
+        }
+      }
+    },
+    "period_range": {
+      "description": "Contiguous range of periods of one model point, both ends inclusive.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["model_point_id", "first_period", "last_period"],
+      "properties": {
+        "model_point_id": { "$ref": "#/$defs/id" },
+        "first_period": { "$ref": "#/$defs/period" },
+        "last_period": { "$ref": "#/$defs/period" }
+      }
+    },
+    "diagnostic": {
+      "description": "Reason for a rejection, a failure, or an incompatibility.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["code", "message"],
+      "properties": {
+        "code": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9_]*$"
+        },
+        "message": { "$ref": "#/$defs/text" },
+        "model_point_ids": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": { "$ref": "#/$defs/id" }
+        },
+        "change_ids": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": { "$ref": "#/$defs/id" }
+        }
+      }
+    },
+    "diagnostics": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/diagnostic" }
+    },
+    "scalar": {
+      "description": "A parameter value: a number, a string, or a boolean.",
+      "type": ["number", "string", "boolean"]
+    },
+    "scalar_parameter": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "type", "value"],
+      "properties": {
+        "name": { "$ref": "#/$defs/id" },
+        "type": { "const": "scalar" },
+        "value": { "$ref": "#/$defs/scalar" }
+      }
+    },
+    "column_names": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": { "$ref": "#/$defs/id" }
+    },
+    "scalar_tuple": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/scalar" }
+    },
+    "keyed_table_parameter": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "type", "key_columns", "value_columns", "rows"],
+      "properties": {
+        "name": { "$ref": "#/$defs/id" },
+        "type": { "const": "keyed_table" },
+        "key_columns": { "$ref": "#/$defs/column_names" },
+        "value_columns": { "$ref": "#/$defs/column_names" },
+        "rows": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["key", "values"],
+            "properties": {
+              "key": { "$ref": "#/$defs/scalar_tuple" },
+              "values": { "$ref": "#/$defs/scalar_tuple" }
+            }
+          }
+        }
+      }
+    },
+    "parameter": {
+      "oneOf": [
+        { "$ref": "#/$defs/scalar_parameter" },
+        { "$ref": "#/$defs/keyed_table_parameter" }
+      ]
+    },
+    "parameter_inventory": {
+      "description": "All parameters of one run, each a scalar or a keyed table.",
+      "type": "array",
+      "items": { "$ref": "#/$defs/parameter" }
+    }
+  }
+}
