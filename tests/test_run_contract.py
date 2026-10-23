@@ -1920,9 +1920,23 @@ def test_request_command_resolves_any_name_of_a_commit_to_the_full_hash(monkeypa
 def test_request_command_refuses_a_name_that_names_no_commit(monkeypatch, tmp_path, capsys, name):
     output = tmp_path / "run" / "request.json"
     assert cli(monkeypatch, "request", f"--revision={name}", "--repositories", REPOSITORIES, "--label", "N",
-               "--run-id", "x", "--output", output) == 2
-    assert "holds no commit named" in capsys.readouterr().err
+               "--run-id", "x", "--output", output) == 1
+    printed = capsys.readouterr().out
+    assert printed.startswith("request: rejected\ndiagnostic: unknown_reference: ")
+    assert "holds no commit named" in printed
     assert not output.exists() and not output.parent.exists()
+
+
+def test_request_command_with_an_existing_output_starts_nothing_before_it_resolves_the_revision(
+        monkeypatch, tmp_path, capsys):
+    output = tmp_path / "run" / "request.json"
+    output.parent.mkdir()
+    output.write_bytes(b"kept")
+    assert cli(monkeypatch, "request", "--revision", "no-such-branch", "--repositories", REPOSITORIES,
+               "--label", "N", "--run-id", "x", "--output", output) == 2
+    printed = capsys.readouterr()
+    assert printed.out == "" and printed.err.startswith("error: ") and "exists already" in printed.err
+    assert output.read_bytes() == b"kept" and [p.name for p in output.parent.iterdir()] == ["request.json"]
 
 
 def test_request_command_without_a_clone_names_where_it_is_expected(monkeypatch, tmp_path, capsys):
@@ -1930,9 +1944,10 @@ def test_request_command_without_a_clone_names_where_it_is_expected(monkeypatch,
     (tmp_path / "empty" / CLONE_NAME).mkdir(parents=True)  # a folder that is no repository
     for repositories in (tmp_path / "absent", tmp_path / "empty"):
         assert cli(monkeypatch, "request", "--revision", RELEASE_N, "--repositories", repositories,
-                   "--label", "N", "--run-id", "x", "--output", output) == 2
-        error = capsys.readouterr().err
-        assert f"git clone {REPOSITORY_URL} {repositories / CLONE_NAME}" in error
+                   "--label", "N", "--run-id", "x", "--output", output) == 1
+        printed = capsys.readouterr().out
+        assert printed.startswith("request: rejected\ndiagnostic: unknown_reference: ")
+        assert f"git clone {REPOSITORY_URL} {repositories / CLONE_NAME}" in printed
         assert not output.parent.exists()
 
 
@@ -2232,12 +2247,15 @@ def test_revision_without_one_of_its_input_files_is_refused(monkeypatch, tmp_pat
     without_table = commit(clone, "Remove the lapse table")
     shutil.rmtree(clone / PRODUCT_FOLDER / "RLV_DE_S")
     without_model = commit(clone, "Remove the model")
+    capsys.readouterr()
     for name, revision, named in (("table", without_table, LAPSE_TABLE),
                                   ("model", without_model, f"{PRODUCT_FOLDER}/RLV_DE_S")):
         # The request command writes no request for the incomplete release.
         assert cli(monkeypatch, "request", "--revision", revision, "--repositories", repositories,
-                   "--label", "N", "--run-id", "x", "--output", tmp_path / "none" / "request.json") == 2
-        assert named in capsys.readouterr().err and not (tmp_path / "none").exists()
+                   "--label", "N", "--run-id", "x", "--output", tmp_path / "none" / "request.json") == 1
+        printed = capsys.readouterr().out
+        assert printed.startswith("request: rejected\ndiagnostic: unknown_reference: ")
+        assert named in printed and not (tmp_path / "none").exists()
         # A request that names it is rejected, not run.
         for reference in request["release"]["references"][:3]:
             reference["value"] = f"git:{REPOSITORY_URL}@{revision}"
@@ -2508,8 +2526,10 @@ def test_regression_against_a_commit_that_changes_no_model_file_shows_no_deviati
     assert regress(monkeypatch, recorded_subset, "work", repositories, out) == 2
     assert folder_hashes(out) == kept
     # Neither does one for a revision the clone does not hold.
-    assert regress(monkeypatch, recorded_subset, "no-such-branch", repositories, tmp_path / "other") == 2
-    assert "holds no commit named" in capsys.readouterr().err and not (tmp_path / "other").exists()
+    assert regress(monkeypatch, recorded_subset, "no-such-branch", repositories, tmp_path / "other") == 1
+    printed = capsys.readouterr().out
+    assert printed.startswith("regression: rejected\ndiagnostic: unknown_reference: ")
+    assert "holds no commit named" in printed and not (tmp_path / "other").exists()
 
 
 def test_regression_against_a_commit_that_changes_a_lapse_rate_names_stage_and_model_points(

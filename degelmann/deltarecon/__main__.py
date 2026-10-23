@@ -89,8 +89,9 @@ run or one that ends with an error, a replay that is not reproduced or is reject
 comparison or a regression run that
 shows a deviation or a coverage difference, is incompatible, or is rejected, a
 manifest that cannot be derived, a walk that is refused, stops, or leaves a revision
-unattributed because state 0 or the last state does not run or is not reproduced, and a
-search that is refused or stops; 2 when the command cannot start, for example because an
+unattributed because state 0 or the last state does not run or is not reproduced, a
+search that is refused or stops, and a request or regression whose revision, release, or
+clone the repositories do not hold; 2 when the command cannot start, for example because an
 output exists already, the history of the clone is cut off, or Git is not installed.
 """
 from __future__ import annotations
@@ -129,14 +130,16 @@ def command_request(args) -> int:
 
     output = Path(args.output).resolve()
     repositories = repositories_folder(args.repositories)
+    if output.exists():
+        raise UsageError(f"{output} exists already; no file is overwritten")
     try:  # the request names a release only if a run would accept it
         revision = reference_model.resolve_revision(args.revision, repositories)
         release = {"label": args.label, "references": reference_model.release_references(revision)}
         engine().resolve(release, repositories)
-    except Rejection as rejection:
-        raise UsageError(rejection.message) from None
-    if output.exists():
-        raise UsageError(f"{output} exists already; no file is overwritten")
+    except Rejection as rejection:  # nothing is written
+        print("request: rejected")
+        print_diagnostic(rejection.diagnostic())
+        return 1
     changes = {"enabled": list(args.enable)}
     if args.manifest:
         manifest = Path(args.manifest).resolve()
@@ -266,8 +269,10 @@ def command_regression(args) -> int:
         # recorded run may come from another engine version; the new run uses this engine.
         _, input_revision = reference_model.recorded_identity(recorded.record["releases"][0])
         revision = reference_model.resolve_revision(args.revision, repositories)
-    except Rejection as rejection:
-        raise UsageError(rejection.message) from None
+    except Rejection as rejection:  # nothing is written
+        print("regression: rejected")
+        print_diagnostic(rejection.diagnostic())
+        return 1
     release = {"label": args.label,
                "references": reference_model.release_references(revision, input_revision)}
     result = regression(recorded, release, output, engine(), repositories, args.tolerance)
