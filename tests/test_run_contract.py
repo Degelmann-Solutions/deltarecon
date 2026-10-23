@@ -2084,6 +2084,39 @@ def test_projection_keeps_the_failure_when_no_item_space_was_created():
     assert Projection.deleted == [0]
 
 
+def test_projection_releases_the_item_space_when_result_cf_raises():
+    import pandas as pd
+    from degelmann.deltarecon.engines.reference_model import ReferenceModelSession
+
+    class ItemSpace:
+        @staticmethod
+        def result_cf():
+            raise ValueError("no result")
+
+    class Projection:
+        itemspaces = {}
+
+        def __getitem__(self, index):
+            return self.itemspaces.setdefault(index, ItemSpace())
+
+        def __delitem__(self, index):
+            del self.itemspaces[index]
+
+    class Data:
+        @staticmethod
+        def model_point_table():
+            return pd.DataFrame({"policy_id": ["RLV-000001"]})
+
+    class Model:
+        pass
+
+    model = Model()
+    model.Projection, model.Data = Projection(), Data()
+    with pytest.raises(ModelPointFailure, match="result_cf raised ValueError: no result"):
+        ReferenceModelSession(model).project("RLV-000001")
+    assert Projection.itemspaces == {}
+
+
 FORMULA_MESSAGE = (
     "Error raised during formula execution\n"
     "TypeError: unsupported operand type(s) for -: 'str' and 'int'\n"

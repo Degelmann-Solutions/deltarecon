@@ -138,9 +138,9 @@ def _number(value: float | None, digits: int) -> str:
 def report(record: dict, baseline: dict | None) -> str:
     """The fixed-width table of a measurement beside a baseline, and the cost per state."""
     old = {step["name"]: step for step in baseline["steps"]} if baseline else {}
-    columns = ("step", "seconds", "peak MB")
+    columns = ("step", "seconds", "peak MiB")
     if baseline:
-        columns += ("baseline s", "baseline MB", "factor")
+        columns += ("baseline s", "baseline MiB", "factor")
     lines = [f"{columns[0]:<12}" + "".join(f"{column:>13}" for column in columns[1:])]
     rows = [(step["name"], step) for step in record["steps"]] + [("total", record["total"])]
     for name, step in rows:
@@ -185,6 +185,7 @@ def parse(argv: list[str] | None, steps: dict[str, dict]) -> argparse.Namespace:
 def main(argv: list[str] | None = None, steps: dict[str, dict] = STEPS) -> int:
     arguments = parse(argv, steps)
     now = datetime.datetime.now(datetime.timezone.utc)
+    commit, dirty = git_text("rev-parse", "HEAD"), git_text("status", "--porcelain")  # before any step runs
     work = (arguments.work or ROOT / RUNS / f"measure-{now:%Y%m%dT%H%M%SZ}").resolve()
     if work.exists():
         print(f"measure: the work folder {work} exists already", file=sys.stderr)
@@ -216,10 +217,9 @@ def main(argv: list[str] | None = None, steps: dict[str, dict] = STEPS) -> int:
                 entry["seconds_per_state"] = seconds / states if states else None
             measured.append(entry)
     peaks = [step["peak_mib"] for step in measured if step["peak_mib"] is not None]
-    dirty = git_text("status", "--porcelain")
     record = {
         "date": now.strftime("%Y-%m-%dT%H:%M:%SZ"),
-        "commit": git_text("rev-parse", "HEAD"),
+        "commit": commit,
         "dirty": None if dirty is None else bool(dirty),
         "platform": platform.platform(),
         "cpu_count": os.cpu_count(),

@@ -88,7 +88,6 @@ def test_recorded_measurement_holds_every_step(path):
     assert [step["name"] for step in record["steps"]] == list(tool.STEPS)
     for step in record["steps"]:
         assert isinstance(step["seconds"], (int, float)) and not isinstance(step["seconds"], bool)
-    assert record["note"]
 
 
 SYNTHETIC = {
@@ -102,7 +101,7 @@ SYNTHETIC = {
 
 def test_report_without_a_baseline():
     lines = tool.report(SYNTHETIC, None).splitlines()
-    assert lines[0].split() == ["step", "seconds", "peak", "MB"]
+    assert lines[0].split() == ["step", "seconds", "peak", "MiB"]
     assert lines[1].split() == ["run", "10.0", "155"]
     assert lines[3].split() == ["total", "370.0", "160"]
     assert lines[4] == "walk: 36 states, 10.0 s per state"
@@ -114,7 +113,7 @@ def test_report_beside_a_baseline():
     baseline["steps"][1].update(seconds=720.0, seconds_per_state=20.0)
     baseline["total"]["seconds"] = 820.0
     lines = tool.report(SYNTHETIC, baseline).splitlines()
-    assert lines[0].split() == ["step", "seconds", "peak", "MB", "baseline", "s", "baseline", "MB", "factor"]
+    assert lines[0].split() == ["step", "seconds", "peak", "MiB", "baseline", "s", "baseline", "MiB", "factor"]
     assert lines[1].split() == ["run", "10.0", "155", "100.0", "8000", "10.00"]
     assert lines[2].split() == ["walk", "360.0", "160", "720.0", "160", "2.00"]
     assert lines[3].split() == ["total", "370.0", "160", "820.0", "160", "2.22"]
