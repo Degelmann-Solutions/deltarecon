@@ -28,11 +28,11 @@ import shutil
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from .compare import COMPARE_REQUEST, CompareResult, compare, read_tolerance
-from .documents import (CONTRACT_VERSION, RUN_REQUEST, artifact_reference, document_bytes,
-                        schema_errors, write_document, write_new)
+from .compare import COMPARE_REQUEST, CompareResult, compare, compare_request_document, read_tolerance
+from .documents import artifact_reference, copy_files, document_bytes, write_document, write_new
 from .replay import RecordedRun, read_recorded_run
-from .run import RECORD_NAME, Engine, RunResult, UsageError, repositories_folder, run_request
+from .run import (RECORD_NAME, Engine, RunResult, UsageError, repositories_folder, run_request,
+                  run_request_document)
 
 RECORDED_FOLDER = "recorded"
 RUN_FOLDER = "run"
@@ -74,23 +74,11 @@ def regression(recorded: RecordedRun, release: dict, output: Path | str, engine:
         raise UsageError("the recorded run has enabled changes")
     profile = read_tolerance(tolerance, recorded.response["quantities"])
     run_id = f"regression-{recorded.request['run_id']}"
-    request = {
-        "document": "run_request", "contract_version": CONTRACT_VERSION, "stage": recorded.record["stage"],
-        "run_id": run_id, "release": release, "changes": {"enabled": []},
-        "selection": recorded.request["selection"],
-    }
-    errors = schema_errors(request, RUN_REQUEST)
-    if errors:
-        raise UsageError(f"the request of the regression run would violate its schema at {errors[0]}")
-    folder = recorded.folder
-    copies = [recorded.request_ref["path"], recorded.response_ref["path"], recorded.export_ref["path"],
-              recorded.record_path.name]
+    request = run_request_document(recorded.record["stage"], run_id, release, {"enabled": []},
+                                   recorded.request["selection"], "the request of the regression run")
     output.mkdir(parents=True)
     try:
-        for relative in dict.fromkeys(copies):
-            target = output / RECORDED_FOLDER / relative
-            target.parent.mkdir(parents=True, exist_ok=True)
-            shutil.copyfile(folder / relative, target)
+        copy_files(recorded.folder, output / RECORDED_FOLDER, recorded.files())
         (output / RUN_FOLDER).mkdir()
         request_path = output / RUN_FOLDER / REQUEST_NAME
         write_new(request_path, document_bytes(request))
@@ -98,16 +86,13 @@ def regression(recorded: RecordedRun, release: dict, output: Path | str, engine:
         if run.outcome != "succeeded":
             return RegressionResult(run)
 
-        compare_request = {
-            "document": "compare_request", "contract_version": CONTRACT_VERSION,
-            "stage": recorded.record["stage"], "compare_id": f"compare-{run_id}",
-            "left": {
-                "response": artifact_reference(output, output / RECORDED_FOLDER / recorded.response_ref["path"]),
-                "run_record": artifact_reference(output, output / RECORDED_FOLDER / recorded.record_path.name)},
-            "right": {"response": artifact_reference(output, run.response_path),
-                      "run_record": artifact_reference(output, output / RUN_FOLDER / RECORD_NAME)},
-            "tolerance": profile,
-        }
+        compare_request = compare_request_document(
+            recorded.record["stage"], f"compare-{run_id}",
+            (artifact_reference(output, output / RECORDED_FOLDER / recorded.response_ref["path"]),
+             artifact_reference(output, output / RECORDED_FOLDER / recorded.record_path.name)),
+            (artifact_reference(output, run.response_path),
+             artifact_reference(output, output / RUN_FOLDER / RECORD_NAME)),
+            profile)
         compare_request_path = output / COMPARE_REQUEST_NAME
         write_document(compare_request_path, compare_request, COMPARE_REQUEST)
         return RegressionResult(run, compare(compare_request_path))

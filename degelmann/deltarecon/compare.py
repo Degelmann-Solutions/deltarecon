@@ -30,10 +30,10 @@ from decimal import ROUND_HALF_UP, Context, Decimal
 from pathlib import Path
 
 from .documents import (CONTRACT_VERSION, RECORD_SCHEMA, RUN_SCHEMA, Rejection, artifact_reference,
-                        check_artifact, check_schema, check_version, document_bytes, new_record_id,
-                        parse_document, read_document, schema_errors, strict_json_text, write_new)
+                        check_artifact, check_document, check_schema, check_version, parse_document,
+                        read_document, schema_errors, strict_json_text, write_document, write_new)
 from .export import check_export, deviation_bytes, format_number, read_deviations
-from .run import STAGE_QUANTITIES, UsageError, _key_order, _typed_key, quantity_errors, recorded_now
+from .run import STAGE_QUANTITIES, UsageError, _key_order, _typed_key, quantity_errors, run_record
 from .signature import signature_table
 
 COMPARE_SCHEMA = "compare.schema.json"
@@ -69,8 +69,13 @@ class CompareResult:
 
     @property
     def no_deviation(self) -> bool:
-        return (self.outcome == "compared" and not self.deviations
-                and not self.result["added"] and not self.result["removed"])
+        return shows_no_deviation(self.result, self.deviations)
+
+
+def shows_no_deviation(result: dict, rows: list[dict]) -> bool:
+    """The statement "no deviation" of the compare contract: a compared result without a row
+    of its deviation file, ``rows``, and without an added or removed coordinate."""
+    return result["outcome"] == "compared" and not rows and not result["added"] and not result["removed"]
 
 
 def read_result_deviations(result: dict, folder: Path) -> list[dict]:
@@ -92,8 +97,7 @@ def no_deviation(result: dict, folder: Path) -> bool:
     """
     if result["outcome"] != "compared":
         return False
-    rows = read_result_deviations(result, folder)
-    return not rows and not result["added"] and not result["removed"]
+    return shows_no_deviation(result, read_result_deviations(result, folder))
 
 
 # --- tolerance rule -----------------------------------------------------------------
@@ -418,6 +422,19 @@ def _compare_request(request: dict, folder: Path) -> tuple[dict, list[dict]]:
     return _with_engine_versions(result, paths), deviations
 
 
+def compare_request_document(stage: str, compare_id: str, left: tuple[dict, dict], right: tuple[dict, dict],
+                             tolerance: dict) -> dict:
+    """A compare request the tool writes. ``left`` and ``right`` hold the artifact references
+    of the response and the run record of each side."""
+    return {
+        "document": "compare_request", "contract_version": CONTRACT_VERSION, "stage": stage,
+        "compare_id": compare_id,
+        "left": {"response": left[0], "run_record": left[1]},
+        "right": {"response": right[0], "run_record": right[1]},
+        "tolerance": tolerance,
+    }
+
+
 def compare(request_path: Path | str, *, result_name: str = RESULT_NAME,
             record_name: str | None = RECORD_NAME,
             signature_name: str | None = SIGNATURE_NAME,
@@ -466,12 +483,7 @@ def compare(request_path: Path | str, *, result_name: str = RESULT_NAME,
         files = [(result_path, result, COMPARE_SCHEMA)]
         if table is not None:
             files.append((signature_path, table, COMPARE_SCHEMA))
-        stored = []
-        for path, document, schema in files:
-            errors = schema_errors(document, schema)
-            if errors:
-                raise AssertionError(f"{path.name} would violate {schema}: {errors[0]}")
-            stored.append((path, document_bytes(document)))
+        stored = [(path, check_document(document, schema, path.name)) for path, document, schema in files]
         for path, data in stored:
             write_new(path, data)
             written.append(path)
@@ -487,17 +499,9 @@ def compare(request_path: Path | str, *, result_name: str = RESULT_NAME,
             outputs.append({"role": "deviations", "artifact": artifact_reference(folder, deviations_path)})
         if table is not None:
             outputs.append({"role": "signature_table", "artifact": artifact_reference(folder, signature_path)})
-        record = {
-            "document": "run_record", "contract_version": CONTRACT_VERSION, "stage": request["stage"],
-            "record_id": new_record_id(), "procedure": {"type": "compare"},
-            "outcome": outcome, "recorded_at": recorded_now(),
-            "inputs": [{"role": "request", "artifact": artifact_reference(folder, request_path)}],
-            "releases": releases, "parameters": [], "outputs": outputs,
-        }
-        errors = schema_errors(record, RECORD_SCHEMA)
-        if errors:
-            raise AssertionError(f"{record_path.name} would violate {RECORD_SCHEMA}: {errors[0]}")
-        write_new(record_path, document_bytes(record))
+        inputs = [{"role": "request", "artifact": artifact_reference(folder, request_path)}]
+        write_document(record_path, run_record(request["stage"], "compare", outcome, inputs, releases, [], outputs),
+                       RECORD_SCHEMA)
         written_record = record_path
     return CompareResult(outcome, result, result_path, written_record,
                          signature_path if table is not None else None, table,

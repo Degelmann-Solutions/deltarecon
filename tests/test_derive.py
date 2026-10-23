@@ -1,6 +1,6 @@
 """The derived change manifest: ``degelmann/deltarecon/derive.py`` and the history reader of the adapter.
 
-The core is tested on the stub engine of ``test_run_contract.py``, whose history is a list
+The core is tested on the stub engine of ``conftest.py``, whose history is a list
 that a test sets. The history reader of the reference engine is tested on throw-away
 repositories that are built on the fly and hold no model: reading a history needs none.
 One chain of two subset runs on a throw-away clone of the reference model checks the
@@ -23,12 +23,10 @@ from degelmann.deltarecon.documents import CHANGES_SCHEMA, Rejection, document_b
 from degelmann.deltarecon.replay import replay
 from degelmann.deltarecon.run import STAGE_QUANTITIES, History, Revision, UsageError
 
-from conftest import (CLONE_NAME, PRODUCT_FOLDER, RELEASE_N, REPOSITORIES, REPOSITORY_URL, ROOT, branch,
-                      clone_state, commit, commit_message, empty_repository, git, git_environment, merge,
-                      throwaway, write_files)
-from test_run_contract import (LAPSE_TABLE, NEW_BUSINESS, PARAMS, POINTS, POINTS_B, StubEngine, change, cli,
-                               edit_file, folder_hashes, patch_text, run_stub, stored, stub_request,
-                               with_manifest, world)  # noqa: F401  (world is a fixture)
+from conftest import (CLONE_NAME, LAPSE_TABLE, NEW_BUSINESS, PARAMS, POINTS, POINTS_B, PRODUCT_FOLDER, RELEASE_N,
+                      REPOSITORIES, REPOSITORY_URL, ROOT, StubEngine, branch, change, cli, clone_state, commit,
+                      commit_message, edit_file, empty_repository, folder_hashes, git, git_environment, merge,
+                      patch_text, run_stub, stored, stub_request, throwaway, with_manifest, write_files)
 
 # --- the core on the stub engine ----------------------------------------------------
 

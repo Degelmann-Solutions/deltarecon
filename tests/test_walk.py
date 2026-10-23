@@ -1,6 +1,6 @@
 """The walk of ``contracts/v2/localise.md``: ``degelmann/deltarecon/walk.py`` and the revision states of the adapter.
 
-The core is tested on the stub engine of ``test_run_contract.py``: a revision of the stub
+The core is tested on the stub engine with a main line of ``conftest.py``: a revision of the stub
 is a folder, and ``line`` is its main line. The reference engine is tested on a throw-away
 clone whose base commit shrinks the portfolio to two model points, so that every state
 runs in seconds. Each row of the I/O matrix of the Story 7 plan has a test here; the rows
@@ -11,7 +11,6 @@ from __future__ import annotations
 import json
 import subprocess
 import sys
-from contextlib import contextmanager
 from fractions import Fraction
 from pathlib import Path
 
@@ -23,90 +22,12 @@ from degelmann.deltarecon.documents import (RECORD_SCHEMA, RUN_SCHEMA, Rejection
 from degelmann.deltarecon.run import STAGE_QUANTITIES, UsageError, run_request
 from degelmann.deltarecon.walk import exact_sums, held_kinds, walk, written
 
-from conftest import (PRODUCT_FOLDER, RELEASE_N, ROOT, clone_state, commit, export_coordinates, git,
-                      throwaway, write_files)
-from test_run_contract import (PARAMS, POINTS, StubEngine, StubSession, change, cli, folder_hashes, patch_text,
-                               stored, stub_request, with_manifest, world)  # noqa: F401  (world is a fixture)
+from conftest import (LAPSE_TABLE, MODEL_CODE, PARAMS, PARAMS_RATE, POINTS, POINTS_B, POINTS_E, POINT_TABLE,
+                      RELEASE_N, ROOT, StubEngine, TwoStages, WalkStub, build, change, cli, clone_state, commit,
+                      export_coordinates, folder_hashes, git, patch_text, record, stored, stub_request, throwaway,
+                      with_manifest, write_files)
 
-PARAMS_RATE = PARAMS.replace("rate,0.01", "rate,0.02")
-POINTS_B = POINTS.replace("MP-B,0,2,2", "MP-B,0,2,4")
-POINTS_E = POINTS_B + "MP-E,0,1,7\n"
-# MP-B up by 0.5 and MP-A down by 0.5: the counts of the step partly cancel.
-POINTS_CANCEL = POINTS_E.replace("MP-B,0,2,4", "MP-B,0,2,4.5").replace("MP-A,12,13,1.5", "MP-A,12,13,1")
 QUANTITIES = ["Anzahl Verträge", "Netto-Cashflow"]
-
-# name, log message, classes, points, parameters
-LINE = (
-    ("w0", "The base.\n", (), POINTS, PARAMS),
-    ("w1", "Raise the rate\n", ("parameter",), POINTS, PARAMS_RATE),
-    ("w2", "Touch nothing that has a class\n", (), POINTS, PARAMS_RATE),
-    ("w3", "Raise MP-B and add MP-E\n", ("data",), POINTS_E, PARAMS_RATE),
-    ("w4", "Move MP-B up and MP-A down\n", ("data", "code"), POINTS_CANCEL, PARAMS_RATE),
-)
-
-
-class WalkSession(StubSession):
-    """The stub session whose Netto-Cashflow depends on the parameter ``rate``."""
-
-    def project(self, model_point_id):
-        rate = float(dict(self.params)["rate"])
-        return [(period, [values[0], values[1] * (1 + rate)])
-                for period, values in super().project(model_point_id)]
-
-
-class WalkStub(StubEngine):
-    """The stub engine with a main line of folders. It reads identities that hold further kinds.
-
-    ``drift`` adds a number to every value of the states of the named folders, ``broken``
-    names folders whose state cannot be opened, as a recorded result may differ from a state
-    or a state may not run.
-    """
-
-    def __init__(self, line=LINE, drift: dict | None = None, broken=()):
-        super().__init__()
-        self.line = tuple((name, message, classes) for name, message, classes, *_ in line)
-        self.drift, self.broken = drift or {}, set(broken)
-
-    def _folder(self, release, repositories):
-        kept = [r for r in release["references"] if r["kind"] in self.determines]
-        return super()._folder({**release, "references": kept}, repositories)
-
-    @contextmanager
-    def open(self, release, enabled, manifest_dir, repositories, hold=frozenset()):
-        revisions = [c["realisation"]["revision"] for c in enabled if c["realisation"]["type"] == "revision"]
-        name = revisions[-1] if revisions else self._folder(release, repositories).name
-        if name in self.broken:
-            raise RuntimeError(f"the state {name} cannot be read")
-        with super().open(release, enabled, manifest_dir, repositories, hold) as session:
-            session.__class__ = WalkSession
-            delta = self.drift.get(name)
-            if delta is not None:
-                plain = session.project
-                session.project = lambda point: [(p, [v + delta for v in values]) for p, values in plain(point)]
-            yield session
-
-
-def build(world: Path, line=LINE) -> None:
-    for name, _, _, points, params in line:
-        folder = world / name
-        folder.mkdir(exist_ok=True)
-        if points is not None:
-            (folder / "points.csv").write_text(points, "utf-8")
-        (folder / "params.csv").write_text(params, "utf-8")
-
-
-def record(world: Path, name: str, engine=None, folder: str | None = None, further=(), label: str | None = None,
-           **members) -> Path:
-    """Run the stub folder ``name`` without changes and return the path of its run record."""
-    identity = {"label": label or name, "references": StubEngine.references(world / name, name) + list(further)}
-    folder = folder or f"run-{name}"
-    request = stub_request(world, run_id=folder, release=identity, **members)
-    path = world / folder / "request.json"
-    path.parent.mkdir()
-    path.write_bytes(document_bytes(request))
-    result = run_request(path, engine or WalkStub(), repositories=world)
-    assert result.outcome == "succeeded", result.response
-    return result.record_path
 
 
 @pytest.fixture
@@ -250,7 +171,7 @@ def test_a_linear_walk_attributes_every_revision_and_the_sums_add_up(linear, mon
 WALK_PROCESS = """
 import sys
 sys.path[:0] = [sys.argv[1]]
-from test_walk import WalkStub
+from conftest import WalkStub
 from degelmann.deltarecon.walk import walk
 walk(sys.argv[2], sys.argv[3], sys.argv[4], WalkStub(), repositories=sys.argv[5])
 """
@@ -430,10 +351,6 @@ def test_a_differing_engine_version_is_named_as_remainder(world):
                                          "to": [{"kind": "engine_version", "value": "1.1"}]}]
 
 
-class TwoStages(WalkStub):
-    stages = frozenset({"liability_cashflow", "other_stage"})
-
-
 @pytest.mark.parametrize("case, status", [("wrong-order", 1), ("stage-mismatch", 1), ("failed-run", 2),
                                           ("existing-output", 2)])
 def test_what_derive_refuses_the_walk_refuses_and_no_command_overwrites(world, monkeypatch, capsys, case, status):
@@ -584,10 +501,6 @@ def test_a_held_kind_is_passed_to_the_engine_and_repeated_by_the_response(world)
 
 
 # --- the reference engine on a throw-away clone -------------------------------------
-
-POINT_TABLE = f"{PRODUCT_FOLDER}/model_point_table.csv"
-LAPSE_TABLE = f"{PRODUCT_FOLDER}/lapse_table.csv"
-MODEL_CODE = f"{PRODUCT_FOLDER}/RLV_DE_S/Projection/__init__.py"
 
 
 @pytest.fixture(scope="module")

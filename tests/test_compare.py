@@ -1,8 +1,8 @@
 """The compare contract as implemented by ``degelmann.deltarecon``: compare result, signature table, record.
 
-The runs come from the stub engine of ``test_run_contract.py``, so the tests need no
+The runs come from the stub engine of ``conftest.py``, so the tests need no
 calculation engine. The expected deviation list is computed in ``conftest.py``, from the
-two exports, with ``rounded`` and ``deviates`` of ``test_contracts.py``: an oracle that
+two exports, with ``rounded`` and ``deviates`` there: an oracle that
 shares no code with ``degelmann/deltarecon/compare.py``. Its rule is built like that of the core,
 so it finds faults of wiring and not a shared misreading of the contract. Against that
 stand the cases with an answer worked out by hand, and an oracle of another construction
@@ -12,7 +12,6 @@ from __future__ import annotations
 
 import json
 import random
-import re
 import shutil
 from contextlib import contextmanager
 from fractions import Fraction
@@ -28,13 +27,10 @@ from degelmann.deltarecon.documents import RECORD_SCHEMA, Rejection, document_by
 from degelmann.deltarecon.run import UsageError
 from degelmann.deltarecon.signature import render_table, signature_table
 
-from conftest import deviation_rows, expected_deviations
-from test_contracts import EXAMPLES, deviates, rounded
-from test_run_contract import (POINTS, StubEngine, StubSession, folder_hashes, rehash, roles, run_stub, stored,
-                               stub_request, world)  # noqa: F401  (world is a fixture)
+from conftest import (EXACT, EXAMPLES, POINTS, RECORD_ID, StubEngine, StubSession, compare_request, deviates,
+                      deviation_rows, expected_deviations, folder_hashes, rehash, roles, rounded, run_side,
+                      stored)
 
-EXACT = {"abs_tol": 0, "rel_tol": 0}
-RECORD_ID = re.compile(r"record-[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}")
 COUNT, CASH = "Anzahl Verträge", "Netto-Cashflow"
 OUTPUTS = ["compare.deviations.csv", "compare.result.json", "compare.run-record.json", "signature-table.json"]
 HEADER_ONLY = "model_point_id,period,quantity,left,right\n"
@@ -48,44 +44,6 @@ def entry(upper=(0, 0), lower=(0, 0), decimals=None) -> dict:
     if decimals is not None or any(upper) or any(lower):
         result["derivation"] = "Synthetic test profile."
     return result
-
-
-def release(world: Path, name: str, points: str, params: str | None = None) -> dict:
-    """A second stub release below ``world``. Return its release identity."""
-    folder = world / name
-    folder.mkdir()
-    (folder / "points.csv").write_text(points, "utf-8")
-    (folder / "params.csv").write_text(params or (world / "rel" / "params.csv").read_text("utf-8"), "utf-8")
-    return {"label": name, "references": StubEngine.references(folder, name)}
-
-
-def run_side(world: Path, side: str, points: str | None = None, params: str | None = None, engine=None,
-             **members):
-    """One stub run in the folder ``side``, of the base release or of a release with other files."""
-    if points is not None or params is not None:
-        members["release"] = release(world, f"rel-{side}", points or POINTS, params)
-    result, _ = run_stub(world, stub_request(world, run_id=f"run-{side}", **members), engine, folder=side)
-    return result
-
-
-def reference(world: Path, relative: str) -> dict:
-    return {"path": relative, "sha256": sha256_file(world / relative)}
-
-
-def compare_request(world: Path, per_quantity: dict | None = None, records: bool = True,
-                    left: str = "left", right: str = "right", **members) -> Path:
-    """Store a compare request in ``world`` that names the runs in the folders ``left`` and ``right``."""
-    request = {"document": "compare_request", "contract_version": "2.0", "stage": "liability_cashflow",
-               "compare_id": "compare-stub"}
-    for name, folder in (("left", left), ("right", right)):
-        request[name] = {"response": reference(world, f"{folder}/response.json")}
-        if records:
-            request[name]["run_record"] = reference(world, f"{folder}/run-record.json")
-    request["tolerance"] = {"per_quantity": per_quantity or {}}
-    request.update(members)
-    path = world / "compare.request.json"
-    path.write_bytes(document_bytes(request))
-    return path
 
 
 def written(world: Path) -> list[str]:
@@ -772,6 +730,19 @@ def test_signature_table_counts_the_deviation_list_and_has_reproducible_bytes(wo
     assert sum(row["deviating_coordinates"] for row in table["rows"]) == len(listed)
 
 
+def test_a_signature_table_that_would_violate_its_schema_writes_no_part_of_the_comparison(world, monkeypatch):
+    run_side(world, "left", POINTS_LEFT), run_side(world, "right", POINTS_MOVED)
+    request = compare_request(world)
+    broken = {"document": "signature_table"}
+    assert schema_errors(broken, COMPARE_SCHEMA)
+    monkeypatch.setattr("degelmann.deltarecon.compare.signature_table", lambda result, deviations: broken)
+    with pytest.raises(AssertionError, match=r"^signature-table\.json would violate compare\.schema\.json: "):
+        compare(request)
+    # The result and the table are checked before either is written, and the deviation file
+    # written before them is removed again: no part of the comparison stays, and no record.
+    assert written(world) == []
+
+
 def test_signature_table_names_the_extremes_with_signed_differences():
     def deviation(model_point_id, period, quantity, left, right):
         return {"model_point_id": model_point_id, "period": period, "quantity": quantity, "left": left,
@@ -842,7 +813,7 @@ def test_signature_table_schema(edit, valid):
 
 # --- an oracle of another construction ----------------------------------------------
 
-# ``rounded`` and ``deviates`` of ``test_contracts.py`` are built like the core: a decimal
+# ``rounded`` and ``deviates`` of ``conftest.py`` are built like the core: a decimal
 # number quantized half up. The oracle below rounds with fractions and no decimal module,
 # and builds lists and ranges in its own way, so a shared misreading has to be made twice
 # in two different constructions.

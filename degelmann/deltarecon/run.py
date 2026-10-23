@@ -439,6 +439,31 @@ def recorded_now() -> str:
     return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
+def run_record(stage: str, procedure: str, outcome: str, inputs: list[dict], releases: list[dict],
+               parameters: list[dict], outputs: list[dict]) -> dict:
+    """The run record of one execution of ``procedure``, with a new record id and the present time."""
+    return {
+        "document": "run_record", "contract_version": CONTRACT_VERSION, "stage": stage,
+        "record_id": new_record_id(), "procedure": {"type": procedure},
+        "outcome": outcome, "recorded_at": recorded_now(), "inputs": inputs,
+        "releases": releases, "parameters": parameters, "outputs": outputs,
+    }
+
+
+def run_request_document(stage: str, run_id: str, release: dict, changes: dict, selection: dict,
+                         subject: str) -> dict:
+    """A run request the tool writes. A request that would violate its schema is a usage error
+    that names ``subject``, for example "the request of state 3"."""
+    request = {
+        "document": "run_request", "contract_version": CONTRACT_VERSION, "stage": stage,
+        "run_id": run_id, "release": release, "changes": changes, "selection": selection,
+    }
+    errors = schema_errors(request, RUN_REQUEST)
+    if errors:
+        raise UsageError(f"{subject} would violate its schema at {errors[0]}")
+    return request
+
+
 def repositories_folder(repositories: Path | str | None) -> Path:
     """The repositories folder: the given one, or ``repositories/`` in the working directory."""
     return Path.cwd() / REPOSITORIES_FOLDER if repositories is None else Path(repositories)
@@ -533,14 +558,7 @@ def run_request(request_path: Path, engine: Engine, repositories: Path | None = 
     outputs = [{"role": "response", "artifact": artifact_reference(folder, response_path)}]
     if outcome == "succeeded":
         outputs.append({"role": "export", "artifact": artifact_reference(folder, export_path)})
-    record = {
-        "document": "run_record", "contract_version": CONTRACT_VERSION, "stage": request["stage"],
-        "record_id": new_record_id(), "procedure": {"type": "run"},
-        "outcome": outcome, "recorded_at": recorded_now(), "inputs": inputs,
-        "releases": [request["release"]],
-        "parameters": parameters,
-        "outputs": outputs,
-    }
+    record = run_record(request["stage"], "run", outcome, inputs, [request["release"]], parameters, outputs)
     write_document(record_path, record, RECORD_SCHEMA)
     return RunResult(outcome, response, response_path, record_path,
                      export_path if outcome == "succeeded" else None, record)

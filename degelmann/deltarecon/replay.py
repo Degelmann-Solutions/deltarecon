@@ -32,13 +32,14 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 from . import changes as changes_contract
-from .compare import COMPARE_REQUEST, CompareResult, compare, no_deviation, read_tolerance
+from .compare import (COMPARE_REQUEST, CompareResult, compare, compare_request_document, no_deviation,
+                      read_tolerance)
 from .documents import (CHANGES_SCHEMA, CONTRACT_VERSION, RECORD_SCHEMA, RUN_REQUEST, RUN_SCHEMA,
-                        Rejection, artifact_reference, check_artifact, new_record_id, read_document,
+                        Rejection, artifact_reference, check_artifact, copy_files, read_document,
                         same_release, write_document)
 from .export import check_export
 from .run import (RECORD_NAME, STAGE_QUANTITIES, Engine, UsageError, quantity_errors,
-                  recorded_now, repositories_folder, run_request)
+                  repositories_folder, run_record, run_request)
 
 REPLAY_FOLDER = "replay"
 REPLAY_RECORD_NAME = "replay-record.json"
@@ -69,6 +70,10 @@ class RecordedRun:
     @property
     def folder(self) -> Path:
         return self.record_path.parent
+
+    def files(self) -> list[str]:
+        """Request, response, export, and record of a succeeded run, relative to its folder."""
+        return [self.request_ref["path"], self.response_ref["path"], self.export_ref["path"], self.record_path.name]
 
 
 @dataclass
@@ -252,24 +257,17 @@ def replay(record_path: Path, engine: Engine, repositories: Path | None = None,
     # The repeated run is a normal, self-contained run in its own folder.
     replay_dir.mkdir()
     try:
-        for relative in dict.fromkeys(copies):
-            target = replay_dir / relative
-            target.parent.mkdir(parents=True, exist_ok=True)
-            shutil.copyfile(folder / relative, target)
+        copy_files(folder, replay_dir, copies)
         result = run_request(replay_dir / request_ref["path"], engine, repositories)
         if failed_before:
             return _replay_of_an_error(recorded, result, replay_record_path)
 
         # The recorded run is the left side, the repeated run the right side.
-        compare_request = {
-            "document": "compare_request", "contract_version": CONTRACT_VERSION, "stage": record["stage"],
-            "compare_id": f"compare-replay-{request['run_id']}",
-            "left": {"response": dict(recorded.response_ref),
-                     "run_record": artifact_reference(folder, record_path)},
-            "right": {"response": artifact_reference(folder, result.response_path),
-                      "run_record": artifact_reference(folder, replay_dir / RECORD_NAME)},
-            "tolerance": profile,
-        }
+        compare_request = compare_request_document(
+            record["stage"], f"compare-replay-{request['run_id']}",
+            (dict(recorded.response_ref), artifact_reference(folder, record_path)),
+            (artifact_reference(folder, result.response_path), artifact_reference(folder, replay_dir / RECORD_NAME)),
+            profile)
         write_document(compare_request_path, compare_request, COMPARE_REQUEST)
         compared = compare(compare_request_path, result_name=REPLAY_COMPARE_RESULT_NAME,
                            record_name=None, signature_name=None, deviations_name=REPLAY_DEVIATIONS_NAME)
@@ -285,15 +283,10 @@ def replay(record_path: Path, engine: Engine, repositories: Path | None = None,
                         "artifact": artifact_reference(folder, compare_result_path)})
         if compared.deviations_path is not None:
             outputs.append({"role": "deviations", "artifact": artifact_reference(folder, deviations_path)})
-        replay_record = {
-            "document": "run_record", "contract_version": CONTRACT_VERSION, "stage": record["stage"],
-            "record_id": new_record_id(), "procedure": {"type": "replay"},
-            "outcome": outcome, "recorded_at": recorded_now(),
-            "inputs": [{"role": "run_record", "artifact": artifact_reference(folder, record_path)}],
-            "releases": record["releases"],
-            "parameters": result.record["parameters"],
-            "outputs": outputs,
-        }
+        replay_record = run_record(
+            record["stage"], "replay", outcome,
+            [{"role": "run_record", "artifact": artifact_reference(folder, record_path)}],
+            record["releases"], result.record["parameters"], outputs)
         write_document(replay_record_path, replay_record, RECORD_SCHEMA)
     except BaseException:  # also an interruption: leave nothing that blocks the next replay
         shutil.rmtree(replay_dir, ignore_errors=True)
@@ -309,15 +302,11 @@ def _replay_of_an_error(recorded: RecordedRun, result, replay_record_path: Path)
     folder = recorded.folder
     same = result.response_path.read_bytes() == (folder / recorded.response_ref["path"]).read_bytes()
     outcome = "reproduced_exactly" if same else "not_reproduced"
-    replay_record = {
-        "document": "run_record", "contract_version": CONTRACT_VERSION, "stage": recorded.record["stage"],
-        "record_id": new_record_id(), "procedure": {"type": "replay"},
-        "outcome": outcome, "recorded_at": recorded_now(),
-        "inputs": [{"role": "run_record", "artifact": artifact_reference(folder, recorded.record_path)}],
-        "releases": recorded.record["releases"],
-        "parameters": result.record["parameters"],
-        "outputs": [{"role": "response", "artifact": artifact_reference(folder, result.response_path)}],
-    }
+    replay_record = run_record(
+        recorded.record["stage"], "replay", outcome,
+        [{"role": "run_record", "artifact": artifact_reference(folder, recorded.record_path)}],
+        recorded.record["releases"], result.record["parameters"],
+        [{"role": "response", "artifact": artifact_reference(folder, result.response_path)}])
     write_document(replay_record_path, replay_record, RECORD_SCHEMA)
     return ReplayResult(outcome, replay_record_path, replay_record, None, None, None, None,
                         result.response_path)
