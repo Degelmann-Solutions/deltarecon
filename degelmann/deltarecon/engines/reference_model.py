@@ -72,7 +72,7 @@ import platform
 import re
 import subprocess
 import tempfile
-from contextlib import contextmanager
+from contextlib import contextmanager, suppress
 from pathlib import Path
 
 import modelx as mx
@@ -503,28 +503,34 @@ class ReferenceModelSession:
         matches = table.index[table[MODEL_POINT_ID_COLUMN].astype(str) == model_point_id]
         if len(matches) != 1:
             raise ModelPointFailure(f"The model point table holds {len(matches)} rows with this id.")
+        index = int(matches[0])
         try:
-            projection = self._model.Projection[int(matches[0])]
-            frame = projection.result_cf()
-        except Exception as exc:  # a modelx FormulaError wraps the cause
-            reason = str(exc).strip().splitlines()
-            raise ModelPointFailure(f"result_cf raised {type(exc).__name__}"
-                                    + (f": {reason[-1]}" if reason else "")) from None
-        problems = []
-        for check in CHECKS:
             try:
-                if not bool(getattr(projection, check)()):
-                    problems.append(f"{check} is false")
+                projection = self._model.Projection[index]
+                frame = projection.result_cf()
+            except Exception as exc:  # a modelx FormulaError wraps the cause
+                reason = str(exc).strip().splitlines()
+                raise ModelPointFailure(f"result_cf raised {type(exc).__name__}"
+                                        + (f": {reason[-1]}" if reason else "")) from None
+            problems = []
+            for check in CHECKS:
+                try:
+                    if not bool(getattr(projection, check)()):
+                        problems.append(f"{check} is false")
+                except Exception as exc:
+                    problems.append(f"{check} raised {type(exc).__name__}")
+            if problems:
+                raise ModelPointFailure("; ".join(problems))
+            try:
+                columns = [[float(value) for value in frame[column]] for _, _, column in QUANTITIES]
+                periods = [int(period) for period in frame.index]
             except Exception as exc:
-                problems.append(f"{check} raised {type(exc).__name__}")
-        if problems:
-            raise ModelPointFailure("; ".join(problems))
-        try:
-            columns = [[float(value) for value in frame[column]] for _, _, column in QUANTITIES]
-            periods = [int(period) for period in frame.index]
-        except Exception as exc:
-            raise ModelPointFailure(f"result_cf has not the expected form: {type(exc).__name__}") from None
-        return [(period, [column[row] for column in columns]) for row, period in enumerate(periods)]
+                raise ModelPointFailure(f"result_cf has not the expected form: {type(exc).__name__}") from None
+            return [(period, [column[row] for column in columns]) for row, period in enumerate(periods)]
+        finally:
+            # Release the point's ItemSpace: a run would otherwise keep one per point alive (memory per run).
+            with suppress(KeyError):  # absent when Projection[index] raised
+                del self._model.Projection[index]
 
     def parameters(self) -> list[dict]:
         with _readable_formula_errors():
