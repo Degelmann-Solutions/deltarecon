@@ -28,8 +28,7 @@ import shutil
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from .compare import (COMPARE_REQUEST, CompareResult, compare, compare_request_document, read_tolerance,
-                      shows_no_deviation)
+from .compare import COMPARE_REQUEST, CompareResult, compare, compare_request_document, read_tolerance
 from .documents import artifact_reference, copy_files, document_bytes, write_document, write_new
 from .replay import RecordedRun, read_recorded_run
 from .run import (RECORD_NAME, Engine, RunResult, UsageError, repositories_folder, run_request,
@@ -48,8 +47,7 @@ class RegressionResult:
 
     @property
     def no_deviation(self) -> bool:
-        return self.comparison is not None and shows_no_deviation(self.comparison.result,
-                                                                   self.comparison.deviations)
+        return self.comparison is not None and self.comparison.no_deviation
 
 
 def read_regression_input(record_path: Path | str, stages) -> RecordedRun:

@@ -132,6 +132,13 @@ def command_request(args) -> int:
     repositories = repositories_folder(args.repositories)
     if output.exists():
         raise UsageError(f"{output} exists already; no file is overwritten")
+    changes = {"enabled": list(args.enable)}
+    if args.manifest:
+        manifest = Path(args.manifest).resolve()
+        if not manifest.is_file() or output.parent not in manifest.parents:
+            raise UsageError("the manifest must be a file in the folder of the request or below it")
+        changes["manifest"] = {"path": manifest.relative_to(output.parent).as_posix(),
+                               "sha256": sha256_file(manifest)}
     try:  # the request names a release only if a run would accept it
         revision = reference_model.resolve_revision(args.revision, repositories)
         release = {"label": args.label, "references": reference_model.release_references(revision)}
@@ -140,13 +147,6 @@ def command_request(args) -> int:
         print("request: rejected")
         print_diagnostic(rejection.diagnostic())
         return 1
-    changes = {"enabled": list(args.enable)}
-    if args.manifest:
-        manifest = Path(args.manifest).resolve()
-        if not manifest.is_file() or output.parent not in manifest.parents:
-            raise UsageError("the manifest must be a file in the folder of the request or below it")
-        changes["manifest"] = {"path": manifest.relative_to(output.parent).as_posix(),
-                               "sha256": sha256_file(manifest)}
     selection = ({"mode": "subset", "model_point_ids": list(args.subset)} if args.subset
                  else {"mode": "full"})
     request = run_request_document(reference_model.STAGE, args.run_id, release, changes, selection, "the request")

@@ -1672,6 +1672,20 @@ def test_request_command_with_an_existing_output_starts_nothing_before_it_resolv
     assert output.read_bytes() == b"kept" and [p.name for p in output.parent.iterdir()] == ["request.json"]
 
 
+def test_request_command_with_a_misplaced_manifest_starts_nothing_before_it_resolves_the_revision(
+        monkeypatch, tmp_path, capsys):
+    output = tmp_path / "run" / "request.json"
+    manifest = tmp_path / "elsewhere" / "changes.json"
+    manifest.parent.mkdir()
+    manifest.write_bytes(b"{}")
+    assert cli(monkeypatch, "request", "--revision", "no-such-branch", "--repositories", REPOSITORIES,
+               "--label", "N", "--run-id", "x", "--output", output, "--enable", "c1", "--manifest", manifest) == 2
+    printed = capsys.readouterr()
+    assert printed.out == "" and printed.err == ("error: the manifest must be a file in the folder of the request "
+                                                 "or below it\n")
+    assert not output.parent.exists() and manifest.read_bytes() == b"{}"
+
+
 def test_request_command_without_a_clone_names_where_it_is_expected(monkeypatch, tmp_path, capsys):
     output = tmp_path / "run" / "request.json"
     (tmp_path / "empty" / CLONE_NAME).mkdir(parents=True)  # a folder that is no repository
