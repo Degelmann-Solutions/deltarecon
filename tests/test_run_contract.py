@@ -8,7 +8,6 @@ run and its replay (``conftest.py``).
 """
 from __future__ import annotations
 
-import difflib
 import hashlib
 import json
 import os
@@ -31,237 +30,18 @@ from degelmann.deltarecon.export import (check_export, export_bytes, export_erro
 from degelmann.deltarecon.compare import COMPARE_SCHEMA
 from degelmann.deltarecon.regression import read_regression_input, regression
 from degelmann.deltarecon.replay import check_response, replay
-from degelmann.deltarecon.run import SCRATCH_PREFIX, History, ModelPointFailure, Revision, UsageError, run_request
+from degelmann.deltarecon.run import SCRATCH_PREFIX, ModelPointFailure, UsageError, run_request
 
-from conftest import (CLONE, CLONE_NAME, PRODUCT_FOLDER, RELEASE_N, REPOSITORIES, REPOSITORY_URL, ROOT,
-                      clone_state, commit, committed, deviation_rows, expected_deviations, git, require_clone,
-                      throwaway)
+from conftest import (CLONE, CLONE_NAME, EXACT, LAPSE_TABLE, MODEL_CODE, NEW_BUSINESS, PARAMS, PARAMS_RATE,
+                      POINTS, POINTS_B, POINT_TABLE, PRODUCT_FOLDER, RECORD_ID, RELEASE_N, REPOSITORIES,
+                      REPOSITORY_URL, ROOT, StubEngine, StubSession, assert_documents_valid, change, cli,
+                      clone_state, commit, committed, deviation_rows, edit_file, expected_deviations,
+                      folder_hashes, git, patch_text, rehash, require_clone, roles, run_stub, stored,
+                      stub_regression, stub_release, stub_request, throwaway, with_manifest)
 
 CORE_MODULES = ["documents", "export", "changes", "run", "compare", "signature", "replay", "regression",
                 "derive", "walk", "search", "__main__"]
-
-RECORD_ID = re.compile(r"record-[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}")
-POINTS = "id,first,last,base\nMP-B,0,2,2\nMP-A,12,13,1.5\nMP-C,0,0,1e-05\nMP-D,3,4,1e16\n"
-PARAMS = "name,value\nrate,0.01\nlabel,base\n"
-
-
-def folder_hashes(folder: Path) -> dict[str, str]:
-    return {p.relative_to(folder).as_posix(): sha256_file(p)
-            for p in sorted(folder.rglob("*")) if p.is_file()}
-
-
-# --- a stub engine behind the protocol ----------------------------------------------
-
-
-class StubSession:
-    """A release state of two text files: ``points.csv`` and ``params.csv``."""
-
-    time_basis = "policy_month"
-    quantities = [("Anzahl Verträge", "policies"), ("Netto-Cashflow", "EUR")]
-
-    def __init__(self, folder: Path):
-        lines = (folder / "points.csv").read_text("utf-8").splitlines()[1:]
-        self.points = [line.split(",") for line in lines]
-        self.params = [line.split(",") for line in
-                       (folder / "params.csv").read_text("utf-8").splitlines()[1:]]
-
-    def model_point_ids(self):
-        return [point[0] for point in self.points]
-
-    def project(self, model_point_id):
-        _, first, last, base = next(p for p in self.points if p[0] == model_point_id)
-        if base == "raise":
-            raise ModelPointFailure("The stub cannot calculate this model point.")
-        return [(period, [float(base), float(base) * (period + 1)])
-                for period in range(int(first), int(last) + 1)]
-
-    def parameters(self):
-        def value(text):
-            try:
-                return float(text)
-            except ValueError:
-                return text
-        return [{"name": name, "type": "scalar", "value": value(text)} for name, text in self.params]
-
-
-class StubEngine:
-    """A release is the folder ``rel`` below the repositories folder, named by a file hash.
-
-    The release folder is the revision of the stub: ``line`` is its main line. A change of
-    the type ``revision`` names another folder; the state after it is that folder, with
-    ``points.csv`` of the release folder of the request when ``input_data`` is held.
-    """
-
-    stages = frozenset({"liability_cashflow"})
-    realisations = frozenset({"text_patch", "revision"})
-    determines = frozenset({"release_folder", "input_data"})
-    holdable = {"input_data": frozenset({"data"})}
-    line: tuple = ()  # the main line, oldest first: (release folder, log message, classes)
-
-    def __init__(self):
-        self.opened = 0
-        self.received = []  # the enabled changes of the last call of ``open``
-
-    def history(self, older, newer, repositories):
-        """The part of ``line`` after the folder of ``older`` up to the folder of ``newer``."""
-        names = [name for name, _, _ in self.line]
-        ends = []
-        for release in (older, newer):
-            folders = [r["value"] for r in release["references"] if r["kind"] == "release_folder"]
-            if len(folders) != 1 or folders[0] not in names:
-                raise Rejection("unknown_reference", "The release folder is no revision of the stub history.")
-            ends.append(names.index(folders[0]))
-        if ends[0] > ends[1]:
-            raise Rejection("unrelated_revisions", "The older folder does not stand before the newer one.")
-        return History("git", names[ends[0]], names[ends[1]],
-                       tuple(Revision(name, message, frozenset(classes))
-                             for name, message, classes in self.line[ends[0] + 1:ends[1] + 1]))
-
-    @staticmethod
-    def references(folder: Path, value: str) -> list[dict]:
-        points = folder / "points.csv"
-        data = f"points.csv sha256:{sha256_file(points)}" if points.is_file() else "points.csv absent"
-        return [{"kind": "release_folder", "value": value}, {"kind": "input_data", "value": data}]
-
-    def state_release(self, base, revision, hold, repositories):
-        """The identity of the state after the folder ``revision``; nothing is restored."""
-        kept = [r for r in base["references"] if r["kind"] in self.determines]
-        if revision is None:
-            return {"label": base["label"], "references": kept}
-        moved = self.references(Path(repositories) / revision, revision)
-        return {"label": base["label"], "references": [moved[0]] + [
-            r for r in (kept if "input_data" in hold else moved) if r["kind"] == "input_data"]}
-
-    def _folder(self, release, repositories) -> Path:
-        folders = [r["value"] for r in release["references"] if r["kind"] == "release_folder"]
-        if len(folders) != 1 or not (Path(repositories) / folders[0] / "points.csv").is_file():
-            raise Rejection("unknown_reference", "The release folder cannot be resolved.")
-        folder = Path(repositories) / folders[0]
-        if sorted(map(str, release["references"])) != sorted(map(str, self.references(folder, folders[0]))):
-            raise Rejection("unknown_reference", "The references do not name the release state.")
-        return folder
-
-    def resolve(self, release, repositories):
-        self._folder(release, repositories)
-
-    @contextmanager
-    def open(self, release, enabled, manifest_dir, repositories, hold=frozenset()):
-        """Restore the state to a scratch folder and apply the text patches there."""
-        folder = self._folder(release, repositories)
-        revisions = [c["realisation"]["revision"] for c in enabled if c["realisation"]["type"] == "revision"]
-        with tempfile.TemporaryDirectory() as scratch:
-            state = Path(scratch) / folder.name
-            if revisions:  # the state after the last enabled revision
-                source = Path(repositories) / revisions[-1]
-                if not (source / "points.csv").is_file():
-                    raise RuntimeError(f"the revision {revisions[-1]} holds no points.csv")
-                shutil.copytree(source, state)
-                if "input_data" in hold:
-                    shutil.copyfile(folder / "points.csv", state / "points.csv")
-            else:
-                shutil.copytree(folder, state)
-            patches = [c for c in enabled if c["realisation"]["type"] == "text_patch"]
-            changes_contract.apply_changes(state, patches, manifest_dir)
-            for realisation in (c["realisation"] for c in enabled):
-                if realisation["type"] == "file_replace":
-                    shutil.copyfile(manifest_dir / realisation["file"]["path"], state / realisation["target"])
-            self.received, self.held = list(enabled), hold
-            self.opened += 1
-            yield StubSession(state)
-
-
-@pytest.fixture
-def world(tmp_path):
-    """A folder with a stub release ``rel`` and an empty run folder ``run``.
-
-    It is the repositories folder of the stub engine.
-    """
-    release = tmp_path / "rel"
-    release.mkdir()
-    (release / "points.csv").write_text(POINTS, "utf-8")
-    (release / "params.csv").write_text(PARAMS, "utf-8")
-    (tmp_path / "run").mkdir()
-    return tmp_path
-
-
-def stub_request(world: Path, **members) -> dict:
-    request = {
-        "document": "run_request", "contract_version": "2.0", "stage": "liability_cashflow",
-        "run_id": "run-stub",
-        "release": {"label": "N", "references": StubEngine.references(world / "rel", "rel")},
-        "changes": {"enabled": []}, "selection": {"mode": "full"},
-    }
-    request.update(members)
-    return request
-
-
-def store(world: Path, request, folder: str = "run") -> Path:
-    path = world / folder / "request.json"
-    path.parent.mkdir(exist_ok=True)
-    path.write_bytes(request if isinstance(request, bytes) else document_bytes(request))
-    return path
-
-
-def run_stub(world: Path, request=None, engine=None, folder: str = "run"):
-    engine = engine or StubEngine()
-    path = store(world, stub_request(world) if request is None else request, folder)
-    return run_request(path, engine, repositories=world), engine
-
-
-def stored(path: Path) -> dict:
-    return json.loads(path.read_text("utf-8"))
-
-
-def roles(entries: list[dict]) -> dict[str, str]:
-    return {entry["role"]: entry["artifact"]["path"] for entry in entries}
-
-
-def assert_documents_valid(folder: Path) -> None:
-    """Every document a run wrote passes its schema, and every listed artifact hashes."""
-    assert not schema_errors(stored(folder / "response.json"), RUN_SCHEMA)
-    record_path = folder / "run-record.json"
-    if record_path.exists():
-        record = stored(record_path)
-        assert not schema_errors(record, RECORD_SCHEMA)
-        for entry in record["inputs"] + record["outputs"]:
-            assert sha256_file(folder / entry["artifact"]["path"]) == entry["artifact"]["sha256"]
-
-
-def patch_text(name: str, old: str, new: str) -> str:
-    return "".join(difflib.unified_diff(old.splitlines(keepends=True), new.splitlines(keepends=True),
-                                        fromfile=name, tofile=name))
-
-
-def change(change_id: str, patch: str | None, folder: Path, **members) -> dict:
-    """A change entry; its patch file is written into ``folder/patches``."""
-    entry = {"id": change_id, "class": "data", "description": f"Synthetic change {change_id}.",
-             "prerequisites": [], "conflicts": []}
-    entry.update(members)
-    if "realisation" not in entry:
-        path = folder / "patches" / f"{change_id}.patch"
-        path.parent.mkdir(exist_ok=True)
-        path.write_bytes(patch.encode("utf-8"))
-        entry["realisation"] = {"type": "text_patch", "format": "unified_diff",
-                                "artifact": {"path": f"patches/{change_id}.patch",
-                                             "sha256": sha256_file(path)}}
-    return entry
-
-
-def with_manifest(world: Path, entries: list[dict], enabled: list[str], folder: str = "run",
-                  **manifest_members) -> dict:
-    """Store a manifest beside the request and return the ``changes`` member that enables it."""
-    manifest = {"document": "change_manifest", "contract_version": "2.0",
-                "stage": "liability_cashflow", "manifest_id": "changes-stub", "base_release": "N",
-                "changes": entries}
-    manifest.update(manifest_members)
-    path = world / folder / "changes.json"
-    path.write_bytes(document_bytes(manifest))
-    return {"enabled": enabled, "manifest": {"path": "changes.json", "sha256": sha256_file(path)}}
-
-
-POINTS_B = POINTS.replace("MP-B,0,2,2", "MP-B,0,2,4")
 POINTS_E = POINTS + "MP-E,0,1,7\n"
-PARAMS_RATE = PARAMS.replace("rate,0.01", "rate,0.02")
 
 
 # --- full and subset runs -----------------------------------------------------------
@@ -1162,18 +942,6 @@ def remove_replay(folder: Path) -> None:
         (folder / name).unlink(missing_ok=True)
 
 
-def rehash(folder: Path) -> None:
-    """Make the stored response and record name the current bytes of the export."""
-    digest = sha256_file(folder / "results.csv")
-    response = stored(folder / "response.json")
-    response["export"]["artifact"]["sha256"] = digest
-    (folder / "response.json").write_bytes(document_bytes(response))
-    record = stored(folder / "run-record.json")
-    for entry in record["outputs"]:
-        entry["artifact"]["sha256"] = sha256_file(folder / entry["artifact"]["path"])
-    (folder / "run-record.json").write_bytes(document_bytes(record))
-
-
 @pytest.mark.parametrize("with_changes", [False, True])
 def test_replay_of_an_unchanged_run_is_reproduced_exactly(world, with_changes):
     recorded_run(world, with_changes)
@@ -1381,9 +1149,6 @@ def test_a_coverage_difference_alone_is_not_reproduced(world):
     assert result.compare_result["added"] == [{"model_point_id": "MP-B", "first_period": 2, "last_period": 2}]
 
 
-EXACT = {"abs_tol": 0, "rel_tol": 0}
-
-
 def tolerance_file(world: Path, per_quantity: dict) -> Path:
     path = world / "tolerance.json"
     path.write_bytes(document_bytes({"per_quantity": per_quantity}))
@@ -1542,21 +1307,6 @@ def test_only_the_record_of_a_succeeded_run_is_replayed(world):
 
 
 # --- regression on the stub engine --------------------------------------------------
-
-
-def stub_release(world: Path, name: str, points: str = POINTS, params: str = PARAMS, label: str = "regression"):
-    """Another stub release below ``world``. Return its release identity."""
-    folder = world / name
-    folder.mkdir()
-    (folder / "points.csv").write_text(points, "utf-8")
-    (folder / "params.csv").write_text(params, "utf-8")
-    return {"label": label, "references": StubEngine.references(folder, name)}
-
-
-def stub_regression(world: Path, release: dict, engine=None, tolerance=None):
-    engine = engine or StubEngine()
-    recorded = read_regression_input(world / "run" / "run-record.json", engine.stages)
-    return regression(recorded, release, world / "out", engine, repositories=world, tolerance=tolerance)
 
 
 def test_regression_runs_the_release_on_the_recorded_selection_and_compares(world, capsys):
@@ -1823,16 +1573,7 @@ def test_only_the_adapter_imports_the_engine_and_calls_git():
 
 # --- the reference model ------------------------------------------------------------
 
-NEW_BUSINESS = "RLV-000001"
 RELEASE_VALUE = f"git:{REPOSITORY_URL}@{RELEASE_N}"
-POINT_TABLE = f"{PRODUCT_FOLDER}/model_point_table.csv"
-LAPSE_TABLE = f"{PRODUCT_FOLDER}/lapse_table.csv"
-MODEL_CODE = f"{PRODUCT_FOLDER}/RLV_DE_S/Projection/__init__.py"
-
-
-def cli(monkeypatch, *arguments) -> int:
-    monkeypatch.chdir(ROOT)
-    return main([str(argument) for argument in arguments])
 
 
 def text(path: str) -> str:
@@ -1860,14 +1601,6 @@ def model_request(monkeypatch, folder: Path, *ids: str, revision: str = RELEASE_
 
 def named_revisions(request: dict) -> dict[str, str]:
     return {r["kind"]: r["value"] for r in request["release"]["references"]}
-
-
-def edit_file(clone: Path, path: str, old: str, new: str) -> None:
-    """Replace one place of a file in the working tree of a throw-away clone, as bytes."""
-    file = clone / path
-    data = file.read_bytes()
-    assert data.count(old.encode("utf-8")) == 1
-    file.write_bytes(data.replace(old.encode("utf-8"), new.encode("utf-8")))
 
 
 def point_line(policy_id: str) -> tuple[list[str], str]:

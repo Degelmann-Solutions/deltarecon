@@ -11,7 +11,6 @@ from __future__ import annotations
 import hashlib
 import json
 import re
-from decimal import ROUND_HALF_UP, Decimal
 from pathlib import Path
 
 import pytest
@@ -21,11 +20,12 @@ from degelmann.deltarecon.documents import load_schemas, strict_json_text, valid
 from degelmann.deltarecon.export import (INTEGER, READER_INTEGER, export_errors, export_rows,
                                is_profile_number, is_readable_number)
 
+from conftest import EXACT, EXAMPLES, deviates, rounded
+
 ROOT = Path(__file__).resolve().parent.parent
 PACK = ROOT / "contracts" / "v2"
 V1_PACK = ROOT / "contracts" / "v1"
 SCHEMAS = PACK / "schemas"
-EXAMPLES = PACK / "examples"
 TEXT_FILES = ["README.md", "run.md", "changes.md", "compare.md", "localise.md", "domain/liability_cashflow.md"]
 
 # The rows of the behaviour matrix in contracts/v2/README.md.
@@ -804,8 +804,6 @@ def test_domain_reference_declares_selection_independence():
 
 # --- tolerance ----------------------------------------------------------------------
 
-EXACT = {"abs_tol": 0, "rel_tol": 0}
-
 
 def test_reference_comparison_uses_a_derived_profile_per_quantity():
     request = json.loads((EXAMPLES / "reference" / "compare.request.json").read_text("utf-8"))
@@ -832,21 +830,6 @@ def deviation_file(folder: Path, result: dict) -> list[dict]:
     assert rows[0] == ["model_point_id", "period", "quantity", "left", "right"]
     return [{"model_point_id": row[0], "period": int(row[1]), "quantity": row[2], "left": float(row[3]),
              "right": float(row[4])} for row in rows[1:]]
-
-
-def rounded(value: float, decimals: int) -> float:
-    """Commercial rounding of the decimal number the writer form denotes."""
-    step = Decimal(1).scaleb(-decimals)
-    return float(Decimal(repr(value)).quantize(step, rounding=ROUND_HALF_UP))
-
-
-def deviates(left, right, entry):
-    """The tolerance rule of compare.md, for the worked values only."""
-    if "decimals" in entry:
-        left, right = rounded(left, entry["decimals"]), rounded(right, entry["decimals"])
-    d, m = right - left, max(abs(left), abs(right))
-    return (d > max(entry["upper"]["abs_tol"], entry["upper"]["rel_tol"] * m)
-            or -d > max(entry["lower"]["abs_tol"], entry["lower"]["rel_tol"] * m))
 
 
 def test_reference_deviation_list_follows_the_tolerance_rule():

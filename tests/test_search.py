@@ -1,7 +1,7 @@
 """The search of ``contracts/v2/localise.md``: ``degelmann/deltarecon/search.py`` and its check against the walk.
 
-The core is tested on the stub engine of ``test_walk.py``: a revision of the stub is a folder,
-and ``line`` is its main line. The quantities of the stub are ``Anzahl Verträge``, the
+The core is tested on the stub engine with a main line of ``conftest.py``: a revision of the
+stub is a folder, and ``line`` is its main line. The quantities of the stub are ``Anzahl Verträge``, the
 column ``base`` of a model point in every period, and ``Netto-Cashflow``, which also
 depends on the parameter ``rate``. The cancelling pair is also run on the reference engine,
 on a throw-away clone of two model points. Each row of the I/O matrix of the Story 8 plan
@@ -26,42 +26,14 @@ from degelmann.deltarecon.run import STAGE_QUANTITIES, UsageError, run_request
 from degelmann.deltarecon.search import Target, read_target, restrict, search, walk_changes
 from degelmann.deltarecon.walk import prepare, read_walk_folder, walk
 
-from conftest import (PRODUCT_FOLDER, ROOT, clone_state, commit, export_coordinates, throwaway, write_files,
+from conftest import (CANCEL, CASH, HISTORY, LAPSE_TABLE, LINE, PARAMS, PARAMS_RATE, POINTS, POINTS_B,
+                      POINT_TABLE, ROOT, StubEngine, TwoStages, WalkStub, build, clone_state, commit,
+                      export_coordinates, folder_hashes, record, stored, stub_request, throwaway, write_files,
                       written_under)
-from test_run_contract import PARAMS, POINTS, StubEngine, folder_hashes, stored, stub_request, world  # noqa: F401
-from test_walk import LINE, PARAMS_RATE, POINTS_B, POINTS_E, TwoStages, WalkStub, build, record
 
-COUNT, CASH = "Anzahl Verträge", "Netto-Cashflow"
+COUNT = "Anzahl Verträge"
 PROFILE = {"per_quantity": {COUNT: {"upper": {"abs_tol": 0.01, "rel_tol": 0}, "lower": {"abs_tol": 0.01, "rel_tol": 0},
                                     "derivation": "A test bound of 0.01 policies."}}}
-
-# Placed against the split points of n = 8: the offsetting pair r1, r2 and the revert pair r3, r4
-# fall into the interval (0, 4), whose ends agree on the target; the sub-tolerance steps r5 and r6
-# into the two halves of (4, 6); r7 adds a model point; r8 moves the cash flow alone.
-POINTS_UP = POINTS.replace("MP-B,0,2,2", "MP-B,0,2,3")
-POINTS_C = POINTS.replace("MP-C,0,0,1e-05", "MP-C,0,0,1")
-POINTS_T1 = POINTS.replace("MP-B,0,2,2", "MP-B,0,2,2.006")
-POINTS_T2 = POINTS.replace("MP-B,0,2,2", "MP-B,0,2,2.012")
-POINTS_T2E = POINTS_T2 + "MP-E,0,1,7\n"
-HISTORY = (
-    ("h0", "The base.\n", (), POINTS, PARAMS),
-    ("h1", "Raise MP-B\n", ("data",), POINTS_UP, PARAMS),
-    ("h2", "Offset the raise of MP-B\n", ("data",), POINTS.replace("MP-B,0,2,2", "MP-B,0,2,2.0"), PARAMS),
-    ("h3", "Raise MP-C\n", ("data",), POINTS_C, PARAMS),
-    ("h4", "Revert the raise of MP-C\n", ("data",), POINTS, PARAMS),
-    ("h5", "Raise MP-B a little\n", ("data",), POINTS_T1, PARAMS),
-    ("h6", "Raise MP-B a little more\n", ("data",), POINTS_T2, PARAMS),
-    ("h7", "Add MP-E\n", ("data",), POINTS_T2E, PARAMS),
-    ("h8", "Raise the rate\n", ("parameter",), POINTS_T2E, PARAMS_RATE),
-)
-# A, its revert B, C that contributes, and D without effect.
-CANCEL = (
-    ("c0", "The base.\n", (), POINTS, PARAMS),
-    ("c1", "A: raise the rate\n", ("parameter",), POINTS, PARAMS_RATE),
-    ("c2", "B: revert A\n", ("parameter",), POINTS, PARAMS),
-    ("c3", "C: raise MP-B\n", ("data",), POINTS_B, PARAMS),
-    ("c4", "D: touch nothing\n", (), POINTS_B, PARAMS),
-)
 
 
 @pytest.fixture
@@ -437,8 +409,7 @@ def test_the_check_recomputes_the_walk_flags_from_the_exports(history):
 SEARCH_PROCESS = """
 import sys
 sys.path[:0] = [sys.argv[1]]
-from test_search import HISTORY
-from test_walk import WalkStub
+from conftest import HISTORY, WalkStub
 from degelmann.deltarecon.search import search
 search(sys.argv[2], sys.argv[3], sys.argv[4], WalkStub(HISTORY), repositories=sys.argv[5], tolerance=sys.argv[6],
        quantities=["Anzahl Verträge"], periods="0-2", walk=sys.argv[7])
@@ -955,9 +926,6 @@ def test_usage_errors_are_usage_errors(world):
 
 
 # --- the reference engine on a throw-away clone -------------------------------------
-
-LAPSE_TABLE = f"{PRODUCT_FOLDER}/lapse_table.csv"
-POINT_TABLE = f"{PRODUCT_FOLDER}/model_point_table.csv"
 
 
 def test_the_cancelling_pair_on_the_reference_engine(tmp_path):
