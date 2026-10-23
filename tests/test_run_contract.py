@@ -2228,6 +2228,21 @@ def regress(monkeypatch, record_folder: Path, revision: str, repositories: Path,
                "--repositories", repositories, "--output", output, *options)
 
 
+def test_regression_command_without_a_clone_is_rejected_and_writes_nothing(
+        monkeypatch, tmp_path, capsys, recorded_subset):
+    before = folder_hashes(recorded_subset)
+    (tmp_path / "empty" / CLONE_NAME).mkdir(parents=True)  # a folder that is no repository
+    for repositories in (tmp_path / "absent", tmp_path / "empty"):
+        capsys.readouterr()
+        output = tmp_path / f"out-{repositories.name}"
+        assert regress(monkeypatch, recorded_subset, RELEASE_N, repositories, output) == 1
+        printed = capsys.readouterr()
+        assert printed.out.startswith("regression: rejected\ndiagnostic: unknown_reference: ")
+        assert f"git clone {REPOSITORY_URL} {repositories / CLONE_NAME}" in printed.out
+        assert printed.err == "" and not output.exists()
+    assert folder_hashes(recorded_subset) == before
+
+
 def test_regression_against_a_commit_that_changes_no_model_file_shows_no_deviation(
         monkeypatch, tmp_path, capsys, recorded_subset):
     repositories, clone = throwaway(tmp_path)

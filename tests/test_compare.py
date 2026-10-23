@@ -730,6 +730,19 @@ def test_signature_table_counts_the_deviation_list_and_has_reproducible_bytes(wo
     assert sum(row["deviating_coordinates"] for row in table["rows"]) == len(listed)
 
 
+def test_a_signature_table_that_would_violate_its_schema_writes_no_part_of_the_comparison(world, monkeypatch):
+    run_side(world, "left", POINTS_LEFT), run_side(world, "right", POINTS_MOVED)
+    request = compare_request(world)
+    broken = {"document": "signature_table"}
+    assert schema_errors(broken, COMPARE_SCHEMA)
+    monkeypatch.setattr("degelmann.deltarecon.compare.signature_table", lambda result, deviations: broken)
+    with pytest.raises(AssertionError, match=r"^signature-table\.json would violate compare\.schema\.json: "):
+        compare(request)
+    # The result and the table are checked before either is written, and the deviation file
+    # written before them is removed again: no part of the comparison stays, and no record.
+    assert written(world) == []
+
+
 def test_signature_table_names_the_extremes_with_signed_differences():
     def deviation(model_point_id, period, quantity, left, right):
         return {"model_point_id": model_point_id, "period": period, "quantity": quantity, "left": left,
