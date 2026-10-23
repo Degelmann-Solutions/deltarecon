@@ -76,7 +76,7 @@ def require_clone(clone: Path = CLONE, revision: str = RELEASE_N) -> None:
 
 
 # The modules that stamp the contract version on the documents they write.
-WRITER_MODULES = ("run", "compare", "signature", "derive", "walk", "search", "replay", "regression", "__main__")
+WRITER_MODULES = ("run", "compare", "signature", "derive", "walk", "search", "replay")
 
 
 @contextmanager

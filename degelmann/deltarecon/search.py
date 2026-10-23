@@ -34,13 +34,13 @@ This module knows no engine and no kind of reference, and starts no process.
 from __future__ import annotations
 
 import re
-import shutil
 from collections import OrderedDict
 from dataclasses import dataclass, field
 from pathlib import Path
 
 from .compare import CheckedRun, compare_runs
-from .documents import CONTRACT_VERSION, RUN_SCHEMA, Rejection, artifact_reference, read_document, write_document
+from .documents import (CONTRACT_VERSION, RUN_SCHEMA, Rejection, artifact_reference, copy_files, read_document,
+                        write_document)
 from .replay import check_response
 from .run import Engine, RunResult, UsageError, repositories_folder
 from .walk import (LOCALISE_SCHEMA, MANIFEST_NAME, NEWER, OLDER, REQUEST_NAME, RESULT_NAME as WALK_RESULT_NAME,
@@ -357,10 +357,7 @@ def search(older_record: Path | str, newer_record: Path | str, output: Path | st
         head = {"document": "search_result", "contract_version": CONTRACT_VERSION, "stage": prepared.stage,
                 "search_id": state.prefix}
         if reference is not None:
-            for relative in reference.files:  # byte copies, in their relative layout
-                copy = output / WALK_FOLDER / relative
-                copy.parent.mkdir(parents=True, exist_ok=True)
-                shutil.copyfile(reference.folder / relative, copy)
+            copy_files(reference.folder, output / WALK_FOLDER, reference.files)  # byte copies, in their layout
             copied = output / WALK_FOLDER / WALK_RESULT_NAME
             head["walk"] = {"walk_id": reference.result["walk_id"], "result": artifact_reference(output, copied)}
             further.append({"role": "walk_result", "artifact": artifact_reference(output, copied)})

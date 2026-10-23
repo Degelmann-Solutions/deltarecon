@@ -100,15 +100,14 @@ import os
 import sys
 from pathlib import Path
 
-from .documents import (CONTRACT_VERSION, RUN_REQUEST, Rejection, document_bytes, schema_errors,
-                        sha256_file, write_new)
+from .documents import Rejection, document_bytes, sha256_file, write_new
 from .compare import CompareResult, compare
 from .derive import derive
 from .search import search
 from .walk import walk
 from .regression import read_regression_input, regression
 from .replay import replay
-from .run import REPOSITORIES_FOLDER, UsageError, repositories_folder, run_request
+from .run import REPOSITORIES_FOLDER, UsageError, repositories_folder, run_request, run_request_document
 from .signature import render_coverage, render_model_points, render_table
 
 
@@ -147,14 +146,7 @@ def command_request(args) -> int:
                                "sha256": sha256_file(manifest)}
     selection = ({"mode": "subset", "model_point_ids": list(args.subset)} if args.subset
                  else {"mode": "full"})
-    request = {
-        "document": "run_request", "contract_version": CONTRACT_VERSION,
-        "stage": reference_model.STAGE, "run_id": args.run_id,
-        "release": release, "changes": changes, "selection": selection,
-    }
-    errors = schema_errors(request, RUN_REQUEST)
-    if errors:
-        raise UsageError(f"the request would violate its schema at {errors[0]}")
+    request = run_request_document(reference_model.STAGE, args.run_id, release, changes, selection, "the request")
     output.parent.mkdir(parents=True, exist_ok=True)
     write_new(output, document_bytes(request))
     print(f"request: {os.path.relpath(output)}")

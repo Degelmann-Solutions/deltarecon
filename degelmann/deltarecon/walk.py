@@ -50,13 +50,14 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 from . import changes as changes_contract
-from .compare import COMPARE_REQUEST, CheckedRun, CompareResult, compare, compare_runs, read_tolerance
+from .compare import (COMPARE_REQUEST, CheckedRun, CompareResult, compare, compare_request_document, compare_runs,
+                      read_tolerance, shows_no_deviation)
 from .derive import CLASS_ORDER, build_manifest, read_derive_input, remainder
-from .documents import (CONTRACT_VERSION, RECORD_SCHEMA, RUN_REQUEST, RUN_SCHEMA, SCHEMA_FOLDERS, Rejection,
-                        artifact_reference, check_artifact, document_bytes, new_record_id, parse_document, read_document,
-                        schema_errors, sha256_file, write_document, write_new)
+from .documents import (CONTRACT_VERSION, RECORD_SCHEMA, RUN_SCHEMA, SCHEMA_FOLDERS, Rejection, artifact_reference,
+                        check_artifact, copy_files, document_bytes, parse_document, read_document, sha256_file,
+                        write_document, write_new)
 from .replay import RecordedRun, check_response
-from .run import Engine, RunResult, UsageError, recorded_now, repositories_folder, run_request
+from .run import Engine, RunResult, UsageError, repositories_folder, run_record, run_request, run_request_document
 
 LOCALISE_SCHEMA = "localise.schema.json"
 MANIFEST_NAME = "changes.json"
@@ -273,12 +274,7 @@ class States:
 
     # The recorded runs, byte for byte.
     def copy_recorded(self, recorded: RecordedRun, side: str) -> None:
-        copies = [recorded.request_ref["path"], recorded.response_ref["path"], recorded.export_ref["path"],
-                  recorded.record_path.name]
-        for relative in dict.fromkeys(copies):
-            target = self.output / side / relative
-            target.parent.mkdir(parents=True, exist_ok=True)
-            shutil.copyfile(recorded.folder / relative, target)
+        copy_files(recorded.folder, self.output / side, recorded.files())
 
     def recorded_files(self, recorded: RecordedRun, side: str) -> tuple[Path, Path]:
         return (self.output / side / recorded.response_ref["path"], self.output / side / recorded.record_path.name)
@@ -302,14 +298,8 @@ class States:
             changes["manifest"] = artifact_reference(folder, folder / MANIFEST_NAME)
             if hold:
                 changes["hold"] = hold
-        request = {
-            "document": "run_request", "contract_version": CONTRACT_VERSION, "stage": self.stage,
-            "run_id": f"{self.prefix}-state-{k}", "release": self.base, "changes": changes,
-            "selection": self.older.request["selection"],
-        }
-        errors = schema_errors(request, RUN_REQUEST)
-        if errors:
-            raise UsageError(f"the request of state {k} would violate its schema at {errors[0]}")
+        request = run_request_document(self.stage, f"{self.prefix}-state-{k}", self.base, changes,
+                                       self.older.request["selection"], f"the request of state {k}")
         write_new(folder / REQUEST_NAME, document_bytes(request))
         run = run_request(folder / REQUEST_NAME, self.engine, self.repositories)
         entry = {"state": k, **({"revision": self.ids[k - 1]} if k else {}), "run_id": request["run_id"],
@@ -339,15 +329,9 @@ class States:
     # A comparison the procedure keeps, written at the root of the folder.
     def write_compare(self, prefix: str, compare_id: str, left: tuple[Path, Path],
                       right: tuple[Path, Path]) -> CompareResult:
-        request = {
-            "document": "compare_request", "contract_version": CONTRACT_VERSION, "stage": self.stage,
-            "compare_id": compare_id,
-            "left": {"response": artifact_reference(self.output, left[0]),
-                     "run_record": artifact_reference(self.output, left[1])},
-            "right": {"response": artifact_reference(self.output, right[0]),
-                      "run_record": artifact_reference(self.output, right[1])},
-            "tolerance": self.profile,
-        }
+        request = compare_request_document(
+            self.stage, compare_id, tuple(artifact_reference(self.output, path) for path in left),
+            tuple(artifact_reference(self.output, path) for path in right), self.profile)
         request_path = self.output / f"{prefix}.request.json"
         write_document(request_path, request, COMPARE_REQUEST)
         compared = compare(request_path, result_name=f"{prefix}.result.json",
@@ -368,7 +352,7 @@ class States:
         compare_id = f"{self.prefix}-state-{k}-check-{side}"
         result, deviations = compare_runs({"stage": self.stage, "compare_id": compare_id,
                                            "tolerance": self.profile}, _checked(recorded), state)
-        if result["outcome"] == "compared" and not deviations and not result["added"] and not result["removed"]:
+        if shows_no_deviation(result, deviations):
             return {"state": k, "outcome": "reproduced"}
         compared = self.write_compare(f"{self.name(k)}.check-{side}", compare_id,
                                       self.recorded_files(recorded, side), (run.response_path, run.record_path))
@@ -418,12 +402,7 @@ class States:
                    {"role": "result", "artifact": artifact_reference(output, result_path)}]
         outputs += [{"role": "compare_result", "artifact": artifact_reference(output, path)}
                     for path in self.compares]
-        record = {
-            "document": "run_record", "contract_version": CONTRACT_VERSION, "stage": self.stage,
-            "record_id": new_record_id(), "procedure": {"type": self.procedure}, "outcome": outcome,
-            "recorded_at": recorded_now(), "inputs": inputs, "releases": list(self.prepared.releases),
-            "parameters": [], "outputs": outputs,
-        }
+        record = run_record(self.stage, self.procedure, outcome, inputs, list(self.prepared.releases), [], outputs)
         record_path = output / self.record_name
         write_document(record_path, record, RECORD_SCHEMA)
         return record_path

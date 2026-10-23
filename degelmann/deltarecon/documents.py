@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import shutil
 import uuid
 from functools import lru_cache
 from pathlib import Path
@@ -249,9 +250,23 @@ def write_new(path: Path, data: bytes) -> None:
         handle.write(data)
 
 
-def write_document(path: Path, document: dict, schema: str) -> None:
-    """Write a document after checking that it passes its schema."""
+def check_document(document: dict, schema: str, name: str) -> bytes:
+    """The stored form of a document that passes its schema. ``name`` names the file in the error."""
     errors = schema_errors(document, schema)
     if errors:
-        raise AssertionError(f"{path.name} would violate {schema}: {errors[0]}")
-    write_new(path, document_bytes(document))
+        raise AssertionError(f"{name} would violate {schema}: {errors[0]}")
+    return document_bytes(document)
+
+
+def write_document(path: Path, document: dict, schema: str) -> None:
+    """Write a document after checking that it passes its schema."""
+    write_new(path, check_document(document, schema, path.name))
+
+
+def copy_files(source: Path, target: Path, relatives) -> None:
+    """Copy the files ``relatives`` names, relative to ``source``, byte for byte into the same
+    layout below ``target``. A name given twice is copied once."""
+    for relative in dict.fromkeys(relatives):
+        copy = target / relative
+        copy.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copyfile(source / relative, copy)
