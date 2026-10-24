@@ -3,8 +3,9 @@ of its walk result and of every signature table it writes, under contract versio
 archive of the oracle of 2026-10-22, published under contract version 2.0.
 
 The fast tests check the published files: the renewed requests are those of the archive with
-contract version 3.0, and the archived files stay well formed. The reproduction runs both requests
-and the walk, about an hour on all 350 model points, and is skipped unless it is asked for:
+contract version 3.0 and the engine version of Python 3.14.9, and the archived files stay well
+formed. The reproduction runs both requests and the walk, about 80 minutes on all 350 model points,
+and is skipped unless it is asked for:
 ``DELTARECON_ORACLE=1``. Besides the renewed hashes it checks that every signature table, with its
 contract version set back to the archived ``2.0``, hashes to the archived digest: the tables are the
 archived ones, field for field, apart from ``contract_version``. The archived walk result is not
@@ -29,6 +30,8 @@ from conftest import CLONE, RELEASE_N, REPOSITORIES, ROOT, git, require_clone
 ORACLE = ROOT / "oracle"
 ARCHIVE = ORACLE / "archive" / "2026-10-22"
 ARCHIVED_VERSION = "2.0"
+ENGINE_VERSION = "modelx 0.33.0, pandas 3.0.6, numpy 2.5.3, Python 3.14.9"
+ARCHIVED_ENGINE_VERSION = "modelx 0.33.0, pandas 3.0.6, numpy 2.5.3, Python 3.12.13"
 PROFILE = ROOT / "profiles" / "tolerance-bruttobeitrag.json"
 NEWER = "ab5dc790f5bed52f94a4c8fb8d6b710bc31f0a33"  # the newer revision of the reference walk
 REQUESTS = {"n.request.json": ("oracle-n", "N", RELEASE_N), "n1.request.json": ("oracle-n1", "N+1", NEWER)}
@@ -53,7 +56,7 @@ def tables(hashes: dict[str, str]) -> dict[str, str]:
     return {name: digest for name, digest in hashes.items() if name != WALK_RESULT}
 
 
-def check_request(request: dict, name: str) -> None:
+def check_request(request: dict, name: str, engine_version: str) -> None:
     run_id, label, revision = REQUESTS[name]
     assert request["run_id"] == run_id and request["release"]["label"] == label
     assert request["changes"] == {"enabled": []} and request["selection"] == {"mode": "full"}
@@ -61,29 +64,32 @@ def check_request(request: dict, name: str) -> None:
     expected = f"git:https://github.com/Degelmann-Solutions/delib-history@{revision}"
     assert {kind: references[kind] for kind in ("code_state", "parameter_set", "input_data")} == \
         dict.fromkeys(("code_state", "parameter_set", "input_data"), expected)
-    assert references["engine_version"] == "modelx 0.33.0, pandas 3.0.6, numpy 2.5.3, Python 3.12.13"
+    assert references["engine_version"] == engine_version
 
 
 @pytest.mark.parametrize("name", sorted(REQUESTS))
 def test_published_request_is_a_3_0_run_request_of_its_pinned_revision(name):
     request = read_document(ORACLE / name, RUN_SCHEMA, "run_request")
     assert request["contract_version"] == "3.0"
-    check_request(request, name)
+    check_request(request, name, ENGINE_VERSION)
 
 
 @pytest.mark.parametrize("name", sorted(REQUESTS))
-def test_published_request_is_the_archived_one_but_for_the_contract_version(name):
+def test_published_request_is_the_archived_one_but_for_the_contract_and_engine_version(name):
     published = parse_document((ORACLE / name).read_bytes())
     archived = parse_document((ARCHIVE / name).read_bytes())
-    assert {**published, "contract_version": ARCHIVED_VERSION} == archived
-    assert (ORACLE / name).read_bytes() == document_bytes({**archived, "contract_version": "3.0"})
+    renewed = parse_document(
+        (ARCHIVE / name).read_bytes().replace(ARCHIVED_ENGINE_VERSION.encode(), ENGINE_VERSION.encode()))
+    assert renewed != archived
+    assert {**published, "contract_version": ARCHIVED_VERSION} == renewed
+    assert (ORACLE / name).read_bytes() == document_bytes({**renewed, "contract_version": "3.0"})
 
 
 @pytest.mark.parametrize("name", sorted(REQUESTS))
 def test_archived_request_is_a_2_0_run_request_of_its_pinned_revision(name):
     request = read_document(ARCHIVE / name, RUN_SCHEMA, "run_request")
     assert request["contract_version"] == ARCHIVED_VERSION
-    check_request(request, name)
+    check_request(request, name, ARCHIVED_ENGINE_VERSION)
 
 
 def test_newer_revision_lies_on_the_main_line_after_release_n():
