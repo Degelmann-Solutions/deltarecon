@@ -1,4 +1,4 @@
-"""The walk of ``contracts/v2/localise.md``: every state between two recorded results.
+"""The walk of ``contracts/v3/localise.md``: every state between two recorded results.
 
 A walk reads the records of two succeeded runs without enabled changes, the older one
 first, derives the change manifest of the history between the revisions they name, runs

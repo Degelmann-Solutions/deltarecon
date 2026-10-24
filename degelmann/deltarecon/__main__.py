@@ -27,9 +27,10 @@ the request names; the response and the run record are written as for every outc
 and the repeated run, and writes ``replay-compare.request.json``,
 ``replay-compare.result.json``, ``replay-compare.deviations.csv`` when the runs are
 compared, and ``replay-record.json``. A recorded run with the outcome ``error`` is
-repeated and its response compared byte for byte; nothing else is compared. The engine
+repeated and its response compared byte for byte, apart from ``contract_version`` for a run
+recorded under 2.0; nothing else is compared. The engine
 version of the record must be the present one. A run record written under contract version
-1.0 is not replayed; it is rejected with ``unsupported_version``.
+2.0 or 3.0 is replayed; one written under 1.0 is rejected with ``unsupported_version``.
 
 ``compare`` compares the two runs a compare request names and writes
 ``compare.result.json`` beside the request, ``compare.deviations.csv`` and

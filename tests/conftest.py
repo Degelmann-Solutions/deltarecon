@@ -29,8 +29,8 @@ import pytest
 
 from degelmann.deltarecon import changes as changes_contract
 from degelmann.deltarecon.__main__ import main
-from degelmann.deltarecon.documents import (RECORD_SCHEMA, RUN_SCHEMA, Rejection, document_bytes, schema_errors,
-                                            sha256_file)
+from degelmann.deltarecon.documents import (CONTRACT_VERSION, RECORD_SCHEMA, RUN_SCHEMA, Rejection, document_bytes,
+                                            schema_errors, sha256_file)
 from degelmann.deltarecon.regression import read_regression_input, regression
 from degelmann.deltarecon.run import History, ModelPointFailure, Revision, run_request
 
@@ -41,7 +41,7 @@ CLONE = REPOSITORIES / CLONE_NAME
 REPOSITORY_URL = "https://github.com/Degelmann-Solutions/delib-history"
 RELEASE_N = "b64334e09613c45a7a12468dfddc0d9ec47819bb"  # the first commit of delib-history
 PRODUCT_FOLDER = "risikolebensversicherung"
-EXAMPLES = ROOT / "contracts" / "v2" / "examples"
+EXAMPLES = ROOT / "contracts" / "v3" / "examples"
 
 
 def folder_hashes(folder: Path) -> dict[str, str]:
@@ -91,7 +91,7 @@ def require_clone(clone: Path = CLONE, revision: str = RELEASE_N) -> None:
 
 
 # The modules that stamp the contract version on the documents they write.
-WRITER_MODULES = ("run", "compare", "signature", "derive", "walk", "search", "replay")
+WRITER_MODULES = ("run", "compare", "signature", "derive", "walk", "search")
 
 
 @contextmanager
@@ -397,7 +397,7 @@ def world(tmp_path):
 
 def stub_request(world: Path, **members) -> dict:
     request = {
-        "document": "run_request", "contract_version": "2.0", "stage": "liability_cashflow",
+        "document": "run_request", "contract_version": CONTRACT_VERSION, "stage": "liability_cashflow",
         "run_id": "run-stub",
         "release": {"label": "N", "references": StubEngine.references(world / "rel", "rel")},
         "changes": {"enabled": []}, "selection": {"mode": "full"},
@@ -461,7 +461,7 @@ def change(change_id: str, patch: str | None, folder: Path, **members) -> dict:
 def with_manifest(world: Path, entries: list[dict], enabled: list[str], folder: str = "run",
                   **manifest_members) -> dict:
     """Store a manifest beside the request and return the ``changes`` member that enables it."""
-    manifest = {"document": "change_manifest", "contract_version": "2.0",
+    manifest = {"document": "change_manifest", "contract_version": CONTRACT_VERSION,
                 "stage": "liability_cashflow", "manifest_id": "changes-stub", "base_release": "N",
                 "changes": entries}
     manifest.update(manifest_members)
@@ -653,7 +653,7 @@ def reference(world: Path, relative: str) -> dict:
 def compare_request(world: Path, per_quantity: dict | None = None, records: bool = True,
                     left: str = "left", right: str = "right", **members) -> Path:
     """Store a compare request in ``world`` that names the runs in the folders ``left`` and ``right``."""
-    request = {"document": "compare_request", "contract_version": "2.0", "stage": "liability_cashflow",
+    request = {"document": "compare_request", "contract_version": CONTRACT_VERSION, "stage": "liability_cashflow",
                "compare_id": "compare-stub"}
     for name, folder in (("left", left), ("right", right)):
         request[name] = {"response": reference(world, f"{folder}/response.json")}

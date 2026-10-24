@@ -1,4 +1,4 @@
-"""The search of ``contracts/v2/localise.md``: ``degelmann/deltarecon/search.py`` and its check against the walk.
+"""The search of ``contracts/v3/localise.md``: ``degelmann/deltarecon/search.py`` and its check against the walk.
 
 The core is tested on the stub engine with a main line of ``conftest.py``: a revision of the
 stub is a folder, and ``line`` is its main line. The quantities of the stub are ``Anzahl Verträge``, the
@@ -318,27 +318,29 @@ def test_only_a_proper_subset_of_the_quantities_or_a_period_range_narrows_the_ta
     assert all(c["quantity"] == CASH for c in every_contribution(result))
 
 
-def test_a_walk_folder_written_under_1_0_is_a_reference(cancel):
+@pytest.mark.parametrize("version", ["1.0", "2.0"])
+def test_a_walk_folder_written_under_an_earlier_version_is_a_reference(cancel, version):
     world, older, newer = cancel
-    with written_under("1.0"):
+    with written_under(version):
         run_walk(world, older, newer, WalkStub(CANCEL))
     walked = world / "walk"
-    assert stored(walked / "walk.result.json")["contract_version"] == "1.0"
-    assert stored(walked / "changes.json")["contract_version"] == "1.0"
-    assert stored(walked / "state-02" / "changes.json")["contract_version"] == "1.0"
+    assert stored(walked / "walk.result.json")["contract_version"] == version
+    assert stored(walked / "changes.json")["contract_version"] == version
+    assert stored(walked / "state-02" / "changes.json")["contract_version"] == version
     run_walk(world, older, newer, WalkStub(CANCEL), output="walk-2")
     result = run_search(world, older, newer, WalkStub(CANCEL), walk=walked).result
     again = run_search(world, older, newer, WalkStub(CANCEL), output="search-2", walk=world / "walk-2").result
-    assert result["contract_version"] == "2.0"
+    assert result["contract_version"] == "3.0"
     assert result["missed"] == again["missed"] == [{"revision": "c1", "quantity": CASH},
                                                    {"revision": "c2", "quantity": CASH}]
     # The copy of the walk keeps its bytes and its version.
     assert (world / "search" / "walk" / "walk.result.json").read_bytes() == (walked / "walk.result.json").read_bytes()
 
 
-def test_a_1_0_walk_folder_whose_manifest_differs_otherwise_is_refused(cancel):
+@pytest.mark.parametrize("version", ["1.0", "2.0"])
+def test_an_earlier_walk_folder_whose_manifest_differs_otherwise_is_refused(cancel, version):
     world, older, newer = cancel
-    with written_under("1.0"):
+    with written_under(version):
         run_walk(world, older, newer, WalkStub(CANCEL))
     rewrite_state(world / "walk", 2, edit_manifest=redescribe)
     with pytest.raises(Rejection) as caught:
@@ -347,7 +349,7 @@ def test_a_1_0_walk_folder_whose_manifest_differs_otherwise_is_refused(cancel):
     assert not (world / "search").exists()
 
 
-@pytest.mark.parametrize("version", [["1.0"], "3.0"])
+@pytest.mark.parametrize("version", [["1.0"], "4.0"])
 def test_a_walk_manifest_of_a_version_the_tool_does_not_read_is_refused(cancel, version):
     world, older, newer = cancel
     run_walk(world, older, newer, WalkStub(CANCEL))

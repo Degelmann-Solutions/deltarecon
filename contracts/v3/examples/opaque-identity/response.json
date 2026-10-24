@@ -1,0 +1,82 @@
+{
+  "document": "run_response",
+  "contract_version": "3.0",
+  "stage": "liability_cashflow",
+  "run_id": "run-2026q3-full",
+  "outcome": "succeeded",
+  "release": {
+    "label": "2026Q3",
+    "references": [
+      {
+        "kind": "input_data",
+        "value": "portfolio extract 2026-09-30, run group 17"
+      },
+      {
+        "kind": "parameter_set",
+        "value": "assumption set 2026Q3 revision 4"
+      },
+      {
+        "kind": "code_state",
+        "value": "workspace revision 8841"
+      },
+      {
+        "kind": "engine_version",
+        "value": "12.4.1"
+      }
+    ]
+  },
+  "changes": {
+    "enabled": []
+  },
+  "selection": {
+    "mode": "full"
+  },
+  "time_basis": {
+    "id": "valuation_year"
+  },
+  "quantities": [
+    {
+      "name": "Anzahl Verträge",
+      "unit": "policies"
+    },
+    {
+      "name": "Zahlbeitrag",
+      "unit": "EUR"
+    },
+    {
+      "name": "garantierte Todesfallleistung",
+      "unit": "EUR"
+    },
+    {
+      "name": "Kosten 2. Ordnung ohne Provisionen",
+      "unit": "EUR"
+    },
+    {
+      "name": "Provisionen",
+      "unit": "EUR"
+    },
+    {
+      "name": "Netto-Cashflow",
+      "unit": "EUR"
+    }
+  ],
+  "model_points": [
+    {
+      "model_point_id": "TERM 10y, female",
+      "first_period": 1,
+      "last_period": 2
+    },
+    {
+      "model_point_id": "TERM 10y, male",
+      "first_period": 1,
+      "last_period": 2
+    }
+  ],
+  "export": {
+    "artifact": {
+      "path": "results.csv",
+      "sha256": "8f58de3acb8cfecad78764403245aa8eab2d5d8d1b15b62e13959adb42fb6a33"
+    },
+    "data_rows": 4
+  }
+}

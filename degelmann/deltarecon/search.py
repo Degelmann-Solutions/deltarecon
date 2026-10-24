@@ -1,4 +1,4 @@
-"""The search of ``contracts/v2/localise.md``: halving the history between two recorded results.
+"""The search of ``contracts/v3/localise.md``: halving the history between two recorded results.
 
 A search starts, as the walk does, from the records of two succeeded runs without enabled
 changes, the older one first, and needs no walk. Its checks before the first run are those

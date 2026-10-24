@@ -1,4 +1,4 @@
-"""DeltaRecon: the stage contracts of ``contracts/v2`` as a runnable procedure.
+"""DeltaRecon: the stage contracts of ``contracts/v3`` as a runnable procedure.
 
 The core modules (``documents``, ``export``, ``changes``, ``run``, ``replay``) handle
 documents, exports, and run records and know no calculation engine. An engine sits behind

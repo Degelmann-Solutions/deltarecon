@@ -1,0 +1,11 @@
+model_point_id,period,quantity,left,right
+MP-0001,1,Anzahl Verträge,0.94,0.95
+MP-0001,1,Netto-Cashflow,69,70
+MP-0001,2,Anzahl Verträge,0.88,0.9
+MP-0001,2,Netto-Cashflow,63,65
+MP-0002,1,Anzahl Verträge,1.88,1.9
+MP-0002,1,Netto-Cashflow,130.4,132
+MP-0002,2,Anzahl Verträge,1.76,1.8
+MP-0002,2,Netto-Cashflow,120.8,124
+MP-0003,1,Anzahl Verträge,0.94,0.95
+MP-0003,1,Netto-Cashflow,37,37.5

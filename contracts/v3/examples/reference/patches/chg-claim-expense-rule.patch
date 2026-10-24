@@ -1,0 +1,8 @@
+--- projection.rules
++++ projection.rules
+@@ -1,4 +1,4 @@
+ # Synthetic rule file for the examples. It is not executable.
+-claim_expense_per_death = 250
++claim_expense_per_death = parameter(claim_expense)
+ maintenance_per_period = maintenance_cost / 12
+ premium_rebate = surplus_share * (gross_premium - net_premium)

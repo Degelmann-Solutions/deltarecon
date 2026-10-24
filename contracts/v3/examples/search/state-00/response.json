@@ -1,0 +1,71 @@
+{
+  "document": "run_response",
+  "contract_version": "3.0",
+  "stage": "liability_cashflow",
+  "run_id": "search-run-n-full-run-n1-full-state-0",
+  "outcome": "succeeded",
+  "release": {
+    "label": "N",
+    "references": [
+      {
+        "kind": "code_state",
+        "value": "revision 1d6a0d0cde197b83580e5e17c93192c34572d838"
+      },
+      {
+        "kind": "parameter_set",
+        "value": "revision 1d6a0d0cde197b83580e5e17c93192c34572d838"
+      },
+      {
+        "kind": "input_data",
+        "value": "revision 1d6a0d0cde197b83580e5e17c93192c34572d838"
+      },
+      {
+        "kind": "engine_version",
+        "value": "engine build 2026.10"
+      }
+    ]
+  },
+  "changes": {
+    "enabled": []
+  },
+  "selection": {
+    "mode": "full"
+  },
+  "time_basis": {
+    "id": "policy_month"
+  },
+  "quantities": [
+    {
+      "name": "Anzahl Verträge",
+      "unit": "policies"
+    },
+    {
+      "name": "Netto-Cashflow",
+      "unit": "EUR"
+    }
+  ],
+  "model_points": [
+    {
+      "model_point_id": "MP-0001",
+      "first_period": 0,
+      "last_period": 2
+    },
+    {
+      "model_point_id": "MP-0002",
+      "first_period": 0,
+      "last_period": 2
+    },
+    {
+      "model_point_id": "MP-0003",
+      "first_period": 0,
+      "last_period": 1
+    }
+  ],
+  "export": {
+    "artifact": {
+      "path": "results.csv",
+      "sha256": "3d156041948bc96dec7aa7011981cb1b40d13ad780a2767adaf6f40581dc4dfc"
+    },
+    "data_rows": 8
+  }
+}

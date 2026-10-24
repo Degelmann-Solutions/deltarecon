@@ -584,12 +584,12 @@ def test_a_request_that_is_not_a_compare_request_writes_nothing(world, capsys, c
     data = {
         "not-json": b"{ this is not JSON",
         "duplicate-member": text.replace('"compare_id"', '"compare_id": "x",\n  "compare_id"', 1).encode("utf-8"),
-        "wrong-version": document_bytes({**request, "contract_version": "3.0", "tolerance": {}}),
+        "wrong-version": document_bytes({**request, "contract_version": "4.0", "tolerance": {}}),
         "no-tolerance": document_bytes({k: v for k, v in request.items() if k != "tolerance"}),
         "general-tolerance": document_bytes({**request, "tolerance": {"abs_tol": 0.5, "rel_tol": 0}}),
         "bound-without-derivation": document_bytes({**request, "tolerance": {"per_quantity": {
             CASH: {"upper": {"abs_tol": 0.5, "rel_tol": 0}, "lower": EXACT}}}}),
-        "a-result": document_bytes({"document": "compare_result", "contract_version": "2.0",
+        "a-result": document_bytes({"document": "compare_result", "contract_version": "3.0",
                                     "stage": "liability_cashflow", "compare_id": "x", "outcome": "rejected",
                                     "diagnostics": [{"code": "invalid_json", "message": "x"}]}),
     }[case]
@@ -748,7 +748,7 @@ def test_signature_table_names_the_extremes_with_signed_differences():
         return {"model_point_id": model_point_id, "period": period, "quantity": quantity, "left": left,
                 "right": right}
 
-    result = {"document": "compare_result", "contract_version": "2.0", "stage": "liability_cashflow",
+    result = {"document": "compare_result", "contract_version": "3.0", "stage": "liability_cashflow",
               "compare_id": "compare-x", "outcome": "compared",
               "left": {"run_id": "a", "release_label": "N"}, "right": {"run_id": "b", "release_label": "M"},
               "quantities": [{"name": COUNT, "unit": "policies"}, {"name": "Zahlbeitrag", "unit": "EUR"},
@@ -786,7 +786,7 @@ def test_signature_table_names_the_extremes_with_signed_differences():
 
 @pytest.mark.parametrize("outcome", ["incompatible", "rejected"])
 def test_there_is_no_signature_table_for_another_outcome(outcome):
-    result = {"document": "compare_result", "contract_version": "2.0", "stage": "liability_cashflow",
+    result = {"document": "compare_result", "contract_version": "3.0", "stage": "liability_cashflow",
               "compare_id": "compare-x", "outcome": outcome,
               "diagnostics": [{"code": "unit_mismatch", "message": "x"}]}
     with pytest.raises(ValueError):

@@ -1,0 +1,16 @@
+{
+  "document": "run_response",
+  "contract_version": "3.0",
+  "stage": "liability_cashflow",
+  "run_id": "run-unknown-model-point",
+  "outcome": "rejected",
+  "diagnostics": [
+    {
+      "code": "unknown_model_point",
+      "message": "The release holds no model point with this id.",
+      "model_point_ids": [
+        "MP-9999"
+      ]
+    }
+  ]
+}
