@@ -1,4 +1,4 @@
-"""The walk of ``contracts/v2/localise.md``: ``degelmann/deltarecon/walk.py`` and the revision states of the adapter.
+"""The walk of ``contracts/v3/localise.md``: ``degelmann/deltarecon/walk.py`` and the revision states of the adapter.
 
 The core is tested on the stub engine with a main line of ``conftest.py``: a revision of the stub
 is a folder, and ``line`` is its main line. The reference engine is tested on a throw-away

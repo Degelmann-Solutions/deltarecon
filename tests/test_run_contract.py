@@ -60,7 +60,7 @@ def test_full_run_exports_every_model_point_and_writes_the_record(world):
         stored(folder / "request.json")
     for member in ("stage", "run_id", "release", "changes", "selection"):
         assert response[member] == request[member]
-    assert response["contract_version"] == record["contract_version"] == "2.0"
+    assert response["contract_version"] == record["contract_version"] == "3.0"
     assert response["time_basis"] == {"id": "policy_month"}
     assert response["model_points"] == [
         {"model_point_id": "MP-A", "first_period": 12, "last_period": 13},
@@ -135,12 +135,12 @@ def test_bad_request_is_rejected_with_the_response_alone(world, case, code):
         "byte-order-mark": b"\xef\xbb\xbf" + valid,
         "lone-surrogate": text.replace('"run-stub"', '"run-\\ud800"', 1).encode("utf-8"),
         "duplicate-member": text.replace('"run_id"', '"run_id": "other",\n  "run_id"', 1).encode("utf-8"),
-        "wrong-version": request_bytes(world, contract_version="3.0"),
+        "wrong-version": request_bytes(world, contract_version="4.0"),
         "empty-selection": request_bytes(world, selection={"mode": "subset", "model_point_ids": []}),
         "duplicate-selection": request_bytes(
             world, selection={"mode": "subset", "model_point_ids": ["MP-A", "MP-A"]}),
         "unknown-member": request_bytes(world, priority="high"),
-        "a-response": document_bytes({"document": "run_response", "contract_version": "2.0",
+        "a-response": document_bytes({"document": "run_response", "contract_version": "3.0",
                                       "stage": "liability_cashflow", "run_id": "run-stub",
                                       "outcome": "rejected",
                                       "diagnostics": [{"code": "invalid_json", "message": "x"}]}),
@@ -154,7 +154,7 @@ def test_bad_request_is_rejected_with_the_response_alone(world, case, code):
     response = stored(folder / "response.json")
     assert not schema_errors(response, RUN_SCHEMA)
     assert [d["code"] for d in response["diagnostics"]] == [code]
-    assert response["contract_version"] == "2.0"
+    assert response["contract_version"] == "3.0"
     # Stage and run id are repeated where they can be read.
     readable = case not in {"not-json", "non-finite", "too-large", "not-an-object", "byte-order-mark",
                             "duplicate-member", "lone-surrogate"}
@@ -162,7 +162,7 @@ def test_bad_request_is_rejected_with_the_response_alone(world, case, code):
 
 
 def test_the_version_is_checked_before_the_schema(world):
-    result, _ = run_stub(world, request_bytes(world, contract_version="3.0", selection={"mode": "none"}))
+    result, _ = run_stub(world, request_bytes(world, contract_version="4.0", selection={"mode": "none"}))
     assert result.response["diagnostics"][0]["code"] == "unsupported_version"
 
 
@@ -754,7 +754,7 @@ class AnyRelease(StubEngine):
     ("state-not-readable", lambda: AnyRelease(raises=True)),
 ])
 def test_the_error_examples_of_the_pack_are_written_by_the_core(world, case, engine):
-    example = ROOT / "contracts" / "v2" / "examples" / "negative" / case
+    example = ROOT / "contracts" / "v3" / "examples" / "negative" / case
     shutil.copyfile(example / "request.json", world / "run" / "request.json")
     result = run_request(world / "run" / "request.json", engine(), repositories=world)
     assert result.outcome == "error"
@@ -968,7 +968,7 @@ def test_replay_of_an_unchanged_run_is_reproduced_exactly(world, with_changes):
     record = stored(folder / "replay-record.json")
     assert not schema_errors(record, RECORD_SCHEMA)
     assert record["procedure"] == {"type": "replay"} and record["outcome"] == "reproduced_exactly"
-    assert record["stage"] == "liability_cashflow" and record["contract_version"] == "2.0"
+    assert record["stage"] == "liability_cashflow" and record["contract_version"] == "3.0"
     # Every execution has its own record id: the replay, the repeated run, and the recorded run.
     repeated = stored(folder / "replay" / "run-record.json")
     assert RECORD_ID.fullmatch(record["record_id"]) and RECORD_ID.fullmatch(repeated["record_id"])
@@ -2182,7 +2182,7 @@ def test_unsupported_realisation_over_a_revision_is_rejected_and_names_the_chang
                folder, **{"class": "parameter"}),
         change("chg-switch", None, folder, realisation={"type": "engine_switch", "switch": "RC-1"}),
     ]
-    manifest = {"document": "change_manifest", "contract_version": "2.0", "stage": "liability_cashflow",
+    manifest = {"document": "change_manifest", "contract_version": "3.0", "stage": "liability_cashflow",
                 "manifest_id": "changes-synthetic", "base_release": "N", "changes": entries}
     (folder / "changes.json").write_bytes(document_bytes(manifest))
     assert cli(monkeypatch, "request", "--revision", RELEASE_N, "--repositories", REPOSITORIES, "--label", "N",
@@ -2204,7 +2204,7 @@ def test_an_enabled_revision_the_clone_does_not_hold_ends_with_the_outcome_error
     folder = tmp_path / "run"
     folder.mkdir()
     manifest = {
-        "document": "change_manifest", "contract_version": "2.0", "stage": "liability_cashflow",
+        "document": "change_manifest", "contract_version": "3.0", "stage": "liability_cashflow",
         "manifest_id": f"history-{RELEASE_N}-{'1' * 40}", "base_release": "N",
         "history": {"source": "git", "from": RELEASE_N, "to": "1" * 40,
                     "determines": ["code_state", "input_data", "parameter_set"], "remainder": []},
@@ -2251,7 +2251,7 @@ def test_changes_over_a_revision_and_replay_without_the_clone(monkeypatch, tmp_p
         change("chg-claim-expense", patch_text(MODEL_CODE, code, new_code), folder, **{"class": "code"}),
         change("chg-rename-point", patch_text(POINT_TABLE, points, new_points), folder),
     ]
-    manifest = {"document": "change_manifest", "contract_version": "2.0", "stage": "liability_cashflow",
+    manifest = {"document": "change_manifest", "contract_version": "3.0", "stage": "liability_cashflow",
                 "manifest_id": "changes-synthetic", "base_release": "N", "changes": entries}
     (folder / "changes.json").write_bytes(document_bytes(manifest))
     assert not schema_errors(manifest, CHANGES_SCHEMA)
@@ -2525,9 +2525,10 @@ def test_full_changed_case_on_all_model_points_of_release_n(monkeypatch, tmp_pat
     # table is the one that main wrote before the deviations left the result (story 9).
     assert compared["deviations"]["path"] == "compare.deviations.csv"
     assert (out / "compare.result.json").stat().st_size < 64 * 1024
-    # Contract version 2.0: the table of 1.0 (4fc28fbd...) with "contract_version": "2.0", byte for byte.
+    # Contract version 3.0: the 2.0 table 7ba6c115... with "contract_version": "3.0", byte for byte; that
+    # table was the table of 1.0 (4fc28fbd...) with "contract_version": "2.0".
     assert sha256_file(out / "signature-table.json") == \
-        "7ba6c115a2c42d3688a0589a759f664ebe298306fb77ea9ee7a3d73d66109821"
+        "5ddfe21969e468cbfe7e38bf25ce65e4086fa89cd0c7a980ad580b5047b73fc9"
     assert len(stored(recorded / "response.json")["model_points"]) == 350
     # Exactly the new business deviates: no in-force point lies in policy year 1.
     lines = text(POINT_TABLE).splitlines()

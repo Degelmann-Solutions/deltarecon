@@ -1,0 +1,15 @@
+{
+  "document": "signature_table",
+  "contract_version": "3.0",
+  "stage": "liability_cashflow",
+  "compare_id": "compare-n-with-itself",
+  "left": {
+    "run_id": "run-n-full",
+    "release_label": "N"
+  },
+  "right": {
+    "run_id": "run-n-full",
+    "release_label": "N"
+  },
+  "rows": []
+}

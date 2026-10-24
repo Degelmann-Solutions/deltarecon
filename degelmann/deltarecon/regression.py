@@ -3,7 +3,7 @@
 A regression run takes the record of a succeeded run without enabled changes, runs the
 release identity the caller hands in on the selection of the recorded run, and compares
 the recorded run, as the left side, with the new run, as the right side, through the
-compare procedure of ``contracts/v2/compare.md``. The caller builds the identity: it names
+compare procedure of ``contracts/v3/compare.md``. The caller builds the identity: it names
 the newer state and the input data of the recorded run. This module knows no engine.
 
 The output folder must not exist. It receives:

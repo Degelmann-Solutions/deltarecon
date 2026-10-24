@@ -1,0 +1,334 @@
+{
+  "document": "walk_result",
+  "contract_version": "3.0",
+  "stage": "liability_cashflow",
+  "walk_id": "walk-run-n-full-run-n1-full",
+  "manifest": {
+    "path": "changes.json",
+    "sha256": "77f5f015eaa7ad6844ec041c7452926775506e467867dbf3d3759f4280e6a91a"
+  },
+  "older": {
+    "run_id": "run-n-full",
+    "release_label": "N"
+  },
+  "newer": {
+    "run_id": "run-n1-full",
+    "release_label": "N+1"
+  },
+  "tolerance": {
+    "per_quantity": {}
+  },
+  "held": [],
+  "remainder": [
+    {
+      "kind": "engine_version",
+      "from": [
+        {
+          "kind": "engine_version",
+          "value": "engine build 2026.09"
+        }
+      ],
+      "to": [
+        {
+          "kind": "engine_version",
+          "value": "engine build 2026.10"
+        }
+      ]
+    }
+  ],
+  "ends": {
+    "zero": {
+      "state": 0,
+      "outcome": "reproduced"
+    },
+    "n": {
+      "state": 4,
+      "outcome": "reproduced"
+    }
+  },
+  "states": [
+    {
+      "state": 0,
+      "run_id": "walk-run-n-full-run-n1-full-state-0",
+      "outcome": "succeeded",
+      "response": {
+        "path": "state-00/response.json",
+        "sha256": "055caa937b6e34fb46f25733a6b6fd95186df29bc273b34b3c9b5472f33f3b91"
+      },
+      "export": {
+        "path": "state-00/results.csv",
+        "sha256": "3d156041948bc96dec7aa7011981cb1b40d13ad780a2767adaf6f40581dc4dfc"
+      }
+    },
+    {
+      "state": 1,
+      "revision": "f291e79376fd8157cefa009bc06d213711b6490b",
+      "run_id": "walk-run-n-full-run-n1-full-state-1",
+      "outcome": "succeeded",
+      "response": {
+        "path": "state-01/response.json",
+        "sha256": "2f7d8dc7e0d52c892a9931ea6961961845b8120c10f1c796be45888e3daa1949"
+      },
+      "export": {
+        "path": "state-01/results.csv",
+        "sha256": "aee351f131a1d721f5b68e1733aeaa1e3b9b86ce5439dc5a93425ecb5a0c3303"
+      }
+    },
+    {
+      "state": 2,
+      "revision": "0b2f58ed2d975f2ebd8bc4ac58a1c37d3d62997f",
+      "run_id": "walk-run-n-full-run-n1-full-state-2",
+      "outcome": "succeeded",
+      "response": {
+        "path": "state-02/response.json",
+        "sha256": "e433756d6cee9ff733e10a6e512b1b1ec191b7891458c7432032d0d5457fd7c1"
+      },
+      "export": {
+        "path": "state-02/results.csv",
+        "sha256": "44b712c061bd81abbb0d4268780cc82ab04dc9d38c82e9ee1c8df4e1bc6eaa33"
+      }
+    },
+    {
+      "state": 3,
+      "revision": "0767d650b32a037f9a98260a8a7531c7ade3d8af",
+      "run_id": "walk-run-n-full-run-n1-full-state-3",
+      "outcome": "succeeded",
+      "response": {
+        "path": "state-03/response.json",
+        "sha256": "e71688871c73712fba4af609a0453a8b18f181c4998f68288f19bb3f7a097aaf"
+      },
+      "export": {
+        "path": "state-03/results.csv",
+        "sha256": "44b712c061bd81abbb0d4268780cc82ab04dc9d38c82e9ee1c8df4e1bc6eaa33"
+      }
+    },
+    {
+      "state": 4,
+      "revision": "a58186a2a54cedfe17ef8ab4c0851a10a18bf59f",
+      "run_id": "walk-run-n-full-run-n1-full-state-4",
+      "outcome": "succeeded",
+      "response": {
+        "path": "state-04/response.json",
+        "sha256": "09939296e361cfacc7053cccc0a130bf09d6782274b59e7dd2fa03ef74f2d4a2"
+      },
+      "export": {
+        "path": "state-04/results.csv",
+        "sha256": "3af60211be1707ed9edb7d510c4f12a2f9cb0f8d5871a9a6f82ec61debe0395c"
+      }
+    }
+  ],
+  "steps": [
+    {
+      "from_state": 0,
+      "to_state": 1,
+      "revisions": [
+        "f291e79376fd8157cefa009bc06d213711b6490b"
+      ],
+      "compare": {
+        "result": {
+          "path": "step-01.compare.result.json",
+          "sha256": "54e6d6e0c402cf69ea016a41be0364666c55ef1ee8631dfc021eef434b6d0c3f"
+        },
+        "deviations": {
+          "path": "step-01.compare.deviations.csv",
+          "sha256": "c94017ef15fc7773d152c6829a31b718b681497f34aa1cbc176fff8a23996dde"
+        }
+      },
+      "contributions": [
+        {
+          "quantity": "Anzahl Verträge",
+          "contributes": true,
+          "sum": 0.10000000000000009,
+          "absolute_sum": 0.10000000000000009,
+          "signature": {
+            "stage": "liability_cashflow",
+            "quantity": "Anzahl Verträge",
+            "deviating_model_points": 3,
+            "deviating_coordinates": 5,
+            "right_above_left": 5,
+            "right_below_left": 0,
+            "first_period": 1,
+            "last_period": 2,
+            "largest_increase": {
+              "model_point_id": "MP-0002",
+              "period": 2,
+              "absolute": 0.040000000000000036,
+              "relative": 0.02222222222222224
+            }
+          }
+        },
+        {
+          "quantity": "Netto-Cashflow",
+          "contributes": true,
+          "sum": 8.299999999999997,
+          "absolute_sum": 8.299999999999997,
+          "signature": {
+            "stage": "liability_cashflow",
+            "quantity": "Netto-Cashflow",
+            "deviating_model_points": 3,
+            "deviating_coordinates": 5,
+            "right_above_left": 5,
+            "right_below_left": 0,
+            "first_period": 1,
+            "last_period": 2,
+            "largest_increase": {
+              "model_point_id": "MP-0002",
+              "period": 2,
+              "absolute": 3.200000000000003,
+              "relative": 0.02580645161290325
+            }
+          }
+        }
+      ]
+    },
+    {
+      "from_state": 1,
+      "to_state": 2,
+      "revisions": [
+        "0b2f58ed2d975f2ebd8bc4ac58a1c37d3d62997f"
+      ],
+      "compare": {
+        "result": {
+          "path": "step-02.compare.result.json",
+          "sha256": "9cb3463d8c1aa8533945827f0fc20976133656636a9d4576b8a996ba03fd674e"
+        },
+        "deviations": {
+          "path": "step-02.compare.deviations.csv",
+          "sha256": "d36e301421bff325b185399c65b1892bcee512f851945d0d298fda577f782e05"
+        }
+      },
+      "contributions": [
+        {
+          "quantity": "Anzahl Verträge",
+          "contributes": false,
+          "sum": 0.0,
+          "absolute_sum": 0.0
+        },
+        {
+          "quantity": "Netto-Cashflow",
+          "contributes": true,
+          "sum": -7.5,
+          "absolute_sum": 22.5,
+          "signature": {
+            "stage": "liability_cashflow",
+            "quantity": "Netto-Cashflow",
+            "deviating_model_points": 2,
+            "deviating_coordinates": 6,
+            "right_above_left": 3,
+            "right_below_left": 3,
+            "first_period": 0,
+            "last_period": 2,
+            "largest_increase": {
+              "model_point_id": "MP-0002",
+              "period": 0,
+              "absolute": 2.5,
+              "relative": 0.017543859649122806
+            },
+            "largest_decrease": {
+              "model_point_id": "MP-0001",
+              "period": 0,
+              "absolute": -5.0,
+              "relative": -0.06666666666666667
+            }
+          }
+        }
+      ]
+    },
+    {
+      "from_state": 2,
+      "to_state": 3,
+      "revisions": [
+        "0767d650b32a037f9a98260a8a7531c7ade3d8af"
+      ],
+      "contributions": [
+        {
+          "quantity": "Anzahl Verträge",
+          "contributes": false,
+          "sum": 0.0,
+          "absolute_sum": 0.0
+        },
+        {
+          "quantity": "Netto-Cashflow",
+          "contributes": false,
+          "sum": 0.0,
+          "absolute_sum": 0.0
+        }
+      ]
+    },
+    {
+      "from_state": 3,
+      "to_state": 4,
+      "revisions": [
+        "a58186a2a54cedfe17ef8ab4c0851a10a18bf59f"
+      ],
+      "compare": {
+        "result": {
+          "path": "step-04.compare.result.json",
+          "sha256": "86d45b4aadc3d49b5d6e900fc587a101af484862cd09a36e95b3bba3420a073d"
+        },
+        "deviations": {
+          "path": "step-04.compare.deviations.csv",
+          "sha256": "1911d27d19469209a99cc6a8032e02231d52da94ace41d7908d6b10926939c95"
+        }
+      },
+      "contributions": [
+        {
+          "quantity": "Anzahl Verträge",
+          "contributes": true,
+          "sum": 6.75,
+          "absolute_sum": 6.75,
+          "signature": {
+            "stage": "liability_cashflow",
+            "quantity": "Anzahl Verträge",
+            "deviating_model_points": 1,
+            "deviating_coordinates": 2,
+            "right_above_left": 2,
+            "right_below_left": 0,
+            "first_period": 0,
+            "last_period": 1,
+            "largest_increase": {
+              "model_point_id": "MP-0003",
+              "period": 0,
+              "absolute": 1.0,
+              "relative": 0.5
+            }
+          }
+        },
+        {
+          "quantity": "Netto-Cashflow",
+          "contributes": true,
+          "sum": 294.5,
+          "absolute_sum": 294.5,
+          "signature": {
+            "stage": "liability_cashflow",
+            "quantity": "Netto-Cashflow",
+            "deviating_model_points": 1,
+            "deviating_coordinates": 2,
+            "right_above_left": 2,
+            "right_below_left": 0,
+            "first_period": 0,
+            "last_period": 1,
+            "largest_increase": {
+              "model_point_id": "MP-0003",
+              "period": 0,
+              "absolute": 50.0,
+              "relative": 0.5555555555555556
+            }
+          }
+        }
+      ]
+    }
+  ],
+  "unattributed": [],
+  "totals": [
+    {
+      "quantity": "Anzahl Verträge",
+      "sum": 6.85
+    },
+    {
+      "quantity": "Netto-Cashflow",
+      "sum": 295.3
+    }
+  ],
+  "findings": []
+}

@@ -1,0 +1,17 @@
+{
+  "document": "run_response",
+  "contract_version": "3.0",
+  "stage": "liability_cashflow",
+  "run_id": "run-unmet-prerequisite",
+  "outcome": "rejected",
+  "diagnostics": [
+    {
+      "code": "unmet_prerequisite",
+      "message": "The request enables chg-b without its prerequisite chg-a.",
+      "change_ids": [
+        "chg-b",
+        "chg-a"
+      ]
+    }
+  ]
+}

@@ -1,4 +1,4 @@
-"""The compare procedure of ``contracts/v2/compare.md``.
+"""The compare procedure of ``contracts/v3/compare.md``.
 
 A comparison reads a compare request and writes, beside it, the compare result, the
 deviation file and the signature table when the outcome is ``compared``, and the run

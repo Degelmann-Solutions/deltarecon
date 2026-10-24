@@ -1,0 +1,31 @@
+{
+  "document": "run_request",
+  "contract_version": "3.0",
+  "stage": "liability_cashflow",
+  "run_id": "run-unmet-prerequisite",
+  "release": {
+    "label": "N",
+    "references": [
+      {
+        "kind": "code_state",
+        "value": "revision 1047"
+      },
+      {
+        "kind": "input_data",
+        "value": "extract 2026-09-30"
+      }
+    ]
+  },
+  "changes": {
+    "enabled": [
+      "chg-b"
+    ],
+    "manifest": {
+      "path": "changes.json",
+      "sha256": "7f0c0a99470b84575af92b9b6800014ce4615737e3e9235e9dcd508e513e76bf"
+    }
+  },
+  "selection": {
+    "mode": "full"
+  }
+}

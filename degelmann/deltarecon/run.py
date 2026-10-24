@@ -1,4 +1,4 @@
-"""The run procedure of ``contracts/v2/run.md``.
+"""The run procedure of ``contracts/v3/run.md``.
 
 A run reads a run request and writes, beside it, the response, the per-model-point
 export, and the run record. The calculation sits behind the :class:`Engine` protocol; this

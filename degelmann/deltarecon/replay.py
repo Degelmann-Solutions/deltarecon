@@ -1,14 +1,15 @@
 """Replay of a recorded run.
 
-A replay checks the run record (rules 15 to 17 of ``contracts/v2/run.md``) and the
+A replay checks the run record (rules 15 to 17 of ``contracts/v3/run.md``) and the
 recorded result (rules 6 to 13), repeats the run in the folder ``replay/`` beside the
 record, and compares the recorded run, as the left side, with the repeated run, as the
-right side, through the compare procedure of ``contracts/v2/compare.md``. Without a
+right side, through the compare procedure of ``contracts/v3/compare.md``. Without a
 tolerance profile the comparison is exact.
 
-- A run record written under contract version 1.0 is read by ``regression``, ``derive``,
-  ``walk``, and ``search``, but it is not replayed: the replay rejects it with
-  ``unsupported_version`` (``contracts/v2/README.md``, "Version compatibility").
+- The replay repeats runs recorded under contract version 2.0 or 3.0. A run record written
+  under 1.0 is read by ``regression``, ``derive``, ``walk``, and ``search``, but it is not
+  replayed: the replay rejects it with ``unsupported_version`` (``contracts/v3/README.md``,
+  "Version compatibility").
 
 - The replay writes ``replay-compare.request.json``, ``replay-compare.result.json``, and,
   when the outcome of the comparison is ``compared``, ``replay-compare.deviations.csv``
@@ -34,13 +35,15 @@ from pathlib import Path
 from . import changes as changes_contract
 from .compare import (COMPARE_REQUEST, CompareResult, compare, compare_request_document, no_deviation,
                       read_tolerance)
-from .documents import (CHANGES_SCHEMA, CONTRACT_VERSION, RECORD_SCHEMA, RUN_REQUEST, RUN_SCHEMA,
+from .documents import (CHANGES_SCHEMA, RECORD_SCHEMA, RUN_REQUEST, RUN_SCHEMA,
                         Rejection, artifact_reference, check_artifact, copy_files, read_document,
                         same_release, write_document)
 from .export import check_export
 from .run import (RECORD_NAME, STAGE_QUANTITIES, Engine, UsageError, quantity_errors,
                   repositories_folder, run_record, run_request)
 
+# The contract versions of the run records a replay repeats; a 1.0 record is not replayed.
+REPLAY_VERSIONS = ("2.0", "3.0")
 REPLAY_FOLDER = "replay"
 REPLAY_RECORD_NAME = "replay-record.json"
 REPLAY_COMPARE_REQUEST_NAME = "replay-compare.request.json"
@@ -223,10 +226,10 @@ def replay(record_path: Path, engine: Engine, repositories: Path | None = None,
         raise UsageError(f"no tolerance file at {tolerance}")
 
     recorded = read_recorded_run(record_path, engine.stages, allow_error=True)
-    if recorded.record["contract_version"] != CONTRACT_VERSION:
+    if recorded.record["contract_version"] not in REPLAY_VERSIONS:
         raise Rejection("unsupported_version",
-                        f"The replay repeats only runs recorded under contract version {CONTRACT_VERSION}, "
-                        f"not {recorded.record['contract_version']}.")
+                        f"The replay repeats only runs recorded under contract version "
+                        f"{' or '.join(REPLAY_VERSIONS)}, not {recorded.record['contract_version']}.")
     record, request, manifest = recorded.record, recorded.request, recorded.manifest
     request_ref, manifest_ref = recorded.request_ref, recorded.manifest_ref
     failed_before = recorded.response["outcome"] == "error"
