@@ -3,8 +3,8 @@ of its walk result and of every signature table it writes, under contract versio
 archive of the oracle of 2026-10-22, published under contract version 2.0.
 
 The fast tests check the published files: the renewed requests are those of the archive with
-contract version 3.0 and the engine version of Python 3.14.9, and the archived files stay well
-formed. The reproduction runs both requests and the walk, about 80 minutes on all 350 model points,
+contract version 3.0 and the engine version of the export path under Python 3.14.9, and the
+archived files stay well formed. The reproduction runs both requests and the walk on all 350 model points,
 and is skipped unless it is asked for:
 ``DELTARECON_ORACLE=1``. Besides the renewed hashes it checks that every signature table, with its
 contract version set back to the archived ``2.0``, hashes to the archived digest: the tables are the
@@ -30,7 +30,7 @@ from conftest import CLONE, RELEASE_N, REPOSITORIES, ROOT, git, require_clone
 ORACLE = ROOT / "oracle"
 ARCHIVE = ORACLE / "archive" / "2026-10-22"
 ARCHIVED_VERSION = "2.0"
-ENGINE_VERSION = "modelx 0.33.0, pandas 3.0.6, numpy 2.5.3, Python 3.14.9"
+ENGINE_VERSION = "modelx 0.33.0 export, pandas 3.0.6, numpy 2.5.3, Python 3.14.9"
 ARCHIVED_ENGINE_VERSION = "modelx 0.33.0, pandas 3.0.6, numpy 2.5.3, Python 3.12.13"
 PROFILE = ROOT / "profiles" / "tolerance-bruttobeitrag.json"
 NEWER = "ab5dc790f5bed52f94a4c8fb8d6b710bc31f0a33"  # the newer revision of the reference walk
