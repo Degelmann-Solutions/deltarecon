@@ -115,7 +115,9 @@ Reader rule for documents of versions 1.0 and 2.0:
 - A run record of version 1.0 or 2.0, with the documents it lists, serves as
   input to every procedure that reads recorded runs, except the replay: a
   replay repeats only runs recorded under 2.0 or 3.0 and rejects a 1.0 run
-  record with `unsupported_version`.
+  record with `unsupported_version`. For a run recorded under 2.0 with the
+  outcome `error`, the recorded and the repeated response may differ in
+  `contract_version` only, see [compare.md](compare.md#replay-criterion).
 - A walk folder written under 1.0 or 2.0 is a reference for a search when it
   passes the reader rules of a walk folder, see
   [localise.md](localise.md#reader-rules-of-a-walk-folder); its change
@@ -126,7 +128,10 @@ Reader rule for documents of versions 1.0 and 2.0:
 
 Version 3.0 changes so far only the versions a reader accepts. It changes
 neither the stage contracts run, changes, and compare nor the walk and the
-search; their documents differ from 2.0 in `contract_version` only.
+search; their documents differ from 2.0 in `contract_version` only. The one
+consequence in the text is the replay of a run recorded under 2.0 with the
+outcome `error`: its repeated response is written under 3.0, so the byte
+comparison of the two responses ignores `contract_version`.
 
 - A reader of 3.0 also reads documents of 1.0 and 2.0, under the
   [reader rule for documents of versions 1.0 and 2.0](#version-compatibility).

@@ -35,9 +35,9 @@ from pathlib import Path
 from . import changes as changes_contract
 from .compare import (COMPARE_REQUEST, CompareResult, compare, compare_request_document, no_deviation,
                       read_tolerance)
-from .documents import (CHANGES_SCHEMA, RECORD_SCHEMA, RUN_REQUEST, RUN_SCHEMA,
-                        Rejection, artifact_reference, check_artifact, copy_files, read_document,
-                        same_release, write_document)
+from .documents import (CHANGES_SCHEMA, CONTRACT_VERSION, RECORD_SCHEMA, RUN_REQUEST, RUN_SCHEMA,
+                        Rejection, artifact_reference, check_artifact, copy_files, document_bytes,
+                        parse_document, read_document, same_release, write_document)
 from .export import check_export
 from .run import (RECORD_NAME, STAGE_QUANTITIES, Engine, UsageError, quantity_errors,
                   repositories_folder, run_record, run_request)
@@ -301,9 +301,19 @@ def replay(record_path: Path, engine: Engine, repositories: Path | None = None,
 
 
 def _replay_of_an_error(recorded: RecordedRun, result, replay_record_path: Path) -> ReplayResult:
-    """Write the replay record of a run that ended with an error. Nothing is compared."""
+    """Write the replay record of a run that ended with an error. Nothing is compared.
+
+    The repeated response must equal the recorded one byte for byte. For a run recorded under an
+    earlier version the two may differ in ``contract_version`` only: the recorded version is written
+    into the repeated response before the bytes are compared.
+    """
     folder = recorded.folder
-    same = result.response_path.read_bytes() == (folder / recorded.response_ref["path"]).read_bytes()
+    repeated = result.response_path.read_bytes()
+    stored = (folder / recorded.response_ref["path"]).read_bytes()
+    version = recorded.response["contract_version"]
+    if version != CONTRACT_VERSION:
+        repeated = document_bytes({**parse_document(repeated), "contract_version": version})
+    same = repeated == stored
     outcome = "reproduced_exactly" if same else "not_reproduced"
     replay_record = run_record(
         recorded.record["stage"], "replay", outcome,

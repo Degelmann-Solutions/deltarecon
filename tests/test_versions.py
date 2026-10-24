@@ -19,7 +19,7 @@ from degelmann.deltarecon.replay import read_recorded_run, replay
 from degelmann.deltarecon.search import search
 from degelmann.deltarecon.walk import walk
 
-from conftest import (CANCEL, CASH, LINE, POINTS_B, StubEngine, WalkStub, assert_documents_valid, build,
+from conftest import (CANCEL, CASH, LINE, POINTS_B, StubEngine, StubSession, WalkStub, assert_documents_valid, build,
                       compare_request, folder_hashes, record, run_side, run_stub, stored, stub_regression,
                       stub_release, stub_request, written_under)
 
@@ -199,3 +199,27 @@ def test_the_replay_repeats_a_3_0_record_of_an_earlier_request(world, version):
     result, _ = run_stub(world, stub_request(world, contract_version=version))
     assert stored(result.record_path)["contract_version"] == "3.0"
     assert replay(result.record_path, StubEngine(), repositories=world).outcome == "reproduced_exactly"
+
+
+def recorded_error_under_2_0(world):
+    """A stub run recorded under 2.0 that ends with an error: the points table holds no model point."""
+    (world / "rel" / "points.csv").write_text("id,first,last,base\n", "utf-8")
+    with written_under("2.0"):
+        result, _ = run_stub(world, stub_request(world, contract_version="2.0"))
+    assert result.outcome == "error" and versions(world / "run") == {"2.0"}
+    return result
+
+
+def test_the_replay_reproduces_a_2_0_error_record_whose_response_differs_in_the_version_only(world):
+    result = recorded_error_under_2_0(world)
+    done = replay(result.record_path, StubEngine(), repositories=world)
+    assert done.outcome == "reproduced_exactly"
+    repeated = stored(world / "run" / "replay" / "response.json")
+    assert repeated["contract_version"] == "3.0"
+    assert document_bytes({**repeated, "contract_version": "2.0"}) == (world / "run" / "response.json").read_bytes()
+
+
+def test_the_replay_does_not_reproduce_a_2_0_error_record_whose_response_differs_otherwise(world, monkeypatch):
+    result = recorded_error_under_2_0(world)
+    monkeypatch.setattr(StubSession, "model_point_ids", lambda self: ["MP-A", 7])  # another error
+    assert replay(result.record_path, StubEngine(), repositories=world).outcome == "not_reproduced"

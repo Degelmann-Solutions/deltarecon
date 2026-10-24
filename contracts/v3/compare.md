@@ -514,7 +514,10 @@ side, reports no deviation.
   of one file; a repeated run may write other bytes for the same values.
 - A recorded run with the outcome `error` has no export to compare. It is
   reproduced exactly when the repeated run writes a response byte for byte
-  equal to the recorded one, and not reproduced otherwise.
+  equal to the recorded one, and not reproduced otherwise. For a run recorded
+  under 2.0 the two responses may differ in `contract_version` only: the
+  recorded version is set in the repeated response, with its members in their
+  order, before the bytes are compared.
 - The repeated run uses the release identity that the run record holds, and
   the enabled changes and the selection of the request that the record lists.
 
