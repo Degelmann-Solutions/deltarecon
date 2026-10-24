@@ -1589,9 +1589,11 @@ def in_force_id() -> str:
 
 
 def model_request(monkeypatch, folder: Path, *ids: str, revision: str = RELEASE_N,
-                  repositories: Path = REPOSITORIES, run_id: str = "run-n-subset") -> Path:
+                  repositories: Path = REPOSITORIES, run_id: str = "run-n-subset", path: str | None = None) -> Path:
     arguments = ["request", "--revision", revision, "--repositories", repositories, "--label", "N",
                  "--run-id", run_id, "--output", folder / "request.json"]
+    if path is not None:
+        arguments += ["--path", path]
     if ids:
         arguments += ["--subset", *ids]
     assert cli(monkeypatch, *arguments) == 0
@@ -1778,6 +1780,10 @@ IDENTITY_EDITS = {
         value=refs[2]["value"].replace("delib-history", "other-history")),
     "no-engine": lambda refs: refs.pop(3),
     "other-engine": lambda refs: refs[3].update(value="modelx 0.0.1"),
+    # A value of the export form that names another Python, and one whose suffix stands elsewhere.
+    "other-engine-on-the-export-path": lambda refs: refs[3].update(value=refs[3]["value"].replace(", Python ", ", Python 0.")),
+    "export-suffix-on-another-part": lambda refs: refs[3].update(
+        value=refs[3]["value"].replace(" export,", ",").replace(", numpy", " export, numpy")),
     "with-artifact": lambda refs: refs[2].update(artifact={"path": "request.json", "sha256": "0" * 64}),
     # The value does not name a commit of the repository the engine knows.
     "other-repository": lambda refs: [r.update(value=r["value"].replace("delib-history", "other-history"))
@@ -2034,8 +2040,9 @@ def test_false_built_in_check_is_a_failed_model_point(monkeypatch, tmp_path, cap
     assert record["outcome"] == "failed" and len(record["parameters"]) > 20
 
 
-def test_projection_releases_the_item_space_of_each_point(tmp_path):
-    """A run keeps no ItemSpace of a projected point alive, after a point that fails neither."""
+@pytest.mark.parametrize("path", ["export", "modelx"])
+def test_projection_releases_the_item_space_of_each_point(tmp_path, path):
+    """A run keeps no ItemSpace of a projected point alive, after a point that fails neither, on both paths."""
     from degelmann.deltarecon.engines.reference_model import ReferenceModel, release_references
     repositories, clone = throwaway(tmp_path)
     lines = text(POINT_TABLE).splitlines()
@@ -2044,15 +2051,23 @@ def test_projection_releases_the_item_space_of_each_point(tmp_path):
     broken = lines[15].split(",")[columns.index("policy_id")]
     edit_file(clone, POINT_TABLE, lines[15] + "\n", with_columns(columns, lines[15], duration_y=term) + "\n")
     revision = commit(clone, "Set a duration that equals the term")
-    release = {"label": "N", "references": release_references(revision)}
+    release = {"label": "N", "references": release_references(revision, path=path)}
     with ReferenceModel().open(release, [], None, repositories) as session:
-        projection = session._model.Projection
+        projection = session._computing.Projection
+        assert (projection is session._model.Projection) == (path == "modelx")
+
+        def item_spaces() -> dict:  # modelx and the exported package name them differently
+            return dict(projection.itemspaces if path == "modelx" else projection._mx_itemspaces)
+
+        projection[1]
+        assert item_spaces()  # the probe sees an ItemSpace that is alive
+        del projection[1]
         for point in (NEW_BUSINESS, in_force_id()):
             assert session.project(point)
-            assert dict(projection.itemspaces) == {}
+            assert item_spaces() == {}
         with pytest.raises(ModelPointFailure, match="check_pols_roll_fwd is false"):
             session.project(broken)
-        assert dict(projection.itemspaces) == {}
+        assert item_spaces() == {}
 
 
 def test_projection_keeps_the_failure_when_no_item_space_was_created():
@@ -2547,6 +2562,195 @@ def test_full_changed_case_on_all_model_points_of_release_n(monkeypatch, tmp_pat
         print("\n".join(line for line in output.splitlines() if not line.startswith("deviation: ")))
         print(f"compared coordinates: {compared['compared_coordinates']}, deviating model points: "
               f"{len(new_business)} of 350")
+
+
+# --- the computation paths -----------------------------------------------------------
+
+
+def test_the_engine_version_names_the_computation_path():
+    from degelmann.deltarecon.engines.reference_model import DEFAULT_PATH, PATHS, engine_version, path_of
+    assert PATHS == ("export", "modelx") and DEFAULT_PATH == "export"
+    export, modelx = engine_version("export"), engine_version("modelx")
+    assert engine_version() == export
+    assert re.fullmatch(r"modelx \S+, pandas \S+, numpy \S+, Python \S+", modelx)
+    assert export == modelx.replace(", pandas ", " export, pandas ", 1)
+    assert (path_of(export), path_of(modelx)) == ("export", "modelx")
+    # The rule for any recorded value: the first comma-separated part ends with " export" or not.
+    for version, path in (("modelx 0.30.0, pandas 2.2.3, numpy 2.1.0, Python 3.12.7", "modelx"),
+                          ("modelx 0.30.0 export, pandas 2.2.3, numpy 2.1.0, Python 3.12.7", "export"),
+                          ("12.4.1", "modelx"), ("another engine export", "export"),
+                          ("modelx 0.33.0, pandas 3.0.6 export, numpy 2.5.3", "modelx"),
+                          ("engine, export", "modelx"), ("modelx export", "export"), ("", "modelx")):
+        assert path_of(version) == path, version
+    with pytest.raises(ValueError):
+        engine_version("lifelib")
+
+
+@pytest.mark.parametrize("path", [None, "export", "modelx"])
+def test_request_command_names_the_engine_version_of_the_path(monkeypatch, tmp_path, path):
+    from degelmann.deltarecon.engines.reference_model import engine_version
+    request = stored(model_request(monkeypatch, tmp_path / "run", NEW_BUSINESS, path=path))
+    assert named_revisions(request)["engine_version"] == engine_version(path or "export")
+
+
+def test_request_command_refuses_an_unknown_path(monkeypatch, tmp_path, capsys):
+    with pytest.raises(SystemExit) as caught:
+        cli(monkeypatch, "request", "--revision", RELEASE_N, "--repositories", REPOSITORIES, "--label", "N",
+            "--run-id", "x", "--output", tmp_path / "run" / "request.json", "--path", "lifelib")
+    assert caught.value.code == 2 and "invalid choice: 'lifelib'" in capsys.readouterr().err
+    assert not (tmp_path / "run").exists()
+
+
+@contextmanager
+def counted_exports(monkeypatch):
+    """Count the calls of ``mx.export_model``; the export itself runs as it is."""
+    from degelmann.deltarecon.engines import reference_model
+    calls = []
+    real = reference_model.mx.export_model
+
+    def export_model(model, path, *arguments, **options):
+        calls.append(Path(path))
+        return real(model, path, *arguments, **options)
+
+    with monkeypatch.context() as patch:
+        patch.setattr(reference_model.mx, "export_model", export_model)
+        yield calls
+
+
+def exported_modules() -> list[str]:
+    return [name for name in sys.modules if name.startswith("_deltarecon_export_")]
+
+
+def without_engine_version(document: dict) -> dict:
+    """A request or a response with the value of its engine version blanked."""
+    copy = json.loads(json.dumps(document))
+    for reference in copy["release"]["references"]:
+        if reference["kind"] == "engine_version":
+            reference["value"] = ""
+    return copy
+
+
+def test_both_paths_give_the_same_export_and_each_replays_on_its_own(monkeypatch, tmp_path, capsys):
+    from degelmann.deltarecon.engines.reference_model import engine_version
+    documents = {}
+    for path in ("export", "modelx"):
+        folder = tmp_path / path
+        request_path = model_request(monkeypatch, folder, in_force_id(), NEW_BUSINESS, path=path)
+        with counted_exports(monkeypatch) as calls:
+            assert cli(monkeypatch, "run", request_path, "--repositories", REPOSITORIES) == 0
+            # The export lies directly in the product folder of the scratch state of the run.
+            assert [(call.name, call.parent.name, call.parent.parent.parent.name.startswith(SCRATCH_PREFIX))
+                    for call in calls] == ([("_deltarecon_export", PRODUCT_FOLDER, True)] if path == "export" else [])
+            assert cli(monkeypatch, "replay", folder / "run-record.json", "--repositories", REPOSITORIES) == 0
+            assert len(calls) == (2 if path == "export" else 0)  # the replay repeats the run on its path
+        assert "replay: reproduced_exactly" in capsys.readouterr().out
+        assert_documents_valid(folder)
+        documents[path] = {name: stored(folder / name) for name in ("request.json", "response.json", "run-record.json")}
+        assert named_revisions(documents[path]["response.json"])["engine_version"] == engine_version(path)
+        assert named_revisions(stored(folder / "replay" / "response.json"))["engine_version"] == engine_version(path)
+    assert exported_modules() == []  # the imported packages left sys.modules with their sessions
+    assert (tmp_path / "export" / "results.csv").read_bytes() == (tmp_path / "modelx" / "results.csv").read_bytes()
+    export, modelx = documents["export"], documents["modelx"]
+    for name in ("request.json", "response.json"):
+        assert export[name] != modelx[name]
+        assert without_engine_version(export[name]) == without_engine_version(modelx[name]), name
+    assert export["run-record.json"]["parameters"] == modelx["run-record.json"]["parameters"]
+    assert ([without_engine_version({"release": r}) for r in export["run-record.json"]["releases"]]
+            == [without_engine_version({"release": r}) for r in modelx["run-record.json"]["releases"]])
+
+
+def test_a_request_written_before_the_paths_runs_on_modelx(monkeypatch, tmp_path):
+    """The requests of the oracle before this story name the modelx string; they still run, on modelx."""
+    from degelmann.deltarecon.engines.reference_model import engine_version, path_of
+    request = stored(ROOT / "oracle" / "n.request.json")
+    for reference in request["release"]["references"]:
+        if reference["kind"] == "engine_version":  # the value as the request command wrote it before
+            reference["value"] = engine_version("modelx")
+    assert path_of(named_revisions(request)["engine_version"]) == "modelx"
+    request["selection"] = {"mode": "subset", "model_point_ids": [NEW_BUSINESS, in_force_id()]}
+    request["contract_version"] = "3.0"
+    folder = tmp_path / "run"
+    folder.mkdir()
+    with counted_exports(monkeypatch) as calls:
+        result = run_model(folder / "request.json", request)
+    assert result.outcome == "succeeded" and calls == []
+    assert result.response["release"] == request["release"]
+
+
+@pytest.mark.parametrize("where", ["export", "import"])
+def test_an_export_that_fails_ends_the_run_with_an_error_and_does_not_fall_back(monkeypatch, tmp_path, capsys, where):
+    from degelmann.deltarecon.engines import reference_model
+    real = reference_model.mx.export_model
+
+    def export_model(model, path, *arguments, **options):
+        if where == "export":
+            raise RuntimeError("the model cannot be exported")
+        real(model, path, *arguments, **options)
+        (Path(path) / "__init__.py").write_text("raise ImportError('the package cannot be imported')\n")
+
+    monkeypatch.setattr(reference_model.mx, "export_model", export_model)
+    folder = tmp_path / "run"
+    request_path = model_request(monkeypatch, folder, NEW_BUSINESS)
+    assert cli(monkeypatch, "run", request_path, "--repositories", REPOSITORIES) == 1
+    assert "outcome: error" in capsys.readouterr().out
+    response = stored(folder / "response.json")
+    message = ("RuntimeError: the model cannot be exported" if where == "export"
+               else "ImportError: the package cannot be imported")
+    assert response["outcome"] == "error"
+    assert response["diagnostics"] == [{"code": "state_not_readable", "message": message}]
+    assert not (folder / "results.csv").exists() and exported_modules() == []
+    assert_documents_valid(folder)
+
+
+def test_a_point_that_raises_under_the_export_is_a_failed_model_point(monkeypatch, tmp_path, capsys):
+    repositories, clone = throwaway(tmp_path)
+    lines = text(POINT_TABLE).splitlines()
+    columns = lines[0].split(",")
+    broken = lines[15].split(",")[columns.index("policy_id")]
+    edit_file(clone, POINT_TABLE, lines[15] + "\n", with_columns(columns, lines[15], sex="X") + "\n")
+    revision = commit(clone, "Give one model point an unknown sex")
+    messages = {}
+    for path in ("export", "modelx"):
+        folder = tmp_path / path
+        request_path = model_request(monkeypatch, folder, NEW_BUSINESS, broken, revision=revision,
+                                     repositories=repositories, path=path)
+        assert cli(monkeypatch, "run", request_path, "--repositories", repositories) == 1
+        assert "outcome: failed" in capsys.readouterr().out
+        response = stored(folder / "response.json")
+        assert response["outcome"] == "failed" and not (folder / "results.csv").exists()
+        assert [f["model_point_id"] for f in response["failed_model_points"]] == [broken]
+        messages[path] = response["failed_model_points"][0]["message"]
+        assert_documents_valid(folder)
+    assert messages["export"] == "result_cf raised ValueError: invalid sex"
+    assert messages["modelx"].startswith("result_cf raised FormulaError")
+
+
+def test_a_state_takes_the_computation_path_of_the_older_record():
+    from degelmann.deltarecon.engines.reference_model import ReferenceModel, engine_version, release_references
+    other = "1" * 40
+    for version, path in ((engine_version("export"), "export"), (engine_version("modelx"), "modelx"),
+                          ("modelx 0.30.0, pandas 2.2.3, numpy 2.1.0, Python 3.12.7", "modelx"),
+                          ("modelx 0.30.0 export, pandas 2.2.3, numpy 2.1.0, Python 3.12.7", "export")):
+        base = {"label": "N", "references": release_references(RELEASE_N)[:3]
+                + [{"kind": "engine_version", "value": version}]}
+        for revision, hold in ((None, frozenset()), (other, frozenset()), (other, frozenset({"input_data"}))):
+            state = ReferenceModel().state_release(base, revision, hold, REPOSITORIES)
+            assert state["label"] == "N"
+            assert named_revisions({"release": state})["engine_version"] == engine_version(path), version
+
+
+def test_regression_runs_on_the_path_it_is_given(monkeypatch, tmp_path, capsys, recorded_subset):
+    from degelmann.deltarecon.engines.reference_model import engine_version
+    recorded = named_revisions(stored(recorded_subset / "request.json"))["engine_version"]
+    assert recorded == engine_version("export")
+    for options, path in (((), "export"), (("--path", "modelx"), "modelx")):
+        out = tmp_path / path
+        assert regress(monkeypatch, recorded_subset, RELEASE_N, REPOSITORIES, out, *options) == 0
+        assert "regression: no deviation above tolerance" in capsys.readouterr().out
+        assert named_revisions(stored(out / "run" / "request.json"))["engine_version"] == engine_version(path)
+        compared = stored(out / "compare.result.json")
+        assert compared.get("engine_version") == (
+            None if path == "export" else {"left": engine_version("export"), "right": engine_version("modelx")})
 
 
 # --- the full run of release N and its replay ---------------------------------------

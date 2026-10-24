@@ -6,7 +6,9 @@ applies the enabled text patches there, lists the model points, projects a selec
 maps the model's variables to the quantity names of the domain reference, reports
 failures, and builds the parameter inventory. It also reads the history between two
 revisions: the main line, the log messages, and the classes of the touched paths. The
-clone it reads is never written: no checkout, no worktree, no fetch, and no modelx writer.
+clone it reads is never written: no checkout, no worktree, no fetch, and no modelx writer. On the
+computation path ``export`` the one modelx writer it calls, ``mx.export_model``, writes into the
+scratch folder of the run.
 
 Release identity
 ----------------
@@ -15,7 +17,8 @@ it by four opaque references without an artifact:
 
 - one reference for each kind a revision determines, ``code_state``, ``parameter_set``,
   and ``input_data``, each with a value ``git:<repository URL>@<full commit hash>``;
-- one ``engine_version`` that names modelx, pandas, numpy, and Python.
+- one ``engine_version`` that names modelx, pandas, numpy, and Python, and the computation
+  path, see "Computation paths".
 
 ``code_state`` and ``parameter_set`` name one commit, the state commit. ``input_data``
 names the same commit or another one, the input-data commit: a regression run names a
@@ -33,6 +36,27 @@ The repository URL says where the state comes from; the commit hash proves it. T
 reads the clone ``<repositories folder>/delib-history`` and never uses the network. It does
 not look at the remote of the clone.
 
+Computation paths
+-----------------
+The engine computes a release on one of two paths, and the ``engine_version`` value names
+it. The engine accepts exactly two values:
+
+- ``modelx <v> export, pandas <v>, numpy <v>, Python <v>``, the path ``export``, the
+  default: the model is read with modelx, exported with ``mx.export_model`` into the
+  restored state, and every model point and its checks are projected through the exported
+  package;
+- ``modelx <v>, pandas <v>, numpy <v>, Python <v>``, the path ``modelx``: every model point
+  is projected through modelx itself.
+
+On both paths the model point ids and the parameter inventory are read through modelx, so
+they do not depend on the path. A run never falls back to the other path: an export or an
+import of the exported package that fails ends the run with the outcome ``error``.
+
+A recorded ``engine_version`` of another value, of another engine or of a run made before
+the paths existed, names the path ``export`` when its first comma-separated part ends with
+`` export``, and ``modelx`` otherwise. A walk or a search runs its states on the path of the
+older record, see ``state_release``.
+
 Changes
 -------
 The path of a text patch is relative to the root of the repository, for example
@@ -47,7 +71,8 @@ file cannot be restored and ends the run with the outcome ``error``.
 
 ``state_release`` names such a state as a release identity without restoring it: the
 revision as state commit, the revision or the held input-data commit as input-data commit,
-the label of the base identity, and the present engine version.
+the label of the base identity, and the present engine version of the computation path the
+base identity names.
 
 History
 -------
@@ -67,11 +92,14 @@ object, so that no configuration of the user or the system changes the result.
 """
 from __future__ import annotations
 
+import importlib.util
 import os
 import platform
 import re
 import subprocess
+import sys
 import tempfile
+import uuid
 from contextlib import contextmanager, suppress
 from pathlib import Path
 
@@ -120,9 +148,37 @@ CHECKS = ("check_net_cf", "check_pols_roll_fwd", "check_prem_split", "check_res_
           "check_no_cash_value")
 
 
-def engine_version() -> str:
-    return (f"modelx {mx.__version__}, pandas {pd.__version__}, numpy {np.__version__}, "
+PATHS = ("export", "modelx")  # the computation paths, see "Computation paths"
+DEFAULT_PATH = "export"
+EXPORT_SUFFIX = " export"      # the end of the first part of an engine version on the path export
+EXPORT_FOLDER = "_deltarecon_export"  # the exported package, directly in the product folder
+
+
+def engine_version(path: str = DEFAULT_PATH) -> str:
+    """The ``engine_version`` value of this engine on the computation path ``path``."""
+    if path not in PATHS:
+        raise ValueError(f"no computation path {path!r}; the paths are {', '.join(PATHS)}")
+    suffix = EXPORT_SUFFIX if path == "export" else ""
+    return (f"modelx {mx.__version__}{suffix}, pandas {pd.__version__}, numpy {np.__version__}, "
             f"Python {platform.python_version()}")
+
+
+def path_of(version: str) -> str:
+    """The computation path an ``engine_version`` value names, of this or of any other engine.
+
+    ``export`` when the first comma-separated part of the value ends with `` export``,
+    ``modelx`` otherwise; so every value recorded before the paths existed names ``modelx``.
+    """
+    return "export" if version.split(",", 1)[0].endswith(EXPORT_SUFFIX) else "modelx"
+
+
+def release_path(release: dict) -> str:
+    """The computation path the one ``engine_version`` reference of an identity names."""
+    versions = [r["value"] for r in release["references"] if r["kind"] == "engine_version"]
+    if len(versions) != 1:
+        raise Rejection("unknown_reference", "The release identity holds exactly one reference of the "
+                        f"kind engine_version; it holds {len(versions)}.")
+    return path_of(versions[0])
 
 
 def reference_value(revision: str) -> str:
@@ -136,7 +192,7 @@ def parse_identity(release: dict) -> tuple[str, str]:
     Raises ``unknown_reference`` unless the identity holds exactly one reference per
     determined kind, each with a value of the form ``git:<repository URL>@<full commit
     hash>``, ``code_state`` and ``parameter_set`` with the same value, and one
-    ``engine_version`` that names this engine.
+    ``engine_version`` that names this engine on one of its computation paths.
     """
     return _identity(release, strict=True)
 
@@ -162,9 +218,11 @@ def _identity(release: dict, strict: bool) -> tuple[str, str]:
                         f"kind {', '.join(sorted(DETERMINED_KINDS))}, and engine_version; it holds "
                         f"{', '.join(kinds)}.")
     values = {reference["kind"]: reference["value"] for reference in references}
-    if strict and values["engine_version"] != engine_version():
+    present = [engine_version(path) for path in PATHS]
+    if strict and values["engine_version"] not in present:
         raise Rejection("unknown_reference", f"The release identity names the engine version "
-                        f"{values['engine_version']!r}; this engine is {engine_version()!r}.")
+                        f"{values['engine_version']!r}; this engine is "
+                        + " or ".join(repr(version) for version in present) + ".")
     if values["code_state"] != values["parameter_set"]:
         raise Rejection("unknown_reference", "The references of the kinds code_state and parameter_set "
                         "name more than one revision.")
@@ -248,16 +306,18 @@ def resolve_revision(name: str, repositories: Path) -> str:
     return revision
 
 
-def release_references(revision: str, input_revision: str | None = None) -> list[dict]:
+def release_references(revision: str, input_revision: str | None = None,
+                       path: str = DEFAULT_PATH) -> list[dict]:
     """The complete release identity of the commit ``revision``, a full hash.
 
     ``input_revision`` names another commit that the input data is taken from; without it
-    the input data is that of ``revision``.
+    the input data is that of ``revision``. ``path`` is the computation path the engine
+    version names.
     """
     value = reference_value(revision)
     return [{"kind": "code_state", "value": value}, {"kind": "parameter_set", "value": value},
             {"kind": "input_data", "value": reference_value(input_revision or revision)},
-            {"kind": "engine_version", "value": engine_version()}]
+            {"kind": "engine_version", "value": engine_version(path)}]
 
 
 def read_tree(clone: Path, revision: str) -> dict[str, str]:
@@ -481,12 +541,38 @@ def _is_scalar(value) -> bool:
     return isinstance(value, (bool, int, float, str, np.bool_, np.integer, np.floating))
 
 
+@contextmanager
+def _exported(model, product: Path):
+    """The model exported into ``product`` and imported under a name of its own.
+
+    The package lies directly in the product folder, because the exported model reads its
+    tables from the folder above its own. Its modules leave ``sys.modules`` when the block
+    ends.
+    """
+    package = product / EXPORT_FOLDER
+    mx.export_model(model, package)
+    name = f"_deltarecon_export_{uuid.uuid4().hex}"
+    try:
+        spec = importlib.util.spec_from_file_location(name, package / "__init__.py",
+                                                      submodule_search_locations=[str(package)])
+        module = importlib.util.module_from_spec(spec)
+        sys.modules[name] = module
+        spec.loader.exec_module(module)
+        yield module.mx_model
+    finally:
+        for loaded in [key for key in sys.modules if key == name or key.startswith(f"{name}.")]:
+            del sys.modules[loaded]
+
+
 class ReferenceModelSession:
     time_basis = TIME_BASIS
     quantities = [(name, unit) for name, unit, _ in QUANTITIES]
 
-    def __init__(self, model):
+    def __init__(self, model, computing=None):
+        """``model`` is the modelx model; ``computing`` the model the points are projected
+        through: the exported one on the path ``export``, ``model`` itself on ``modelx``."""
         self._model = model
+        self._computing = model if computing is None else computing
         self._table = None
 
     def _points(self):
@@ -506,7 +592,7 @@ class ReferenceModelSession:
         index = int(matches[0])
         try:
             try:
-                projection = self._model.Projection[index]
+                projection = self._computing.Projection[index]
                 frame = projection.result_cf()
             except Exception as exc:  # a modelx FormulaError wraps the cause
                 reason = str(exc).strip().splitlines()
@@ -528,9 +614,10 @@ class ReferenceModelSession:
                 raise ModelPointFailure(f"result_cf has not the expected form: {type(exc).__name__}") from None
             return [(period, [column[row] for column in columns]) for row, period in enumerate(periods)]
         finally:
-            # Release the point's ItemSpace: a run would otherwise keep one per point alive (memory per run).
+            # Release the point's ItemSpace, on both paths: a run would otherwise keep one per point
+            # alive (memory per run).
             with suppress(KeyError):  # absent when Projection[index] raised
-                del self._model.Projection[index]
+                del self._computing.Projection[index]
 
     def parameters(self) -> list[dict]:
         with _readable_formula_errors():
@@ -562,7 +649,8 @@ class ReferenceModelSession:
 
 
 class ReferenceModel:
-    """The engine of the stage ``liability_cashflow``: modelx with the model ``RLV_DE_S``."""
+    """The engine of the stage ``liability_cashflow``: modelx with the model ``RLV_DE_S``,
+    computed through its export or through modelx, as the engine version names."""
 
     stages = frozenset({STAGE})
     realisations = frozenset({changes_contract.TEXT_PATCH, changes_contract.REVISION})
@@ -596,11 +684,16 @@ class ReferenceModel:
         return {**files, MODEL_POINT_PATH: input_files[MODEL_POINT_PATH]}
 
     def state_release(self, base: dict, revision: str | None, hold, repositories: Path) -> dict:
-        """The identity of the state after ``revision`` on the present engine, with the label of ``base``."""
+        """The identity of the state after ``revision`` on the present engine, with the label of ``base``.
+
+        The engine version is that of the computation path ``base`` names, see
+        :func:`path_of`: a state runs on the path of the older record.
+        """
         state, input_revision = recorded_identity(base)
         if revision is not None:
             state, input_revision = revision, (input_revision if "input_data" in hold else revision)
-        return {"label": base["label"], "references": release_references(state, input_revision)}
+        return {"label": base["label"],
+                "references": release_references(state, input_revision, release_path(base))}
 
     def resolve(self, release: dict, repositories: Path) -> None:
         self._locate(release, repositories)
@@ -629,6 +722,7 @@ class ReferenceModel:
     def open(self, release: dict, enabled: list[dict], manifest_dir: Path | None, repositories: Path,
              hold=frozenset()):
         clone, files = self._locate(release, repositories)
+        path = release_path(release)
         revisions = [c["realisation"]["revision"] for c in enabled
                      if c["realisation"]["type"] == changes_contract.REVISION]
         patches = [c for c in enabled if c["realisation"]["type"] != changes_contract.REVISION]
@@ -649,6 +743,10 @@ class ReferenceModel:
             with _readable_formula_errors():
                 model = mx.read_model(state / PRODUCT_FOLDER / MODEL_NAME)
             try:
-                yield ReferenceModelSession(model)
+                if path == "modelx":
+                    yield ReferenceModelSession(model)
+                else:  # no fallback: an export or an import that fails ends the run with an error
+                    with _exported(model, state / PRODUCT_FOLDER) as exported:
+                        yield ReferenceModelSession(model, exported)
             finally:
                 model.close()

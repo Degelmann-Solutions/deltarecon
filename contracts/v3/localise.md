@@ -24,8 +24,11 @@ change manifest of the history between the revisions they name, see
   release. When both results name one revision, n is 0.
 - Every state is one run of the run contract, with its own request, response,
   export, and run record. The request of state k names the release identity of
-  the older result as the present engine records it, with the label of the older
-  result, so that the base release of the manifest is the release of the request.
+  the older result as the present engine records it, on the computation path of
+  the older result (see [README.md](README.md#release-identity)), with the label
+  of the older result, so that the base release of the manifest is the release
+  of the request. Which path a record of another engine version names is the
+  engine's matter.
   It enables the first k changes of the manifest, a prefix, see
   [changes.md](changes.md#revision-profile), and selects what both results
   select.
@@ -52,7 +55,7 @@ names every held kind with the revisions of the classes that carry it, see
 Kinds that no revision determines are not attributed. Where they differ between
 the two results they are named as the remainder, as in the derived manifest. An
 engine version that differs is such a kind: every state runs on the present
-engine, and the walk goes on.
+engine, on the computation path of the older result, and the walk goes on.
 
 ### Before the first run
 
