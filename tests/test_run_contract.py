@@ -2034,6 +2034,89 @@ def test_false_built_in_check_is_a_failed_model_point(monkeypatch, tmp_path, cap
     assert record["outcome"] == "failed" and len(record["parameters"]) > 20
 
 
+def test_projection_releases_the_item_space_of_each_point(tmp_path):
+    """A run keeps no ItemSpace of a projected point alive, after a point that fails neither."""
+    from degelmann.deltarecon.engines.reference_model import ReferenceModel, release_references
+    repositories, clone = throwaway(tmp_path)
+    lines = text(POINT_TABLE).splitlines()
+    columns = lines[0].split(",")
+    term = lines[15].split(",")[columns.index("policy_term")]
+    broken = lines[15].split(",")[columns.index("policy_id")]
+    edit_file(clone, POINT_TABLE, lines[15] + "\n", with_columns(columns, lines[15], duration_y=term) + "\n")
+    revision = commit(clone, "Set a duration that equals the term")
+    release = {"label": "N", "references": release_references(revision)}
+    with ReferenceModel().open(release, [], None, repositories) as session:
+        projection = session._model.Projection
+        for point in (NEW_BUSINESS, in_force_id()):
+            assert session.project(point)
+            assert dict(projection.itemspaces) == {}
+        with pytest.raises(ModelPointFailure, match="check_pols_roll_fwd is false"):
+            session.project(broken)
+        assert dict(projection.itemspaces) == {}
+
+
+def test_projection_keeps_the_failure_when_no_item_space_was_created():
+    import pandas as pd
+    from degelmann.deltarecon.engines.reference_model import ReferenceModelSession
+
+    class Projection:
+        deleted = []
+
+        def __getitem__(self, index):
+            raise ValueError("no item space")
+
+        def __delitem__(self, index):
+            self.deleted.append(index)
+            raise KeyError(index)
+
+    class Data:
+        @staticmethod
+        def model_point_table():
+            return pd.DataFrame({"policy_id": ["RLV-000001"]})
+
+    class Model:
+        pass
+
+    model = Model()
+    model.Projection, model.Data = Projection(), Data()
+    with pytest.raises(ModelPointFailure, match="result_cf raised ValueError: no item space"):
+        ReferenceModelSession(model).project("RLV-000001")
+    assert Projection.deleted == [0]
+
+
+def test_projection_releases_the_item_space_when_result_cf_raises():
+    import pandas as pd
+    from degelmann.deltarecon.engines.reference_model import ReferenceModelSession
+
+    class ItemSpace:
+        @staticmethod
+        def result_cf():
+            raise ValueError("no result")
+
+    class Projection:
+        itemspaces = {}
+
+        def __getitem__(self, index):
+            return self.itemspaces.setdefault(index, ItemSpace())
+
+        def __delitem__(self, index):
+            del self.itemspaces[index]
+
+    class Data:
+        @staticmethod
+        def model_point_table():
+            return pd.DataFrame({"policy_id": ["RLV-000001"]})
+
+    class Model:
+        pass
+
+    model = Model()
+    model.Projection, model.Data = Projection(), Data()
+    with pytest.raises(ModelPointFailure, match="result_cf raised ValueError: no result"):
+        ReferenceModelSession(model).project("RLV-000001")
+    assert Projection.itemspaces == {}
+
+
 FORMULA_MESSAGE = (
     "Error raised during formula execution\n"
     "TypeError: unsupported operand type(s) for -: 'str' and 'int'\n"
