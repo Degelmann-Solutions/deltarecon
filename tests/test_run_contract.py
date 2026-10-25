@@ -2707,6 +2707,7 @@ def test_a_point_that_raises_under_the_export_is_a_failed_model_point(monkeypatc
     lines = text(POINT_TABLE).splitlines()
     columns = lines[0].split(",")
     broken = lines[15].split(",")[columns.index("policy_id")]
+    index = lines[15].split(",")[columns.index("point_id")]  # the model reads the table by point_id
     edit_file(clone, POINT_TABLE, lines[15] + "\n", with_columns(columns, lines[15], sex="X") + "\n")
     revision = commit(clone, "Give one model point an unknown sex")
     messages = {}
@@ -2721,8 +2722,171 @@ def test_a_point_that_raises_under_the_export_is_a_failed_model_point(monkeypatc
         assert [f["model_point_id"] for f in response["failed_model_points"]] == [broken]
         messages[path] = response["failed_model_points"][0]["message"]
         assert_documents_valid(folder)
-    assert messages["export"] == "result_cf raised ValueError: invalid sex"
-    assert messages["modelx"].startswith("result_cf raised FormulaError")
+    assert messages == dict.fromkeys(
+        ("export", "modelx"), f"result_cf raised ValueError: invalid sex in RLV_DE_S.Projection[{index}].sex()")
+
+
+def test_a_formula_of_t_and_a_check_that_raise_name_their_formula_alike_on_both_paths(monkeypatch, tmp_path,
+                                                                                       capsys):
+    repositories, clone = throwaway(tmp_path)
+    lines = text(POINT_TABLE).splitlines()
+    columns = lines[0].split(",")
+    points = {line.split(",")[columns.index("policy_id")]: line.split(",")[columns.index("point_id")]
+              for line in lines[1:3]}
+    (lapse_id, lapse_index), (check_id, check_index) = points.items()
+    edit_file(clone, MODEL_CODE, "    return lapse_rate_base(t) * shock_lapse_factor(t)\n",
+              f"    if point_id == {lapse_index} and t == 3:  # noqa: F821\n"
+              "        raise ValueError('no lapse rate\\nfor month 3')\n"
+              "    return lapse_rate_base(t) * shock_lapse_factor(t)\n")
+    edit_file(clone, MODEL_CODE,
+              "    tol = val_tol * max(sum_assured(), 1.0)                          # noqa: F821\n"
+              "    return all(abs(check_net_cf_resid(t))",
+              f"    if point_id == {check_index}:  # noqa: F821\n"
+              "        raise TypeError('no reconciliation')\n"
+              "    tol = val_tol * max(sum_assured(), 1.0)                          # noqa: F821\n"
+              "    return all(abs(check_net_cf_resid(t))")
+    revision = commit(clone, "Raise in a formula of t and in a check")
+    expected = {
+        lapse_id: f"result_cf raised ValueError: no lapse rate in RLV_DE_S.Projection[{lapse_index}].lapse_rate(t=3)",
+        check_id: f"check_net_cf raised TypeError: no reconciliation in RLV_DE_S.Projection[{check_index}].check_net_cf()",
+    }
+    for path in ("export", "modelx"):
+        folder = tmp_path / path
+        request_path = model_request(monkeypatch, folder, lapse_id, check_id, revision=revision,
+                                     repositories=repositories, path=path)
+        assert cli(monkeypatch, "run", request_path, "--repositories", repositories) == 1
+        assert "outcome: failed" in capsys.readouterr().out
+        response = stored(folder / "response.json")
+        assert {f["model_point_id"]: f["message"] for f in response["failed_model_points"]} == expected, path
+        assert_documents_valid(folder)
+
+
+def test_a_failure_under_the_export_names_the_innermost_exported_formula():
+    """Stub spaces of a stub exported package: a library frame below a formula, a formula of another
+    space, a cause of two lines, and a check that raises beside one that is false."""
+    import pandas as pd
+    from degelmann.deltarecon.engines.reference_model import ReferenceModelSession
+
+    with pytest.raises(ValueError) as caught:
+        pd.to_numeric(pd.Series(["x"]))
+    library_cause = f"ValueError: {str(caught.value).splitlines()[0]}"
+
+    class Data:
+        _name = "Data"
+
+        @staticmethod
+        def model_point_table():
+            return pd.DataFrame({"policy_id": ["MP-0", "MP-1", "MP-2"]})
+
+        def _f_lapse_table(self):
+            return {}["policy_year"]
+
+    data = Data()
+
+    class ItemSpace:
+        _name = "Projection"
+
+        def __init__(self, index):
+            self.index = index
+
+        def result_cf(self):
+            return self._f_result_cf()
+
+        def _f_result_cf(self):
+            if self.index == 0:
+                return self._f_premiums(0, "AFT_DECR")
+            if self.index == 2:
+                return self._f_sex()
+            return pd.DataFrame()
+
+        def _f_premiums(self, t, timing):
+            return pd.to_numeric(pd.Series(["x"]))  # raises inside pandas
+
+        def _f_sex(self):
+            raise ValueError("invalid sex\nX is neither M nor F")
+
+        def check_net_cf(self):
+            return self._f_check_net_cf()
+
+        def _f_check_net_cf(self):
+            return data._f_lapse_table()
+
+        def check_prem_split(self):
+            return False
+
+        def __getattr__(self, name):  # every other check holds
+            return lambda: True
+
+    class Projection:
+        def __getitem__(self, index):
+            return ItemSpace(index)
+
+        def __delitem__(self, index):
+            pass
+
+    class Exported:
+        pass
+
+    class Model:
+        Data = data
+
+    exported = Exported()
+    exported.Projection = Projection()
+    session = ReferenceModelSession(Model(), exported)
+    messages = {}
+    for point in ("MP-0", "MP-1", "MP-2"):
+        with pytest.raises(ModelPointFailure) as failure:
+            session.project(point)
+        messages[point] = str(failure.value)
+    assert messages == {
+        "MP-0": f"result_cf raised {library_cause} in RLV_DE_S.Projection[0].premiums(t=0, timing=AFT_DECR)",
+        "MP-1": "check_net_cf raised KeyError: 'policy_year' in RLV_DE_S.Data.lapse_table(); check_prem_split is false",
+        "MP-2": "result_cf raised ValueError: invalid sex in RLV_DE_S.Projection[2].sex()",
+    }
+
+
+def test_a_failure_without_a_formula_keeps_its_last_line():
+    """A raise outside every exported formula, on the path export: the last line of the message."""
+    import pandas as pd
+    from degelmann.deltarecon.engines.reference_model import ReferenceModelSession
+
+    class ItemSpace:
+        _name = "Projection"
+
+        def result_cf(self):
+            raise ValueError("first line\nlast line")
+
+        def check_net_cf(self):
+            raise TypeError()
+
+        def __getattr__(self, name):  # every other check holds
+            return lambda: True
+
+    class Projection:
+        def __getitem__(self, index):
+            return ItemSpace()
+
+        def __delitem__(self, index):
+            pass
+
+    class Data:
+        @staticmethod
+        def model_point_table():
+            return pd.DataFrame({"policy_id": ["MP-0"]})
+
+    class Exported:
+        pass
+
+    class Model:
+        pass
+
+    model, exported = Model(), Exported()
+    model.Data, exported.Projection = Data(), Projection()
+    with pytest.raises(ModelPointFailure, match="^result_cf raised ValueError: last line$"):
+        ReferenceModelSession(model, exported).project("MP-0")
+    ItemSpace.result_cf = lambda self: None
+    with pytest.raises(ModelPointFailure, match="^check_net_cf raised TypeError$"):
+        ReferenceModelSession(model, exported).project("MP-0")
 
 
 def test_a_state_takes_the_computation_path_of_the_older_record():

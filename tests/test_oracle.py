@@ -25,7 +25,7 @@ import pytest
 from degelmann.deltarecon.__main__ import main
 from degelmann.deltarecon.documents import RUN_SCHEMA, document_bytes, parse_document, read_document
 
-from conftest import CLONE, RELEASE_N, REPOSITORIES, ROOT, git, require_clone
+from conftest import CLONE, NEWER, RELEASE_N, REPOSITORIES, ROOT, git, require_clone
 
 ORACLE = ROOT / "oracle"
 ARCHIVE = ORACLE / "archive" / "2026-10-22"
@@ -33,7 +33,6 @@ ARCHIVED_VERSION = "2.0"
 ENGINE_VERSION = "modelx 0.33.0 export, pandas 3.0.6, numpy 2.5.3, Python 3.14.9"
 ARCHIVED_ENGINE_VERSION = "modelx 0.33.0, pandas 3.0.6, numpy 2.5.3, Python 3.12.13"
 PROFILE = ROOT / "profiles" / "tolerance-bruttobeitrag.json"
-NEWER = "ab5dc790f5bed52f94a4c8fb8d6b710bc31f0a33"  # the newer revision of the reference walk
 REQUESTS = {"n.request.json": ("oracle-n", "N", RELEASE_N), "n1.request.json": ("oracle-n1", "N+1", NEWER)}
 WALK_RESULT = "walk.result.json"
 SUM_LINE = re.compile(r"([0-9a-f]{64})  (walk\.result\.json|step-[0-9]{2}\.compare\.signature-table\.json)")
