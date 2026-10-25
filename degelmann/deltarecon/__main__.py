@@ -77,6 +77,11 @@ cancel within one interval. A walk that does not attribute every revision or doe
 search is refused with ``walk_not_attributed`` or ``walk_mismatch``, and nothing is written;
 an unknown quantity or an empty period range is a usage error.
 
+``run``, ``replay``, ``regression``, ``walk``, and ``search`` project the model points of each
+state in ``--workers N`` worker processes, else as many as ``DELTARECON_WORKERS`` names, else
+one per processor; ``N`` and the variable must be whole numbers of at least 1. The count changes
+no byte of any document and is not recorded.
+
 ``compare`` takes its tolerance profile from the request. ``replay``, ``regression``,
 ``walk``, and ``search`` compare exactly unless ``--tolerance FILE`` names a tolerance profile: a JSON file in the
 form of the ``tolerance`` member of a compare request. There is no default profile.
@@ -114,12 +119,26 @@ from .regression import read_regression_input, regression
 from .replay import replay
 from .run import REPOSITORIES_FOLDER, UsageError, repositories_folder, run_request, run_request_document
 from .signature import render_coverage, render_model_points, render_table
+from .workers import WORKERS_VARIABLE, whole_number
 
 
-def engine():
+def engine(workers: int | None = None):
     # The adapter is the only module that imports the calculation engine.
     from .engines.reference_model import ReferenceModel
-    return ReferenceModel()
+    return ReferenceModel(workers)
+
+
+def state_engine(args):
+    """The engine of a command that runs states. Without ``--workers`` the factory is called
+    without an argument, and the engine takes its count from the environment."""
+    return engine() if args.workers is None else engine(args.workers)
+
+
+def worker_option(text: str) -> int:
+    value = whole_number(text)
+    if value is None:
+        raise argparse.ArgumentTypeError(f"must be a whole number of at least 1, not {text!r}")
+    return value
 
 
 def print_diagnostic(diagnostic: dict) -> None:
@@ -162,7 +181,7 @@ def command_request(args) -> int:
 
 
 def command_run(args) -> int:
-    result = run_request(Path(args.request), engine(), args.repositories)
+    result = run_request(Path(args.request), state_engine(args), args.repositories)
     print(f"outcome: {result.outcome}")
     for diagnostic in result.response.get("diagnostics", []):
         print_diagnostic(diagnostic)
@@ -181,7 +200,7 @@ def command_run(args) -> int:
 
 def command_replay(args) -> int:
     try:
-        result = replay(Path(args.run_record), engine(), args.repositories, args.tolerance)
+        result = replay(Path(args.run_record), state_engine(args), args.repositories, args.tolerance)
     except Rejection as rejection:
         print("replay: rejected")
         print_diagnostic(rejection.diagnostic())
@@ -264,7 +283,7 @@ def command_regression(args) -> int:
         raise UsageError(f"{output} exists already; a regression run overwrites no file")
     repositories = repositories_folder(args.repositories)
     try:
-        recorded = read_regression_input(Path(args.run_record), engine().stages)
+        recorded = read_regression_input(Path(args.run_record), state_engine(args).stages)
     except Rejection as rejection:
         print("regression: rejected")
         print_diagnostic(rejection.diagnostic())
@@ -281,7 +300,7 @@ def command_regression(args) -> int:
         return 1
     release = {"label": args.label,
                "references": reference_model.release_references(revision, input_revision, args.path)}
-    result = regression(recorded, release, output, engine(), repositories, args.tolerance)
+    result = regression(recorded, release, output, state_engine(args), repositories, args.tolerance)
     if result.comparison is None:
         print(f"regression: the run of the revision has the outcome {result.run.outcome}; nothing is compared")
         for diagnostic in result.run.response.get("diagnostics", []):
@@ -321,7 +340,7 @@ def _number(value) -> str:
 
 def command_walk(args) -> int:
     try:
-        done = walk(Path(args.older_record), Path(args.newer_record), Path(args.output), engine(),
+        done = walk(Path(args.older_record), Path(args.newer_record), Path(args.output), state_engine(args),
                     args.repositories, args.tolerance)
     except Rejection as rejection:  # refused before the first run; nothing is written
         print("walk: rejected")
@@ -363,7 +382,7 @@ def command_walk(args) -> int:
 
 def command_search(args) -> int:
     try:
-        done = search(Path(args.older_record), Path(args.newer_record), Path(args.output), engine(),
+        done = search(Path(args.older_record), Path(args.newer_record), Path(args.output), state_engine(args),
                       args.repositories, args.tolerance, args.quantity, args.periods,
                       Path(args.walk) if args.walk else None)
     except Rejection as rejection:  # refused before the first run; nothing is written
@@ -482,6 +501,11 @@ def main(argv: list[str] | None = None) -> int:
         command.add_argument("--tolerance", metavar="FILE",
                              help="tolerance profile, JSON in the form of the tolerance member of a "
                                   "compare request; without it the comparison is exact")
+
+    for command in (run, again, regress, stepper, halver):
+        command.add_argument("--workers", type=worker_option, metavar="N",
+                             help="the number of worker processes that project the model points of a "
+                                  f"state (default: {WORKERS_VARIABLE}, else one per processor)")
 
     for command in (request, regress):
         command.add_argument("--path", choices=("export", "modelx"), default="export",

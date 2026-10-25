@@ -21,6 +21,7 @@ import subprocess
 import sys
 import tempfile
 import threading
+import time
 from contextlib import contextmanager
 from decimal import ROUND_HALF_UP, Decimal
 from pathlib import Path
@@ -29,8 +30,8 @@ import pytest
 
 from degelmann.deltarecon import changes as changes_contract
 from degelmann.deltarecon.__main__ import main
-from degelmann.deltarecon.documents import (CONTRACT_VERSION, RECORD_SCHEMA, RUN_SCHEMA, Rejection, document_bytes,
-                                            schema_errors, sha256_file)
+from degelmann.deltarecon.documents import (CONTRACT_VERSION, RECORD_SCHEMA, RUN_REQUEST, RUN_SCHEMA, Rejection,
+                                            document_bytes, schema_errors, sha256_file)
 from degelmann.deltarecon.regression import read_regression_input, regression
 from degelmann.deltarecon.run import History, ModelPointFailure, Revision, run_request
 
@@ -272,6 +273,7 @@ class StubSession:
     quantities = [("Anzahl Verträge", "policies"), ("Netto-Cashflow", "EUR")]
 
     def __init__(self, folder: Path):
+        self.folder = folder
         lines = (folder / "points.csv").read_text("utf-8").splitlines()[1:]
         self.points = [line.split(",") for line in lines]
         self.params = [line.split(",") for line in
@@ -380,6 +382,58 @@ class StubEngine:
             self.received, self.held = list(enabled), hold
             self.opened += 1
             yield StubSession(state)
+
+
+# --- a stub engine whose sessions project in worker processes ---
+
+_stub_session = None  # the session of a stub worker process
+
+
+def _stub_start(folder: str) -> None:
+    global _stub_session
+    _stub_session = StubSession(Path(folder))
+
+
+def _stub_project(model_point_id: str):
+    """One point in a stub worker. An earlier point in writer order sleeps longer, so that the
+    points finish in reverse; the base ``crash`` raises an error that is no model point failure."""
+    ids = sorted(_stub_session.model_point_ids())
+    time.sleep(0.05 * (len(ids) - ids.index(model_point_id)))
+    if next(p for p in _stub_session.points if p[0] == model_point_id)[3] == "crash":
+        raise RuntimeError("the stub worker crashes")
+    try:
+        return "ok", _stub_session.project(model_point_id)
+    except ModelPointFailure as failure:
+        return "failed", str(failure)
+
+
+class WorkerSession(StubSession):
+    """The stub session whose ``project_many`` projects the points in worker processes."""
+
+    def __init__(self, folder: Path, engine: "WorkerStub"):
+        super().__init__(folder)
+        self.engine = engine
+
+    def project_many(self, model_point_ids):
+        from degelmann.deltarecon.workers import ordered_map
+        self.engine.asked.append(list(model_point_ids))
+        results = ordered_map(_stub_start, (str(self.folder),), _stub_project, model_point_ids,
+                              self.engine.workers)
+        return [value if kind == "ok" else ModelPointFailure(value) for kind, value in results]
+
+
+class WorkerStub(StubEngine):
+    """The stub engine with ``workers`` worker processes per session. ``asked`` holds the ids of
+    every call of ``project_many``."""
+
+    def __init__(self, workers: int):
+        super().__init__()
+        self.workers, self.asked = workers, []
+
+    @contextmanager
+    def open(self, release, enabled, manifest_dir, repositories, hold=frozenset()):
+        with super().open(release, enabled, manifest_dir, repositories, hold) as session:
+            yield WorkerSession(session.folder, self)
 
 
 @pytest.fixture
@@ -501,6 +555,32 @@ def stub_regression(world: Path, release: dict, engine=None, tolerance=None):
 def cli(monkeypatch, *arguments) -> int:
     monkeypatch.chdir(ROOT)
     return main([str(argument) for argument in arguments])
+
+
+def text(path: str) -> str:
+    """A file of release N, as committed."""
+    return committed(path).decode("utf-8")
+
+
+def model_request(monkeypatch, folder: Path, *ids: str, revision: str = RELEASE_N,
+                  repositories: Path = REPOSITORIES, run_id: str = "run-n-subset", path: str | None = None) -> Path:
+    arguments = ["request", "--revision", revision, "--repositories", repositories, "--label", "N",
+                 "--run-id", run_id, "--output", folder / "request.json"]
+    if path is not None:
+        arguments += ["--path", path]
+    if ids:
+        arguments += ["--subset", *ids]
+    assert cli(monkeypatch, *arguments) == 0
+    assert not schema_errors(stored(folder / "request.json"), RUN_REQUEST)
+    return folder / "request.json"
+
+
+def with_columns(columns: list[str], line: str, **changes: str) -> str:
+    values = line.split(",")
+    for column, value in changes.items():
+        assert values[columns.index(column)] != value
+        values[columns.index(column)] = value
+    return ",".join(values)
 
 
 def edit_file(clone: Path, path: str, old: str, new: str) -> None:
