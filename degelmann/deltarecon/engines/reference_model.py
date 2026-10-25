@@ -70,6 +70,19 @@ a frame of a library the formula calls does not count. Without a formula the mes
 ``<output> raised <Kind>: <last line of the message>``, or ``<output> raised <Kind>`` for an
 empty message. The problems of one point are joined with ``; ``.
 
+Worker processes
+----------------
+A session projects the selected model points in worker processes, ``--workers`` of them,
+else ``DELTARECON_WORKERS``, else one per processor the process may use, never more than
+points. The parent restores the state, reads the model, exports it on the path ``export``,
+and maps each id to its row of the model point table. Each worker opens the same scratch
+folder once: on ``export`` it imports the package the parent exported, on ``modelx`` it
+reads the model with ``mx.read_model``. It projects a point by its row and returns the
+periods or the message of its failure; the parent keeps the order of the selection. The
+pool ends with the session call, before the scratch folder is removed. With one worker the
+points are projected in the parent, one after the other. The worker count changes no byte of
+any document and is not recorded.
+
 Changes
 -------
 The path of a text patch is relative to the root of the repository, for example
@@ -125,6 +138,7 @@ import pandas as pd
 from .. import changes as changes_contract
 from ..documents import Rejection
 from ..run import SCRATCH_PREFIX, History, ModelPointFailure, Revision, UsageError
+from ..workers import ordered_map, worker_count
 
 STAGE = "liability_cashflow"
 SOURCE = "git"
@@ -581,6 +595,28 @@ def _is_scalar(value) -> bool:
     return isinstance(value, (bool, int, float, str, np.bool_, np.integer, np.floating))
 
 
+def _load_package(package: Path, name: str):
+    """The model of the exported package ``package``, imported as the module ``name``."""
+    spec = importlib.util.spec_from_file_location(name, package / "__init__.py",
+                                                  submodule_search_locations=[str(package)])
+    module = importlib.util.module_from_spec(spec)
+    sys.modules[name] = module
+    spec.loader.exec_module(module)
+    return module.mx_model
+
+
+@contextmanager
+def _import_exported(package: Path):
+    """The model of the exported package ``package``, imported under a name of its own. Its
+    modules leave ``sys.modules`` when the block ends."""
+    name = f"_deltarecon_export_{uuid.uuid4().hex}"
+    try:
+        yield _load_package(package, name)
+    finally:
+        for loaded in [key for key in sys.modules if key == name or key.startswith(f"{name}.")]:
+            del sys.modules[loaded]
+
+
 @contextmanager
 def _exported(model, product: Path):
     """The model exported into ``product`` and imported under a name of its own.
@@ -591,27 +627,52 @@ def _exported(model, product: Path):
     """
     package = product / EXPORT_FOLDER
     mx.export_model(model, package)
-    name = f"_deltarecon_export_{uuid.uuid4().hex}"
+    with _import_exported(package) as exported:
+        yield exported
+
+
+# The session of a worker process, set once by ``_start_worker``.
+_worker_session = None
+
+
+def _start_worker(state: str, path: str) -> None:
+    """Open the restored state ``state`` in a worker process for the computation path ``path``.
+
+    On ``export`` the worker imports the package the parent has exported into the state; on
+    ``modelx`` it reads the model of the state. Nothing is exported and nothing is written.
+    """
+    global _worker_session
+    product = Path(state) / PRODUCT_FOLDER
+    if path == "modelx":
+        with _readable_formula_errors():
+            _worker_session = ReferenceModelSession(mx.read_model(product / MODEL_NAME))
+    else:
+        exported = _load_package(product / EXPORT_FOLDER, f"_deltarecon_export_{uuid.uuid4().hex}")
+        _worker_session = ReferenceModelSession(None, exported)
+
+
+def _project_in_worker(index: int) -> tuple[str, object]:
+    """The point of row ``index`` in a worker: ``("ok", periods)`` or ``("failed", message)``."""
     try:
-        spec = importlib.util.spec_from_file_location(name, package / "__init__.py",
-                                                      submodule_search_locations=[str(package)])
-        module = importlib.util.module_from_spec(spec)
-        sys.modules[name] = module
-        spec.loader.exec_module(module)
-        yield module.mx_model
-    finally:
-        for loaded in [key for key in sys.modules if key == name or key.startswith(f"{name}.")]:
-            del sys.modules[loaded]
+        return "ok", _worker_session._project_index(index)
+    except ModelPointFailure as failure:
+        return "failed", str(failure)
 
 
 class ReferenceModelSession:
     time_basis = TIME_BASIS
     quantities = [(name, unit) for name, unit, _ in QUANTITIES]
 
-    def __init__(self, model, computing=None):
+    def __init__(self, model, computing=None, workers: int = 1, state: Path | None = None):
         """``model`` is the modelx model; ``computing`` the model the points are projected
-        through: the exported one on the path ``export``, ``model`` itself on ``modelx``."""
+        through: the exported one on the path ``export``, ``model`` itself on ``modelx``.
+
+        ``project_many`` projects the points in ``workers`` worker processes that open the
+        restored state ``state``; without a state, or with one worker, it projects them here.
+        """
         self._model = model
+        self._workers, self._state = workers, state
+        self._path = "modelx" if computing is None else "export"
         self._computing = model if computing is None else computing
         # The top-level module of the exported package; its formulas name a failure.
         self._package = None if computing is None else type(computing).__module__.partition(".")[0]
@@ -646,11 +707,43 @@ class ReferenceModelSession:
             return [str(value) for value in self._points()[MODEL_POINT_ID_COLUMN]]
 
     def project(self, model_point_id: str) -> list[tuple[int, list[float]]]:
+        return self._project_index(self._index(model_point_id))
+
+    def project_many(self, model_point_ids: list[str]) -> list:
+        """The outcome of each id in the given order: its periods or its :class:`ModelPointFailure`.
+
+        The parent maps each id to its row; the workers project by row and return the periods
+        or the message of a failure, so a message is the same on every worker count.
+        """
+        outcomes, rows = {}, {}
+        for model_point_id in dict.fromkeys(model_point_ids):
+            try:
+                rows[model_point_id] = self._index(model_point_id)
+            except ModelPointFailure as failure:
+                outcomes[model_point_id] = failure
+        if self._workers <= 1 or len(rows) <= 1 or self._state is None:
+            for model_point_id, index in rows.items():
+                try:
+                    outcomes[model_point_id] = self._project_index(index)
+                except ModelPointFailure as failure:
+                    outcomes[model_point_id] = failure
+        else:
+            results = ordered_map(_start_worker, (str(self._state), self._path), _project_in_worker,
+                                  list(rows.values()), self._workers, preload=[__name__])
+            for model_point_id, (kind, value) in zip(rows, results):
+                outcomes[model_point_id] = value if kind == "ok" else ModelPointFailure(value)
+        return [outcomes[model_point_id] for model_point_id in model_point_ids]
+
+    def _index(self, model_point_id: str) -> int:
+        """The row of the model point table that holds ``model_point_id``."""
         table = self._points()
         matches = table.index[table[MODEL_POINT_ID_COLUMN].astype(str) == model_point_id]
         if len(matches) != 1:
             raise ModelPointFailure(f"The model point table holds {len(matches)} rows with this id.")
-        index = int(matches[0])
+        return int(matches[0])
+
+    def _project_index(self, index: int) -> list[tuple[int, list[float]]]:
+        """The periods of the point of row ``index``. Raises :class:`ModelPointFailure`."""
         projection = None
         try:
             try:
@@ -716,6 +809,10 @@ class ReferenceModel:
     realisations = frozenset({changes_contract.TEXT_PATCH, changes_contract.REVISION})
     determines = DETERMINED_KINDS
     holdable = {"input_data": frozenset({"data"})}  # the model point table, the class ``data``
+
+    def __init__(self, workers: int | None = None):
+        """``workers`` is the number of worker processes of a session, see :func:`worker_count`."""
+        self.workers = worker_count(workers)
 
     def _locate(self, release: dict, repositories: Path) -> tuple[Path, dict[str, str]]:
         """The clone and the files of the release state: path and blob id.
@@ -804,9 +901,9 @@ class ReferenceModel:
                 model = mx.read_model(state / PRODUCT_FOLDER / MODEL_NAME)
             try:
                 if path == "modelx":
-                    yield ReferenceModelSession(model)
+                    yield ReferenceModelSession(model, workers=self.workers, state=state)
                 else:  # no fallback: an export or an import that fails ends the run with an error
                     with _exported(model, state / PRODUCT_FOLDER) as exported:
-                        yield ReferenceModelSession(model, exported)
+                        yield ReferenceModelSession(model, exported, self.workers, state)
             finally:
                 model.close()

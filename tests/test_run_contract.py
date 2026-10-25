@@ -37,10 +37,11 @@ from conftest import (CLONE, CLONE_NAME, EXACT, LAPSE_TABLE, MODEL_CODE, NEW_BUS
                       REPOSITORY_URL, ROOT, StubEngine, StubSession, assert_documents_valid, change, cli,
                       clone_state, commit, committed, deviation_rows, edit_file, expected_deviations,
                       folder_hashes, git, patch_text, rehash, require_clone, roles, run_stub, stored,
-                      stub_regression, stub_release, stub_request, throwaway, with_manifest)
+                      stub_regression, stub_release, stub_request, text, throwaway, with_columns, with_manifest,
+                      model_request)
 
 CORE_MODULES = ["documents", "export", "changes", "run", "compare", "signature", "replay", "regression",
-                "derive", "walk", "search", "__main__"]
+                "derive", "walk", "search", "workers", "__main__"]
 POINTS_E = POINTS + "MP-E,0,1,7\n"
 
 
@@ -1576,29 +1577,11 @@ def test_only_the_adapter_imports_the_engine_and_calls_git():
 RELEASE_VALUE = f"git:{REPOSITORY_URL}@{RELEASE_N}"
 
 
-def text(path: str) -> str:
-    """A file of release N, as committed."""
-    return committed(path).decode("utf-8")
-
-
 def in_force_id() -> str:
     lines = text(POINT_TABLE).splitlines()
     columns = lines[0].split(",")
     row = next(line.split(",") for line in lines[1:] if line.split(",")[columns.index("duration_y")] != "0")
     return row[columns.index("policy_id")]
-
-
-def model_request(monkeypatch, folder: Path, *ids: str, revision: str = RELEASE_N,
-                  repositories: Path = REPOSITORIES, run_id: str = "run-n-subset", path: str | None = None) -> Path:
-    arguments = ["request", "--revision", revision, "--repositories", repositories, "--label", "N",
-                 "--run-id", run_id, "--output", folder / "request.json"]
-    if path is not None:
-        arguments += ["--path", path]
-    if ids:
-        arguments += ["--subset", *ids]
-    assert cli(monkeypatch, *arguments) == 0
-    assert not schema_errors(stored(folder / "request.json"), RUN_REQUEST)
-    return folder / "request.json"
 
 
 def named_revisions(request: dict) -> dict[str, str]:
@@ -1609,14 +1592,6 @@ def point_line(policy_id: str) -> tuple[list[str], str]:
     """The columns of the model point table and the line of one model point of release N."""
     lines = text(POINT_TABLE).split("\n")
     return lines[0].split(","), next(line for line in lines if line.split(",")[1:2] == [policy_id])
-
-
-def with_columns(columns: list[str], line: str, **changes: str) -> str:
-    values = line.split(",")
-    for column, value in changes.items():
-        assert values[columns.index(column)] != value
-        values[columns.index(column)] = value
-    return ",".join(values)
 
 
 def test_request_command_names_the_complete_release_identity(monkeypatch, tmp_path):

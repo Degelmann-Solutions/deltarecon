@@ -15,7 +15,9 @@ run with the outcome ``error`` and the diagnostic ``state_not_readable``; a
 :class:`~degelmann.deltarecon.documents.Rejection` and a :class:`UsageError` keep their meaning. A
 state without a model point gives ``no_model_point``, an id the schema forbids
 ``invalid_model_point_id``. A :class:`ModelPointFailure` of ``project`` still fails the
-model point, and an error of the core still stops the procedure.
+model point, and an error of the core still stops the procedure. A session may project the
+selection at once through ``project_many``; its outcomes are checked in writer order as
+those of ``project``.
 """
 from __future__ import annotations
 
@@ -78,6 +80,11 @@ class Session(Protocol):
 
         Raises :class:`ModelPointFailure` when the model point cannot be calculated.
         """
+
+    # A session may also offer ``project_many(model_point_ids)``: the outcome of each id in
+    # the given order, its periods as ``project`` returns them or the ModelPointFailure that
+    # ``project`` would raise. Any other exception propagates. A session without it is
+    # projected point by point through ``project``.
 
     def parameters(self) -> list[dict]:
         """The parameter inventory of the release state, in the form of the run record.
@@ -380,6 +387,27 @@ def read_inventory(session: Session) -> list[dict]:
     return sorted(ordered, key=lambda parameter: parameter["name"])
 
 
+def project_selection(session: Session, model_point_ids: list[str]) -> list:
+    """The outcome of each id, in the given order: its periods, or its :class:`ModelPointFailure`.
+
+    Through ``session.project_many`` when the session offers it, else ``project`` per id.
+    """
+    many = getattr(session, "project_many", None)
+    if many is not None:
+        outcomes = list(many(model_point_ids))
+        if len(outcomes) != len(model_point_ids):
+            raise RuntimeError(f"the engine returns {len(outcomes)} outcomes for {len(model_point_ids)} "
+                               "model points")
+        return outcomes
+    outcomes = []
+    for model_point_id in model_point_ids:
+        try:
+            outcomes.append(session.project(model_point_id))
+        except ModelPointFailure as failure:
+            outcomes.append(failure)
+    return outcomes
+
+
 def calculate(session: Session, stage: str, selected: list[str], available: list[str],
               names: list[str] | None = None):
     """Project the selection. Return the export rows, the period ranges, and the failures.
@@ -391,12 +419,18 @@ def calculate(session: Session, stage: str, selected: list[str], available: list
     problem = quantity_errors(stage, names)
     if problem:
         raise RuntimeError(f"the engine declares quantities the stage does not allow: {problem}")
+    # An id the release holds more than once fails in the core and is never projected.
+    single = [model_point_id for model_point_id in dict.fromkeys(selected)
+              if available.count(model_point_id) <= 1]
+    outcomes = dict(zip(single, project_selection(session, single)))
     rows, ranges, failures = [], [], []
     for model_point_id in selected:
         try:
             if available.count(model_point_id) > 1:
                 raise ModelPointFailure("The release holds this model point id more than once.")
-            periods = session.project(model_point_id)
+            periods = outcomes[model_point_id]
+            if isinstance(periods, ModelPointFailure):
+                raise periods
             if not periods:
                 raise ModelPointFailure("The model point has no period.")
             first = periods[0][0]
