@@ -170,7 +170,8 @@ class Engine(Protocol):
         """The release identity of the state after ``revision``, as this engine would record it.
 
         ``base`` is a recorded release identity, of any engine version. The result has the
-        label of ``base``, names the present engine, and names the state after ``revision``
+        label of ``base``, names the present engine, on the computation path ``base`` names
+        when the engine has several, and names the state after ``revision``
         with the kinds in ``hold`` taken from ``base``; for ``revision`` ``None`` it names
         the state of ``base`` itself. Nothing is restored and nothing is written.
 

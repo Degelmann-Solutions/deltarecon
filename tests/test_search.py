@@ -980,3 +980,58 @@ def test_the_cancelling_pair_on_the_reference_engine(tmp_path):
     assert clone_state(clone) == state
     assert {n: folder_hashes(p.parent) for n, p in records.items()} == before
     assert folder_hashes(tmp_path / "walk") == walk_hashes
+
+
+def test_a_walk_runs_on_the_path_of_the_older_record_and_a_walk_on_another_path_is_refused(
+        tmp_path, monkeypatch, capsys):
+    """Two model points and one revision; the records run on the export path, the default."""
+    from degelmann.deltarecon.engines.reference_model import ReferenceModel, engine_version
+    repositories, clone = throwaway(tmp_path)
+    lines = (clone / POINT_TABLE).read_text("utf-8").splitlines(keepends=True)
+    write_files(clone, {POINT_TABLE: lines[0] + lines[1] + lines[2]})
+    base = commit(clone, "Keep two model points")
+    lapse = (clone / LAPSE_TABLE).read_text("utf-8")
+    write_files(clone, {LAPSE_TABLE: lapse.replace("\n2,0.04,", "\n2,0.02,")})
+    newest = commit(clone, "Halve the lapse rate of policy year 2")
+    records = {}
+    for name, revision in (("older", base), ("newer", newest)):
+        folder = tmp_path / name
+        assert main(["request", "--revision", revision, "--repositories", str(repositories), "--label", name,
+                     "--run-id", f"run-{name}", "--output", str(folder / "request.json")]) == 0
+        assert main(["run", str(folder / "request.json"), "--repositories", str(repositories)]) == 0
+        records[name] = str(folder / "run-record.json")
+
+    def walk_on(output: str) -> None:
+        assert main(["walk", records["older"], records["newer"], "--output", str(tmp_path / output),
+                     "--repositories", str(repositories)]) == 0
+
+    def versions(output: str) -> set[str]:
+        return {reference["value"] for state in ("state-00", "state-01")
+                for reference in stored(tmp_path / output / state / "request.json")["release"]["references"]
+                if reference["kind"] == "engine_version"}
+
+    walk_on("walk")
+    assert versions("walk") == {engine_version("export")}
+    # The same two records walked by an engine that names the modelx path for every state.
+    real = ReferenceModel.state_release
+
+    def on_modelx(self, base, revision, hold, repositories):
+        state = real(self, base, revision, hold, repositories)
+        return {**state, "references": [{**r, "value": engine_version("modelx")} if r["kind"] == "engine_version"
+                                        else r for r in state["references"]]}
+
+    with monkeypatch.context() as patch:
+        patch.setattr(ReferenceModel, "state_release", on_modelx)
+        walk_on("walk-modelx")
+    assert versions("walk-modelx") == {engine_version("modelx")}
+    capsys.readouterr()
+    before = folder_hashes(tmp_path / "walk-modelx")
+    assert main(["search", records["older"], records["newer"], "--output", str(tmp_path / "refused"),
+                 "--repositories", str(repositories), "--walk", str(tmp_path / "walk-modelx")]) == 1
+    out = capsys.readouterr().out
+    assert out.startswith("search: rejected") and "diagnostic: walk_mismatch: " in out
+    assert not (tmp_path / "refused").exists() and folder_hashes(tmp_path / "walk-modelx") == before
+    # The walk on the path of the older record is a reference.
+    assert main(["search", records["older"], records["newer"], "--output", str(tmp_path / "search"),
+                 "--repositories", str(repositories), "--walk", str(tmp_path / "walk")]) == 0
+    assert versions("search") == {engine_version("export")}

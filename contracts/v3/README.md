@@ -126,19 +126,29 @@ Reader rule for documents of versions 1.0 and 2.0:
 
 ### Changes from 2.0
 
-Version 3.0 changes so far only the versions a reader accepts. It changes
-neither the stage contracts run, changes, and compare nor the walk and the
-search; their documents differ from 2.0 in `contract_version` only. The one
-consequence in the text is the replay of a run recorded under 2.0 with the
-outcome `error`: its repeated response is written under 3.0, so the byte
-comparison of the two responses ignores `contract_version`.
+Version 3.0 changes the versions a reader accepts and adds computation paths to
+the release identity. Its documents differ from 2.0 in `contract_version` only;
+no schema changes.
 
+What changes in the versions a reader accepts:
+
+- The replay of a run recorded under 2.0 with the outcome `error`: its repeated
+  response is written under 3.0, so the byte comparison of the two responses
+  ignores `contract_version`.
 - A reader of 3.0 also reads documents of 1.0 and 2.0, under the
   [reader rule for documents of versions 1.0 and 2.0](#version-compatibility).
   A reader of 2.0 rejects a 3.0 document with `unsupported_version`, as its
   pack states.
 - A walk folder written under 2.0 is a reference for a search, as a walk folder
   written under 1.0 already was under 2.0.
+
+What computation paths add:
+
+- An engine may offer several computation paths for one release, each named by
+  its own `engine_version` value, see [Release identity](#release-identity). The
+  request chooses the path, and a run never falls back to another one. A state
+  of a walk or a search names the release identity of the older result on the
+  computation path of the older result, see [localise.md](localise.md#walk).
 
 The 2.0 pack: [README](../v2/README.md), [run](../v2/run.md),
 [changes](../v2/changes.md), [compare](../v2/compare.md),
@@ -259,6 +269,11 @@ A release is identified by a label and a set of opaque references:
   returns them unchanged. The run record stores them unchanged.
 - The set should name the complete state: input data, parameters, own code, and
   engine version. What the references leave out cannot be restored later.
+- An engine may offer several computation paths for one release, each with its
+  own `engine_version` value. The request chooses the path by the value it
+  names, and a run never falls back to another path: a path that cannot compute
+  the state ends the run with the outcome `error`, see
+  [run.md](run.md#error-outcome).
 
 Reader rules:
 

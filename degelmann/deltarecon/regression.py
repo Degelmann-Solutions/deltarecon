@@ -19,8 +19,9 @@ id>``; no id depends on a path. Only the run records carry the identity of an ex
 stay: also when the engine cannot restore the release and rejects the run, and when the
 run ends with an error.
 
-The recorded run may come from another engine version than the present one: the new run
-is run on the present engine, and the compare result names both versions.
+The recorded run may come from another engine version than the present one, or from
+another computation path of the present engine: the new run is run on the engine version
+the caller's identity names, and the compare result names both versions when they differ.
 """
 from __future__ import annotations
 

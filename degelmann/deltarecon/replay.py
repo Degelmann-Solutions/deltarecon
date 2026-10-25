@@ -24,7 +24,8 @@ tolerance profile the comparison is exact.
   compared, and it is ``reproduced_exactly`` when the new response is byte for byte the
   recorded one, else ``not_reproduced``. The replay record lists the new response only.
 - A rejected replay raises a :class:`~degelmann.deltarecon.documents.Rejection` and writes nothing.
-  The replay stays strict: the engine resolves the recorded release identity as it is.
+  The replay stays strict: the engine resolves the recorded release identity as it is, so
+  the run is repeated on the computation path its engine version names.
 """
 from __future__ import annotations
 

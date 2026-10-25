@@ -17,7 +17,9 @@
 
 ``request`` writes a run request with the complete release identity of a commit of the
 reference model repository. ``--revision`` takes any name of a commit in the local clone,
-``HEAD``, a branch, or a short hash; the request holds the full hash. ``run`` writes
+``HEAD``, a branch, or a short hash; the request holds the full hash. ``--path
+export|modelx`` chooses the computation path the engine version names, export by default.
+``run`` writes
 ``response.json``, ``results.csv``, and ``run-record.json`` beside the request.
 
 ``run`` ends with the outcome ``error`` when the engine cannot restore or read the state
@@ -28,8 +30,8 @@ and the repeated run, and writes ``replay-compare.request.json``,
 ``replay-compare.result.json``, ``replay-compare.deviations.csv`` when the runs are
 compared, and ``replay-record.json``. A recorded run with the outcome ``error`` is
 repeated and its response compared byte for byte, apart from ``contract_version`` for a run
-recorded under 2.0; nothing else is compared. The engine
-version of the record must be the present one. A run record written under contract version
+recorded under 2.0; nothing else is compared. The record must name one of the present
+engine versions, and the replay repeats the run on the computation path it names. A run record written under contract version
 2.0 or 3.0 is replayed; one written under 1.0 is rejected with ``unsupported_version``.
 
 ``compare`` compares the two runs a compare request names and writes
@@ -41,8 +43,9 @@ compare request writes nothing.
 ``regression`` runs the commit ``--revision`` names on the input data and the selection of
 a recorded run, compares the recorded run with the new one, and prints "no deviation above
 tolerance" or the deviating model points and the signature table. It writes everything
-into the new folder ``--output``. The recorded run may come from another engine version;
-the new run uses the present engine, and the output names both versions.
+into the new folder ``--output``. ``--path export|modelx`` chooses the computation path the
+engine version names, export by default. The recorded run may come from another engine
+version; the new run uses the present engine on that path, and the output names both versions.
 
 ``derive`` reads the records of two succeeded runs without enabled changes, the older one
 first, and writes the change manifest of the history between the revisions they name: one
@@ -142,7 +145,8 @@ def command_request(args) -> int:
                                "sha256": sha256_file(manifest)}
     try:  # the request names a release only if a run would accept it
         revision = reference_model.resolve_revision(args.revision, repositories)
-        release = {"label": args.label, "references": reference_model.release_references(revision)}
+        release = {"label": args.label,
+                   "references": reference_model.release_references(revision, path=args.path)}
         engine().resolve(release, repositories)
     except Rejection as rejection:  # nothing is written
         print("request: rejected")
@@ -267,7 +271,8 @@ def command_regression(args) -> int:
         return 1
     try:
         # The newer commit is the state; the input data stays that of the recorded run. The
-        # recorded run may come from another engine version; the new run uses this engine.
+        # recorded run may come from another engine version or path; the new run uses this
+        # engine on the path --path names.
         _, input_revision = reference_model.recorded_identity(recorded.record["releases"][0])
         revision = reference_model.resolve_revision(args.revision, repositories)
     except Rejection as rejection:  # nothing is written
@@ -275,7 +280,7 @@ def command_regression(args) -> int:
         print_diagnostic(rejection.diagnostic())
         return 1
     release = {"label": args.label,
-               "references": reference_model.release_references(revision, input_revision)}
+               "references": reference_model.release_references(revision, input_revision, args.path)}
     result = regression(recorded, release, output, engine(), repositories, args.tolerance)
     if result.comparison is None:
         print(f"regression: the run of the revision has the outcome {result.run.outcome}; nothing is compared")
@@ -477,6 +482,12 @@ def main(argv: list[str] | None = None) -> int:
         command.add_argument("--tolerance", metavar="FILE",
                              help="tolerance profile, JSON in the form of the tolerance member of a "
                                   "compare request; without it the comparison is exact")
+
+    for command in (request, regress):
+        command.add_argument("--path", choices=("export", "modelx"), default="export",
+                             help="the computation path the engine version of the release names: "
+                                  "export, through the modelx export of the model (default), or "
+                                  "modelx, through modelx itself; a run never falls back to the other")
 
     for command in (request, run, again, regress, history, stepper, halver):
         command.add_argument("--repositories", metavar="DIR",
