@@ -2929,3 +2929,97 @@ def test_runs_through_the_contract_leave_the_clone_untouched(full_chain):
     """Status, ``HEAD``, and the references of the clone are as before the run and the replay."""
     assert full_chain["after"] == full_chain["before"]
     assert full_chain["before"][1].decode("ascii").strip() == git(CLONE, "rev-parse", "HEAD").decode().strip()
+
+
+# --- the values a run keeps in memory ---------------------------------------------------
+
+
+def test_the_values_in_memory_are_the_values_read_back_from_the_export(world):
+    """A succeeded run hands on its values as ``check_export`` reads them back: ``-0.0`` as ``0.0``,
+    a ``numpy.float64`` as a float, a subnormal and ``0.1`` unchanged, in writer order."""
+    import numpy as np
+
+    (world / "rel" / "points.csv").write_text(
+        "id,first,last,base\nMP-D,2,3,3\nMP-A,0,1,-0.0\nMP-B,0,1,0.1\nMP-C,0,0,1e-310\n", "utf-8")
+
+    class Float64Stub(StubEngine):
+        @contextmanager
+        def open(self, *arguments, **options):
+            with super().open(*arguments, **options) as session:
+                plain = session.project
+                session.project = lambda point: [
+                    (period, [np.float64(value) for value in values]) if point == "MP-D" else (period, values)
+                    for period, values in plain(point)]
+                yield session
+
+    result, _ = run_stub(world, engine=Float64Stub())
+    assert result.outcome == "succeeded"
+    request = stored(world / "run" / "request.json")
+    read_back = check_response(request, result.response, world / "run")
+    assert result.values == read_back and list(result.values) == list(read_back)
+    assert all(type(value) is float and str(value) != "-0.0" for numbers in result.values.values() for value in numbers)
+    assert all(type(period) is int for _, period in result.values)
+    assert result.values[("MP-A", 0)] == [0.0, 0.0] and result.values[("MP-C", 0)] == [1e-310, 1e-310]
+    # With the values, rules 6 and 7 still apply and the export is not read.
+    (world / "run" / "results.csv").unlink()
+    assert check_response(request, result.response, world / "run", result.values) is result.values
+    with pytest.raises(Rejection) as raised:
+        check_response({**request, "run_id": "another"}, result.response, world / "run", result.values)
+    assert raised.value.code == "request_mismatch"
+
+
+def test_a_run_that_has_not_succeeded_holds_no_values(world):
+    (world / "rel" / "points.csv").write_text("id,first,last,base\nMP-A,0,1,raise\n", "utf-8")
+    result, _ = run_stub(world)
+    assert result.outcome == "failed" and result.values is None
+
+
+def test_the_reference_engine_exports_a_product_folder_once_per_engine_object(tmp_path, monkeypatch):
+    """Same release twice: exported once, the same periods. Another product tree: exported again. A
+    state with a text patch: exported, neither kept nor served from the kept packages."""
+    import modelx as mx
+    from degelmann.deltarecon.engines import reference_model
+    from degelmann.deltarecon.engines.reference_model import ReferenceModel, release_references
+    from conftest import NEWER
+
+    require_clone()
+    exports = []
+    plain = mx.export_model
+
+    def counting(model, path, *arguments, **options):
+        exports.append(Path(path))
+        return plain(model, path, *arguments, **options)
+
+    monkeypatch.setattr(reference_model.mx, "export_model", counting)
+    engine = ReferenceModel(workers=1)
+    release = {"label": "N", "references": release_references(RELEASE_N)}
+    points = [NEW_BUSINESS, in_force_id()]
+
+    def projected(enabled=(), manifest_dir=None, use=release) -> list:
+        with engine.open(use, list(enabled), manifest_dir, REPOSITORIES) as session:
+            assert (session._state / PRODUCT_FOLDER / "_deltarecon_export").is_dir()
+            return [session.project(point) for point in points] if use is release else []
+
+    first = projected()
+    assert len(exports) == 1 and len(engine._exports) == 1
+    kept = next(iter(engine._exports.values()))
+    assert kept.is_dir() and not list(kept.rglob("__pycache__"))
+    second = projected()
+    assert len(exports) == 1 and second == first  # served from the kept package
+
+    newer = {"label": "N+1", "references": release_references(NEWER)}
+    projected(use=newer)
+    assert len(exports) == 2 and len(engine._exports) == 2  # another product tree: exported again
+
+    folder = tmp_path / "patched"
+    folder.mkdir()
+    code = text(MODEL_CODE)
+    entry = change("chg-comment", patch_text(MODEL_CODE, code, code + "# a comment\n"), folder, **{"class": "code"})
+    projected([entry], folder)
+    assert len(exports) == 3 and len(engine._exports) == 2  # exported, not kept
+    assert Path(engine._export_folder.name).name.startswith(SCRATCH_PREFIX)
+    folder_name = engine._export_folder.name
+    del engine
+    import gc
+    gc.collect()
+    assert not Path(folder_name).exists()

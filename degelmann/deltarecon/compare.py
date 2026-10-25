@@ -21,6 +21,12 @@ rejected response or one with the outcome ``error`` with the code of its first d
 
 The signature table is built from the compare result and the deviation file as written:
 the file is read back under rules 8 to 13 before the table is derived from it.
+
+A walk or a search that has just run both sides passes them as checked runs (``runs``): the
+two runs are then not checked again (rule 1 with rules 7 to 13 of the run contract) and their
+exports are not read; the responses are still read for their release identities, the
+artifacts the request names are still checked, and the run records, the deviation file, and
+the signature table are read and written as without them.
 """
 from __future__ import annotations
 
@@ -388,8 +394,12 @@ def _with_engine_versions(result: dict, paths: dict) -> dict:
                          "engine_version", member)
 
 
-def _compare_request(request: dict, folder: Path) -> tuple[dict, list[dict]]:
-    """Every check after the schema of the request. Return the compare result and the deviations."""
+def _compare_request(request: dict, folder: Path,
+                     preloaded: tuple[CheckedRun, CheckedRun] | None = None) -> tuple[dict, list[dict]]:
+    """Every check after the schema of the request. Return the compare result and the deviations.
+
+    ``preloaded`` are the two runs, already checked, of the responses the request names.
+    """
     paths = {}
     try:
         if request["stage"] not in STAGE_QUANTITIES:
@@ -399,10 +409,13 @@ def _compare_request(request: dict, folder: Path) -> tuple[dict, list[dict]]:
             for member in ("response", "run_record"):
                 if member in side:
                     paths[name, member] = check_artifact(folder, side[member])
-        responses = {name: read_document(paths[name, "response"], RUN_SCHEMA, "run_response")
-                     for name, _ in sides}
-        runs = {name: check_run(responses[name], paths[name, "response"].parent, name)
-                for name, _ in sides}
+        if preloaded is not None:
+            runs = dict(zip(("left", "right"), preloaded))
+        else:
+            responses = {name: read_document(paths[name, "response"], RUN_SCHEMA, "run_response")
+                         for name, _ in sides}
+            runs = {name: check_run(responses[name], paths[name, "response"].parent, name)
+                    for name, _ in sides}
     except Rejection as rejection:
         return _with_engine_versions(_not_compared(request, "rejected", rejection), paths), []
 
@@ -438,12 +451,16 @@ def compare_request_document(stage: str, compare_id: str, left: tuple[dict, dict
 def compare(request_path: Path | str, *, result_name: str = RESULT_NAME,
             record_name: str | None = RECORD_NAME,
             signature_name: str | None = SIGNATURE_NAME,
-            deviations_name: str = DEVIATIONS_NAME) -> CompareResult:
+            deviations_name: str = DEVIATIONS_NAME,
+            runs: tuple[CheckedRun, CheckedRun] | None = None) -> CompareResult:
     """Compare the two runs a stored compare request names and write the documents beside it.
 
     ``record_name`` and ``signature_name`` are ``None`` for a caller that records the
     comparison itself and wants no table, such as the replay. The deviation file is
-    written for every comparison with the outcome ``compared``.
+    written for every comparison with the outcome ``compared``. ``runs`` are the left and
+    the right run, already checked, of the two responses the request names; with them the two
+    runs are not checked again (rule 1 with rules 7 to 13) and their exports are not read. The
+    responses are still read for their release identities.
     """
     request_path = Path(request_path).resolve()
     folder = request_path.parent
@@ -461,7 +478,7 @@ def compare(request_path: Path | str, *, result_name: str = RESULT_NAME,
     check_version(request)
     check_schema(request, COMPARE_REQUEST)
 
-    result, deviations = _compare_request(request, folder)
+    result, deviations = _compare_request(request, folder, runs)
     outcome = result["outcome"]
     releases = [_read_release(folder, request[name]) for name in ("left", "right")]
 

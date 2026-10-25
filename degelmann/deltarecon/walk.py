@@ -33,8 +33,9 @@ folder must not exist; a walk that is interrupted leaves no folder behind. It re
   that is not reproduced;
 - ``walk.result.json`` and ``walk.run-record.json``.
 
-Sums are exact: every binary64 value is an integer multiple of 2**-1074, so the walk adds
-integers and rounds once, to the nearest binary64 value, when it writes a sum.
+Sums are exact: ``math.fsum`` rounds the exact sum once, to the nearest binary64 value, ties
+to even. Where ``fsum`` overflows on the way, the walk adds the values as integer multiples of
+2**-1074, which every binary64 value is, and rounds that exact sum once in the same way.
 
 The checks before the first run, the folder setup, the run of a state, the checks of the
 ends, and the comparisons kept are shared with the search of ``degelmann/deltarecon/search.py``
@@ -44,6 +45,7 @@ ends, and the comparisons kept are shared with the search of ``degelmann/deltare
 from __future__ import annotations
 
 import json
+import math
 import shutil
 from contextlib import contextmanager
 from dataclasses import dataclass, field
@@ -101,14 +103,31 @@ def written(total: int) -> float | None:
         return None
 
 
-def exact_sums(left: CheckedRun, right: CheckedRun, names: list[str]) -> tuple[list[int], list[int]]:
+def _sum(terms: list[float], pairs: list[tuple[float, float]], absolute: bool) -> float | None:
+    """The exact sum of ``terms`` rounded once to the nearest binary64 value; ``None`` when it does
+    not fit a finite one. ``pairs`` are the ``(a, b)`` the terms come from, for the integer method
+    when ``fsum`` overflows on the way."""
+    try:
+        total = math.fsum(terms)
+    except OverflowError:
+        total = math.inf
+    if math.isfinite(total):
+        return total + 0.0
+    if absolute:
+        return written(sum(_scaled(max(a, b)) - _scaled(min(a, b)) for a, b in pairs))
+    return written(sum(_scaled(b) - _scaled(a) for a, b in pairs))
+
+
+def exact_sums(left: CheckedRun, right: CheckedRun,
+               names: list[str]) -> tuple[list[float | None], list[float | None]]:
     """Per quantity of ``names``: the sum of ``right - left`` over every coordinate and the sum of
-    its absolute values, both exact in units of 2**-1074. A missing coordinate counts as 0."""
+    its absolute values, each the exact sum rounded once to the nearest binary64 value, ``None``
+    when it does not fit a finite one. A missing coordinate counts as 0."""
     left_index = {quantity["name"]: i for i, quantity in enumerate(left.response["quantities"])}
     right_index = {quantity["name"]: i for i, quantity in enumerate(right.response["quantities"])}
     positions = [(j, left_index.get(name), right_index.get(name)) for j, name in enumerate(names)]
     same_layout = all(a == b for _, a, b in positions)
-    signed, absolute = [0] * len(names), [0] * len(names)
+    pairs: list[list[tuple[float, float]]] = [[] for _ in names]
     for key in left.values.keys() | right.values.keys():
         old, new = left.values.get(key), right.values.get(key)
         if same_layout and old == new:
@@ -116,11 +135,12 @@ def exact_sums(left: CheckedRun, right: CheckedRun, names: list[str]) -> tuple[l
         for j, at_left, at_right in positions:
             a = old[at_left] if old is not None and at_left is not None else 0.0
             b = new[at_right] if new is not None and at_right is not None else 0.0
-            if a == b:
-                continue
-            difference = _scaled(b) - _scaled(a)
-            signed[j] += difference
-            absolute[j] += abs(difference)
+            if a != b:
+                pairs[j].append((a, b))
+    signed, absolute = [], []
+    for found in pairs:
+        signed.append(_sum([term for a, b in found for term in (b, -a)], found, False))
+        absolute.append(_sum([term for a, b in found for term in (max(a, b), -min(a, b))], found, True))
     return signed, absolute
 
 
@@ -324,11 +344,16 @@ class States:
         return run, request
 
     def checked(self, run: RunResult, request: dict) -> CheckedRun:
-        return CheckedRun(run.response, check_response(request, run.response, run.response_path.parent))
+        """The checked values of a state. The values the run holds in memory are taken from it, so
+        that it does not keep them; a run whose values were taken is read again from its export."""
+        values, run.values = run.values, None
+        return CheckedRun(run.response, check_response(request, run.response, run.response_path.parent, values))
 
-    # A comparison the procedure keeps, written at the root of the folder.
+    # A comparison the procedure keeps, written at the root of the folder. ``runs`` are the two
+    # sides, already checked, so that the comparison does not read their exports again.
     def write_compare(self, prefix: str, compare_id: str, left: tuple[Path, Path],
-                      right: tuple[Path, Path]) -> CompareResult:
+                      right: tuple[Path, Path],
+                      runs: tuple[CheckedRun, CheckedRun] | None = None) -> CompareResult:
         request = compare_request_document(
             self.stage, compare_id, tuple(artifact_reference(self.output, path) for path in left),
             tuple(artifact_reference(self.output, path) for path in right), self.profile)
@@ -337,7 +362,7 @@ class States:
         compared = compare(request_path, result_name=f"{prefix}.result.json",
                            record_name=f"{prefix}.run-record.json",
                            signature_name=f"{prefix}.signature-table.json",
-                           deviations_name=f"{prefix}.deviations.csv")
+                           deviations_name=f"{prefix}.deviations.csv", runs=runs)
         self.compares.append(compared.result_path)
         return compared
 
@@ -355,7 +380,8 @@ class States:
         if shows_no_deviation(result, deviations):
             return {"state": k, "outcome": "reproduced"}
         compared = self.write_compare(f"{self.name(k)}.check-{side}", compare_id,
-                                      self.recorded_files(recorded, side), (run.response_path, run.record_path))
+                                      self.recorded_files(recorded, side), (run.response_path, run.record_path),
+                                      (_checked(recorded), state))
         end = {"state": k, "outcome": "not_reproduced", "compare": self.reference(compared)}
         code = "state_zero_not_reproduced" if side == OLDER else "state_n_not_reproduced"
         self.findings.append({"code": code, "message": f"State {k} does not reproduce the {side} recorded result "
@@ -372,7 +398,7 @@ class States:
         entries = []
         for name, flag, total, size in zip(names, contributes, signed, absolute):
             contribution = {"quantity": name, "contributes": flag}
-            for member, value in (("sum", written(total)), ("absolute_sum", written(size))):
+            for member, value in (("sum", total), ("absolute_sum", size)):
                 if value is None:
                     self.findings.append({
                         "code": "non_finite_difference",
@@ -427,7 +453,7 @@ class _Walk(States):
         if any(contributes):
             compared = self.write_compare(f"step-{to_k:0{self.width}d}.compare", compare_id,
                                           (left_run.response_path, left_run.record_path),
-                                          (right_run.response_path, right_run.record_path))
+                                          (right_run.response_path, right_run.record_path), (left, right))
             entry["compare"] = self.reference(compared)
             table = compared.table
             if compared.outcome != "compared":
@@ -444,8 +470,7 @@ class _Walk(States):
         """The deviation between the two recorded results, per quantity."""
         signed, _ = exact_sums(_checked(self.older), _checked(self.newer), self.names)
         totals = []
-        for name, total in zip(self.names, signed):
-            value = written(total)
+        for name, value in zip(self.names, signed):
             totals.append({"quantity": name, **({"sum": value} if value is not None else {})})
             if value is None:
                 self.findings.append({"code": "non_finite_difference",

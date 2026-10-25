@@ -1206,3 +1206,45 @@ def test_the_other_negative_cases_of_story_9_carry_the_diagnostic_the_core_gives
     assert result["diagnostics"][0]["model_point_ids"] == ["MP-0001"]
     assert sorted(p.name for p in folder.iterdir() if p.name.startswith("compare.")) == [
         "compare.request.json", "compare.result.json"]
+
+
+# --- preloaded runs -------------------------------------------------------------------
+
+
+def test_preloaded_runs_give_the_same_comparison_without_reading_the_runs_again(world, monkeypatch):
+    """``compare(..., runs=...)`` writes the same documents as a comparison that reads both runs,
+    and does not check the two runs again."""
+    from degelmann.deltarecon import compare as compare_module
+
+    per_quantity = PROFILES["relative"]
+    left, right = run_side(world, "left", POINTS_LEFT), run_side(world, "right", POINTS_MOVED)
+    compare_request(world, per_quantity)
+    folders = {}
+    for name in ("read", "preloaded"):
+        folders[name] = world / name
+        for part in ("left", "right", "compare.request.json"):
+            (shutil.copytree if part in ("left", "right") else shutil.copyfile)(world / part, folders[name] / part)
+    done = {"read": compare(folders["read"] / "compare.request.json")}
+    checked = []
+    monkeypatch.setattr(compare_module, "check_run", lambda *arguments: checked.append(arguments))
+    runs = (CheckedRun(left.response, left.values), CheckedRun(right.response, right.values))
+    done["preloaded"] = compare(folders["preloaded"] / "compare.request.json", runs=runs)
+    assert checked == []
+
+    assert done["read"].outcome == done["preloaded"].outcome == "compared"
+    assert done["read"].result == done["preloaded"].result and done["read"].deviations == done["preloaded"].deviations
+    assert done["read"].deviations and done["read"].table == done["preloaded"].table
+    for name in ("compare.result.json", "compare.deviations.csv", "signature-table.json"):
+        assert (folders["read"] / name).read_bytes() == (folders["preloaded"] / name).read_bytes(), name
+    one, two = (stored(folder / "compare.run-record.json") for folder in folders.values())
+    assert {**one, "record_id": None, "recorded_at": None} == {**two, "record_id": None, "recorded_at": None}
+
+
+def test_preloaded_runs_still_check_the_artifacts_the_request_names(world):
+    left, right = run_side(world, "left", POINTS_LEFT), run_side(world, "right", POINTS_MOVED)
+    path = compare_request(world)
+    response = world / "right" / "response.json"
+    response.write_bytes(response.read_bytes() + b" ")
+    runs = (CheckedRun(left.response, left.values), CheckedRun(right.response, right.values))
+    done = compare(path, runs=runs)
+    assert done.outcome == "rejected" and done.result["diagnostics"][0]["code"] == "artifact_hash_mismatch"

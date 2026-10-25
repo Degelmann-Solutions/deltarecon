@@ -120,12 +120,20 @@ def check_repeated(request: dict, response: dict) -> None:
                         "identity, change set, and selection of its request.")
 
 
-def check_response(request: dict, response: dict, folder: Path) -> dict:
-    """Rules 6 to 13 of the run contract for a succeeded response. Return the export values."""
+def check_response(request: dict, response: dict, folder: Path, values: dict | None = None) -> dict:
+    """Rules 6 to 13 of the run contract for a succeeded response. Return the export values.
+
+    ``values`` are the values of a run this process has just made, as the core wrote them into
+    its export (:attr:`~degelmann.deltarecon.run.RunResult.values`). With them only rules 6 and 7
+    are applied and the export is not read: rules 8 to 13 hold by construction, because the core
+    wrote the export and the response from those values.
+    """
     check_repeated(request, response)  # rule 6
     problem = quantity_errors(response["stage"], [q["name"] for q in response["quantities"]])  # rule 7
     if problem:
         raise Rejection("quantity_mismatch", f"The response declares its quantities wrongly: {problem}.")
+    if values is not None:
+        return values
     export_path = check_artifact(folder, response["export"]["artifact"])  # rule 8
     return check_export(response, export_path)  # rules 9 to 13
 

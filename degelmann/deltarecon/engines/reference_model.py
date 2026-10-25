@@ -52,6 +52,11 @@ On both paths the model point ids and the parameter inventory are read through m
 they do not depend on the path. A run never falls back to the other path: an export or an
 import of the exported package that fails ends the run with the outcome ``error``.
 
+Within one engine object the package exported for a state is kept, keyed by the files of the
+product folder (the model point table as laid over it), and copied into a later state with the
+same files instead of being exported again; a state with text patches is always exported. The
+copies lie in a temporary folder that lives no longer than the engine object.
+
 A recorded ``engine_version`` of another value, of another engine or of a run made before
 the paths existed, names the path ``export`` when its first comma-separated part ends with
 `` export``, and ``modelx`` otherwise. A walk or a search runs its states on the path of the
@@ -122,6 +127,7 @@ import importlib.util
 import os
 import platform
 import re
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -618,15 +624,22 @@ def _import_exported(package: Path):
 
 
 @contextmanager
-def _exported(model, product: Path):
+def _exported(model, product: Path, cached: Path | None = None, keep: Path | None = None):
     """The model exported into ``product`` and imported under a name of its own.
 
     The package lies directly in the product folder, because the exported model reads its
     tables from the folder above its own. Its modules leave ``sys.modules`` when the block
-    ends.
+    ends. ``cached`` is a package exported before for the same product folder: it is copied
+    instead of exporting the model. ``keep`` is a new folder the fresh export is copied to
+    before it is imported, so that the copy holds no ``__pycache__``.
     """
     package = product / EXPORT_FOLDER
-    mx.export_model(model, package)
+    if cached is not None:
+        shutil.copytree(cached, package)
+    else:
+        mx.export_model(model, package)
+        if keep is not None:
+            shutil.copytree(package, keep)
     with _import_exported(package) as exported:
         yield exported
 
@@ -813,6 +826,19 @@ class ReferenceModel:
     def __init__(self, workers: int | None = None):
         """``workers`` is the number of worker processes of a session, see :func:`worker_count`."""
         self.workers = worker_count(workers)
+        # The packages exported by this object, by the files of the product folder; see
+        # "Computation paths". The folder that holds them is created on first use.
+        self._exports: dict[tuple[tuple[str, str], ...], Path] = {}
+        self._export_folder: tempfile.TemporaryDirectory | None = None
+
+    def _export_slot(self, files: dict[str, str]) -> tuple[tuple, Path | None, Path]:
+        """The key of the product folder of ``files``, the package exported for it before (or
+        ``None``), and the folder a new export of it is kept in."""
+        key = tuple(sorted((path, blob) for path, blob in files.items()
+                           if path.startswith(f"{PRODUCT_FOLDER}/")))
+        if self._export_folder is None:
+            self._export_folder = tempfile.TemporaryDirectory(prefix=SCRATCH_PREFIX)
+        return key, self._exports.get(key), Path(self._export_folder.name) / uuid.uuid4().hex
 
     def _locate(self, release: dict, repositories: Path) -> tuple[Path, dict[str, str]]:
         """The clone and the files of the release state: path and blob id.
@@ -902,8 +928,15 @@ class ReferenceModel:
             try:
                 if path == "modelx":
                     yield ReferenceModelSession(model, workers=self.workers, state=state)
-                else:  # no fallback: an export or an import that fails ends the run with an error
+                elif patches:  # no fallback: an export or an import that fails ends the run with an error
                     with _exported(model, state / PRODUCT_FOLDER) as exported:
+                        yield ReferenceModelSession(model, exported, self.workers, state)
+                else:  # the package of an unpatched product folder is exported once per engine object
+                    key, cached, keep = self._export_slot(files)
+                    with _exported(model, state / PRODUCT_FOLDER, cached,
+                                   None if cached is not None else keep) as exported:
+                        if cached is None:
+                            self._exports[key] = keep
                         yield ReferenceModelSession(model, exported, self.workers, state)
             finally:
                 model.close()
