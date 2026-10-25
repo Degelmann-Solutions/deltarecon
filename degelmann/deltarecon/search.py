@@ -253,7 +253,8 @@ class _Search(States):
         compared = self.write_compare(f"interval-{a:0{self.width}d}-{b:0{self.width}d}.compare",
                                       f"{self.prefix}-interval-{a}-{b}",
                                       (left_run.response_path, left_run.record_path),
-                                      (right_run.response_path, right_run.record_path))
+                                      (right_run.response_path, right_run.record_path),
+                                      (self.state(a), self.state(b)))
         entry = {"from_state": a, "to_state": b, "revisions": revisions, "compare": self.reference(compared)}
         if judged["outcome"] != "compared":
             self.findings.append({

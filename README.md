@@ -65,7 +65,7 @@ cd runs/oracle-walk
 sha256sum -c ../../oracle/SHA256SUMS
 ```
 
-On macOS the last command is `shasum -a 256 -c ../../oracle/SHA256SUMS`. Every listed file must report `OK`. The two runs take about 9 s each and the walk of 36 states about 9 minutes.
+On macOS the last command is `shasum -a 256 -c ../../oracle/SHA256SUMS`. Every listed file must report `OK`. The two runs take about 9 s each and the walk of 36 states about 3 minutes.
 
 The requests name the engine version `modelx 0.33.0 export, pandas 3.0.6, numpy 2.5.3, Python 3.14.9`, the export path. `uv sync` installs it: the uv-managed Python 3.14.9 and the packages locked in `uv.lock`, as described at the top of this README. Under another Python patch release or another package version `run` rejects the request with `unknown_reference`, because the request names another engine version than the present one; nothing runs. The engine version is part of every run response, and `walk.result.json` holds the SHA-256 of the responses, so its hash depends on the exact engine; the signature tables do not name it. The hashes were computed under Linux on x86-64, with this repository at the commit that computes through the modelx export, `793c035`, and a fresh clone of `delib-history`; whether other hardware gives the same bytes is not yet checked. [`oracle/REPRODUCTIONS.md`](oracle/REPRODUCTIONS.md) records every reproduction with its machine, engine version and revisions. `DELTARECON_ORACLE=1 uv run pytest tests/test_oracle.py -q` runs the reproduction in a temporary folder and checks every listed hash, and that every signature table, with its contract version set back to `2.0`, hashes to the digest the archive lists; without the variable only the published files are checked.
 

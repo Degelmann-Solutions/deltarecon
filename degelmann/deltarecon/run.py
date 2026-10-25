@@ -195,6 +195,9 @@ class RunResult:
     record_path: Path | None = None
     export_path: Path | None = None
     record: dict | None = field(default=None, repr=False)
+    # The values of a succeeded run as ``check_export`` reads them back from the export, by model
+    # point id and period; ``None`` for a run that has not succeeded or once a caller took them.
+    values: dict[tuple[str, int], list[float]] | None = field(default=None, repr=False)
 
 
 def quantity_errors(stage: str, names: list[str]) -> str | None:
@@ -532,7 +535,7 @@ def run_request(request_path: Path, engine: Engine, repositories: Path | None = 
     repeated = {name: request[name] for name in ("stage", "run_id")}
     carried = {name: request[name] for name in ("release", "changes", "selection")}
     head = {"document": "run_response", "contract_version": CONTRACT_VERSION, **repeated}
-    manifest_path, parameters, rows = None, [], None
+    manifest_path, parameters, rows, values = None, [], None, None
     try:
         if request["stage"] not in engine.stages or request["stage"] not in STAGE_QUANTITIES:
             raise Rejection("unsupported_stage", f"The stage {request['stage']} is not supported.")
@@ -571,6 +574,7 @@ def run_request(request_path: Path, engine: Engine, repositories: Path | None = 
             response = {**head, "outcome": "failed", **carried, "failed_model_points": failures}
         else:
             write_export(export_path, [quantity["name"] for quantity in quantities], rows)
+            values = written_values(rows)
             response = {**head, "outcome": "succeeded", **carried, "time_basis": time_basis,
                         "quantities": quantities, "model_points": ranges,
                         "export": {"artifact": artifact_reference(folder, export_path),
@@ -596,4 +600,12 @@ def run_request(request_path: Path, engine: Engine, repositories: Path | None = 
     record = run_record(request["stage"], "run", outcome, inputs, [request["release"]], parameters, outputs)
     write_document(record_path, record, RECORD_SCHEMA)
     return RunResult(outcome, response, response_path, record_path,
-                     export_path if outcome == "succeeded" else None, record)
+                     export_path if outcome == "succeeded" else None, record, values)
+
+
+def written_values(rows) -> dict[tuple[str, int], list[float]]:
+    """The export rows as ``check_export`` reads them back from the written export: in writer order,
+    keyed by model point id and period, each value a float. The writer form writes every zero as
+    ``0``, so ``-0.0`` becomes ``0.0``; every other finite value round-trips exactly."""
+    return {(model_point_id, int(period)): [float(value) + 0.0 for value in numbers]
+            for model_point_id, period, numbers in sorted(rows, key=lambda row: (row[0], row[1]))}
