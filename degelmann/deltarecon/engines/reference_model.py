@@ -57,6 +57,19 @@ the paths existed, names the path ``export`` when its first comma-separated part
 `` export``, and ``modelx`` otherwise. A walk or a search runs its states on the path of the
 older record, see ``state_release``.
 
+Failed model points
+-------------------
+A model point fails when ``result_cf`` or one of its checks raises, or when a check is false.
+The message of an output that raised is one line, the same on both paths:
+``<output> raised <Kind>: <first line of the cause> in <formula>``, for example
+``result_cf raised ValueError: invalid sex in RLV_DE_S.Projection[16].sex()``. The formula is
+the innermost formula that raised, named as in a modelx formula traceback, with its
+arguments: ``RLV_DE_S.Projection[16].lapse_rate(t=3)``. On the path ``modelx`` it is read from
+the ``FormulaError``, on the path ``export`` from the innermost frame of an exported formula;
+a frame of a library the formula calls does not count. Without a formula the message is
+``<output> raised <Kind>: <last line of the message>``, or ``<output> raised <Kind>`` for an
+empty message. The problems of one point are joined with ``; ``.
+
 Changes
 -------
 The path of a text patch is relative to the root of the repository, for example
@@ -99,6 +112,7 @@ import re
 import subprocess
 import sys
 import tempfile
+import traceback
 import uuid
 from contextlib import contextmanager, suppress
 from pathlib import Path
@@ -537,6 +551,32 @@ def _readable_formula_errors():
         raise readable from error
 
 
+def _exported_formula(exc: Exception, package: str, projection, index: int) -> str | None:
+    """The formula of the exported model that raised ``exc``, as modelx names it in a formula
+    traceback: ``RLV_DE_S.Projection[16].sex()`` or ``RLV_DE_S.Projection[16].lapse_rate(t=3)``.
+
+    It is the innermost frame of the traceback that runs an exported formula, a method
+    ``_f_<name>`` of a space of ``package``; a frame of a library it calls does not count.
+    ``[index]`` follows the space when it is ``projection``, the item space of the point.
+    ``None`` when no frame runs an exported formula.
+    """
+    found = None
+    traceback_entry = exc.__traceback__
+    while traceback_entry is not None:
+        frame = traceback_entry.tb_frame
+        owner = frame.f_locals.get("self")
+        if (frame.f_code.co_name.startswith("_f_") and owner is not None
+                and type(owner).__module__.partition(".")[0] == package):
+            found = frame
+        traceback_entry = traceback_entry.tb_next
+    if found is None:
+        return None
+    code, owner = found.f_code, found.f_locals["self"]
+    arguments = ", ".join(f"{name}={found.f_locals.get(name)}" for name in code.co_varnames[1:code.co_argcount])
+    space = f"{MODEL_NAME}.{owner._name}" + (f"[{index}]" if owner is projection else "")
+    return f"{space}.{code.co_name[len('_f_'):]}({arguments})"
+
+
 def _is_scalar(value) -> bool:
     return isinstance(value, (bool, int, float, str, np.bool_, np.integer, np.floating))
 
@@ -573,7 +613,28 @@ class ReferenceModelSession:
         through: the exported one on the path ``export``, ``model`` itself on ``modelx``."""
         self._model = model
         self._computing = model if computing is None else computing
+        # The top-level module of the exported package; its formulas name a failure.
+        self._package = None if computing is None else type(computing).__module__.partition(".")[0]
         self._table = None
+
+    def _failure(self, output: str, exc: Exception, projection, index: int) -> str:
+        """The one-line message of ``output`` that raised ``exc`` while the point ``index`` was
+        projected: ``<output> raised <Kind>: <cause> in <formula>``, see "Failed model points".
+
+        The formula of a modelx ``FormulaError`` is read by :func:`formula_error`. Under the
+        export it is the innermost frame of an exported formula, named as modelx names it.
+        Without a formula the form is ``<output> raised <Kind>: <last line of the message>``.
+        """
+        readable = formula_error(exc) if isinstance(exc, mx_errors.FormulaError) else None
+        if readable is None and self._package is not None:
+            formula = _exported_formula(exc, self._package, projection, index)
+            if formula is not None:
+                cause = "".join(traceback.format_exception_only(exc)).splitlines()[0].strip()
+                readable = f"{cause} in {formula}"
+        if readable is not None:
+            return f"{output} raised {readable}"
+        reason = str(exc).strip().splitlines()
+        return f"{output} raised {type(exc).__name__}" + (f": {reason[-1]}" if reason else "")
 
     def _points(self):
         if self._table is None:
@@ -590,21 +651,20 @@ class ReferenceModelSession:
         if len(matches) != 1:
             raise ModelPointFailure(f"The model point table holds {len(matches)} rows with this id.")
         index = int(matches[0])
+        projection = None
         try:
             try:
                 projection = self._computing.Projection[index]
                 frame = projection.result_cf()
             except Exception as exc:  # a modelx FormulaError wraps the cause
-                reason = str(exc).strip().splitlines()
-                raise ModelPointFailure(f"result_cf raised {type(exc).__name__}"
-                                        + (f": {reason[-1]}" if reason else "")) from None
+                raise ModelPointFailure(self._failure("result_cf", exc, projection, index)) from None
             problems = []
             for check in CHECKS:
                 try:
                     if not bool(getattr(projection, check)()):
                         problems.append(f"{check} is false")
                 except Exception as exc:
-                    problems.append(f"{check} raised {type(exc).__name__}")
+                    problems.append(self._failure(check, exc, projection, index))
             if problems:
                 raise ModelPointFailure("; ".join(problems))
             try:
