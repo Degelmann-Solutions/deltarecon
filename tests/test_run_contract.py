@@ -1101,11 +1101,12 @@ def test_replay_with_other_values_is_not_reproduced(world):
     alter_export(folder)
     lines = (folder / "results.csv").read_text("utf-8").splitlines()
     lines = [line for line in lines if not line.startswith("MP-C,")]
-    lines.insert(1, "MP-A,11,1.5,18")
+    # The recorded run exports one more period of MP-A, at its end: projection period 2.
+    lines.insert(lines.index(next(line for line in lines if line.startswith("MP-A,13,"))) + 1, "MP-A,14,1.5,22.5")
     (folder / "results.csv").write_text("\n".join(lines) + "\n", "utf-8")
     response = stored(folder / "response.json")
     response["model_points"] = [
-        {"model_point_id": "MP-A", "first_period": 11, "last_period": 13},
+        {"model_point_id": "MP-A", "first_period": 12, "last_period": 14},
         {"model_point_id": "MP-B", "first_period": 0, "last_period": 2},
         {"model_point_id": "MP-D", "first_period": 3, "last_period": 4}]
     (folder / "response.json").write_bytes(document_bytes(response))
@@ -1125,7 +1126,7 @@ def test_replay_with_other_values_is_not_reproduced(world):
     assert deviation_rows(folder / "replay-compare.result.json") == [
         {"model_point_id": "MP-B", "period": 1, "quantity": "Netto-Cashflow", "left": 4.5, "right": 4.0}]
     assert compared["deviating_model_points"] == ["MP-B"]
-    assert compared["removed"] == [{"model_point_id": "MP-A", "first_period": 11, "last_period": 11}]
+    assert compared["removed"] == [{"model_point_id": "MP-A", "first_period": 2, "last_period": 2}]
     assert compared["added"] == [{"model_point_id": "MP-C", "first_period": 0, "last_period": 0}]
     for entry in record["inputs"] + record["outputs"]:
         assert sha256_file(folder / entry["artifact"]["path"]) == entry["artifact"]["sha256"]
@@ -1419,8 +1420,8 @@ class OtherTimeBasis(StubEngine):
 def test_regression_never_reports_no_deviation_for_a_coverage_difference_or_no_comparison(world, capsys, case):
     from degelmann.deltarecon.__main__ import print_comparison
     recorded_run(world)
-    if case == "coverage":  # only the period range of MP-B differs
-        done = stub_regression(world, stub_release(world, "rel-new", POINTS.replace("MP-B,0,2,2", "MP-B,1,4,2")))
+    if case == "coverage":  # only the period range of MP-B differs: it ends two periods later
+        done = stub_regression(world, stub_release(world, "rel-new", POINTS.replace("MP-B,0,2,2", "MP-B,0,4,2")))
     else:
         done = stub_regression(world, stub_release(world, "rel-new"), OtherTimeBasis())
     assert not done.no_deviation and print_comparison("regression", done.comparison) == 1
@@ -1430,9 +1431,8 @@ def test_regression_never_reports_no_deviation_for_a_coverage_difference_or_no_c
     if case == "coverage":
         assert deviation_rows(world / "out" / "compare.result.json") == []
         assert compared["added"] == [{"model_point_id": "MP-B", "first_period": 3, "last_period": 4}]
-        assert compared["removed"] == [{"model_point_id": "MP-B", "first_period": 0, "last_period": 0}]
+        assert compared["removed"] == []
         assert "added: liability_cashflow / model point MP-B, periods 3 to 4" in output
-        assert "removed: liability_cashflow / model point MP-B, periods 0 to 0" in output
     else:
         assert compared["outcome"] == "incompatible"
         assert "regression: incompatible" in output and "diagnostic: time_basis_mismatch:" in output

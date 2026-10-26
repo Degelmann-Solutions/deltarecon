@@ -251,6 +251,81 @@ def test_a_period_written_as_a_float_is_compared_as_the_integer(world, capsys):
     assert result["compared_coordinates"] == 24 and result["added"] == result["removed"] == []
 
 
+# --- alignment on projection periods ----------------------------------------------
+
+
+def by_projection_period(self, model_point_id):
+    """The stub values counted from the first period of the model point: equal per projection period."""
+    _, first, last, base = next(p for p in self.points if p[0] == model_point_id)
+    return [(period, [float(base), float(base) * (period - int(first) + 1)])
+            for period in range(int(first), int(last) + 1)]
+
+
+def test_a_first_period_that_moves_is_compared_on_projection_periods(world, capsys):
+    """On policy_month each run counts a model point from its own first exported period."""
+    engine = engine_with(project=by_projection_period)
+    run_side(world, "left", "id,first,last,base\nMP-P,144,299,2\n", engine=engine)
+    run_side(world, "right", "id,first,last,base\nMP-P,156,299,2\n", engine=engine)
+    assert main(["compare", str(compare_request(world))]) == 1
+    result = stored(world / "compare.result.json")
+    assert result["outcome"] == "compared" and deviation_rows(world / "compare.result.json") == []
+    # Projection periods 0 to 143 are common; the left run has 156 periods, the right one 144.
+    assert result["compared_coordinates"] == 144 * 2 and result["added"] == []
+    assert result["removed"] == [{"model_point_id": "MP-P", "first_period": 144, "last_period": 155}]
+    assert "removed: liability_cashflow / model point MP-P, periods 144 to 155" in capsys.readouterr().out
+
+
+def test_a_deviation_of_an_in_force_point_is_written_in_projection_periods(world):
+    run_side(world, "left", "id,first,last,base\nMP-P,144,160,2\n")
+    right = run_side(world, "right", "id,first,last,base\nMP-P,144,160,2\n")
+    export = right.export_path.read_text("utf-8")
+    assert "MP-P,150,2,302\n" in export
+    right.export_path.write_text(export.replace("MP-P,150,2,302\n", "MP-P,150,2,303\n"), "utf-8")
+    rehash(world / "right")
+    assert main(["compare", str(compare_request(world))]) == 1
+    assert deviation_rows(world / "compare.result.json") == [
+        {"model_point_id": "MP-P", "period": 6, "quantity": CASH, "left": 302.0, "right": 303.0}]
+    (row,) = stored(world / "signature-table.json")["rows"]
+    assert (row["first_period"], row["last_period"], row["largest_increase"]["period"]) == (6, 6, 6)
+
+
+def test_on_valuation_year_periods_are_compared_and_written_as_they_are(world):
+    engine = engine_with(time_basis="valuation_year")
+    run_side(world, "left", "id,first,last,base\nMP-P,1,5,2\n", engine=engine)
+    right = run_side(world, "right", "id,first,last,base\nMP-P,2,5,2\n", engine=engine)
+    export = right.export_path.read_text("utf-8")
+    right.export_path.write_text(export.replace("MP-P,4,2,10\n", "MP-P,4,2,11\n"), "utf-8")
+    rehash(world / "right")
+    assert main(["compare", str(compare_request(world))]) == 1
+    result = stored(world / "compare.result.json")
+    assert result["removed"] == [{"model_point_id": "MP-P", "first_period": 1, "last_period": 1}]
+    assert result["added"] == [] and result["compared_coordinates"] == 4 * 2
+    assert deviation_rows(world / "compare.result.json") == [
+        {"model_point_id": "MP-P", "period": 4, "quantity": CASH, "left": 10.0, "right": 11.0}]
+
+
+def test_a_point_of_one_run_only_is_added_on_its_own_projection_periods(world):
+    run_side(world, "left", "id,first,last,base\nMP-A,0,2,1\n")
+    run_side(world, "right", "id,first,last,base\nMP-A,0,2,1\nMP-N,60,62,1\n")
+    assert main(["compare", str(compare_request(world))]) == 1
+    result = stored(world / "compare.result.json")
+    assert result["added"] == [{"model_point_id": "MP-N", "first_period": 0, "last_period": 2}]
+    assert result["removed"] == [] and deviation_rows(world / "compare.result.json") == []
+
+
+def test_alignment_is_built_once_and_never_applied_twice():
+    from degelmann.deltarecon.compare import align
+    response = {"quantities": [{"name": COUNT, "unit": "policies"}], "time_basis": {"id": "policy_month"}}
+    run = CheckedRun(response, {("P", 144): [1.0], ("P", 145): [2.0]})
+    aligned = align(run)
+    assert aligned.values == {("P", 0): [1.0], ("P", 1): [2.0]} and aligned.aligned
+    assert align(run) is aligned and align(aligned) is aligned
+    other = CheckedRun({**response, "time_basis": {"id": "valuation_year"}}, {("P", 3): [1.0]})
+    assert align(other) is other
+    unknown = CheckedRun({**response, "time_basis": {"id": "calendar_quarter"}}, {("P", 3): [1.0]})
+    assert align(unknown) is unknown
+
+
 VALUES = [0.0, 1.0, -1.0, 0.125, -0.125, 2.675, 0.6949, 0.6951, 0.6972, 0.6974, 1234.5, 1e-5, 1e16,
           0.1 + 0.2, 0.3, 100.0, 100.25, -38.5, -32.5, 5e-324, 123456.789]
 ENTRIES = [None, entry(), entry(upper=(0.25, 0)), entry(lower=(0.25, 0)), entry(upper=(0, 0.01), lower=(0, 0.2)),
@@ -288,9 +363,12 @@ def test_rounding_holds_for_the_largest_values():
 
 
 def test_coverage_differences_are_ranges_and_never_deviations(world, capsys):
-    """Another selection, a model point on one side only, and other period ranges."""
+    """Another selection, a model point on one side only, and other period ranges.
+
+    On ``policy_month`` the ranges are projection periods: each model point counts from its first
+    exported period in each run, so a range that ends earlier or later shows at its end only."""
     left_points = "id,first,last,base\nMP-A,12,13,1.5\nMP-B,0,2,2\nMP-C,0,0,1e-05\nMP-G,5,9,3\nMP-L,0,1,4\n"
-    right_points = ("id,first,last,base\nMP-A,10,15,1.5\nMP-B,0,5,2\nMP-C,0,0,1e-05\nMP-G,6,7,3\nMP-R,2,3,4\n"
+    right_points = ("id,first,last,base\nMP-A,12,15,1.5\nMP-B,0,5,2\nMP-C,0,0,1e-05\nMP-G,5,6,3\nMP-R,2,3,4\n"
                     "MP-D,3,4,1e16\n")
     run_side(world, "left", left_points)
     run_side(world, "right", right_points,
@@ -303,13 +381,11 @@ def test_coverage_differences_are_ranges_and_never_deviations(world, capsys):
     assert not schema_errors(result, COMPARE_SCHEMA) and result["outcome"] == "compared"
     # The longest contiguous ranges, by model point id and first period.
     assert result["added"] == [
-        {"model_point_id": "MP-A", "first_period": 10, "last_period": 11},
-        {"model_point_id": "MP-A", "first_period": 14, "last_period": 15},
+        {"model_point_id": "MP-A", "first_period": 2, "last_period": 3},
         {"model_point_id": "MP-B", "first_period": 3, "last_period": 5},
-        {"model_point_id": "MP-R", "first_period": 2, "last_period": 3}]
+        {"model_point_id": "MP-R", "first_period": 0, "last_period": 1}]
     assert result["removed"] == [
-        {"model_point_id": "MP-G", "first_period": 5, "last_period": 5},
-        {"model_point_id": "MP-G", "first_period": 8, "last_period": 9},
+        {"model_point_id": "MP-G", "first_period": 2, "last_period": 4},
         {"model_point_id": "MP-L", "first_period": 0, "last_period": 1}]
     # Never a deviation and never filled with zero: only common coordinates are compared.
     assert deviation_rows(world / "compare.result.json") == [] and result["deviating_model_points"] == []
@@ -319,10 +395,12 @@ def test_coverage_differences_are_ranges_and_never_deviations(world, capsys):
 
 
 def test_coverage_on_one_side_only_and_ranges_of_neighbouring_model_points(world, capsys):
-    """Only added, then only removed; the ranges of two model points never join."""
-    run_side(world, "left", "id,first,last,base\nMP-A,0,0,1\n")
+    """Only added, then only removed; the ranges of two model points never join. On ``valuation_year``
+    periods are compared and written as they are."""
+    engine = engine_with(time_basis="valuation_year")
+    run_side(world, "left", "id,first,last,base\nMP-A,0,0,1\n", engine=engine)
     # MP-X ends at period 2 and MP-Y starts at period 3.
-    run_side(world, "right", "id,first,last,base\nMP-A,0,0,1\nMP-X,0,2,1\nMP-Y,3,4,1\n")
+    run_side(world, "right", "id,first,last,base\nMP-A,0,0,1\nMP-X,0,2,1\nMP-Y,3,4,1\n", engine=engine)
     ranges = [{"model_point_id": "MP-X", "first_period": 0, "last_period": 2},
               {"model_point_id": "MP-Y", "first_period": 3, "last_period": 4}]
     assert main(["compare", str(compare_request(world))]) == 1
@@ -896,6 +974,15 @@ def ranges_of(keys) -> list[dict]:
     return result
 
 
+def on_projection_periods(values: dict) -> dict:
+    """``values`` with every period less the lowest period of its model point."""
+    lowest = {}
+    for model_point_id, period in values:
+        lowest[model_point_id] = min(period, lowest.get(model_point_id, period))
+    return {(model_point_id, period - lowest[model_point_id]): numbers
+            for (model_point_id, period), numbers in values.items()}
+
+
 def test_whole_comparisons_agree_with_an_oracle_of_another_construction():
     """Eleven quantities in no alphabetical order, values of any sign, odd ids, rows in any order."""
     rnd = random.Random(20261012)
@@ -936,6 +1023,8 @@ def test_whole_comparisons_agree_with_an_oracle_of_another_construction():
         result, deviations = compare_runs(request, CheckedRun(response("left"), left),
                                           CheckedRun(response("right"), right))
 
+        # On policy_month both sides are compared on projection periods.
+        left, right = on_projection_periods(left), on_projection_periods(right)
         common = set(left) & set(right)
         expected = [{"model_point_id": key[0], "period": key[1], "quantity": name,
                      "left": left[key][index], "right": right[key][index]}

@@ -52,6 +52,19 @@ valuation date. An engine may use another basis. It then publishes a declaration
 with the same four entries and uses its identifier. The contracts treat the
 identifier as a name and never convert between two bases.
 
+The **projection period** of a coordinate is its period counted from the
+valuation date of its run. On a basis whose origin is the valuation date, such as
+`valuation_year`, it is the period as exported. On a basis whose origin is the
+issue date, `policy_month`, the projection period of the coordinate (model point
+p, period t) of a run is t - s_p, where s_p is the first exported period of p in
+that same run: the policy month of its valuation date. Projection period 0 is
+then the first projection month of every model point, new business and business
+in force alike. Each run has its own s_p, so a model point whose valuation month
+moves between two runs keeps its projection periods. Run responses, exports, and
+run requests carry the periods of the time basis; comparisons pair values by
+projection period and write projection periods, see
+[../compare.md](../compare.md#alignment).
+
 ## Quantities
 
 The stage defines eleven quantities per model point and period, in this order.

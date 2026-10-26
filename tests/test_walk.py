@@ -413,7 +413,7 @@ def test_a_tolerance_file_is_copied_listed_and_applied_to_the_ends_and_the_steps
 def test_exact_sums_are_exact_and_rounded_once():
     from degelmann.deltarecon.compare import CheckedRun
     names = ["Anzahl Verträge"]
-    response = {"quantities": [{"name": names[0], "unit": "policies"}]}
+    response = {"quantities": [{"name": names[0], "unit": "policies"}], "time_basis": {"id": "policy_month"}}
     left = CheckedRun(response, {("A", 0): [0.1], ("B", 0): [1e16]})
     right = CheckedRun(response, {("A", 0): [0.2], ("C", 0): [1.0]})
     signed, absolute = exact_sums(left, right, names)
@@ -425,12 +425,20 @@ def test_exact_sums_are_exact_and_rounded_once():
 
 def _one_quantity(left: dict, right: dict):
     from degelmann.deltarecon.compare import CheckedRun
-    response = {"quantities": [{"name": "Anzahl Verträge", "unit": "policies"}]}
+    response = {"quantities": [{"name": "Anzahl Verträge", "unit": "policies"}],
+                "time_basis": {"id": "policy_month"}}
     return CheckedRun(response, left), CheckedRun(response, right)
 
 
 def _integer_sums(left: dict, right: dict) -> tuple[float | None, float | None]:
     """The sums by the integer method: exact in units of 2**-1074, rounded once by ``written``."""
+    def aligned(values: dict) -> dict:  # on policy_month: each period less its model point's first one
+        first = {}
+        for point, period in values:
+            first[point] = min(period, first.get(point, period))
+        return {(point, period - first[point]): numbers for (point, period), numbers in values.items()}
+
+    left, right = aligned(left), aligned(right)
     signed = absolute = 0
     for key in left.keys() | right.keys():
         a, b = left.get(key, [0.0])[0], right.get(key, [0.0])[0]

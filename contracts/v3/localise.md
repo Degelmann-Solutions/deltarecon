@@ -115,7 +115,7 @@ Per step and quantity, the walk states:
 | Member | Meaning |
 |---|---|
 | `contributes` | Whether the step contributes to the quantity: a coordinate of the quantity deviates under the tolerance rule, or a coordinate is added or removed. It is true for every quantity of a step whose comparison has no outcome `compared`. |
-| `sum` | The signed sum of `right - left` over every coordinate of the quantity in the two exports, a coordinate that one export lacks counted as 0. |
+| `sum` | The signed sum of `right - left` over every coordinate of the quantity in the two exports, both aligned on projection periods as in [compare.md](compare.md#alignment), a coordinate that one export lacks counted as 0. The pairing does not change the signed sum; it changes `absolute_sum` where the first period of a model point moves. |
 | `absolute_sum` | The sum of the absolute values of the same differences. It shows effects that cancel within the step, and does not add up across steps. |
 | `signature` | The row of the quantity in the signature table of the step, see [compare.md](compare.md#signature-table), when the step contributes and the row exists. |
 
@@ -269,22 +269,21 @@ every coordinate. A list of quantities that names every quantity of the older
 recorded response, without a range, narrows nothing: the search is the one
 without a target, and its target is written in the same form.
 
-Target periods count from the valuation date, so that on `policy_month` a range
-such as 0 to 59 means the first five projection years of every model point, new
-business and business in force alike; on `valuation_year`, which is 1-based, the
-same five projection years are 1 to 5. On a time basis whose origin is the valuation date the
-target periods are the periods of the export, as they are. On `policy_month`,
-whose origin is the issue date of a model point, the **projection period** of a
-coordinate (model point p, period t) is t - s_p, where s_p is the first period of
-p in the older recorded export, or, for a model point absent there, its first
-period in the run being restricted; on `policy_month` the exported range of a
-model point starts at the valuation date of the run, see
-[domain/liability_cashflow.md](domain/liability_cashflow.md#time-basis). For the
-model points of the older recorded export the offsets s_p are fixed once per
-search and hold for every judgement and for the check against a walk. For a
-model point absent there the offset is taken anew from each run being
-restricted, so it can differ from state to state. A target with the periods 0 to 2 thus judges a model point
-that starts at period 144 on its periods 144 to 146.
+Target periods are projection periods, counted from the valuation date, see
+[domain/liability_cashflow.md](domain/liability_cashflow.md#time-basis) and
+[compare.md](compare.md#alignment). On `policy_month` a range such as 0 to 59
+thus means the first five projection years of every model point, new business
+and business in force alike; on `valuation_year`, which is 1-based, the same five
+projection years are 1 to 5. On a time basis whose origin is the valuation date
+the projection periods are the periods of the export, as they are. On
+`policy_month`, whose origin is the issue date of a model point, the projection
+period of a coordinate (model point p, period t) of a run is t - s_p, where s_p
+is the first period of p in the export of that same run. Each run, a recorded
+run or a state, has its own offsets: a revision that moves the valuation month
+of a model point does not move its target coordinates. A target with the
+periods 0 to 2 thus judges a model point that starts at period 144 in the older
+recorded export on its policy months 144 to 146 there, and on 156 to 158 in a
+state in which it starts at period 156.
 
 A quantity the older response does not declare, a range that is not
 `FIRST-LAST` with integers 0 <= `FIRST` <= `LAST`, and a range in which neither
@@ -292,7 +291,7 @@ recorded export has a coordinate with a projection period inside it are faults o
 the call: nothing runs and nothing is written.
 
 Under a target, the search judges an interval on its two states **restricted to
-the target**: the rows whose projection period lies in the target periods, the target quantities only, in the
+the target**: both runs aligned on projection periods as in [compare.md](compare.md#alignment), the rows whose projection period lies in the target periods, the target quantities only, in the
 quantity order of the response, and the entries of the tolerance profile for
 those quantities. A failure outside the target, of a value or of its metadata,
 cannot change the judgement. Without a target the judgement is that of the full
@@ -516,7 +515,7 @@ copies of the recorded runs, and the run record of the search are left out.
 | `walk` | With a walk only: its `walk_id` and the copied walk result `walk/walk.result.json`, by artifact reference. |
 | `manifest`, `older`, `newer`, `tolerance`, `held`, `remainder`, `ends` | As in the walk result. |
 | `states` | Every state the search requested, in the form of the walk result. Under `reuse_walk` every state it took from the walk, with `reused` true, the walk's run id, and paths into `walk/`. |
-| `target` | `quantities`, in quantity order, and, when a range was asked for, `periods` with `first` and `last`, counted from the valuation date, see [Target](#target). |
+| `target` | `quantities`, in quantity order, and, when a range was asked for, `periods` with `first` and `last`, projection periods counted from the valuation date, see [Target](#target). |
 | `intervals` | Every interval judged: `from_state`, `to_state`, the `revisions` between them, and `differs`: among the quantities the interval is judged for, those its parent passes on, the ones for which its ends differ. |
 | `contributions` | Every contribution found, in the shape of a step of the walk. |
 | `runs` | `walk`, the n + 1 states a walk requests; `search`, the states the search requested and ran itself; `saved`, the difference. With a walk, `walk` equals the number of its states. Under `reuse_walk` also `reused`, the states taken from the walk. |

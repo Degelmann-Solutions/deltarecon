@@ -28,8 +28,8 @@ from degelmann.deltarecon.walk import prepare, read_walk_folder, walk
 
 from conftest import (CANCEL, CASH, HISTORY, LAPSE_TABLE, LINE, PARAMS, PARAMS_RATE, POINTS, POINTS_B,
                       POINT_TABLE, ROOT, StubEngine, TwoStages, WalkStub, build, clone_state, commit,
-                      export_coordinates, folder_hashes, record, stored, stub_request, throwaway, write_files,
-                      written_under)
+                      export_coordinates, folder_hashes, projection_periods, record, stored, stub_request, throwaway,
+                      write_files, written_under)
 
 COUNT = "Anzahl Verträge"
 PROFILE = {"per_quantity": {COUNT: {"upper": {"abs_tol": 0.01, "rel_tol": 0}, "lower": {"abs_tol": 0.01, "rel_tol": 0},
@@ -111,24 +111,14 @@ def assert_search_folder_valid(folder: Path) -> dict:
     return result
 
 
-def exact(left: Path, right: Path, quantities, periods=None, origin: Path | None = None) -> dict[str, Fraction]:
+def exact(left: Path, right: Path, quantities, periods=None) -> dict[str, Fraction]:
     """The sum of ``right - left`` per quantity over the coordinates of a target, read without ``degelmann.deltarecon``.
 
-    Target periods count from the valuation date: on ``policy_month`` a period less the first period of
-    its model point in the export ``origin`` (the older recorded export), or, for a model point absent
-    there, its first period on its own side."""
-    def firsts(coordinates) -> dict[str, int]:
-        first = {}
-        for point, period, _ in coordinates:
-            first[point] = min(period, first.get(point, period))
-        return first
-
-    offsets = firsts(export_coordinates(origin or left))
-
+    Target periods are projection periods: on ``policy_month`` a period less the first period of its model
+    point in the same export."""
     def kept(coordinates) -> dict:
-        own = firsts(coordinates)
-        return {key: value for key, value in coordinates.items() if key[2] in quantities and (
-            periods is None or periods[0] <= key[1] - offsets.get(key[0], own[key[0]]) <= periods[1])}
+        return {key: value for key, value in projection_periods(coordinates).items() if key[2] in quantities and (
+            periods is None or periods[0] <= key[1] <= periods[1])}
 
     old, new = kept(export_coordinates(left)), kept(export_coordinates(right))
     totals = {name: Fraction(0) for name in quantities}
@@ -179,7 +169,7 @@ def test_a_targeted_search_saves_runs_and_names_what_it_missed(history, monkeypa
     walked = stored(world / "walk" / "walk.result.json")
     step = next(s for s in walked["steps"] if s["revisions"] == ["h7"])
     exports = {s["state"]: world / "walk" / s["export"]["path"] for s in walked["states"]}
-    assert float(exact(exports[6], exports[7], [COUNT], (0, 2), exports[0])[COUNT]) == found["contributions"][0]["sum"]
+    assert float(exact(exports[6], exports[7], [COUNT], (0, 2))[COUNT]) == found["contributions"][0]["sum"]
     assert next(c for c in step["contributions"] if c["quantity"] == COUNT)["contributes"]
     # The walk is copied with what it references, and listed as an input.
     record = stored(folder / "search.run-record.json")
@@ -796,8 +786,46 @@ def test_an_in_force_point_is_judged_on_its_projection_periods(world):
     assert found["contributions"] == [{"quantity": COUNT, "contributes": True, "sum": 3.0, "absolute_sum": 3.0}]
     exports = {s["state"]: world / "walk" / s["export"]["path"] for s in stored(world / "walk" / "walk.result.json")[
         "states"]}
-    assert float(exact(exports[1], exports[2], [COUNT], (0, 2), exports[0])[COUNT]) == 3.0
+    assert float(exact(exports[1], exports[2], [COUNT], (0, 2))[COUNT]) == 3.0
     # The walk shows i1 as a change of the full runs, but not of the target: nothing is missed.
+    assert result["missed"] == [] and not result["findings"]
+
+
+# M1 moves the valuation month of the in-force point B from period 144 to 156; its count stays.
+# M2 raises B.
+MOVED = (
+    ("m0", "The base.\n", (), "id,first,last,base\nMP-A,0,150,1\nMP-B,144,150,2\n", PARAMS),
+    ("m1", "Move the valuation month of MP-B\n", ("data",), "id,first,last,base\nMP-A,0,150,1\nMP-B,156,162,2\n",
+     PARAMS),
+    ("m2", "Raise MP-B\n", ("data",), "id,first,last,base\nMP-A,0,150,1\nMP-B,156,162,3\n", PARAMS),
+)
+
+
+def test_each_state_is_judged_on_its_own_valuation_month(world):
+    """Target 0-2: B is judged on policy months 144 to 146 of the older state and 156 to 158 of a later one."""
+    build(world, MOVED)
+    engine = WalkStub(MOVED)
+    older, newer = record(world, "m0", engine, label="N"), record(world, "m2", engine, label="N+1")
+    walked = run_walk(world, older, newer, WalkStub(MOVED))
+    assert walked.attributed
+    # The walk pairs B by projection period: m1 keeps its count; only the cash flow, which the stub
+    # computes from the policy month, moves.
+    first = walked.result["steps"][0]
+    assert first["revisions"] == ["m1"] and [(c["quantity"], c["contributes"]) for c in first["contributions"]] == [
+        (COUNT, False), (CASH, True)]
+    step = stored(world / "walk" / first["compare"]["result"]["path"])
+    assert step["added"] == step["removed"] == []
+    result = run_search(world, older, newer, WalkStub(MOVED), quantities=[COUNT], periods="0-2",
+                        walk=world / "walk").result
+    assert_search_folder_valid(world / "search")
+    assert [(i["from_state"], i["to_state"], i["differs"]) for i in result["intervals"]] == [
+        (0, 2, [COUNT]), (0, 1, []), (1, 2, [COUNT])]
+    (found,) = result["contributions"]
+    assert found["revisions"] == ["m2"]
+    assert found["contributions"] == [{"quantity": COUNT, "contributes": True, "sum": 3.0, "absolute_sum": 3.0}]
+    exports = {s["state"]: world / "walk" / s["export"]["path"] for s in stored(world / "walk" / "walk.result.json")[
+        "states"]}
+    assert float(exact(exports[1], exports[2], [COUNT], (0, 2))[COUNT]) == 3.0
     assert result["missed"] == [] and not result["findings"]
 
 
@@ -806,10 +834,10 @@ def test_restrict_counts_target_periods_from_the_valuation_date_on_policy_month(
     response = {"quantities": [{"name": COUNT, "unit": "policies"}], "time_basis": {"id": "policy_month"}}
     values = {**{("A", t): [1.0] for t in range(0, 150)}, **{("B", t): [2.0] for t in range(144, 150)},
               **{("C", t): [3.0] for t in range(30, 40)}}
-    narrowed = restrict(CheckedRun(response, values), Target((COUNT,), (0, 2), True, {"A": 0, "B": 144}))
-    # C, absent from the older export, counts from its own first period.
-    assert sorted(narrowed.values) == [("A", 0), ("A", 1), ("A", 2), ("B", 144), ("B", 145), ("B", 146),
-                                       ("C", 30), ("C", 31), ("C", 32)]
+    narrowed = restrict(CheckedRun(response, values), Target((COUNT,), (0, 2), True))
+    # Every model point counts from its own first period in this run; the result is aligned.
+    assert narrowed.aligned and narrowed.values == {
+        (point, t): [value] for point, value in (("A", 1.0), ("B", 2.0), ("C", 3.0)) for t in range(3)}
 
 
 class ValuationStub(WalkStub):
@@ -850,7 +878,8 @@ def test_on_a_valuation_origin_basis_target_periods_are_used_as_they_are(world):
 
 def test_restrict_keeps_the_target_periods_and_quantities_in_response_order():
     from degelmann.deltarecon.compare import CheckedRun
-    response = {"quantities": [{"name": COUNT, "unit": "policies"}, {"name": CASH, "unit": "EUR"}]}
+    response = {"quantities": [{"name": COUNT, "unit": "policies"}, {"name": CASH, "unit": "EUR"}],
+                "time_basis": {"id": "valuation_year"}}
     run = CheckedRun(response, {("A", 0): [1.0, 2.0], ("A", 5): [3.0, 4.0]})
     narrowed = restrict(run, Target((CASH,), (0, 2), True))
     assert narrowed.response["quantities"] == [{"name": CASH, "unit": "EUR"}]

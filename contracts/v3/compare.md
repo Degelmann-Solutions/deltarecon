@@ -101,14 +101,29 @@ may differ. That is what a comparison is for.
 
 ## Alignment
 
-Results are aligned by coordinate: stage, model point id, period, and quantity.
+Results are aligned by coordinate: stage, model point id, projection period, and
+quantity.
 
 - The stage is the same on both sides by rule 2.
 - Model point ids are equal when the strings are equal, code point by code point.
   There is no trimming, no case folding, and no numeric reading.
-- Periods are equal when the integers are equal. They are indices on the same
-  time basis by rule 3.
+- Each side is first put on **projection periods**, see
+  [domain/liability_cashflow.md](domain/liability_cashflow.md#time-basis). On a
+  time basis whose origin is the issue date of a model point, the coordinate
+  (model point p, period t) of a run becomes (p, t - s_p), where s_p is the first
+  period of p in the export of that run. Each run has its own s_p: when the first
+  period of a model point moves between the two runs, its values still pair by
+  projection period. The only such identifier in this version is
+  `policy_month`. On every other identifier, `valuation_year` and an identifier
+  the reader does not know included, the projection period is the period as
+  exported.
+- Projection periods are equal when the integers are equal. They are counted on
+  the same time basis by rule 3.
 - Quantities are equal when the names are equal.
+
+Every period a comparison writes is a projection period: the coverage lists, the
+rows of the deviation file, and the periods of the signature table. The responses
+and the exports of the two runs keep the periods of the time basis.
 
 A coordinate present on both sides is a common coordinate. Only common
 coordinates are compared. The order of rows in the exports carries no meaning.
@@ -120,12 +135,15 @@ removed and added coordinates, not as deviations.
 ## Coverage differences
 
 The two runs may cover different coordinates: the selections differ, a model
-point exists in one release only, or the period range of a model point differs.
+point exists in one release only, or the number of projection periods of a model
+point differs. On `policy_month` the projection periods of a model point start
+at 0 on both sides, so a range that ends earlier or later shows at its end, and a
+model point of one run only shows from projection period 0.
 
 - A coordinate present only on the right side is **added**.
 - A coordinate present only on the left side is **removed**.
-- Added and removed coordinates are reported in their own lists, as period
-  ranges per model point. A range covers every quantity for each of its periods.
+- Added and removed coordinates are reported in their own lists, as ranges of
+  projection periods per model point. A range covers every quantity for each of its periods.
   Each list holds the longest contiguous ranges, ordered by model point id and
   first period.
 - An absent value is never replaced by zero, and an added or removed coordinate
@@ -236,7 +254,7 @@ only.
   "compared_coordinates": 50,
   "deviations": { "path": "compare.deviations.csv", "sha256": "…" },
   "deviating_model_points": ["MP-0001"],
-  "added": [ { "model_point_id": "MP-0002", "first_period": 146, "last_period": 146 } ],
+  "added": [ { "model_point_id": "MP-0002", "first_period": 2, "last_period": 2 } ],
   "removed": [ { "model_point_id": "MP-0003", "first_period": 0, "last_period": 1 } ],
   "parameter_diff": [ ]
 }
@@ -281,8 +299,8 @@ MP-0001,1,garantierte Todesfallleistung,30,36
 
 - The header is exactly `model_point_id,period,quantity,left,right`.
 - Each row holds one coordinate whose values deviate by the
-  [tolerance rule](#tolerance-rule): its model point id, period, and quantity
-  name, and the left and the right value as exported, before any rounding.
+  [tolerance rule](#tolerance-rule): its model point id, projection period (see
+  [Alignment](#alignment)), and quantity name, and the left and the right value as exported, before any rounding.
 - The file is complete: it holds every deviating coordinate and no other. A
   model point without a deviation has no row, and a coordinate within its
   tolerance has none. When nothing deviates the file holds the header alone.
@@ -359,12 +377,13 @@ comparison without deviation.
 | `deviating_model_points` | The number of model points with at least one deviation of this quantity. |
 | `deviating_coordinates` | The number of deviations of this quantity. |
 | `right_above_left`, `right_below_left` | The number of these deviations whose right value lies above the left one, and below it. The two add up to `deviating_coordinates`. |
-| `first_period`, `last_period` | The lowest and the highest period among these deviations. |
+| `first_period`, `last_period` | The lowest and the highest projection period among these deviations. |
 | `largest_increase` | The deviation with the greatest `absolute` among those with right above left. Present when `right_above_left` is above zero. |
 | `largest_decrease` | The deviation with the least `absolute` among those with right below left. Present when `right_below_left` is above zero. |
 
 `largest_increase` and `largest_decrease` each name their coordinate by
-`model_point_id` and `period` and hold two numbers:
+`model_point_id` and `period`, its projection period as in the deviation file,
+and hold two numbers:
 
 ```
 absolute = right - left
@@ -495,6 +514,9 @@ outputs, as the left side, with the outputs of the repeated run, as the right
 side, reports no deviation.
 
 - The comparison follows this contract, and the caller supplies its tolerances.
+  It pairs the recorded and the repeated values by projection period, as every
+  comparison does, and its deviation file and coverage lists write projection
+  periods.
 - An engine that repeats its own results exactly is replayed with an empty
   tolerance profile, or with every part at zero and no rounding. The run is then
   **reproduced exactly**.

@@ -19,6 +19,11 @@ Rule 1 names no diagnostic of its own for a response that has not succeeded. A f
 response is rejected with ``model_point_failed``, the code its outcome implies, and a
 rejected response or one with the outcome ``error`` with the code of its first diagnostic.
 
+Values are paired by projection period (:func:`align`): on a time basis whose origin is the
+issue date, ``ISSUE_ORIGIN``, each run counts a model point from its own first exported period;
+on every other basis the periods stay as they are. The coverage lists, the deviation file and the
+signature table write projection periods; the responses and exports of the runs are not changed.
+
 The signature table is built from the compare result and the deviation file as written:
 the file is read back under rules 8 to 13 before the table is derived from it.
 
@@ -54,12 +59,44 @@ DEVIATIONS_NAME = "compare.deviations.csv"
 _ROUNDING = Context(prec=400, rounding=ROUND_HALF_UP)
 
 
+# The time bases whose origin is the issue date of a model point. On them a run is aligned on
+# projection periods before it is compared; every other identifier keeps its periods as they are.
+ISSUE_ORIGIN = frozenset({"policy_month"})
+
+
 @dataclass
 class CheckedRun:
-    """A succeeded run that passed rule 1: its response and its values by model point and period."""
+    """A succeeded run that passed rule 1: its response and its values by model point and period.
+
+    ``aligned`` marks values whose periods are projection periods already (:func:`align`)."""
 
     response: dict
     values: dict[tuple[str, int], list[float]] = field(repr=False)
+    aligned: bool = False
+    _view: CheckedRun | None = field(default=None, init=False, repr=False, compare=False)
+
+
+def first_periods(values) -> dict[str, int]:
+    """The first period of every model point of ``values``."""
+    first: dict[str, int] = {}
+    for point, period in values:
+        if point not in first or period < first[point]:
+            first[point] = period
+    return first
+
+
+def align(run: CheckedRun) -> CheckedRun:
+    """The run on projection periods: on a time basis whose origin is the issue date, coordinate
+    (p, t) becomes (p, t - s_p), where s_p is the first exported period of p in this run, the
+    period of its valuation date. On any other basis the run itself. An aligned run is not
+    aligned again, and the aligned view of a run is built once."""
+    if run.aligned or run.response["time_basis"]["id"] not in ISSUE_ORIGIN:
+        return run
+    if run._view is None:
+        first = first_periods(run.values)
+        run._view = CheckedRun(run.response, {(point, period - first[point]): numbers
+                                              for (point, period), numbers in run.values.items()}, True)
+    return run._view
 
 
 @dataclass
@@ -255,8 +292,9 @@ def compare_runs(request: dict, left: CheckedRun, right: CheckedRun) -> tuple[di
 
     Return the compare result without a parameter diff and without the reference to the
     deviation file, and the deviations in the order of the deviation file. Rules 2 to 6
-    are applied here, then the check that every difference is finite, alignment,
-    coverage, and the tolerance rule.
+    are applied here, then alignment on projection periods (:func:`align`), the check that
+    every difference is finite, coverage, and the tolerance rule. Coverage ranges and the
+    deviations carry projection periods.
     """
     try:
         _check_compatible(request, left.response, right.response)
@@ -272,6 +310,7 @@ def compare_runs(request: dict, left: CheckedRun, right: CheckedRun) -> tuple[di
             "unknown_quantity", f"The request sets a tolerance for {unknown[0]}, which the two runs "
             "do not declare.")), []
 
+    left, right = align(left), align(right)
     common = sorted(set(left.values) & set(right.values))
     # Every difference of the exported values is finite, before any rounding or tolerance.
     overflow = sorted({key[0] for key in common
