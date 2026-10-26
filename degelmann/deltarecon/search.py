@@ -7,8 +7,9 @@ against the two recorded results, then halves the history for a target: the quan
 and periods asked about, by default every coordinate.
 
 - An interval ``(a, b)`` is judged by comparing state ``a`` with state ``b`` on the target's
-  coordinates only: the runs are restricted to the target periods, counted from the valuation
-  date, and to the target quantities, and the tolerance profile to the entries of those
+  coordinates only: both runs are aligned on projection periods, as every comparison is, each
+  model point counted from its own valuation date in that run, then restricted to the target
+  periods and to the target quantities, and the tolerance profile to the entries of those
   quantities, so a quantity outside the target cannot change the judgement. It differs for a quantity when a coordinate of it deviates
   under the tolerance rule or a coordinate is added or removed; a comparison without the
   outcome ``compared`` differs for every quantity it judges.
@@ -40,7 +41,7 @@ from collections import OrderedDict
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from .compare import CheckedRun, compare_runs
+from .compare import CheckedRun, align, compare_runs
 from .documents import (CONTRACT_VERSION, RUN_SCHEMA, Rejection, artifact_reference, copy_files, read_document,
                         write_document)
 from .replay import check_response
@@ -57,23 +58,14 @@ REUSE_WALK = "reuse_walk"
 _CACHED = 4
 
 
-# The time basis whose origin is the issue date of a model point; target periods are shifted on it.
-ISSUE_ORIGIN = "policy_month"
-
-
 @dataclass(frozen=True)
 class Target:
-    """The coordinates a search judges: quantities in the order of the response, and periods counted
-    from the valuation date.
-
-    ``offsets`` holds, on a basis whose origin is the issue date, the first period of every model point
-    of the older recorded export: the period of the valuation date. ``None`` on a basis whose origin is
-    the valuation date, where target periods are used as they are."""
+    """The coordinates a search judges: quantities in the order of the response, and projection
+    periods, counted from the valuation date of each model point in each run."""
 
     quantities: tuple[str, ...]
     periods: tuple[int, int] | None = None
     narrowed: bool = False  # a proper subset of the quantities or a period range was asked for
-    offsets: dict[str, int] | None = field(default=None, compare=False, repr=False)
 
     def document(self) -> dict:
         target = {"quantities": list(self.quantities)}
@@ -81,31 +73,13 @@ class Target:
             target["periods"] = {"first": self.periods[0], "last": self.periods[1]}
         return target
 
-    def projection(self, values) -> dict[tuple[str, int], int]:
-        """The projection period of every coordinate of ``values``: its period counted from the valuation
-        date. On a basis whose origin is the issue date the period less the model point's offset, which
-        for a model point absent from the older recorded export is its first period in ``values``."""
-        if self.offsets is None:
-            return {key: key[1] for key in values}
-        own = first_periods(values)
-        return {key: key[1] - self.offsets.get(key[0], own[key[0]]) for key in values}
-
     def within(self, values) -> list[tuple[str, int]]:
-        """The coordinates of ``values`` inside the target periods, in their order."""
+        """The coordinates of ``values``, aligned on projection periods, inside the target periods,
+        in their order."""
         if self.periods is None:
             return list(values)
         first, last = self.periods
-        projection = self.projection(values)
-        return [key for key in values if first <= projection[key] <= last]
-
-
-def first_periods(values) -> dict[str, int]:
-    """The first period of every model point of ``values``."""
-    first: dict[str, int] = {}
-    for point, period in values:
-        if point not in first or period < first[point]:
-            first[point] = period
-    return first
+        return [key for key in values if first <= key[1] <= last]
 
 
 def read_target(quantities, periods: str | None, prepared: Prepared) -> Target:
@@ -121,29 +95,29 @@ def read_target(quantities, periods: str | None, prepared: Prepared) -> Target:
         if not match or int(match[1]) > int(match[2]):
             raise UsageError(f"the period range {periods!r} is not FIRST-LAST with integers 0 <= FIRST <= LAST")
         span = (int(match[1]), int(match[2]))
-    offsets = (first_periods(prepared.older.values)
-               if span is not None and prepared.older.response["time_basis"]["id"] == ISSUE_ORIGIN else None)
     chosen = tuple(name for name in names if name in asked) if asked else tuple(names)
     # A quantity list that names every quantity, without a period range, narrows nothing: the
     # search is the one without a target and keeps the signature rows of its contributions.
     narrowed = set(chosen) != set(names) or span is not None
-    target = Target(chosen, span, narrowed, offsets)
-    if span is not None and not any(target.within(run.values) for run in (prepared.older, prepared.newer)):
+    target = Target(chosen, span, narrowed)
+    if span is not None and not any(target.within(align(CheckedRun(run.response, run.values)).values)
+                                    for run in (prepared.older, prepared.newer)):
         raise UsageError(f"neither recorded export has a coordinate in the projection periods {periods}")
     return target
 
 
 def restrict(checked: CheckedRun, target: Target) -> CheckedRun:
-    """A run restricted to the target: the rows of the target periods, counted from the valuation date,
-    and the target quantities only, in the quantity order of the response. Without a target the run
-    itself."""
+    """A run aligned on projection periods (:func:`~degelmann.deltarecon.compare.align`) and restricted
+    to the target: the rows of the target periods and the target quantities only, in the quantity order
+    of the response. Without a target the run itself."""
     if not target.narrowed:
         return checked
+    checked = align(checked)
     quantities = checked.response["quantities"]
     keep = [i for i, quantity in enumerate(quantities) if quantity["name"] in target.quantities]
     response = {**checked.response, "quantities": [quantities[i] for i in keep]}
     values = {key: [checked.values[key][i] for i in keep] for key in target.within(checked.values)}
-    return CheckedRun(response, values)
+    return CheckedRun(response, values, aligned=True)
 
 
 def restrict_profile(profile: dict, target: Target) -> dict:

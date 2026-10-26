@@ -11,12 +11,18 @@ The fast tests check the published files: the renewed requests are those of the 
 contract version 3.0, the engine version of the export path under Python 3.14.9, and the two ends of
 the new chain in place of release N and ``ab5dc79``, and the archived files stay well formed. The
 reproduction runs both requests and the walk on all 350 model points, and is skipped unless it is
-asked for: ``DELTARECON_ORACLE=1``. Besides the renewed hashes it checks that every signature table,
-with its contract version set back to the archived ``2.0``, hashes to the archived digest: the tables
-are the archived ones, field for field, apart from ``contract_version``. This holds across the move to
-the new chain because the fixes keep every result bit for bit, so state k of the new chain gives the
-bits of state k of the earlier chain, and the step numbers, run ids and labels are unchanged; a
-signature table names no revision. The archived walk result is not compared, because it holds the
+asked for: ``DELTARECON_ORACLE=1``. Besides the renewed hashes it checks every signature table against
+the archive. The archived tables were built under 2.0, which paired values by policy month; the present
+tables carry projection periods. So each table is rebuilt in policy months from the deviation file of
+its step: every row's period gets back the first exported period of its model point in the step's left
+state export, the table is derived again from the rows, and its contract version is set back to the
+archived ``2.0``. The rebuilt table hashes to the archived digest: the tables are the archived ones,
+field for field, apart from ``contract_version`` and the period numbering. The rebuild assumes that
+left and right offsets agree for every deviating model point; a hash that matches proves it, since a
+moved offset would have paired other values under 2.0. This holds across the move to the new chain
+because the fixes keep every result bit for bit, so state k of the new chain gives the bits of state k
+of the earlier chain, and the step numbers, run ids and labels are unchanged; a signature table names
+no revision. The archived walk result is not compared, because it holds the
 hashes of the 2.0 responses and the revisions. The pinned hashes are never rewritten to make a test
 pass.
 """
@@ -31,9 +37,11 @@ from pathlib import Path
 import pytest
 
 from degelmann.deltarecon.__main__ import main
+from degelmann.deltarecon.compare import first_periods, read_result_deviations
 from degelmann.deltarecon.documents import RUN_SCHEMA, document_bytes, parse_document, read_document
+from degelmann.deltarecon.signature import signature_table
 
-from conftest import CLONE, NEWER, RELEASE_N, REPOSITORIES, ROOT, START, git, require_clone
+from conftest import CLONE, NEWER, RELEASE_N, REPOSITORIES, ROOT, START, export_coordinates, git, require_clone
 
 ORACLE = ROOT / "oracle"
 ARCHIVE = ORACLE / "archive" / "2026-10-22"
@@ -64,6 +72,30 @@ def listed_hashes(folder: Path = ORACLE) -> dict[str, str]:
 def tables(hashes: dict[str, str]) -> dict[str, str]:
     """The signature tables of a sums file, without the walk result."""
     return {name: digest for name, digest in hashes.items() if name != WALK_RESULT}
+
+
+def in_policy_months(walk: Path, name: str) -> bytes:
+    """The bytes of the signature table ``name`` of the walk folder ``walk`` rebuilt in policy months
+    under the archived contract version: the rows of its step's deviation file, each period plus the
+    first exported period of its model point in the step's left state export."""
+    prefix = name.removesuffix(".signature-table.json")
+    result = parse_document((walk / f"{prefix}.result.json").read_bytes())
+    request = parse_document((walk / f"{prefix}.request.json").read_bytes())
+    deviations = read_result_deviations(result, walk)
+    stored = parse_document((walk / name).read_bytes())
+    assert stored["contract_version"] == "3.0" and stored == signature_table(result, deviations), name
+    left = walk / request["left"]["response"]["path"]
+    export = left.parent / parse_document(left.read_bytes())["export"]["artifact"]["path"]
+    offsets = first_periods({(point, period) for point, period, _ in export_coordinates(export)})
+    rows = [{**row, "period": row["period"] + offsets[row["model_point_id"]]} for row in deviations]
+    return document_bytes({**signature_table(result, rows), "contract_version": ARCHIVED_VERSION})
+
+
+def archive_mismatches(walk: Path) -> list[str]:
+    """The signature tables of ``walk`` whose rebuild in policy months does not hash to the archived digest."""
+    archived = tables(listed_hashes(ARCHIVE))
+    return [name for name, digest in archived.items()
+            if hashlib.sha256(in_policy_months(walk, name)).hexdigest() != digest]
 
 
 def check_request(request: dict, name: str, engine_version: str, revision: str) -> None:
@@ -149,12 +181,7 @@ def test_reference_walk_reproduces_every_published_hash(monkeypatch, tmp_path):
     hashes = listed_hashes()
     assert set(hashes) == written
     assert {name: hashlib.sha256((walk / name).read_bytes()).hexdigest() for name in hashes} == hashes
-    # Each table, with the archived contract version written back, is the archived table byte for
-    # byte; the member order is kept, so equal bytes mean equal fields.
-    archived = tables(listed_hashes(ARCHIVE))
-    assert set(archived) == set(tables(hashes))
-    for name, digest in archived.items():
-        table = parse_document((walk / name).read_bytes())
-        assert table["contract_version"] == "3.0", name
-        assert hashlib.sha256(document_bytes({**table, "contract_version": ARCHIVED_VERSION})).hexdigest() == \
-            digest, name
+    # Each table, rebuilt in policy months with the archived contract version written back, is the
+    # archived table byte for byte; the member order is kept, so equal bytes mean equal fields.
+    assert set(tables(listed_hashes(ARCHIVE))) == set(tables(hashes))
+    assert archive_mismatches(walk) == []

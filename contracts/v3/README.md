@@ -52,6 +52,11 @@ Each contract file separates two kinds of statement:
 - **Time basis:** the declared meaning of the time coordinate. It belongs to the
   domain reference of a stage.
 - **Period:** an integer index on the time basis.
+- **Projection period:** a period counted from the valuation date of its run. On
+  a time basis whose origin is the issue date, `policy_month`, it is the period
+  less the first exported period of the model point in that run; on every other
+  basis it is the period. Comparisons pair values by projection period and write
+  projection periods, see [compare.md](compare.md#alignment).
 - **Quantity:** a named result value, with a unit, defined in the domain reference.
 - **Coordinate:** a triple of model point id, period, and quantity. A result has
   one finite number per coordinate.
@@ -127,8 +132,12 @@ Reader rule for documents of versions 1.0 and 2.0:
 ### Changes from 2.0
 
 Version 3.0 changes the versions a reader accepts, adds computation paths to
-the release identity, and adds the opt-in switch `reuse_walk` of the search. A
-document written without a switch differs from 2.0 in `contract_version` only.
+the release identity, aligns every comparison on projection periods, and adds
+the opt-in switch `reuse_walk` of the search. A document written without a
+switch differs from 2.0 in `contract_version` and, for a comparison on
+`policy_month`, in its period numbering only, as long as no model point's first
+exported period moves between the compared runs; where one moves, the pairing
+of values changes as described below.
 The schemas change for the switch alone: they gain optional members, a search
 under the switch may report 0 runs of its own, and the search result ties these
 members to the switch, as listed below.
@@ -144,6 +153,23 @@ What changes in the versions a reader accepts:
   pack states.
 - A walk folder written under 2.0 is a reference for a search, as a walk folder
   written under 1.0 already was under 2.0.
+
+What the alignment on projection periods changes:
+
+- On `policy_month`, whose origin is the issue date, a comparison puts each run
+  on projection periods first: coordinate (p, t) becomes (p, t - s_p), where s_p
+  is the first exported period of p in that run, see
+  [compare.md](compare.md#alignment). Under 2.0 values were paired by policy
+  month, so a model point whose first exported period moved between the two runs
+  paired values of different projection periods and showed added and removed
+  coordinates. The field names and the schemas do not change: `period`,
+  `first_period`, and `last_period` of compare results, deviation files, and
+  signature tables, and the sums of walk steps and search contributions, now
+  rest on projection periods. Run responses, exports, and run requests keep
+  policy months. On every other time basis nothing changes.
+- The target of a search counts each model point from its first exported period
+  in each run, recorded run or state, and no longer from the older recorded
+  export alone, see [localise.md](localise.md#target).
 
 What computation paths add:
 

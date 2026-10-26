@@ -121,12 +121,25 @@ def export_coordinates(path: Path) -> dict[tuple[str, int, str], float]:
             for row in rows[1:] for quantity, value in zip(rows[0][2:], row[2:])}
 
 
-def expected_deviations(left: Path, right: Path, per_quantity: dict) -> list[dict]:
+def projection_periods(coordinates: dict[tuple[str, int, str], float]) -> dict[tuple[str, int, str], float]:
+    """The values of one export on projection periods: each period less the first period of its model
+    point in that export, as on ``policy_month``, whose origin is the issue date."""
+    first: dict[str, int] = {}
+    for point, period, _ in coordinates:
+        first[point] = min(period, first.get(point, period))
+    return {(point, period - first[point], quantity): value
+            for (point, period, quantity), value in coordinates.items()}
+
+
+def expected_deviations(left: Path, right: Path, per_quantity: dict, issue_origin: bool = True) -> list[dict]:
     """The deviation list of two exports, recomputed without ``degelmann/deltarecon/compare.py``.
 
-    The tolerance rule is that of :func:`deviates`.
+    The tolerance rule is that of :func:`deviates`. With ``issue_origin``, the time basis of the stub
+    and of the model, both exports are aligned on projection periods first.
     """
     old, new = export_coordinates(left), export_coordinates(right)
+    if issue_origin:
+        old, new = projection_periods(old), projection_periods(new)
     order = next(csv.reader(io.StringIO(left.read_text("utf-8"), newline="")))[2:]
     keys = sorted(set(old) & set(new), key=lambda key: (key[0], key[1], order.index(key[2])))
     exact = {"upper": {"abs_tol": 0, "rel_tol": 0}, "lower": {"abs_tol": 0, "rel_tol": 0}}

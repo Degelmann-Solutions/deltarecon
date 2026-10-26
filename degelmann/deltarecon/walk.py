@@ -52,8 +52,8 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 from . import changes as changes_contract
-from .compare import (COMPARE_REQUEST, CheckedRun, CompareResult, compare, compare_request_document, compare_runs,
-                      read_tolerance, shows_no_deviation)
+from .compare import (COMPARE_REQUEST, CheckedRun, CompareResult, align, compare, compare_request_document,
+                      compare_runs, read_tolerance, shows_no_deviation)
 from .derive import CLASS_ORDER, build_manifest, read_derive_input, remainder
 from .documents import (CONTRACT_VERSION, RECORD_SCHEMA, RUN_SCHEMA, SCHEMA_FOLDERS, Rejection, artifact_reference,
                         check_artifact, copy_files, document_bytes, parse_document, read_document, sha256_file,
@@ -122,7 +122,9 @@ def exact_sums(left: CheckedRun, right: CheckedRun,
                names: list[str]) -> tuple[list[float | None], list[float | None]]:
     """Per quantity of ``names``: the sum of ``right - left`` over every coordinate and the sum of
     its absolute values, each the exact sum rounded once to the nearest binary64 value, ``None``
-    when it does not fit a finite one. A missing coordinate counts as 0."""
+    when it does not fit a finite one. Both runs are aligned on projection periods first, as in a
+    comparison; a missing coordinate counts as 0."""
+    left, right = align(left), align(right)
     left_index = {quantity["name"]: i for i, quantity in enumerate(left.response["quantities"])}
     right_index = {quantity["name"]: i for i, quantity in enumerate(right.response["quantities"])}
     positions = [(j, left_index.get(name), right_index.get(name)) for j, name in enumerate(names)]
@@ -379,13 +381,14 @@ class States:
     def check_end(self, k: int, state: CheckedRun, run: RunResult, recorded: RecordedRun, side: str) -> dict:
         """State ``k`` against the recorded result of one end: no deviation, no added or removed coordinate."""
         compare_id = f"{self.prefix}-state-{k}-check-{side}"
+        checked = _checked(recorded)  # built once, so that its alignment is built once
         result, deviations = compare_runs({"stage": self.stage, "compare_id": compare_id,
-                                           "tolerance": self.profile}, _checked(recorded), state)
+                                           "tolerance": self.profile}, checked, state)
         if shows_no_deviation(result, deviations):
             return {"state": k, "outcome": "reproduced"}
         compared = self.write_compare(f"{self.name(k)}.check-{side}", compare_id,
                                       self.recorded_files(recorded, side), (run.response_path, run.record_path),
-                                      (_checked(recorded), state))
+                                      (checked, state))
         end = {"state": k, "outcome": "not_reproduced", "compare": self.reference(compared)}
         code = "state_zero_not_reproduced" if side == OLDER else "state_n_not_reproduced"
         self.findings.append({"code": code, "message": f"State {k} does not reproduce the {side} recorded result "
