@@ -306,6 +306,7 @@ envelope for every deterministic procedure, not only for a stage run:
 |---|---|
 | `record_id` | The identifier of this execution of the procedure: `record-` followed by a random UUID of version 4 in lower-case hexadecimal, as in the example. The writer generates it anew for every execution of every procedure and never repeats it. |
 | `procedure.type` | The procedure that ran. Version 3 registers `run`, `compare`, `walk`, and `search`, see [localise.md](localise.md#run-record-of-a-walk) and [localise.md](localise.md#run-record-of-a-search). Other procedures use their own type name. |
+| `switches` | Optional: the opt-in switches that were on for the procedure, by name and in name order; absent when none was on. Version 3 registers `reuse_walk` of the search, see [localise.md](localise.md#reuse-of-the-walks-states). |
 | `outcome` | The outcome the procedure reported. |
 | `recorded_at` | Optional time of recording, in UTC. It is information only and is never compared. |
 | `inputs` | The documents handed to the procedure, each with a role and a byte hash. |

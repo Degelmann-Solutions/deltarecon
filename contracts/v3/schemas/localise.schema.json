@@ -48,6 +48,13 @@
     },
     "state": {
       "description": "One state of the walk and the outcome of its run.",
+      "allOf": [
+        { "$ref": "#/$defs/search_state" },
+        { "not": { "required": ["reused"] } }
+      ]
+    },
+    "search_state": {
+      "description": "One state of a walk or a search and the outcome of its run. A search under the switch reuse_walk marks a state it took from the walk with reused.",
       "type": "object",
       "additionalProperties": false,
       "required": ["state", "run_id", "outcome", "response"],
@@ -56,6 +63,7 @@
         "revision": { "$ref": "common.schema.json#/$defs/id" },
         "run_id": { "$ref": "common.schema.json#/$defs/id" },
         "outcome": { "enum": ["succeeded", "failed", "error", "rejected"] },
+        "reused": { "const": true },
         "response": { "$ref": "common.schema.json#/$defs/artifact" },
         "export": { "$ref": "common.schema.json#/$defs/artifact" }
       },
@@ -253,11 +261,26 @@
         "held", "remainder", "ends", "states", "target", "intervals", "contributions", "runs", "findings"
       ],
       "dependentRequired": { "walk": ["missed"], "missed": ["walk"] },
+      "if": { "required": ["switches"], "properties": { "switches": { "contains": { "const": "reuse_walk" } } } },
+      "then": { "required": ["walk"], "properties": { "runs": { "required": ["reused"] } } },
+      "else": {
+        "properties": {
+          "runs": { "properties": { "search": { "minimum": 1 } }, "not": { "required": ["reused"] } },
+          "states": { "items": { "not": { "required": ["reused"] } } }
+        }
+      },
       "properties": {
         "document": { "const": "search_result" },
         "contract_version": { "$ref": "common.schema.json#/$defs/contract_version" },
         "stage": { "$ref": "common.schema.json#/$defs/stage" },
         "search_id": { "$ref": "common.schema.json#/$defs/id" },
+        "switches": {
+          "description": "The opt-in switches that were on for the search, by name; absent when none was on.",
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": { "enum": ["reuse_walk"] }
+        },
         "walk": {
           "type": "object",
           "additionalProperties": false,
@@ -288,7 +311,7 @@
         "states": {
           "type": "array",
           "minItems": 1,
-          "items": { "$ref": "#/$defs/state" }
+          "items": { "$ref": "#/$defs/search_state" }
         },
         "target": { "$ref": "#/$defs/target" },
         "intervals": {
@@ -305,8 +328,9 @@
           "required": ["walk", "search", "saved"],
           "properties": {
             "walk": { "type": "integer", "minimum": 1 },
-            "search": { "type": "integer", "minimum": 1 },
-            "saved": { "type": "integer", "minimum": 0 }
+            "search": { "type": "integer", "minimum": 0 },
+            "saved": { "type": "integer", "minimum": 0 },
+            "reused": { "type": "integer", "minimum": 0 }
           }
         },
         "missed": {

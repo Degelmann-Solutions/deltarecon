@@ -507,6 +507,139 @@ def test_a_state_of_the_walk_on_another_manifest_or_a_malformed_request_is_refus
     assert not (world / "search").exists()
 
 
+# --- reuse of the walk's states -------------------------------------------------------
+
+
+class Counting(WalkStub):
+    """The walk stub that counts the states it is asked to compute."""
+
+    def __init__(self, *args, **options):
+        super().__init__(*args, **options)
+        self.calls = 0
+
+    def open(self, release, enabled, manifest_dir, repositories, hold=frozenset()):
+        self.calls += 1
+        return super().open(release, enabled, manifest_dir, repositories, hold)
+
+
+def without_compare(node):
+    """A document without its comparison references, whose paths name the states compared."""
+    if isinstance(node, dict):
+        return {key: without_compare(value) for key, value in node.items() if key != "compare"}
+    if isinstance(node, list):
+        return [without_compare(value) for value in node]
+    return node
+
+
+def assert_same_search(reused: dict, ran: dict) -> None:
+    """The halving, the ends, the contributions and their sums, the findings and the missed are those
+    of the search that ran its states."""
+    for member in ("ends", "target", "intervals", "contributions", "findings", "missed"):
+        assert without_compare(reused[member]) == without_compare(ran[member]), member
+    assert [s["state"] for s in reused["states"]] == [s["state"] for s in ran["states"]]
+    assert [s["outcome"] for s in reused["states"]] == [s["outcome"] for s in ran["states"]]
+
+
+@pytest.mark.parametrize("options", [
+    {"quantities": [COUNT], "periods": "0-2", "tolerance": "tolerance.json"}, {}], ids=["target", "every-coordinate"])
+def test_reuse_over_a_full_walk_runs_no_state_and_finds_what_the_search_finds(history, options):
+    world, older, newer = history
+    if "tolerance" in options:
+        options = {**options, "tolerance": world / options["tolerance"]}
+    run_walk(world, older, newer, WalkStub(HISTORY), tolerance=options.get("tolerance"))
+    ran = run_search(world, older, newer, WalkStub(HISTORY), walk=world / "walk", **options).result
+    engine = Counting(HISTORY)
+    reused = run_search(world, older, newer, engine, output="reused", walk=world / "walk", reuse=True,
+                        **options).result
+    assert engine.calls == 0
+    assert_same_search(reused, ran)
+    folder = world / "reused"
+    assert assert_search_folder_valid(folder) == reused
+    count = len(ran["states"])
+    assert reused["runs"] == {"walk": 9, "search": 0, "saved": 9, "reused": count}
+    assert ran["runs"] == {"walk": 9, "search": count, "saved": 9 - count}
+    # A reused state is the walk's run: its run id, its files under walk/, and no folder of the search.
+    walked = {s["state"]: s for s in stored(world / "walk" / "walk.result.json")["states"]}
+    for entry in reused["states"]:
+        k = entry["state"]
+        assert entry["reused"] is True and entry["run_id"] == walked[k]["run_id"] == f"walk-run-h0-run-h8-state-{k}"
+        assert entry["response"] == {**walked[k]["response"], "path": "walk/" + walked[k]["response"]["path"]}
+        assert entry["export"] == {**walked[k]["export"], "path": "walk/" + walked[k]["export"]["path"]}
+        assert not (folder / f"state-{k:02d}").exists()
+    assert list(reused["states"][1]) == ["state", "revision", "run_id", "outcome", "reused", "response", "export"]
+    # The comparisons kept reference the reused responses and run records under walk/.
+    for entry in reused["contributions"]:
+        request = stored(folder / entry["compare"]["result"]["path"].replace(".result.", ".request."))
+        assert all(side["path"].startswith("walk/state-") for side in (*request["left"].values(),
+                                                                        *request["right"].values()))
+    # The result and the run record name the switch; without it neither does.
+    record = stored(folder / "search.run-record.json")
+    assert reused["switches"] == record["switches"] == ["reuse_walk"]
+    assert list(reused)[:5] == ["document", "contract_version", "stage", "search_id", "switches"]
+    assert "switches" not in ran and "switches" not in stored(world / "search" / "search.run-record.json")
+    assert "reused" not in json.dumps(ran)
+
+
+def test_a_walk_state_that_did_not_run_is_reused_as_a_state_that_did_not_run(world):
+    build(world, CARRY)
+    engine = WalkStub(CARRY)
+    older, newer = record(world, "x0", engine, label="N"), record(world, "x4", engine, label="N+1")
+    assert run_walk(world, older, newer, WalkStub(CARRY, broken={"x2"})).attributed
+    ran = run_search(world, older, newer, WalkStub(CARRY, broken={"x2"}), walk=world / "walk").result
+    counting = Counting(CARRY, broken={"x2"})
+    reused = run_search(world, older, newer, counting, output="reused", walk=world / "walk", reuse=True).result
+    assert counting.calls == 0
+    assert_same_search(reused, ran)
+    assert_search_folder_valid(world / "reused")
+    (finding,) = [f for f in reused["findings"] if f["code"] == "state_did_not_run"]
+    assert finding["state"] == 2 and finding["revisions"] == ["x2"]
+    walked = stored(world / "walk" / "walk.result.json")["states"][2]
+    failed = next(s for s in reused["states"] if s["state"] == 2)
+    assert failed == {"state": 2, "revision": "x2", "run_id": walked["run_id"], "outcome": walked["outcome"],
+                      "reused": True, "response": {**walked["response"], "path": "walk/" + walked["response"]["path"]}}
+    assert finding["diagnostic"] == stored(world / "walk" / walked["response"]["path"])["diagnostics"][0]
+    assert reused["runs"]["search"] == 0 and reused["runs"]["reused"] == len(reused["states"])
+
+
+def test_the_switch_without_a_walk_is_a_usage_error_and_writes_nothing(history, monkeypatch, capsys):
+    world, older, newer = history
+    before = folder_hashes(world)
+    monkeypatch.setattr("degelmann.deltarecon.__main__.engine", lambda: WalkStub(HISTORY))
+    assert main(["search", str(older), str(newer), "--output", str(world / "search"), "--repositories", str(world),
+                 "--reuse-walk"]) == 2
+    assert "--walk" in capsys.readouterr().err
+    assert folder_hashes(world) == before and not (world / "search").exists()
+    with pytest.raises(UsageError):
+        run_search(world, older, newer, WalkStub(HISTORY), reuse=True)
+
+
+def test_a_refused_walk_is_refused_under_the_switch_before_anything_runs(cancel):
+    world, older, newer = cancel
+    run_walk(world, older, newer, WalkStub(CANCEL, drift={"c4": 1}))
+    engine = Counting(CANCEL)
+    with pytest.raises(Rejection) as caught:
+        run_search(world, older, newer, engine, walk=world / "walk", reuse=True)
+    assert caught.value.code == "walk_not_attributed" and not (world / "search").exists() and engine.calls == 0
+
+
+def test_a_moved_reuse_search_folder_resolves_inside_itself(history, tmp_path_factory, monkeypatch, capsys):
+    world, older, newer = history
+    run_walk(world, older, newer, WalkStub(HISTORY), tolerance=world / "tolerance.json")
+    monkeypatch.setattr("degelmann.deltarecon.__main__.engine", lambda: Counting(HISTORY))
+    monkeypatch.chdir(world)
+    assert main(["search", str(older), str(newer), "--output", str(world / "search"), "--repositories", str(world),
+                 "--quantity", COUNT, "--periods", "0-2", "--tolerance", str(world / "tolerance.json"),
+                 "--walk", str(world / "walk"), "--reuse-walk"]) == 0
+    out = capsys.readouterr().out
+    assert out.splitlines()[0] == "search: searched; 0 states run, 6 reused from the walk, 9 for a walk, 9 saved"
+    assert "  missed: " in out
+    moved = tmp_path_factory.mktemp("moved") / "search"
+    shutil.move(str(world / "search"), str(moved))
+    shutil.rmtree(world / "walk")
+    assert_references_resolve(moved)
+    assert_search_folder_valid(moved)
+
+
 # --- the halving --------------------------------------------------------------------
 
 

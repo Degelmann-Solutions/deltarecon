@@ -27,7 +27,9 @@ and periods asked about, by default every coordinate.
 
 With a walk folder of the same two records the search reads it under the reader rules of a
 walk folder before anything runs, copies it into ``walk/``, recomputes from its state
-exports which steps change the target, and names the contributions it missed.
+exports which steps change the target, and names the contributions it missed. The opt-in
+switch ``reuse_walk`` takes every state the search needs from that copy instead of running
+it: a reused state is no run, keeps the walk's run id, and is counted in ``runs.reused``.
 
 This module knows no engine and no kind of reference, and starts no process.
 """
@@ -42,13 +44,15 @@ from .compare import CheckedRun, compare_runs
 from .documents import (CONTRACT_VERSION, RUN_SCHEMA, Rejection, artifact_reference, copy_files, read_document,
                         write_document)
 from .replay import check_response
-from .run import Engine, RunResult, UsageError, repositories_folder
+from .run import RECORD_NAME as STATE_RECORD_NAME, Engine, RunResult, UsageError, repositories_folder
 from .walk import (LOCALISE_SCHEMA, MANIFEST_NAME, NEWER, OLDER, REQUEST_NAME, RESULT_NAME as WALK_RESULT_NAME,
                    Prepared, States, WalkFolder, flags, new_folder, prepare, read_walk_folder)
 
 RESULT_NAME = "search.result.json"
 RECORD_NAME = "search.run-record.json"
 WALK_FOLDER = "walk"
+# The opt-in switch that takes every state from the copied walk folder instead of running it.
+REUSE_WALK = "reuse_walk"
 # The checked states kept in memory at one time; the others are read again from their exports.
 _CACHED = 4
 
@@ -182,9 +186,11 @@ class _Search(States):
     record_name = RECORD_NAME
 
     def __init__(self, output: Path, engine: Engine, repositories: Path, prepared: Prepared, prefix: str,
-                 target: Target):
+                 target: Target, reused: list[dict] | None = None):
         super().__init__(output, engine, repositories, prepared, prefix)
         self.target = target
+        # Under the switch reuse_walk: the states of the walk result, read from the copy under walk/.
+        self.reused = reused
         self.ran: dict[int, tuple[RunResult, dict] | None] = {}  # None: the state did not run
         self.cache: OrderedDict[int, CheckedRun] = OrderedDict()
         self.intervals, self.found = [], []
@@ -196,11 +202,27 @@ class _Search(States):
                 "the interval that runs.")
 
     def ensure(self, k: int) -> bool:
-        """Run state ``k`` unless it has run. Whether it succeeded."""
+        """Run state ``k``, or under the switch reuse_walk take it from the walk, unless that is done.
+        Whether it succeeded."""
         if k not in self.ran:
-            run, request = self.run_state(k)
+            run, request = self.run_state(k) if self.reused is None else self.reuse_state(k)
             self.ran[k] = (run, request) if run.outcome == "succeeded" else None
         return self.ran[k] is not None
+
+    def reuse_state(self, k: int) -> tuple[RunResult, dict]:
+        """State ``k`` as the walk ran it, read from the copy under ``walk/``: no run and no folder of
+        its own. Its entry keeps the walk's run id and references the copy."""
+        walked = self.reused[k]
+        run, request = read_walk_state(self.output / WALK_FOLDER, walked)
+        entry = {"state": k, **({"revision": walked["revision"]} if k else {}), "run_id": walked["run_id"],
+                 "outcome": run.outcome, "reused": True,
+                 "response": artifact_reference(self.output, run.response_path)}
+        if run.outcome == "succeeded":
+            entry["export"] = artifact_reference(self.output, run.export_path)
+        self.states.append(entry)
+        if run.outcome != "succeeded":
+            self.did_not_run(k, run)
+        return run, request
 
     def state(self, k: int) -> CheckedRun:
         """The checked values of a state that succeeded, read again when they are not cached."""
@@ -290,6 +312,28 @@ class _Search(States):
         return zero, last
 
 
+def read_walk_state(folder: Path, state: dict, values: bool = False) -> tuple[RunResult, dict]:
+    """A state of a walk result, read from the walk folder ``folder``: its run, with the paths of its
+    response, run record, and export in the folder, and its request. A state that succeeded has the
+    export the walk result names; with ``values`` its export is read and checked into ``run.values``.
+    A state that is not readable raises ``walk_mismatch``."""
+    k = state["state"]
+    response_path = folder / state["response"]["path"]
+    try:
+        request = read_document(response_path.parent / REQUEST_NAME, RUN_SCHEMA, "run_request")
+        response = read_document(response_path, RUN_SCHEMA, "run_response")
+        run = RunResult(state["outcome"], response, response_path, response_path.parent / STATE_RECORD_NAME)
+        if state["outcome"] == "succeeded":
+            if response["export"]["artifact"]["sha256"] != state["export"]["sha256"]:
+                raise Rejection("artifact_hash_mismatch", f"The export of state {k} is not the one of the walk result.")
+            run.export_path = response_path.parent / response["export"]["artifact"]["path"]
+            if values:
+                run.values = check_response(request, response, response_path.parent)
+    except Rejection as rejection:
+        raise Rejection("walk_mismatch", f"State {k} of the walk is not readable: {rejection.message}") from None
+    return run, request
+
+
 def walk_changes(walk: WalkFolder, prepared: Prepared, target: Target) -> list[tuple[list[str], list[str]]]:
     """Per step of the walk: its revisions and the target quantities it changes, recomputed from the
     state exports of the walk folder under the tolerance of the walk, without a run."""
@@ -297,15 +341,8 @@ def walk_changes(walk: WalkFolder, prepared: Prepared, target: Target) -> list[t
     states = {state["state"]: state for state in result["states"]}
 
     def read(k: int) -> CheckedRun:
-        response_path = folder / states[k]["response"]["path"]
-        try:
-            request = read_document(response_path.parent / REQUEST_NAME, RUN_SCHEMA, "run_request")
-            response = read_document(response_path, RUN_SCHEMA, "run_response")
-            if response["export"]["artifact"]["sha256"] != states[k]["export"]["sha256"]:
-                raise Rejection("artifact_hash_mismatch", f"The export of state {k} is not the one of the walk result.")
-            return CheckedRun(response, check_response(request, response, response_path.parent))
-        except Rejection as rejection:
-            raise Rejection("walk_mismatch", f"State {k} of the walk is not readable: {rejection.message}") from None
+        run, _ = read_walk_state(folder, states[k], values=True)
+        return CheckedRun(run.response, run.values)
 
     changes = []
     previous = None
@@ -332,8 +369,11 @@ def missed(changes: list[tuple[list[str], list[str]]], contributions: list[dict]
 
 def search(older_record: Path | str, newer_record: Path | str, output: Path | str, engine: Engine,
            repositories: Path | None = None, tolerance: Path | str | None = None, quantities=(),
-           periods: str | None = None, walk: Path | str | None = None) -> SearchResult:
-    """Search the history between two recorded runs and write the search result into ``output``."""
+           periods: str | None = None, walk: Path | str | None = None, reuse: bool = False) -> SearchResult:
+    """Search the history between two recorded runs and write the search result into ``output``.
+    With ``reuse``, the switch reuse_walk, every state is taken from the copy of ``walk``."""
+    if reuse and walk is None:
+        raise UsageError("the switch --reuse-walk takes the states from a walk folder and needs --walk")
     output = Path(output).resolve()
     repositories = repositories_folder(repositories)
     if output.exists():
@@ -351,12 +391,14 @@ def search(older_record: Path | str, newer_record: Path | str, output: Path | st
     n = len(prepared.ids)
 
     with new_folder(output):
+        switches = sorted([REUSE_WALK] if reuse else [])
         state = _Search(output, engine, repositories, prepared,
-                        f"search-{older.request['run_id']}-{newer.request['run_id']}", target)
+                        f"search-{older.request['run_id']}-{newer.request['run_id']}", target,
+                        reference.result["states"] if reuse else None)
         state.setup(tolerance)
         further = []
         head = {"document": "search_result", "contract_version": CONTRACT_VERSION, "stage": prepared.stage,
-                "search_id": state.prefix}
+                "search_id": state.prefix, **({"switches": switches} if switches else {})}
         if reference is not None:
             copy_files(reference.folder, output / WALK_FOLDER, reference.files)  # byte copies, in their layout
             copied = output / WALK_FOLDER / WALK_RESULT_NAME
@@ -375,8 +417,10 @@ def search(older_record: Path | str, newer_record: Path | str, output: Path | st
             "remainder": prepared.manifest["history"]["remainder"],
             "ends": {"zero": zero, "n": last}, "states": states, "target": target.document(),
             "intervals": state.intervals, "contributions": sorted(state.found, key=lambda e: e["from_state"]),
-            "runs": {"walk": n + 1, "search": len(states), "saved": n + 1 - len(states)},
         }
+        reused = sum(1 for entry in states if entry.get("reused"))
+        ran = len(states) - reused
+        result["runs"] = {"walk": n + 1, "search": ran, "saved": n + 1 - ran, **({"reused": reused} if reuse else {})}
         if changes is not None:
             # A search that stops judges no interval; it names no missed contribution.
             searched = zero["outcome"] == last["outcome"] == "reproduced"
@@ -385,5 +429,5 @@ def search(older_record: Path | str, newer_record: Path | str, output: Path | st
         result_path = output / RESULT_NAME
         write_document(result_path, result, LOCALISE_SCHEMA)
         outcome = "searched" if zero["outcome"] == last["outcome"] == "reproduced" else "stopped"
-        record_path = state.write_record(outcome, result_path, tolerance, further)
+        record_path = state.write_record(outcome, result_path, tolerance, further, switches)
     return SearchResult(result, result_path, record_path)

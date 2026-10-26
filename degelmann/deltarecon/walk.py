@@ -328,20 +328,24 @@ class States:
             entry["export"] = artifact_reference(self.output, run.export_path)
         self.states.append(entry)
         if run.outcome != "succeeded":
-            response = run.response
-            if run.outcome == "failed":
-                diagnostic = Rejection("model_point_failed", "A model point of the state could not be calculated.",
-                                       model_point_ids=sorted({point["model_point_id"]
-                                                               for point in response["failed_model_points"]}))
-                diagnostic = diagnostic.diagnostic()
-            else:
-                diagnostic = response["diagnostics"][0]
-            finding = {"code": "state_did_not_run", "message": self.carried(k, run.outcome), "state": k}
-            if k:
-                finding["revisions"] = [self.ids[k - 1]]
-            finding["diagnostic"] = diagnostic
-            self.findings.append(finding)
+            self.did_not_run(k, run)
         return run, request
+
+    def did_not_run(self, k: int, run: RunResult) -> None:
+        """The finding ``state_did_not_run`` of state ``k``, built from the response of its run."""
+        response = run.response
+        if run.outcome == "failed":
+            diagnostic = Rejection("model_point_failed", "A model point of the state could not be calculated.",
+                                   model_point_ids=sorted({point["model_point_id"]
+                                                           for point in response["failed_model_points"]}))
+            diagnostic = diagnostic.diagnostic()
+        else:
+            diagnostic = response["diagnostics"][0]
+        finding = {"code": "state_did_not_run", "message": self.carried(k, run.outcome), "state": k}
+        if k:
+            finding["revisions"] = [self.ids[k - 1]]
+        finding["diagnostic"] = diagnostic
+        self.findings.append(finding)
 
     def checked(self, run: RunResult, request: dict) -> CheckedRun:
         """The checked values of a state. The values the run holds in memory are taken from it, so
@@ -413,9 +417,9 @@ class States:
         return entries
 
     def write_record(self, outcome: str, result_path: Path, tolerance: Path | str | None,
-                     further_inputs: list[dict] = ()) -> Path:
+                     further_inputs: list[dict] = (), switches: list[str] = ()) -> Path:
         """The run record of the procedure: the two recorded runs as copied, the tolerance file, the
-        manifest, the result, and every comparison kept."""
+        manifest, the result, every comparison kept, and the opt-in switches that were on."""
         output = self.output
         inputs = [{"role": "older_record",
                    "artifact": artifact_reference(output, self.recorded_files(self.older, OLDER)[1])},
@@ -428,7 +432,8 @@ class States:
                    {"role": "result", "artifact": artifact_reference(output, result_path)}]
         outputs += [{"role": "compare_result", "artifact": artifact_reference(output, path)}
                     for path in self.compares]
-        record = run_record(self.stage, self.procedure, outcome, inputs, list(self.prepared.releases), [], outputs)
+        record = run_record(self.stage, self.procedure, outcome, inputs, list(self.prepared.releases), [], outputs,
+                            switches)
         record_path = output / self.record_name
         write_document(record_path, record, RECORD_SCHEMA)
         return record_path

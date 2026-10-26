@@ -43,6 +43,13 @@
             }
           }
         },
+        "switches": {
+          "description": "The opt-in switches that were on for the procedure, by name; absent when none was on.",
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": { "enum": ["reuse_walk"] }
+        },
         "outcome": {
           "type": "string",
           "pattern": "^[a-z][a-z0-9_]*$"

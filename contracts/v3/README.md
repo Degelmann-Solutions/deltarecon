@@ -126,9 +126,12 @@ Reader rule for documents of versions 1.0 and 2.0:
 
 ### Changes from 2.0
 
-Version 3.0 changes the versions a reader accepts and adds computation paths to
-the release identity. Its documents differ from 2.0 in `contract_version` only;
-no schema changes.
+Version 3.0 changes the versions a reader accepts, adds computation paths to
+the release identity, and adds the opt-in switch `reuse_walk` of the search. A
+document written without a switch differs from 2.0 in `contract_version` only.
+The schemas change for the switch alone: they gain optional members, a search
+under the switch may report 0 runs of its own, and the search result ties these
+members to the switch, as listed below.
 
 What changes in the versions a reader accepts:
 
@@ -149,6 +152,20 @@ What computation paths add:
   request chooses the path, and a run never falls back to another one. A state
   of a walk or a search names the release identity of the older result on the
   computation path of the older result, see [localise.md](localise.md#walk).
+
+What the switch `reuse_walk` adds:
+
+- A search checked against a walk may take every state it needs from the walk
+  instead of running it, see
+  [localise.md](localise.md#reuse-of-the-walks-states). A reused state is no
+  run and is named as such.
+- `localise.schema.json`: the search result has the optional member `switches`;
+  under `reuse_walk` it requires `walk` and `runs.reused`, and `runs.search` may
+  be 0; without the switch `runs.search` is at least 1, as before, and neither
+  `runs.reused` nor a state with `reused` is allowed. A state of the search
+  result may carry `reused` (`true`), in the new definition `search_state`; the
+  walk's `state` is `search_state` without `reused`.
+- `run-record.schema.json`: the run record has the optional member `switches`.
 
 The 2.0 pack: [README](../v2/README.md), [run](../v2/run.md),
 [changes](../v2/changes.md), [compare](../v2/compare.md),

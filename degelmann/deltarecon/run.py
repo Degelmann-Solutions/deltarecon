@@ -478,11 +478,13 @@ def recorded_now() -> str:
 
 
 def run_record(stage: str, procedure: str, outcome: str, inputs: list[dict], releases: list[dict],
-               parameters: list[dict], outputs: list[dict]) -> dict:
-    """The run record of one execution of ``procedure``, with a new record id and the present time."""
+               parameters: list[dict], outputs: list[dict], switches: list[str] = ()) -> dict:
+    """The run record of one execution of ``procedure``, with a new record id and the present time.
+    ``switches`` are the opt-in switches that were on, by name; the member is absent when none was on."""
     return {
         "document": "run_record", "contract_version": CONTRACT_VERSION, "stage": stage,
         "record_id": new_record_id(), "procedure": {"type": procedure},
+        **({"switches": sorted(switches)} if switches else {}),
         "outcome": outcome, "recorded_at": recorded_now(), "inputs": inputs,
         "releases": releases, "parameters": parameters, "outputs": outputs,
     }
