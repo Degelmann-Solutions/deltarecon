@@ -42,12 +42,12 @@ def _step(command: str, needs: tuple[str, ...] = (), expect: int = 0) -> dict:
 
 # The quick-start commands of the README, verbatim and in order; tests/test_measure.py keeps them in sync.
 STEPS: dict[str, dict] = {
-    "request": _step("uv run deltarecon request --revision b64334e09613c45a7a12468dfddc0d9ec47819bb --label N "
+    "request": _step("uv run deltarecon request --revision fa368575a66d97c94e96dffc62b273ec95511b12 --label N "
                      "--run-id run-n-full --output runs/n-full/request.json"),
     "run": _step("uv run deltarecon run runs/n-full/request.json", ("request",)),
     "replay": _step("uv run deltarecon replay runs/n-full/run-record.json", ("run",)),
     "regression": _step("uv run deltarecon regression runs/n-full/run-record.json "
-                        "--revision ab5dc790f5bed52f94a4c8fb8d6b710bc31f0a33 --output runs/regression-n",
+                        "--revision 887b7181d22550eda2fb52fa1a6bd77376d4eb2e --output runs/regression-n",
                         ("run",), expect=1),
     "derive": _step("uv run deltarecon derive runs/n-full/run-record.json runs/regression-n/run/run-record.json "
                     "--output runs/changes.json", ("run", "regression")),

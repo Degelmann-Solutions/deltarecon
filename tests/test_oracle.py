@@ -2,15 +2,23 @@
 of its walk result and of every signature table it writes, under contract version 3.0, and the
 archive of the oracle of 2026-10-22, published under contract version 2.0.
 
+The reference walk runs from the start commit of the reference chain of ``delib-history``, which
+holds release N on the fixed model, to the newer revision: 32 commits on the main line. The archived
+oracle walked the earlier chain from release N to ``ab5dc79``, whose first 32 commits the new chain
+repeats one by one on the fixed model; its last three commits changed no result.
+
 The fast tests check the published files: the renewed requests are those of the archive with
-contract version 3.0 and the engine version of the export path under Python 3.14.9, and the
-archived files stay well formed. The reproduction runs both requests and the walk on all 350 model points,
-and is skipped unless it is asked for:
-``DELTARECON_ORACLE=1``. Besides the renewed hashes it checks that every signature table, with its
-contract version set back to the archived ``2.0``, hashes to the archived digest: the tables are the
-archived ones, field for field, apart from ``contract_version``. The archived walk result is not
-compared, because it holds the hashes of the 2.0 responses. The pinned hashes are never rewritten
-to make a test pass.
+contract version 3.0, the engine version of the export path under Python 3.14.9, and the two ends of
+the new chain in place of release N and ``ab5dc79``, and the archived files stay well formed. The
+reproduction runs both requests and the walk on all 350 model points, and is skipped unless it is
+asked for: ``DELTARECON_ORACLE=1``. Besides the renewed hashes it checks that every signature table,
+with its contract version set back to the archived ``2.0``, hashes to the archived digest: the tables
+are the archived ones, field for field, apart from ``contract_version``. This holds across the move to
+the new chain because the fixes keep every result bit for bit, so state k of the new chain gives the
+bits of state k of the earlier chain, and the step numbers, run ids and labels are unchanged; a
+signature table names no revision. The archived walk result is not compared, because it holds the
+hashes of the 2.0 responses and the revisions. The pinned hashes are never rewritten to make a test
+pass.
 """
 from __future__ import annotations
 
@@ -25,7 +33,7 @@ import pytest
 from degelmann.deltarecon.__main__ import main
 from degelmann.deltarecon.documents import RUN_SCHEMA, document_bytes, parse_document, read_document
 
-from conftest import CLONE, NEWER, RELEASE_N, REPOSITORIES, ROOT, git, require_clone
+from conftest import CLONE, NEWER, RELEASE_N, REPOSITORIES, ROOT, START, git, require_clone
 
 ORACLE = ROOT / "oracle"
 ARCHIVE = ORACLE / "archive" / "2026-10-22"
@@ -33,7 +41,10 @@ ARCHIVED_VERSION = "2.0"
 ENGINE_VERSION = "modelx 0.33.0 export, pandas 3.0.6, numpy 2.5.3, Python 3.14.9"
 ARCHIVED_ENGINE_VERSION = "modelx 0.33.0, pandas 3.0.6, numpy 2.5.3, Python 3.12.13"
 PROFILE = ROOT / "profiles" / "tolerance-bruttobeitrag.json"
-REQUESTS = {"n.request.json": ("oracle-n", "N", RELEASE_N), "n1.request.json": ("oracle-n1", "N+1", NEWER)}
+REQUESTS = {"n.request.json": ("oracle-n", "N", START), "n1.request.json": ("oracle-n1", "N+1", NEWER)}
+# The ends of the archived oracle, release N and the newer revision of the earlier chain.
+ARCHIVED_ENDS = {"n.request.json": RELEASE_N,
+                 "n1.request.json": "ab5dc790f5bed52f94a4c8fb8d6b710bc31f0a33"}
 WALK_RESULT = "walk.result.json"
 SUM_LINE = re.compile(r"([0-9a-f]{64})  (walk\.result\.json|step-[0-9]{2}\.compare\.signature-table\.json)")
 
@@ -55,8 +66,8 @@ def tables(hashes: dict[str, str]) -> dict[str, str]:
     return {name: digest for name, digest in hashes.items() if name != WALK_RESULT}
 
 
-def check_request(request: dict, name: str, engine_version: str) -> None:
-    run_id, label, revision = REQUESTS[name]
+def check_request(request: dict, name: str, engine_version: str, revision: str) -> None:
+    run_id, label, _ = REQUESTS[name]
     assert request["run_id"] == run_id and request["release"]["label"] == label
     assert request["changes"] == {"enabled": []} and request["selection"] == {"mode": "full"}
     references = {reference["kind"]: reference["value"] for reference in request["release"]["references"]}
@@ -70,15 +81,17 @@ def check_request(request: dict, name: str, engine_version: str) -> None:
 def test_published_request_is_a_3_0_run_request_of_its_pinned_revision(name):
     request = read_document(ORACLE / name, RUN_SCHEMA, "run_request")
     assert request["contract_version"] == "3.0"
-    check_request(request, name, ENGINE_VERSION)
+    check_request(request, name, ENGINE_VERSION, REQUESTS[name][2])
 
 
 @pytest.mark.parametrize("name", sorted(REQUESTS))
-def test_published_request_is_the_archived_one_but_for_the_contract_and_engine_version(name):
+def test_published_request_is_the_archived_one_but_for_the_contract_and_engine_version_and_the_revision(name):
     published = parse_document((ORACLE / name).read_bytes())
     archived = parse_document((ARCHIVE / name).read_bytes())
-    renewed = parse_document(
-        (ARCHIVE / name).read_bytes().replace(ARCHIVED_ENGINE_VERSION.encode(), ENGINE_VERSION.encode()))
+    archived_bytes = (ARCHIVE / name).read_bytes()
+    assert archived_bytes.count(ARCHIVED_ENDS[name].encode()) == 3
+    renewed = parse_document(archived_bytes.replace(ARCHIVED_ENGINE_VERSION.encode(), ENGINE_VERSION.encode())
+                             .replace(ARCHIVED_ENDS[name].encode(), REQUESTS[name][2].encode()))
     assert renewed != archived
     assert {**published, "contract_version": ARCHIVED_VERSION} == renewed
     assert (ORACLE / name).read_bytes() == document_bytes({**renewed, "contract_version": "3.0"})
@@ -88,13 +101,13 @@ def test_published_request_is_the_archived_one_but_for_the_contract_and_engine_v
 def test_archived_request_is_a_2_0_run_request_of_its_pinned_revision(name):
     request = read_document(ARCHIVE / name, RUN_SCHEMA, "run_request")
     assert request["contract_version"] == ARCHIVED_VERSION
-    check_request(request, name, ARCHIVED_ENGINE_VERSION)
+    check_request(request, name, ARCHIVED_ENGINE_VERSION, ARCHIVED_ENDS[name])
 
 
-def test_newer_revision_lies_on_the_main_line_after_release_n():
+def test_newer_revision_lies_on_the_main_line_32_commits_after_the_start():
     require_clone(CLONE, NEWER)
-    assert RELEASE_N in git(CLONE, "rev-list", "--first-parent", NEWER).decode("ascii").split()
-    assert len(git(CLONE, "rev-list", "--first-parent", f"{RELEASE_N}..{NEWER}").split()) == 35
+    assert START in git(CLONE, "rev-list", "--first-parent", NEWER).decode("ascii").split()
+    assert len(git(CLONE, "rev-list", "--first-parent", f"{START}..{NEWER}").split()) == 32
 
 
 @pytest.mark.parametrize("folder", [ORACLE, ARCHIVE], ids=["published", "archived"])
