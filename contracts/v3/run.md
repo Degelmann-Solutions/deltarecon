@@ -33,16 +33,20 @@ Schemas: [schemas/run.schema.json](schemas/run.schema.json) and
 | `changes.manifest` | The change manifest the ids refer to, see [changes.md](changes.md). Required when a change is enabled. |
 | `changes.hold` | Optional. The kinds of release reference the engine takes from `release` while changes of the type `revision` are enabled, see [changes.md](changes.md#revision-profile). Without it nothing is held. |
 | `selection` | The model points to run, see below. |
+| `target` | Optional. The quantities and projection periods of a [target-only run](#target-only-run). |
 
-A request asks for all quantities the engine exports for the stage, for every
-period of every selected model point. Which quantities these are is the
-engine's declaration in the response, see rule 7. Version 3 has no member to
-choose quantities or periods.
+A request without `target` asks for all quantities the engine exports for the
+stage, for every period of every selected model point. Which quantities these
+are is the engine's declaration in the response, see rule 7. A request with
+`target` asks for the target alone, see [Target-only run](#target-only-run).
 
-Schema assertions: all members above are present; `contract_version` is `3.0`;
+Schema assertions: all members above but `changes.hold` and `target` are
+present; `contract_version` is `3.0`;
 the references are not empty; the enabled ids are distinct; the manifest is
 present when a change is enabled; `changes.hold`, when present, names at least
-one kind and no kind twice.
+one kind and no kind twice; `target`, when present, names at least one quantity
+and no quantity twice, and its `periods`, when present, hold `first` and `last`,
+two integers of at least 0.
 
 Reader rules for the engine:
 
@@ -82,6 +86,59 @@ Reader rules for the engine:
    are applied. Otherwise the engine rejects the whole request with
    `unknown_model_point` and names the unknown ids. It does not run the others.
 
+## Target-only run
+
+A request may name a target. The run is then a target-only run: the engine
+computes the target and nothing else.
+
+```json
+"target": { "quantities": ["Bruttobeitrag"], "periods": { "first": 0, "last": 59 } }
+```
+
+| Member | Meaning |
+|---|---|
+| `target.quantities` | The quantities to compute, by name. |
+| `target.periods` | Optional. The first and the last projection period to compute, both inclusive. Projection period 0 is the valuation date of a model point, see [domain/liability_cashflow.md](domain/liability_cashflow.md#time-basis). Without it every period of a model point is computed. |
+
+Reader rules for the engine:
+
+- With the schema assertions, before the stage and the release are checked: a
+  target whose `periods.first` is greater than its `periods.last` is rejected
+  with `schema_violation`.
+- After rule 5, first: every target quantity is a quantity the engine declares
+  for the stage. Otherwise the engine rejects the request with
+  `unknown_quantity`.
+- After rule 5, then: an engine that cannot compute a target rejects the request
+  with `target_not_supported`.
+
+What a target-only run computes:
+
+- The quantities of the response are the target quantities, in the order the
+  engine declares them.
+- The export holds, per model point p, its target window: the periods a run
+  without a target exports for p whose projection period, see
+  [compare.md](compare.md#alignment), lies from `first` to `last`; without
+  `periods` every one of them. The values are those a run without a target
+  exports for these coordinates. On a time basis whose origin is the issue
+  date, such as `policy_month`, with s_p the period of the valuation date of p,
+  the first period a run without a target exports for p, and e_p its last
+  period, the window is s_p + `first` to the lesser of s_p + `last` and e_p.
+- A model point whose window is empty, for example because s_p + `first` is
+  greater than e_p, is not computed. It is absent from `model_points` and from the export.
+  `model_points` may then be empty and `export.data_rows` 0, with an export that
+  holds the header alone. The schema allows this only for a response that
+  carries `target`.
+- The engine evaluates no model check. A model point fails only when a value of
+  its target window cannot be calculated or is not a finite number.
+- Every response that repeats the members of the request, `succeeded`,
+  `failed`, and `error`, also repeats `target`, unchanged.
+
+On a time basis whose origin is the issue date a target window starts at
+s_p + `first` and is never clipped there, so a reader finds the valuation date
+of a point of a target-only run as its first exported period less `first`, see
+[compare.md](compare.md#alignment). The run record of
+a target-only run is that of every run.
+
 ## Run response
 
 A response has one of four outcomes.
@@ -118,6 +175,7 @@ A response with the outcome `succeeded`:
 | Member | Meaning |
 |---|---|
 | `stage`, `run_id`, `release`, `changes`, `selection` | Repeated from the request, unchanged. |
+| `target` | Repeated from the request, unchanged, when the request carries it. |
 | `time_basis` | The declared time basis, by the identifier of the domain reference. |
 | `quantities` | The quantities the engine exports, with their units, in export column order. |
 | `model_points` | Every exported model point with its first and last period, both inclusive. |
@@ -154,8 +212,10 @@ A caller accepts a response with the outcome `succeeded` only as a whole.
 Reader rules for the caller:
 
 6. The response repeats the stage, run id, release identity, change set, and
-   selection of the request. A different stage is rejected with `stage_mismatch`,
-   any other difference with `request_mismatch`.
+   selection of the request, and its `target` when the request carries one; a
+   response that carries a `target` the request does not is a difference. A
+   different stage is rejected with `stage_mismatch`, any other difference with
+   `request_mismatch`.
 7. Every declared quantity name is a name the domain reference of the stage
    defines, no name is declared twice, and the names stand in the order of the
    domain reference. An engine may export a subset of the quantities, with at
@@ -174,15 +234,21 @@ Reader rules for the caller:
     changes are applied. The documents do not list the model points of a
     release, so a caller can detect an omission in a full run only if it knows
     that set from another source; it then applies the same two diagnostics.
+    Under `target` a selected model point without a period in its target window
+    is absent and is not `missing_coordinate`.
 11. No model point id occurs twice in `model_points`, and `first_period` is not
     greater than `last_period`. Otherwise the caller rejects with
     `inconsistent_response`.
 12. The export holds exactly one row for every period from `first_period` to
     `last_period` of every model point in `model_points`, and no other row. A
     repeated key is rejected with `duplicate_coordinate`, an absent row with
-    `missing_coordinate`, a further row with `unrequested_coordinate`.
+    `missing_coordinate`, a further row with `unrequested_coordinate`. Under
+    `target` the range of a model point is its target window, every period of
+    it; with `periods` a range of more than `last` - `first` + 1 periods holds
+    rows outside the window and is rejected with `unrequested_coordinate`.
 13. `export.data_rows` equals the number of rows the ranges in `model_points`
-    add up to. Otherwise the caller rejects with `inconsistent_response`.
+    add up to: under `target` the number of periods of every target window in
+    `model_points`, which may be 0. Otherwise the caller rejects with `inconsistent_response`.
 14. If any rule fails, the caller rejects the whole result. It keeps no rows of
     it: there is no successful partial result.
 
@@ -231,8 +297,8 @@ request names, the run ends with the outcome `error`:
 }
 ```
 
-- The response repeats `stage`, `run_id`, `release`, `changes`, and `selection`
-  of the request, as a failed response does, and carries `diagnostics` in place
+- The response repeats `stage`, `run_id`, `release`, `changes`, `selection`,
+  and `target` when present of the request, as a failed response does, and carries `diagnostics` in place
   of `failed_model_points`. It carries no export.
 - `diagnostics` holds one entry with one of three codes:
 
@@ -306,7 +372,7 @@ envelope for every deterministic procedure, not only for a stage run:
 |---|---|
 | `record_id` | The identifier of this execution of the procedure: `record-` followed by a random UUID of version 4 in lower-case hexadecimal, as in the example. The writer generates it anew for every execution of every procedure and never repeats it. |
 | `procedure.type` | The procedure that ran. Version 3 registers `run`, `compare`, `walk`, and `search`, see [localise.md](localise.md#run-record-of-a-walk) and [localise.md](localise.md#run-record-of-a-search). Other procedures use their own type name. |
-| `switches` | Optional: the opt-in switches that were on for the procedure, by name and in name order; absent when none was on. Version 3 registers `reuse_walk` of the search, see [localise.md](localise.md#reuse-of-the-walks-states). |
+| `switches` | Optional: the opt-in switches that were on for the procedure, by name and in name order; absent when none was on. Version 3 registers `reuse_walk` and `target_only` of the search, see [localise.md](localise.md#reuse-of-the-walks-states) and [localise.md](localise.md#target-only-inner-states). |
 | `outcome` | The outcome the procedure reported. |
 | `recorded_at` | Optional time of recording, in UTC. It is information only and is never compared. |
 | `inputs` | The documents handed to the procedure, each with a role and a byte hash. |

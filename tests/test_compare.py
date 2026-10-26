@@ -326,6 +326,29 @@ def test_alignment_is_built_once_and_never_applied_twice():
     assert align(unknown) is unknown
 
 
+def test_a_target_only_run_is_aligned_from_its_first_target_period():
+    """A window of the target 12-14 starts 12 periods after the valuation date: 156 is projection period 12."""
+    from degelmann.deltarecon.compare import align
+    response = {"quantities": [{"name": COUNT, "unit": "policies"}], "time_basis": {"id": "policy_month"},
+                "target": {"quantities": [COUNT], "periods": {"first": 12, "last": 14}}}
+    run = CheckedRun(response, {("P", 156): [1.0], ("P", 157): [2.0], ("P", 158): [3.0], ("Q", 12): [4.0]})
+    assert align(run).values == {("P", 12): [1.0], ("P", 13): [2.0], ("P", 14): [3.0], ("Q", 12): [4.0]}
+    whole = CheckedRun({**response, "target": {"quantities": [COUNT]}}, {("P", 144): [1.0], ("P", 145): [2.0]})
+    assert align(whole).values == {("P", 0): [1.0], ("P", 1): [2.0]}
+
+
+def test_two_target_only_runs_are_compared_on_projection_periods(world):
+    """MP-A starts at month 12 in the left run and at 24 in the right one; the target 1-1 pairs months 13 and 25."""
+    target = {"quantities": [COUNT], "periods": {"first": 1, "last": 1}}
+    run_side(world, "left", target=target)
+    right = run_side(world, "right", POINTS.replace("MP-A,12,13,1.5", "MP-A,24,25,1.5"), target=target)
+    assert {p["model_point_id"]: p["first_period"] for p in right.response["model_points"]}["MP-A"] == 25
+    assert main(["compare", str(compare_request(world))]) == 0
+    result = stored(world / "compare.result.json")
+    assert result["outcome"] == "compared" and result["added"] == result["removed"] == []
+    assert result["quantities"] == [{"name": COUNT, "unit": "policies"}] and result["compared_coordinates"] == 3
+
+
 VALUES = [0.0, 1.0, -1.0, 0.125, -0.125, 2.675, 0.6949, 0.6951, 0.6972, 0.6974, 1234.5, 1e-5, 1e16,
           0.1 + 0.2, 0.3, 100.0, 100.25, -38.5, -32.5, 5e-324, 123456.789]
 ENTRIES = [None, entry(), entry(upper=(0.25, 0)), entry(lower=(0.25, 0)), entry(upper=(0, 0.01), lower=(0, 0.2)),

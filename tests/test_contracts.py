@@ -349,6 +349,31 @@ def test_a_request_may_name_held_kinds(changes, valid):
     assert (not list(validator("run.schema.json").iter_errors(request))) == valid
 
 
+@pytest.mark.parametrize("target, valid", [
+    ({"quantities": ["Bruttobeitrag"], "periods": {"first": 0, "last": 59}}, True),
+    ({"quantities": ["Bruttobeitrag"]}, True),
+    ({"quantities": []}, False),
+    ({"quantities": ["Bruttobeitrag", "Bruttobeitrag"]}, False),
+    ({"quantities": ["Bruttobeitrag"], "periods": {"first": -1, "last": 59}}, False),
+    ({"quantities": ["Bruttobeitrag"], "periods": {"first": 0}}, False),
+    ({"quantities": ["Bruttobeitrag"], "offset": 0}, False),
+])
+def test_a_request_may_name_a_target(target, valid):
+    request = json.loads((EXAMPLES / "reference" / "full-run.request.json").read_text("utf-8"))
+    request["target"] = target
+    assert (not list(validator("run.schema.json").iter_errors(request))) == valid
+
+
+def test_a_response_without_a_model_point_is_valid_under_a_target_only():
+    response = json.loads((EXAMPLES / "reference" / "full-run.response.json").read_text("utf-8"))
+    empty = {**response, "model_points": [], "export": {**response["export"], "data_rows": 0}}
+    assert list(validator("run.schema.json").iter_errors(empty))
+    assert not list(validator("run.schema.json").iter_errors({**empty, "target": {"quantities": ["Bruttobeitrag"]}}))
+    for switches, valid in ((["reuse_walk", "target_only"], True), (["target_only"], True), (["walk_only"], False)):
+        record = json.loads((EXAMPLES / "reference" / "full-run.run-record.json").read_text("utf-8"))
+        assert (not list(validator("run-record.schema.json").iter_errors({**record, "switches": switches}))) == valid
+
+
 def walk_example() -> dict:
     return json.loads((EXAMPLES / "walk" / "walk.result.json").read_text("utf-8"))
 

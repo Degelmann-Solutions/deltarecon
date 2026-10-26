@@ -309,8 +309,8 @@ class States:
         return (f"State {k} ended with the outcome {outcome}; its revisions are carried "
                 "by the next state that runs.")
 
-    # One state: a normal run of the run contract in a folder of its own.
-    def run_state(self, k: int) -> tuple[RunResult, dict]:
+    # One state: a normal run of the run contract in a folder of its own; with ``target`` a target-only run.
+    def run_state(self, k: int, target: dict | None = None) -> tuple[RunResult, dict]:
         folder = self.output / self.name(k)
         folder.mkdir()
         enabled, hold = self.state_changes(k)
@@ -321,7 +321,7 @@ class States:
             if hold:
                 changes["hold"] = hold
         request = run_request_document(self.stage, f"{self.prefix}-state-{k}", self.base, changes,
-                                       self.older.request["selection"], f"the request of state {k}")
+                                       self.older.request["selection"], f"the request of state {k}", target)
         write_new(folder / REQUEST_NAME, document_bytes(request))
         run = run_request(folder / REQUEST_NAME, self.engine, self.repositories)
         entry = {"state": k, **({"revision": self.ids[k - 1]} if k else {}), "run_id": request["run_id"],
@@ -356,13 +356,17 @@ class States:
         return CheckedRun(run.response, check_response(request, run.response, run.response_path.parent, values))
 
     # A comparison the procedure keeps, written at the root of the folder. ``runs`` are the two
-    # sides, already checked, so that the comparison does not read their exports again.
-    def write_compare(self, prefix: str, compare_id: str, left: tuple[Path, Path],
-                      right: tuple[Path, Path],
-                      runs: tuple[CheckedRun, CheckedRun] | None = None) -> CompareResult:
-        request = compare_request_document(
-            self.stage, compare_id, tuple(artifact_reference(self.output, path) for path in left),
-            tuple(artifact_reference(self.output, path) for path in right), self.profile)
+    # sides, already checked, so that the comparison does not read their exports again. A side
+    # without a run record names its response alone; ``profile`` replaces the tolerance profile.
+    def write_compare(self, prefix: str, compare_id: str, left: tuple[Path, Path | None],
+                      right: tuple[Path, Path | None],
+                      runs: tuple[CheckedRun, CheckedRun] | None = None,
+                      profile: dict | None = None) -> CompareResult:
+        def side(paths: tuple[Path, Path | None]) -> tuple[dict, dict | None]:
+            return tuple(None if path is None else artifact_reference(self.output, path) for path in paths)
+
+        request = compare_request_document(self.stage, compare_id, side(left), side(right),
+                                           self.profile if profile is None else profile)
         request_path = self.output / f"{prefix}.request.json"
         write_document(request_path, request, COMPARE_REQUEST)
         compared = compare(request_path, result_name=f"{prefix}.result.json",

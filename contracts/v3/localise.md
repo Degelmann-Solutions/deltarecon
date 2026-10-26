@@ -253,7 +253,9 @@ walk. Its inputs and its checks before the first run are those of the walk, see
 [Before the first run](#before-the-first-run): two records, an optional tolerance
 profile, the same refusals, and the same held and moving kinds. Every state it
 runs is a state of the walk, run in the same way, with its own request,
-response, export, and run record.
+response, export, and run record. The one exception: under the switch
+`target_only` an inner state is run on the target alone, see
+[Target-only inner states](#target-only-inner-states).
 
 Known limit: the search does not see contributions that cancel within one
 interval. Two revisions whose effects on the target cancel, such as a revision
@@ -336,7 +338,9 @@ for the quantities in `differs` of the interval: among the quantities the
 interval is judged for, those its parent passes on, the ones for which its ends
 differ. The sums run over the coordinates of the target only and are computed
 exactly as in the walk on the restricted states. The comparison the search keeps
-for a contribution is that of the two full states, as evidence. Without a
+for a contribution is that of the two full states, as evidence; under the switch
+`target_only` it is that of the two states on the target only, see
+[Target-only inner states](#target-only-inner-states). Without a
 target, a contribution holds for each quantity with `contributes` true its row
 in the signature table of that comparison, when the row exists, and for a
 quantity with `contributes` false no row, as a step of the walk. This holds also
@@ -425,6 +429,49 @@ search ran itself and may be 0, `saved` is `walk` less `search`, and `reused`
 counts the reused states. The search result and the run record of the search
 name the switch in `switches`.
 
+### Target-only inner states
+
+A search with a narrowed target, a proper subset of the quantities or a range of
+periods, may be asked, with the opt-in switch `target_only`, to run its inner
+states on the target alone. Without a narrowed target the switch is a fault of
+the call: nothing runs and nothing is written. The switch may be combined with
+`reuse_walk`.
+
+- Every state 0 < k < n the search runs itself is a
+  [target-only run](run.md#target-only-run): its request carries the target of
+  the search as `target`, `quantities` and, when a range was asked for,
+  `periods`. The engine computes the target quantities in the target window of
+  each model point and evaluates no model check, so a state whose model check is
+  false still runs.
+- State 0 and state n are full runs with every check, as without the switch, and
+  are checked as the [ends](#ends). A state taken from the walk under
+  `reuse_walk` stays as the walk ran it, a full run.
+- The judgement of an interval is unchanged: both states restricted to the
+  target, see [Target](#target). A target-only run is aligned on projection
+  periods by its target, see [compare.md](compare.md#alignment), so a full state
+  and a target-only state restricted to the target hold the same coordinates.
+- The comparison kept for a contribution is on the target only. Its request
+  carries the tolerance profile with the entries of the target quantities only.
+  A side that is a target-only run is referenced by its response and run record.
+  A side that is a full state, an end or a reused state, is referenced by its
+  **target view**: the response and the export of the state restricted to the
+  target, as a target-only run of the state returns them. The view repeats the
+  members of the response of the state, its `run_id` included, carries `target`,
+  and holds the target quantities, the target window of each model point in the
+  periods of the time basis, and the rows of those windows; a point whose window
+  is empty is left out. It is written once per state, into the folder
+  `<state>.target/` at the root of the search folder, for example
+  `state-00.target/`, with `response.json`, `results.csv`, and, when the change
+  set names a manifest, a copy of `changes.json`. A view is derived and is no
+  run: it has no request and no run record, and the compare request names its
+  response alone, so that comparison has no parameter diff.
+- The checks of the ends stay comparisons of the full states.
+
+The halving, the intervals, the contributions and their sums, the findings, and
+`missed` follow the same rules as without the switch. `runs` counts the
+target-only runs as runs of the search. The search result and the run record of
+the search name the switch in `switches`.
+
 ### Reader rules of a walk folder
 
 A walk folder is the folder a walk writes, see [Walk](#walk). A reader of a walk
@@ -511,7 +558,7 @@ copies of the recorded runs, and the run record of the search are left out.
 | Member | Meaning |
 |---|---|
 | `search_id` | `search-<older run id>-<newer run id>`. It does not name the target; one folder holds one search. |
-| `switches` | The opt-in switches that were on, by name and in name order: `reuse_walk`, see [Reuse of the walk's states](#reuse-of-the-walks-states). Absent when no switch was on. |
+| `switches` | The opt-in switches that were on, by name and in name order: `reuse_walk`, see [Reuse of the walk's states](#reuse-of-the-walks-states), and `target_only`, see [Target-only inner states](#target-only-inner-states). Absent when no switch was on. |
 | `walk` | With a walk only: its `walk_id` and the copied walk result `walk/walk.result.json`, by artifact reference. |
 | `manifest`, `older`, `newer`, `tolerance`, `held`, `remainder`, `ends` | As in the walk result. |
 | `states` | Every state the search requested, in the form of the walk result. Under `reuse_walk` every state it took from the walk, with `reused` true, the walk's run id, and paths into `walk/`. |
@@ -524,7 +571,8 @@ copies of the recorded runs, and the run record of the search are left out.
 
 The search folder holds, like a walk folder, `changes.json`, `older/`,
 `newer/`, and `tolerance.json` when a file names the tolerance profile; one
-folder `state-<k>/` per state run, and none for a reused state; at the root the comparisons it keeps,
+folder `state-<k>/` per state run, and none for a reused state; under
+`target_only` one folder `state-<k>.target/` per target view; at the root the comparisons it keeps,
 `interval-<a>-<b>.compare.*` for a contribution and the checks of the ends as in
 the walk; `search.result.json` and `search.run-record.json`. With a walk, the
 folder `walk/` holds byte copies of `walk.result.json`, `walk.run-record.json`,
@@ -567,4 +615,5 @@ run records, as copied for the search, the tolerance file when there is one, and
 the copied walk result when there is a walk, as inputs; the manifest, the search
 result, and every compare result the search kept, as outputs; and the release
 identities of the older and the newer result, in this order. Under `reuse_walk`
-it names the switch in `switches`, see [run.md](run.md#run-record).
+or `target_only` it names the switches that were on in `switches`, see
+[run.md](run.md#run-record). A target view is no run and is not listed.
