@@ -75,7 +75,9 @@ With ``--walk FOLDER``, a walk folder of the same two records, it copies the wal
 ``walk/`` and names the contributions it missed. A search does not see contributions that
 cancel within one interval. A walk that does not attribute every revision or does not fit the
 search is refused with ``walk_not_attributed`` or ``walk_mismatch``, and nothing is written;
-an unknown quantity or an empty period range is a usage error.
+an unknown quantity or an empty period range is a usage error. ``--reuse-walk`` (with ``--walk``
+only) takes every state the search needs from the copied walk instead of running it, with the
+same findings; a reused state is no run, and the result and the run record name the switch.
 
 ``run``, ``replay``, ``regression``, ``walk``, and ``search`` project the model points of each
 state in ``--workers N`` worker processes, else as many as ``DELTARECON_WORKERS`` names, else
@@ -384,7 +386,7 @@ def command_search(args) -> int:
     try:
         done = search(Path(args.older_record), Path(args.newer_record), Path(args.output), state_engine(args),
                       args.repositories, args.tolerance, args.quantity, args.periods,
-                      Path(args.walk) if args.walk else None)
+                      Path(args.walk) if args.walk else None, args.reuse_walk)
     except Rejection as rejection:  # refused before the first run; nothing is written
         print("search: rejected")
         print_diagnostic(rejection.diagnostic())
@@ -396,7 +398,8 @@ def command_search(args) -> int:
         print(line.encode(encoding, "replace").decode(encoding, "replace"))
 
     runs = result["runs"]
-    say(f"search: {'searched' if done.searched else 'stopped'}; {runs['search']} states run, "
+    reused = f"{runs['reused']} reused from the walk, " if "reused" in runs else ""
+    say(f"search: {'searched' if done.searched else 'stopped'}; {runs['search']} states run, {reused}"
         f"{runs['walk']} for a walk, {runs['saved']} saved")
     ends = result["ends"]
     say(f"state {ends['zero']['state']} against the older record: {ends['zero']['outcome'].replace('_', ' ')}")
@@ -495,6 +498,8 @@ def main(argv: list[str] | None = None) -> int:
                              "without it every period")
     halver.add_argument("--walk", metavar="FOLDER",
                         help="a walk folder of the same two records to check the search against")
+    halver.add_argument("--reuse-walk", action="store_true",
+                        help="take every state from the walk folder instead of running it; needs --walk")
     halver.set_defaults(handler=command_search)
 
     for command in (again, regress, stepper, halver):

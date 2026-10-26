@@ -356,7 +356,9 @@ interaction lands on the later one.
 
 A walk requests every state, n + 1 runs. The search reports the states it
 requested, including those that did not run, and the runs it saved: n + 1 less
-its own runs. The runs saved are reported with and without a walk.
+its own runs. The runs saved are reported with and without a walk. A state taken
+from the walk under the switch `reuse_walk` is not one of its own runs, see
+[Reuse of the walk's states](#reuse-of-the-walks-states).
 
 ### Check against a walk
 
@@ -389,6 +391,40 @@ Before anything runs, the search reads the walk folder under the
   [environment rule](#same-environment).
 
 A refused search writes nothing.
+
+### Reuse of the walk's states
+
+A search checked against a walk may be asked, with the opt-in switch
+`reuse_walk`, to take every state it needs from the walk instead of running it.
+The switch needs a walk; without one it is a fault of the call, and nothing runs
+and nothing is written. A walk the search refuses, see
+[Check against a walk](#check-against-a-walk), is refused under the switch as
+well, before anything runs.
+
+The switch changes no value. The environment rule, see
+[Same environment](#same-environment), has established before anything runs that
+every state of the walk ran on the request the search would send on the present
+engine. A state of the walk is therefore the run the search would make, and
+reading it instead of running it changes only who ran it.
+
+A **reused** state is no run of the search. It is read from the copy of the walk
+under `walk/` in the search folder: its request `request.json`, its response,
+and, when it succeeded, its export, which must be the one the walk result names.
+It gets no folder `state-<k>/` of the search and no request is sent for it. Its
+entry in `states` keeps the walk's `run_id`, `outcome`, `response`, and `export`,
+with paths into `walk/`, and carries `reused` with the value `true`. A reused
+state that did not succeed in the walk is a state that did not run: it gives the
+finding `state_did_not_run` with the diagnostic of the walk's response, and the
+search goes on as for a state it ran that did not run, see
+[Halving](#halving).
+
+The halving, the checks of the ends, the intervals, the contributions and their
+sums, the findings, and `missed` follow the same rules as without the switch.
+The comparisons kept for a contribution or an end reference the reused responses
+and run records under `walk/`. In `runs`, `search` counts only the states the
+search ran itself and may be 0, `saved` is `walk` less `search`, and `reused`
+counts the reused states. The search result and the run record of the search
+name the switch in `switches`.
 
 ### Reader rules of a walk folder
 
@@ -435,7 +471,7 @@ A search has the findings of a walk, with these meanings, and one of its own:
 | Code | Raised when | Then |
 |---|---|---|
 | `state_zero_not_reproduced`, `state_n_not_reproduced` | State 0 or state n does not reproduce its recorded result. | The search stops. The finding references the comparison. |
-| `state_did_not_run` | A state ends `failed`, `rejected`, or `error`. | For state 0 or state n the search stops; for an inner state the nearest other state inside the interval that runs is used. The finding holds the diagnostic of the run. |
+| `state_did_not_run` | A state ends `failed`, `rejected`, or `error`. | For state 0 or state n the search stops; for an inner state the nearest other state inside the interval that runs is used. The finding holds the diagnostic of the run, for a reused state that of the walk's run. |
 | `step_not_compared` | The comparison that judges a contribution has no outcome `compared`. | Every quantity the interval judges differs. The finding holds the diagnostic and references the kept comparison. |
 | `non_finite_difference` | A sum of a contribution does not fit a finite binary64 value. | The sum is not written. |
 | `interval_not_resolved` | An interval differs for a quantity while neither half differs for it. | Nothing is attributed for that quantity. The finding names the interval by its revisions and its later state, and the quantity. |
@@ -476,19 +512,20 @@ copies of the recorded runs, and the run record of the search are left out.
 | Member | Meaning |
 |---|---|
 | `search_id` | `search-<older run id>-<newer run id>`. It does not name the target; one folder holds one search. |
+| `switches` | The opt-in switches that were on, by name and in name order: `reuse_walk`, see [Reuse of the walk's states](#reuse-of-the-walks-states). Absent when no switch was on. |
 | `walk` | With a walk only: its `walk_id` and the copied walk result `walk/walk.result.json`, by artifact reference. |
 | `manifest`, `older`, `newer`, `tolerance`, `held`, `remainder`, `ends` | As in the walk result. |
-| `states` | Every state the search requested, in the form of the walk result. |
+| `states` | Every state the search requested, in the form of the walk result. Under `reuse_walk` every state it took from the walk, with `reused` true, the walk's run id, and paths into `walk/`. |
 | `target` | `quantities`, in quantity order, and, when a range was asked for, `periods` with `first` and `last`, counted from the valuation date, see [Target](#target). |
 | `intervals` | Every interval judged: `from_state`, `to_state`, the `revisions` between them, and `differs`: among the quantities the interval is judged for, those its parent passes on, the ones for which its ends differ. |
 | `contributions` | Every contribution found, in the shape of a step of the walk. |
-| `runs` | `walk`, the n + 1 states a walk requests; `search`, the states the search requested; `saved`, the difference. With a walk, `walk` equals the number of its states. |
+| `runs` | `walk`, the n + 1 states a walk requests; `search`, the states the search requested and ran itself; `saved`, the difference. With a walk, `walk` equals the number of its states. Under `reuse_walk` also `reused`, the states taken from the walk. |
 | `missed` | With a walk only: the revisions and quantities the search missed, see [Check against a walk](#check-against-a-walk). |
 | `findings` | The findings, see [Findings of a search](#findings-of-a-search), in the form of the walk result. |
 
 The search folder holds, like a walk folder, `changes.json`, `older/`,
 `newer/`, and `tolerance.json` when a file names the tolerance profile; one
-folder `state-<k>/` per state run; at the root the comparisons it keeps,
+folder `state-<k>/` per state run, and none for a reused state; at the root the comparisons it keeps,
 `interval-<a>-<b>.compare.*` for a contribution and the checks of the ends as in
 the walk; `search.result.json` and `search.run-record.json`. With a walk, the
 folder `walk/` holds byte copies of `walk.result.json`, `walk.run-record.json`,
@@ -497,8 +534,8 @@ references, directly or through a referenced document, in their relative layout,
 so that every reference of the copied walk resolves inside the search folder.
 
 The search result references no run record, so the same two records, the same
-walk folder or none, and the same history give the same search result, byte for
-byte.
+walk folder or none, the same switches, and the same history give the same search
+result, byte for byte.
 
 Ids: a state run has the run id `<search_id>-state-<k>`; the comparison kept for
 a contribution the compare id `<search_id>-interval-<a>-<b>`; the checks of the
@@ -514,8 +551,12 @@ Orders:
 - `findings` in the order the search meets them.
 
 Schema assertions: every member above is present, `walk` and `missed` exactly
-together; a contribution has a comparison and contributes to at least one
-quantity; the assertions of a state and an end of the walk result hold.
+together, `switches` optional; under `reuse_walk` `walk` and `runs.reused` are
+present, and without it neither `runs.reused` nor a state with `reused` is; a
+contribution has a comparison and contributes to at least one quantity; the
+assertions of a state of the walk result hold apart from `reused`, which only a
+search state under `reuse_walk` carries; the assertions of an end of the walk
+result hold.
 
 ## Run record of a search
 
@@ -526,4 +567,5 @@ that is refused before the first run writes no record. It lists the two recorded
 run records, as copied for the search, the tolerance file when there is one, and
 the copied walk result when there is a walk, as inputs; the manifest, the search
 result, and every compare result the search kept, as outputs; and the release
-identities of the older and the newer result, in this order.
+identities of the older and the newer result, in this order. Under `reuse_walk`
+it names the switch in `switches`, see [run.md](run.md#run-record).
