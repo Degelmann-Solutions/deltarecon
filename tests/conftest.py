@@ -41,7 +41,8 @@ CLONE_NAME = "delib-history"
 CLONE = REPOSITORIES / CLONE_NAME
 REPOSITORY_URL = "https://github.com/Degelmann-Solutions/delib-history"
 RELEASE_N = "b64334e09613c45a7a12468dfddc0d9ec47819bb"  # the first commit of delib-history
-NEWER = "ab5dc790f5bed52f94a4c8fb8d6b710bc31f0a33"  # the newer revision of the reference walk
+START = "fa368575a66d97c94e96dffc62b273ec95511b12"  # release N on the fixed model, the older end of the reference walk
+NEWER = "887b7181d22550eda2fb52fa1a6bd77376d4eb2e"  # the newer revision of the reference walk
 PRODUCT_FOLDER = "risikolebensversicherung"
 EXAMPLES = ROOT / "contracts" / "v3" / "examples"
 

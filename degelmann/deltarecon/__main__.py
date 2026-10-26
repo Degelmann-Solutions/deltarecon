@@ -1,7 +1,7 @@
 """Command line of DeltaRecon. Start it from the root of this repository.
 
     git clone https://github.com/Degelmann-Solutions/delib-history repositories/delib-history
-    uv run python -m degelmann.deltarecon request --revision b64334e09613c45a7a12468dfddc0d9ec47819bb \\
+    uv run python -m degelmann.deltarecon request --revision fa368575a66d97c94e96dffc62b273ec95511b12 \\
         --label N --run-id run-n-full --output runs/n-full/request.json
     uv run python -m degelmann.deltarecon run runs/n-full/request.json
     uv run python -m degelmann.deltarecon replay runs/n-full/run-record.json

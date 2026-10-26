@@ -10,10 +10,10 @@ and ``0.0`` the same text. The guard collects every difference across all states
 once, listing up to 20 of them; a state that cannot be opened on one path is a difference.
 
 The ends are full commit hashes in ``DELTARECON_GUARD_OLDER`` and ``DELTARECON_GUARD_NEWER``
-and default to the ends of the reference walk, release N and the newer revision of the oracle:
-36 states of 350 model points each. The guard ran about 80 minutes on the author's machine and
-is skipped unless it is asked for: ``DELTARECON_GUARD=1``. The fast tests check the ends and the
-chain with Git alone.
+and default to the ends of the reference walk, the start commit of the reference chain, which holds
+release N on the fixed model, and the newer revision of the oracle: 33 states of 350 model points
+each. The guard ran about 49 minutes on the author's machine and is skipped unless it is asked
+for: ``DELTARECON_GUARD=1``. The fast tests check the ends and the chain with Git alone.
 """
 from __future__ import annotations
 
@@ -25,7 +25,7 @@ from degelmann.deltarecon.documents import Rejection
 from degelmann.deltarecon.engines.reference_model import ReferenceModel, release_references
 from degelmann.deltarecon.run import ModelPointFailure
 
-from conftest import CLONE, NEWER, RELEASE_N, REPOSITORIES, require_clone
+from conftest import CLONE, NEWER, REPOSITORIES, START, require_clone
 
 PATHS = ("export", "modelx")
 LISTED = 20  # the differences a failing guard lists
@@ -34,7 +34,7 @@ LISTED = 20  # the differences a failing guard lists
 def ends() -> tuple[str, str]:
     """The ends of the guard's chain: ``DELTARECON_GUARD_OLDER`` and ``DELTARECON_GUARD_NEWER``, or the
     ends of the reference walk."""
-    return os.environ.get("DELTARECON_GUARD_OLDER", RELEASE_N), os.environ.get("DELTARECON_GUARD_NEWER", NEWER)
+    return os.environ.get("DELTARECON_GUARD_OLDER", START), os.environ.get("DELTARECON_GUARD_NEWER", NEWER)
 
 
 def chain(older: str, newer: str) -> list[str]:
@@ -84,26 +84,26 @@ def differences(revision: str, export, modelx) -> list[str]:
     return found
 
 
-def test_the_chain_of_the_default_ends_holds_36_states_from_release_n():
+def test_the_chain_of_the_default_ends_holds_33_states_from_the_start():
     require_clone(CLONE, NEWER)
-    states = chain(RELEASE_N, NEWER)
-    assert len(states) == len(set(states)) == 36
-    assert states[0] == RELEASE_N and states[-1] == NEWER
+    states = chain(START, NEWER)
+    assert len(states) == len(set(states)) == 33
+    assert states[0] == START and states[-1] == NEWER
 
 
 def test_the_ends_of_the_chain_are_read_from_the_environment(monkeypatch):
     require_clone(CLONE, NEWER)
-    states = chain(RELEASE_N, NEWER)
+    states = chain(START, NEWER)
     monkeypatch.delenv("DELTARECON_GUARD_OLDER", raising=False)
     monkeypatch.delenv("DELTARECON_GUARD_NEWER", raising=False)
-    assert ends() == (RELEASE_N, NEWER)
+    assert ends() == (START, NEWER)
     monkeypatch.setenv("DELTARECON_GUARD_OLDER", states[3])
     monkeypatch.setenv("DELTARECON_GUARD_NEWER", states[7])
     assert ends() == (states[3], states[7])
     assert chain(*ends()) == states[3:8]
     # Ends in the wrong order lie on no common main line: the guard fails, it does not pass empty.
     with pytest.raises(Rejection) as rejected:
-        chain(NEWER, RELEASE_N)
+        chain(NEWER, START)
     assert rejected.value.code == "unrelated_revisions"
 
 
