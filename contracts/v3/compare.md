@@ -66,8 +66,9 @@ Reader rules:
 1. Both responses have the outcome `succeeded` and pass rules 7 to 13 of
    [run.md](run.md#result-completeness): the rules that need only the response
    and its export. Rule 10 is applied to the selection that the response itself
-   repeats. The run requests are not part of a comparison, so rule 6, which
-   needs the request, is not applied. Otherwise the comparison is
+   repeats. A response of a [target-only run](run.md#target-only-run) passes
+   these rules as they read under its `target`. The run requests are not part of
+   a comparison, so rule 6, which needs the request, is not applied. Otherwise the comparison is
    `rejected` with the diagnostic of the broken rule. A response that has not
    succeeded is rejected with the code its outcome implies: `model_point_failed`
    for `failed`, and the code of its first diagnostic for `rejected` and
@@ -111,7 +112,11 @@ quantity.
   [domain/liability_cashflow.md](domain/liability_cashflow.md#time-basis). On a
   time basis whose origin is the issue date of a model point, the coordinate
   (model point p, period t) of a run becomes (p, t - s_p), where s_p is the first
-  period of p in the export of that run. Each run has its own s_p: when the first
+  period of p in the export of that run. For a response that carries `target`
+  with `periods`, a [target-only run](run.md#target-only-run), s_p is the first
+  period of p in its export less `target.periods.first`: its window starts
+  `periods.first` periods after the valuation date and is never clipped there.
+  Each run has its own s_p: when the first
   period of a model point moves between the two runs, its values still pair by
   projection period. The only such identifier in this version is
   `policy_month`. On every other identifier, `valuation_year` and an identifier

@@ -3023,3 +3023,163 @@ def test_the_reference_engine_exports_a_product_folder_once_per_engine_object(tm
     import gc
     gc.collect()
     assert not Path(folder_name).exists()
+
+
+# --- target-only runs ------------------------------------------------------------------
+
+CASH_TARGET = {"quantities": ["Netto-Cashflow"], "periods": {"first": 1, "last": 1}}
+ALL_FOUR = {"mode": "subset", "model_point_ids": ["MP-A", "MP-B", "MP-C", "MP-D"]}
+
+
+def test_a_target_only_stub_run_computes_the_target_window_of_each_point(world):
+    full, _ = run_stub(world, folder="full")
+    request = stub_request(world, selection=ALL_FOUR, target=CASH_TARGET)
+    result, _ = run_stub(world, request)
+    assert result.outcome == "succeeded"
+    folder = world / "run"
+    assert_documents_valid(folder)
+    response = stored(folder / "response.json")
+    assert response["target"] == CASH_TARGET and list(response)[7:9] == ["selection", "target"]
+    assert response["quantities"] == [{"name": "Netto-Cashflow", "unit": "EUR"}]
+    # MP-C has projection period 0 alone: its window is empty, and it is absent although selected.
+    assert response["model_points"] == [{"model_point_id": "MP-A", "first_period": 13, "last_period": 13},
+                                        {"model_point_id": "MP-B", "first_period": 1, "last_period": 1},
+                                        {"model_point_id": "MP-D", "first_period": 4, "last_period": 4}]
+    assert response["export"]["data_rows"] == 3
+    values = check_response(request, response, folder)
+    whole = check_response(stub_request(world), full.response, world / "full")
+    assert values == {key: [whole[key][1]] for key in [("MP-A", 13), ("MP-B", 1), ("MP-D", 4)]}
+    assert (folder / "results.csv").read_text("utf-8") == (
+        "model_point_id,period,Netto-Cashflow\nMP-A,13,21\nMP-B,1,4\nMP-D,4,5e16\n")
+
+
+def test_a_target_only_run_without_a_target_period_succeeds_with_no_model_point(world):
+    request = stub_request(world, target={"quantities": ["Anzahl Verträge"], "periods": {"first": 5, "last": 9}})
+    result, _ = run_stub(world, request)
+    assert result.outcome == "succeeded"
+    assert_documents_valid(world / "run")
+    response = stored(world / "run" / "response.json")
+    assert response["model_points"] == [] and response["export"]["data_rows"] == 0
+    assert (world / "run" / "results.csv").read_text("utf-8") == "model_point_id,period,Anzahl Verträge\n"
+    assert check_response(request, response, world / "run") == {}
+    assert roles(stored(world / "run" / "run-record.json")["outputs"]) == {"response": "response.json",
+                                                                         "export": "results.csv"}
+    # Without a target the schema keeps requiring a model point and a row.
+    assert schema_errors({key: value for key, value in response.items() if key != "target"}, RUN_SCHEMA)
+
+
+def test_a_target_only_run_evaluates_no_model_check(world):
+    release = stub_release(world, "checked", POINTS.replace("MP-B,0,2,2", "MP-B,0,2,2!"))
+    full, _ = run_stub(world, stub_request(world, release=release), folder="full")
+    assert full.outcome == "failed"
+    assert full.response["failed_model_points"] == [{"model_point_id": "MP-B", "message": "check_stub is false"}]
+    result, _ = run_stub(world, stub_request(world, release=release, target={"quantities": ["Anzahl Verträge"]}))
+    assert result.outcome == "succeeded"
+    assert {p["model_point_id"]: (p["first_period"], p["last_period"]) for p in result.response["model_points"]}[
+        "MP-B"] == (0, 2)
+
+
+class _NoTargetEngine(StubEngine):
+    @contextmanager
+    def open(self, release, enabled, manifest_dir, repositories, hold=frozenset()):
+        with super().open(release, enabled, manifest_dir, repositories, hold) as session:
+            session.project_target = None  # a session that cannot compute a target
+            yield session
+
+
+@pytest.mark.parametrize("target, engine, code", [
+    ({"quantities": ["Bruttobeitrag"]}, None, "unknown_quantity"),
+    ({"quantities": ["Netto-Cashflow"], "periods": {"first": 3, "last": 2}}, None, "schema_violation"),
+    ({"quantities": ["Netto-Cashflow"]}, _NoTargetEngine(), "target_not_supported"),
+], ids=["undeclared-quantity", "reversed-periods", "not-supported"])
+def test_a_target_the_engine_cannot_run_is_rejected(world, target, engine, code):
+    result, _ = run_stub(world, stub_request(world, target=target), engine)
+    assert result.outcome == "rejected"
+    assert [d["code"] for d in result.response["diagnostics"]] == [code]
+    assert not (world / "run" / "results.csv").exists()
+    assert_documents_valid(world / "run")
+
+
+def test_a_target_only_response_repeats_the_target_and_holds_no_longer_window(world):
+    request = stub_request(world, selection=ALL_FOUR, target=CASH_TARGET)
+    result, _ = run_stub(world, request)
+    response, folder = result.response, world / "run"
+    for other in ({key: value for key, value in response.items() if key != "target"},
+                  {**response, "target": {"quantities": ["Netto-Cashflow"]}}):
+        with pytest.raises(Rejection) as caught:
+            check_response(request, other, folder)
+        assert caught.value.code == "request_mismatch"
+    # A full response read as one of the target 1-1 holds ranges longer than the window.
+    full, _ = run_stub(world, folder="full")
+    with pytest.raises(Rejection) as caught:
+        check_export({**full.response, "target": CASH_TARGET}, world / "full" / "results.csv")
+    assert caught.value.code == "unrequested_coordinate" and caught.value.model_point_ids == ["MP-A", "MP-B", "MP-D"]
+    assert check_export({**full.response, "target": {"quantities": ["Netto-Cashflow"]}},
+                        world / "full" / "results.csv")
+
+
+@pytest.mark.parametrize("workers", [1, 2])
+def test_a_target_only_run_of_release_n_is_the_full_run_restricted_to_the_target(tmp_path, full_chain, workers):
+    """Bit for bit, on the default computation path, in the parent and in worker processes."""
+    from degelmann.deltarecon.engines.reference_model import ReferenceModel
+    assert full_chain["steps"][1][0] == 0, full_chain["steps"][1][2]
+    chain = full_chain["folder"]
+    request, full = stored(chain / "request.json"), stored(chain / "response.json")
+    target = {"quantities": ["Bruttobeitrag", "Netto-Cashflow"], "periods": {"first": 12, "last": 59}}
+    folder = tmp_path / "target"
+    folder.mkdir()
+    targeted = {**request, "run_id": "run-n-target", "target": target}
+    (folder / "request.json").write_bytes(document_bytes(targeted))
+    run = run_request(folder / "request.json", ReferenceModel(workers), REPOSITORIES)
+    assert run.outcome == "succeeded", run.response
+    assert_documents_valid(folder)
+    response = run.response
+    assert response["target"] == target and [q["name"] for q in response["quantities"]] == target["quantities"]
+    whole = check_response(request, full, chain)
+    names = [q["name"] for q in full["quantities"]]
+    keep = [names.index(name) for name in target["quantities"]]
+    ranges, rows = [], []
+    for point in full["model_points"]:
+        start, end = point["first_period"], point["last_period"]
+        first, last = start + 12, min(start + 59, end)
+        if first <= last:
+            ranges.append({"model_point_id": point["model_point_id"], "first_period": first, "last_period": last})
+            rows.extend((point["model_point_id"], t, [whole[(point["model_point_id"], t)][i] for i in keep])
+                        for t in range(first, last + 1))
+    assert response["model_points"] == ranges
+    assert (folder / "results.csv").read_bytes() == export_bytes(target["quantities"], rows)
+    assert check_response(targeted, response, folder)
+    # The in-force point is computed from its valuation month on: its window starts 12 months after it.
+    in_force = in_force_id()
+    start = next(p["first_period"] for p in full["model_points"] if p["model_point_id"] == in_force)
+    assert start >= 144 and next(p for p in response["model_points"] if p["model_point_id"] == in_force)[
+        "first_period"] == start + 12
+
+
+def test_a_target_cell_that_returns_no_number_fails_its_point_alone():
+    """A cell value that is not a number fails the point with one line naming the cell, as the full path does."""
+    from degelmann.deltarecon.engines.reference_model import ReferenceModelSession
+
+    class Point:
+        def proj_start(self):
+            return 0
+
+        def proj_len(self):
+            return 2
+
+        def prem_gross(self, t):
+            return None if t == 1 else 1.5
+
+    class Computing:
+        Projection: dict = {}
+
+    computing = Computing()
+    session = ReferenceModelSession(None, computing)
+    computing.Projection = {0: Point()}
+    session._index = lambda model_point_id: 0
+    (failure,) = session.project_target(["P"], ["Bruttobeitrag"], None)
+    assert isinstance(failure, ModelPointFailure)
+    assert str(failure) == "prem_gross has not the expected form: TypeError"
+    assert computing.Projection == {}  # the point's space is released
+    computing.Projection = {0: Point()}
+    assert session.project_target(["P"], ["Bruttobeitrag"], (0, 0)) == [[(0, [1.5])]]

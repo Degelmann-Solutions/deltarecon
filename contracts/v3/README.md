@@ -133,14 +133,15 @@ Reader rule for documents of versions 1.0 and 2.0:
 
 Version 3.0 changes the versions a reader accepts, adds computation paths to
 the release identity, aligns every comparison on projection periods, and adds
-the opt-in switch `reuse_walk` of the search. A document written without a
-switch differs from 2.0 in `contract_version` and, for a comparison on
+the opt-in switches `reuse_walk` and `target_only` of the search and the
+target-only run they rest on. A document written without a
+switch and without a target differs from 2.0 in `contract_version` and, for a comparison on
 `policy_month`, in its period numbering only, as long as no model point's first
 exported period moves between the compared runs; where one moves, the pairing
 of values changes as described below.
-The schemas change for the switch alone: they gain optional members, a search
-under the switch may report 0 runs of its own, and the search result ties these
-members to the switch, as listed below.
+The schemas change for the switches and the target alone: they gain optional members, a search
+under `reuse_walk` may report 0 runs of its own, the search result ties these
+members to the switch, and a target-only run may export no model point, as listed below.
 
 What changes in the versions a reader accepts:
 
@@ -192,6 +193,26 @@ What the switch `reuse_walk` adds:
   result may carry `reused` (`true`), in the new definition `search_state`; the
   walk's `state` is `search_state` without `reused`.
 - `run-record.schema.json`: the run record has the optional member `switches`.
+
+What the target-only run and the switch `target_only` add:
+
+- A run request may carry `target`: quantities and, optionally, a range of
+  projection periods. The engine then computes the target quantities in the
+  target window of each model point and evaluates no model check; a model point
+  without a period in its window is left out. Every response that repeats the
+  request repeats `target`, and rule 6 compares it. See
+  [run.md](run.md#target-only-run). A comparison aligns a target-only run by its
+  first target period, see [compare.md](compare.md#alignment).
+- Under the switch `target_only` a search with a narrowed target runs its inner
+  states as target-only runs, keeps the comparison of a contribution on the
+  target only, and compares a full state through its target view, see
+  [localise.md](localise.md#target-only-inner-states).
+- `common.schema.json`: the definitions `quantity_name` and `target`, moved from
+  `localise.schema.json`, which references them. `run.schema.json`: the request
+  and the responses `succeeded`, `failed`, and `error` have the optional member
+  `target`; a succeeded response with `target` may have an empty `model_points`
+  and `export.data_rows` 0. `localise.schema.json` and `run-record.schema.json`:
+  `switches` may name `target_only`.
 
 The 2.0 pack: [README](../v2/README.md), [run](../v2/run.md),
 [changes](../v2/changes.md), [compare](../v2/compare.md),
@@ -422,7 +443,7 @@ first broken rule in that order.
 |---|---|
 | `invalid_json` | The text is not JSON under the JSON profile. |
 | `duplicate_member` | An object repeats a member name. |
-| `schema_violation` | A document violates its schema. An empty or duplicate selection, a negative tolerance, a missing tolerance profile, and a rounding or a bound above zero without a derivation are cases of it. |
+| `schema_violation` | A document violates its schema. An empty or duplicate selection, a negative tolerance, a missing tolerance profile, and a rounding or a bound above zero without a derivation are cases of it, and so is a target whose first period lies after its last. |
 | `unsupported_version` | The contract version is not one the reader implements, or a replay is asked for a run record of version 1.0. |
 | `unsupported_stage` | The reader does not support the stage. |
 | `stage_mismatch` | Documents that belong together name different stages. |
@@ -452,7 +473,8 @@ first broken rule in that order.
 | `unit_mismatch` | Two runs declare different units for a quantity. |
 | `time_basis_mismatch` | Two runs declare different time bases. |
 | `quantity_mismatch` | A run declares a quantity name that the domain reference of its stage does not define, a name twice, or the names in another order than the domain reference; or two compared runs declare different quantity names. |
-| `unknown_quantity` | A compare request sets a tolerance for a quantity that the two runs do not declare, or a deviation file names a quantity that its compare result does not declare. |
+| `unknown_quantity` | A compare request sets a tolerance for a quantity that the two runs do not declare, a deviation file names a quantity that its compare result does not declare, or the target of a run request names a quantity the engine does not declare. |
+| `target_not_supported` | The engine cannot compute the target of a run request: it runs no target-only run. |
 | `non_finite_difference` | The difference of the right and the left value of a common coordinate is not a finite number. |
 | `not_a_deviation` | A row of a deviation file does not deviate by the tolerance rule of its compare result: its values are equal or differ within the tolerance. |
 | `invalid_hold` | A request holds a kind the engine cannot hold, or holds a kind while no change of the type `revision` is enabled. |

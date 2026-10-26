@@ -75,6 +75,19 @@ a frame of a library the formula calls does not count. Without a formula the mes
 ``<output> raised <Kind>: <last line of the message>``, or ``<output> raised <Kind>`` for an
 empty message. The problems of one point are joined with ``; ``.
 
+Target-only runs
+----------------
+A request with ``target`` computes only the target quantities in the target window of each
+model point, on both paths and in the worker processes, and evaluates no check. A quantity is
+read from the cell its ``result_cf`` column is built from, for example ``prem_gross(t)`` or
+``claims(t, "DEATH")``, so its values are those of a full run bit for bit. The valuation month
+s of a point is ``valuation_month()``, or ``proj_start()`` in a state that has no
+``valuation_month``; its last month e is ``proj_len() - 1``. With target periods ``first`` to
+``last`` the window holds the policy months s + first to the lesser of s + last and e, without
+them s to e. A point whose window is empty is not computed. A point fails only when a cell of
+its window raises, with the message ``<cell> raised ...`` as in "Failed model points", when a cell
+returns no number, with ``<cell> has not the expected form: <Kind>``, or when a value is not finite.
+
 Worker processes
 ----------------
 A session projects the selected model points in worker processes, ``--workers`` of them,
@@ -163,21 +176,24 @@ PARAMETER_TABLES = ("benefit_schedule", "freq_loading_table", "lapse_table", "mo
 NOT_A_PARAMETER = {"point_id"}       # the argument of the projection space
 NOT_A_VALUE_COLUMN = {"provenance"}  # documentation of a row, not an assumption
 TIME_BASIS = "policy_month"
-# Quantity name, unit, and the column of ``result_cf`` it is read from, in domain order.
+# Quantity name, unit, the column of ``result_cf`` it is read from, and the cell call that column
+# is built from: the cell and the arguments after the period ``t``, in domain order.
 # ``kalkulatorische Kosten`` is not exported yet; ``liability_cf`` is the negative of
 # ``net_cf`` and is not exported.
 QUANTITIES = (
-    ("Anzahl Verträge", "policies", "pols_if"),
-    ("Bruttobeitrag", "EUR", "prem_gross"),
-    ("Zahlbeitrag", "EUR", "premiums"),
-    ("Beitragsverrechnung", "EUR", "prem_rebate"),
-    ("garantierte Todesfallleistung", "EUR", "claims_death"),
-    ("garantierter Rückkaufswert", "EUR", "claims_lapse"),
-    ("garantierte Erlebensfallleistung", "EUR", "claims_maturity"),
-    ("Kosten 2. Ordnung ohne Provisionen", "EUR", "expenses"),
-    ("Provisionen", "EUR", "commissions"),
-    ("Netto-Cashflow", "EUR", "net_cf"),
+    ("Anzahl Verträge", "policies", "pols_if", ("pols_if",)),
+    ("Bruttobeitrag", "EUR", "prem_gross", ("prem_gross",)),
+    ("Zahlbeitrag", "EUR", "premiums", ("premiums",)),
+    ("Beitragsverrechnung", "EUR", "prem_rebate", ("prem_rebate",)),
+    ("garantierte Todesfallleistung", "EUR", "claims_death", ("claims", "DEATH")),
+    ("garantierter Rückkaufswert", "EUR", "claims_lapse", ("claims", "LAPSE")),
+    ("garantierte Erlebensfallleistung", "EUR", "claims_maturity", ("claims", "MATURITY")),
+    ("Kosten 2. Ordnung ohne Provisionen", "EUR", "expenses", ("expenses",)),
+    ("Provisionen", "EUR", "commissions", ("commissions",)),
+    ("Netto-Cashflow", "EUR", "net_cf", ("net_cf",)),
 )
+# The cell of the policy month of the valuation date, and its name in the states before its rename.
+VALUATION_MONTH, BEFORE_RENAME = "valuation_month", "proj_start"
 CHECKS = ("check_net_cf", "check_pols_roll_fwd", "check_prem_split", "check_res_roll_fwd",
           "check_no_cash_value")
 
@@ -664,17 +680,19 @@ def _start_worker(state: str, path: str) -> None:
         _worker_session = ReferenceModelSession(None, exported)
 
 
-def _project_in_worker(index: int) -> tuple[str, object]:
-    """The point of row ``index`` in a worker: ``("ok", periods)`` or ``("failed", message)``."""
+def _project_in_worker(item: tuple) -> tuple[str, object]:
+    """One point in a worker, ``item`` being ``(projector, index, *arguments)``: the session method that
+    projects a row, the row, and its further arguments. ``("ok", periods)`` or ``("failed", message)``."""
+    projector, *arguments = item
     try:
-        return "ok", _worker_session._project_index(index)
+        return "ok", getattr(_worker_session, projector)(*arguments)
     except ModelPointFailure as failure:
         return "failed", str(failure)
 
 
 class ReferenceModelSession:
     time_basis = TIME_BASIS
-    quantities = [(name, unit) for name, unit, _ in QUANTITIES]
+    quantities = [(name, unit) for name, unit, _, _ in QUANTITIES]
 
     def __init__(self, model, computing=None, workers: int = 1, state: Path | None = None):
         """``model`` is the modelx model; ``computing`` the model the points are projected
@@ -728,6 +746,18 @@ class ReferenceModelSession:
         The parent maps each id to its row; the workers project by row and return the periods
         or the message of a failure, so a message is the same on every worker count.
         """
+        return self._project_rows(model_point_ids, "_project_index")
+
+    def project_target(self, model_point_ids: list[str], quantities: list[str],
+                       periods: tuple[int, int] | None) -> list:
+        """The outcome of each id in the given order: the periods of its target window, with one value
+        per name of ``quantities``, or its :class:`ModelPointFailure`; see "Target-only runs"."""
+        return self._project_rows(model_point_ids, "_project_target_index", tuple(quantities),
+                                  None if periods is None else tuple(periods))
+
+    def _project_rows(self, model_point_ids: list[str], projector: str, *arguments) -> list:
+        """The outcome of each id in the given order through the method ``projector``, called with the
+        row of the id and ``arguments``, here or in the worker processes."""
         outcomes, rows = {}, {}
         for model_point_id in dict.fromkeys(model_point_ids):
             try:
@@ -737,15 +767,46 @@ class ReferenceModelSession:
         if self._workers <= 1 or len(rows) <= 1 or self._state is None:
             for model_point_id, index in rows.items():
                 try:
-                    outcomes[model_point_id] = self._project_index(index)
+                    outcomes[model_point_id] = getattr(self, projector)(index, *arguments)
                 except ModelPointFailure as failure:
                     outcomes[model_point_id] = failure
         else:
             results = ordered_map(_start_worker, (str(self._state), self._path), _project_in_worker,
-                                  list(rows.values()), self._workers, preload=[__name__])
+                                  [(projector, index, *arguments) for index in rows.values()], self._workers,
+                                  preload=[__name__])
             for model_point_id, (kind, value) in zip(rows, results):
                 outcomes[model_point_id] = value if kind == "ok" else ModelPointFailure(value)
         return [outcomes[model_point_id] for model_point_id in model_point_ids]
+
+    def _project_target_index(self, index: int, quantities: tuple[str, ...],
+                              periods: tuple[int, int] | None) -> list[tuple[int, list[float]]]:
+        """The target window of the point of row ``index``. Raises :class:`ModelPointFailure`."""
+        calls = [call for name, _, _, call in QUANTITIES if name in quantities]
+        projection = None
+        try:
+            def value(cell: str, *arguments, convert=float):
+                try:
+                    result = getattr(projection, cell)(*arguments)
+                except Exception as exc:  # a modelx FormulaError wraps the cause
+                    raise ModelPointFailure(self._failure(cell, exc, projection, index)) from None
+                try:
+                    return convert(result)
+                except Exception as exc:
+                    raise ModelPointFailure(f"{cell} has not the expected form: {type(exc).__name__}") from None
+
+            try:
+                projection = self._computing.Projection[index]
+            except Exception as exc:
+                raise ModelPointFailure(self._failure("Projection", exc, projection, index)) from None
+            month = VALUATION_MONTH if hasattr(projection, VALUATION_MONTH) else BEFORE_RENAME
+            start, end = value(month, convert=int), value("proj_len", convert=int) - 1
+            first, last = (start, end) if periods is None else (start + periods[0], min(start + periods[1], end))
+            return [(t, [value(cell, t, *arguments) for cell, *arguments in calls])
+                    for t in range(first, last + 1)]
+        finally:
+            # Release the point's ItemSpace, as ``_project_index`` does.
+            with suppress(KeyError):  # absent when Projection[index] raised
+                del self._computing.Projection[index]
 
     def _index(self, model_point_id: str) -> int:
         """The row of the model point table that holds ``model_point_id``."""
@@ -774,7 +835,7 @@ class ReferenceModelSession:
             if problems:
                 raise ModelPointFailure("; ".join(problems))
             try:
-                columns = [[float(value) for value in frame[column]] for _, _, column in QUANTITIES]
+                columns = [[float(value) for value in frame[column]] for _, _, column, _ in QUANTITIES]
                 periods = [int(period) for period in frame.index]
             except Exception as exc:
                 raise ModelPointFailure(f"result_cf has not the expected form: {type(exc).__name__}") from None

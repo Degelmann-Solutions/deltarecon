@@ -2,7 +2,8 @@
 
 The writer writes the writer form in deterministic order. The reader accepts the reader
 grammar of ``contracts/v3/README.md``. ``check_export`` applies rules 9 to 13 of
-``contracts/v3/run.md`` to a succeeded response and its export; ``read_deviations``
+``contracts/v3/run.md`` to a succeeded response and its export, also of a target-only run, whose
+ranges are its target windows; ``read_deviations``
 applies rules 9 to 13 of ``contracts/v3/compare.md`` to a deviation file.
 """
 from __future__ import annotations
@@ -253,9 +254,11 @@ def check_export(response: dict, path: Path) -> dict[tuple[str, int], list[float
               for point in response["model_points"]]
     named = [point["model_point_id"] for point in ranges]
 
+    target = response.get("target")
     selection = response["selection"]  # rule 10
     if selection["mode"] == "subset":
-        missing = set(selection["model_point_ids"]) - set(named)
+        # A target-only run leaves out a selected point without a period in its target window.
+        missing = set(selection["model_point_ids"]) - set(named) if target is None else set()
         if missing:
             raise Rejection("missing_coordinate", "A selected model point is absent from the response.",
                             model_point_ids=_ids(missing))
@@ -273,6 +276,12 @@ def check_export(response: dict, path: Path) -> dict[tuple[str, int], list[float
         raise Rejection("inconsistent_response", "A period range of the response is reversed.",
                         model_point_ids=_ids(reversed_ranges))
 
+    window = (target or {}).get("periods")  # rule 12: a range holds at most the periods of the target window
+    longer = [p["model_point_id"] for p in ranges if window is not None
+              and p["last_period"] - p["first_period"] > window["last"] - window["first"]]
+    if longer:
+        raise Rejection("unrequested_coordinate", "A period range of the response holds more periods than "
+                        "the target window.", model_point_ids=_ids(longer))
     expected = {(p["model_point_id"], period)  # rule 12
                 for p in ranges for period in range(p["first_period"], p["last_period"] + 1)}
     values: dict[tuple[str, int], list[float]] = {}

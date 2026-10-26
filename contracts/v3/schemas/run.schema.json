@@ -21,7 +21,8 @@
         "run_id": { "$ref": "common.schema.json#/$defs/id" },
         "release": { "$ref": "common.schema.json#/$defs/release" },
         "changes": { "$ref": "common.schema.json#/$defs/change_set" },
-        "selection": { "$ref": "common.schema.json#/$defs/selection" }
+        "selection": { "$ref": "common.schema.json#/$defs/selection" },
+        "target": { "$ref": "common.schema.json#/$defs/target" }
       }
     },
     "run_response_succeeded": {
@@ -31,6 +32,13 @@
         "document", "contract_version", "stage", "run_id", "outcome", "release", "changes",
         "selection", "time_basis", "quantities", "model_points", "export"
       ],
+      "if": { "not": { "required": ["target"] } },
+      "then": {
+        "properties": {
+          "model_points": { "minItems": 1 },
+          "export": { "properties": { "data_rows": { "minimum": 1 } } }
+        }
+      },
       "properties": {
         "document": { "const": "run_response" },
         "contract_version": { "$ref": "common.schema.json#/$defs/contract_version" },
@@ -40,12 +48,12 @@
         "release": { "$ref": "common.schema.json#/$defs/release" },
         "changes": { "$ref": "common.schema.json#/$defs/change_set" },
         "selection": { "$ref": "common.schema.json#/$defs/selection" },
+        "target": { "$ref": "common.schema.json#/$defs/target" },
         "time_basis": { "$ref": "common.schema.json#/$defs/time_basis" },
         "quantities": { "$ref": "common.schema.json#/$defs/quantities" },
         "model_points": {
-          "description": "Every exported model point with its period range.",
+          "description": "Every exported model point with its period range. Empty only for a target-only run.",
           "type": "array",
-          "minItems": 1,
           "items": { "$ref": "common.schema.json#/$defs/period_range" }
         },
         "export": {
@@ -54,7 +62,7 @@
           "required": ["artifact", "data_rows"],
           "properties": {
             "artifact": { "$ref": "common.schema.json#/$defs/artifact" },
-            "data_rows": { "type": "integer", "minimum": 1 }
+            "data_rows": { "type": "integer", "minimum": 0 }
           }
         }
       }
@@ -75,6 +83,7 @@
         "release": { "$ref": "common.schema.json#/$defs/release" },
         "changes": { "$ref": "common.schema.json#/$defs/change_set" },
         "selection": { "$ref": "common.schema.json#/$defs/selection" },
+        "target": { "$ref": "common.schema.json#/$defs/target" },
         "failed_model_points": {
           "type": "array",
           "minItems": 1,
@@ -107,6 +116,7 @@
         "release": { "$ref": "common.schema.json#/$defs/release" },
         "changes": { "$ref": "common.schema.json#/$defs/change_set" },
         "selection": { "$ref": "common.schema.json#/$defs/selection" },
+        "target": { "$ref": "common.schema.json#/$defs/target" },
         "diagnostics": { "$ref": "common.schema.json#/$defs/diagnostics" }
       }
     },

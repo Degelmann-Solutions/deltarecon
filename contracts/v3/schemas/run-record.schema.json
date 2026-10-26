@@ -48,7 +48,7 @@
           "type": "array",
           "minItems": 1,
           "uniqueItems": true,
-          "items": { "enum": ["reuse_walk"] }
+          "items": { "enum": ["reuse_walk", "target_only"] }
         },
         "outcome": {
           "type": "string",

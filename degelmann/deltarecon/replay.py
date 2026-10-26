@@ -104,7 +104,8 @@ def _one(entries: list[dict], role: str, required: bool = True) -> dict | None:
 
 
 def check_repeated(request: dict, response: dict) -> None:
-    """Rule 6 of the run contract: the response repeats stage, run id, release, changes, and selection."""
+    """Rule 6 of the run contract: the response repeats stage, run id, release, changes, selection, and
+    the target of a target-only run."""
     if response["stage"] != request["stage"]:
         raise Rejection("stage_mismatch", "The response names another stage than its request.")
     same_changes = (set(response["changes"]["enabled"]) == set(request["changes"]["enabled"])
@@ -115,9 +116,10 @@ def check_repeated(request: dict, response: dict) -> None:
                       and set(response["selection"].get("model_point_ids", []))
                       == set(request["selection"].get("model_point_ids", [])))
     if (response["run_id"] != request["run_id"] or not same_changes or not same_selection
+            or response.get("target") != request.get("target")
             or not same_release(response["release"], request["release"])):
         raise Rejection("request_mismatch", "The response does not repeat the run id, release "
-                        "identity, change set, and selection of its request.")
+                        "identity, change set, selection, and target of its request.")
 
 
 def check_response(request: dict, response: dict, folder: Path, values: dict | None = None) -> dict:

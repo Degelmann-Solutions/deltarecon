@@ -20,8 +20,9 @@ response is rejected with ``model_point_failed``, the code its outcome implies, 
 rejected response or one with the outcome ``error`` with the code of its first diagnostic.
 
 Values are paired by projection period (:func:`align`): on a time basis whose origin is the
-issue date, ``ISSUE_ORIGIN``, each run counts a model point from its own first exported period;
-on every other basis the periods stay as they are. The coverage lists, the deviation file and the
+issue date, ``ISSUE_ORIGIN``, each run counts a model point from its own valuation date, its first
+exported period, or for a target-only run with target periods that period less the first target
+period; on every other basis the periods stay as they are. The coverage lists, the deviation file and the
 signature table write projection periods; the responses and exports of the runs are not changed.
 
 The signature table is built from the compare result and the deviation file as written:
@@ -87,14 +88,17 @@ def first_periods(values) -> dict[str, int]:
 
 def align(run: CheckedRun) -> CheckedRun:
     """The run on projection periods: on a time basis whose origin is the issue date, coordinate
-    (p, t) becomes (p, t - s_p), where s_p is the first exported period of p in this run, the
-    period of its valuation date. On any other basis the run itself. An aligned run is not
-    aligned again, and the aligned view of a run is built once."""
+    (p, t) becomes (p, t - s_p), where s_p is the period of the valuation date of p in this run:
+    its first exported period, or, for a target-only run whose target names periods, its first
+    exported period less the first target period. On any other basis the run itself. An aligned
+    run is not aligned again, and the aligned view of a run is built once."""
     if run.aligned or run.response["time_basis"]["id"] not in ISSUE_ORIGIN:
         return run
     if run._view is None:
         first = first_periods(run.values)
-        run._view = CheckedRun(run.response, {(point, period - first[point]): numbers
+        # A target window starts at the first target period after the valuation date; it is never clipped there.
+        offset = run.response.get("target", {}).get("periods", {}).get("first", 0)
+        run._view = CheckedRun(run.response, {(point, period - first[point] + offset): numbers
                                               for (point, period), numbers in run.values.items()}, True)
     return run._view
 
@@ -474,16 +478,18 @@ def _compare_request(request: dict, folder: Path,
     return _with_engine_versions(result, paths), deviations
 
 
-def compare_request_document(stage: str, compare_id: str, left: tuple[dict, dict], right: tuple[dict, dict],
-                             tolerance: dict) -> dict:
+def compare_request_document(stage: str, compare_id: str, left: tuple[dict, dict | None],
+                             right: tuple[dict, dict | None], tolerance: dict) -> dict:
     """A compare request the tool writes. ``left`` and ``right`` hold the artifact references
-    of the response and the run record of each side."""
+    of the response and the run record of each side; a side without a run record names its
+    response alone."""
+    def side(references: tuple[dict, dict | None]) -> dict:
+        response, record = references
+        return {"response": response, **({"run_record": record} if record is not None else {})}
+
     return {
         "document": "compare_request", "contract_version": CONTRACT_VERSION, "stage": stage,
-        "compare_id": compare_id,
-        "left": {"response": left[0], "run_record": left[1]},
-        "right": {"response": right[0], "run_record": right[1]},
-        "tolerance": tolerance,
+        "compare_id": compare_id, "left": side(left), "right": side(right), "tolerance": tolerance,
     }
 
 

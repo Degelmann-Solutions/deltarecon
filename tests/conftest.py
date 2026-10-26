@@ -281,10 +281,17 @@ MODEL_CODE = f"{PRODUCT_FOLDER}/RLV_DE_S/Projection/__init__.py"
 
 
 class StubSession:
-    """A release state of two text files: ``points.csv`` and ``params.csv``."""
+    """A release state of two text files: ``points.csv`` and ``params.csv``.
+
+    A base that ends with ``!`` names a point whose model check is false: a full run fails it, a
+    target-only run, which evaluates no check, computes it. ``project_target`` restricts the
+    periods of ``project`` to the target window: on ``policy_month`` counted from the first period
+    of a point, its valuation month, on another time basis the periods as they are.
+    """
 
     time_basis = "policy_month"
     quantities = [("Anzahl Verträge", "policies"), ("Netto-Cashflow", "EUR")]
+    checks = True  # whether ``project`` evaluates the model check
 
     def __init__(self, folder: Path):
         self.folder = folder
@@ -300,8 +307,31 @@ class StubSession:
         _, first, last, base = next(p for p in self.points if p[0] == model_point_id)
         if base == "raise":
             raise ModelPointFailure("The stub cannot calculate this model point.")
+        if base.endswith("!") and self.checks:
+            raise ModelPointFailure("check_stub is false")
+        base = base.rstrip("!")
         return [(period, [float(base), float(base) * (period + 1)])
                 for period in range(int(first), int(last) + 1)]
+
+    def project_target(self, model_point_ids, quantities, periods):
+        keep = [i for i, (name, _) in enumerate(self.quantities) if name in quantities]
+        outcomes = []
+        for model_point_id in model_point_ids:
+            self.checks = False
+            try:
+                full = self.project(model_point_id)
+            except ModelPointFailure as failure:
+                outcomes.append(failure)
+                continue
+            finally:
+                self.checks = True
+            start, end = full[0][0], full[-1][0]
+            offset = start if self.time_basis == "policy_month" else 0  # the period of projection period 0
+            first, last = (start, end) if periods is None else (max(start, offset + periods[0]),
+                                                                min(end, offset + periods[1]))
+            outcomes.append([(period, [values[i] for i in keep]) for period, values in full
+                             if first <= period <= last])
+        return outcomes
 
     def parameters(self):
         def value(text):

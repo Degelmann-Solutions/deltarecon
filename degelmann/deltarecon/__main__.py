@@ -78,6 +78,12 @@ search is refused with ``walk_not_attributed`` or ``walk_mismatch``, and nothing
 an unknown quantity or an empty period range is a usage error. ``--reuse-walk`` (with ``--walk``
 only) takes every state the search needs from the copied walk instead of running it, with the
 same findings; a reused state is no run, and the result and the run record name the switch.
+``--target-only`` (only with a narrowed target: ``--quantity`` for a proper subset of the
+quantities, or ``--periods``) runs every inner state the search runs
+itself on the target alone, without the model checks; state 0 and the last state stay full runs.
+The comparison kept for a contribution is then on the target only: a full state, an end or a
+reused walk state, is compared through its target view ``<state>.target/``, a derived response
+and export that is no run. The result and the run record name the switch.
 
 ``run``, ``replay``, ``regression``, ``walk``, and ``search`` project the model points of each
 state in ``--workers N`` worker processes, else as many as ``DELTARECON_WORKERS`` names, else
@@ -386,7 +392,7 @@ def command_search(args) -> int:
     try:
         done = search(Path(args.older_record), Path(args.newer_record), Path(args.output), state_engine(args),
                       args.repositories, args.tolerance, args.quantity, args.periods,
-                      Path(args.walk) if args.walk else None, args.reuse_walk)
+                      Path(args.walk) if args.walk else None, args.reuse_walk, args.target_only)
     except Rejection as rejection:  # refused before the first run; nothing is written
         print("search: rejected")
         print_diagnostic(rejection.diagnostic())
@@ -408,6 +414,8 @@ def command_search(args) -> int:
     periods = target.get("periods")
     say(f"target: {', '.join(target['quantities'])}"
         + (f"; periods {periods['first']} to {periods['last']}" if periods else "; every period"))
+    if "target_only" in result.get("switches", []):
+        say("inner states: run on the target only, without the model checks")
     for held in result["held"]:
         say(f"held: {held['kind']}; the effect on it of {len(held['not_shown'])} revisions is not shown")
     say(f"intervals judged: {len(result['intervals'])}")
@@ -500,6 +508,9 @@ def main(argv: list[str] | None = None) -> int:
                         help="a walk folder of the same two records to check the search against")
     halver.add_argument("--reuse-walk", action="store_true",
                         help="take every state from the walk folder instead of running it; needs --walk")
+    halver.add_argument("--target-only", action="store_true",
+                        help="run every inner state on the target alone, without the model checks; "
+                             "needs a narrowed target: --quantity for a proper subset of the quantities, or --periods")
     halver.set_defaults(handler=command_search)
 
     for command in (again, regress, stepper, halver):
