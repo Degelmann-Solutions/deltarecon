@@ -1,14 +1,15 @@
 """Replay of a recorded run.
 
-A replay checks the run record (rules 15 to 17 of ``contracts/v2/run.md``) and the
+A replay checks the run record (rules 15 to 17 of ``contracts/v3/run.md``) and the
 recorded result (rules 6 to 13), repeats the run in the folder ``replay/`` beside the
 record, and compares the recorded run, as the left side, with the repeated run, as the
-right side, through the compare procedure of ``contracts/v2/compare.md``. Without a
+right side, through the compare procedure of ``contracts/v3/compare.md``. Without a
 tolerance profile the comparison is exact.
 
-- A run record written under contract version 1.0 is read by ``regression``, ``derive``,
-  ``walk``, and ``search``, but it is not replayed: the replay rejects it with
-  ``unsupported_version`` (``contracts/v2/README.md``, "Version compatibility").
+- The replay repeats runs recorded under contract version 2.0 or 3.0. A run record written
+  under 1.0 is read by ``regression``, ``derive``, ``walk``, and ``search``, but it is not
+  replayed: the replay rejects it with ``unsupported_version`` (``contracts/v3/README.md``,
+  "Version compatibility").
 
 - The replay writes ``replay-compare.request.json``, ``replay-compare.result.json``, and,
   when the outcome of the comparison is ``compared``, ``replay-compare.deviations.csv``
@@ -23,7 +24,8 @@ tolerance profile the comparison is exact.
   compared, and it is ``reproduced_exactly`` when the new response is byte for byte the
   recorded one, else ``not_reproduced``. The replay record lists the new response only.
 - A rejected replay raises a :class:`~degelmann.deltarecon.documents.Rejection` and writes nothing.
-  The replay stays strict: the engine resolves the recorded release identity as it is.
+  The replay stays strict: the engine resolves the recorded release identity as it is, so
+  the run is repeated on the computation path its engine version names.
 """
 from __future__ import annotations
 
@@ -35,12 +37,14 @@ from . import changes as changes_contract
 from .compare import (COMPARE_REQUEST, CompareResult, compare, compare_request_document, no_deviation,
                       read_tolerance)
 from .documents import (CHANGES_SCHEMA, CONTRACT_VERSION, RECORD_SCHEMA, RUN_REQUEST, RUN_SCHEMA,
-                        Rejection, artifact_reference, check_artifact, copy_files, read_document,
-                        same_release, write_document)
+                        Rejection, artifact_reference, check_artifact, copy_files, document_bytes,
+                        parse_document, read_document, same_release, write_document)
 from .export import check_export
 from .run import (RECORD_NAME, STAGE_QUANTITIES, Engine, UsageError, quantity_errors,
                   repositories_folder, run_record, run_request)
 
+# The contract versions of the run records a replay repeats; a 1.0 record is not replayed.
+REPLAY_VERSIONS = ("2.0", "3.0")
 REPLAY_FOLDER = "replay"
 REPLAY_RECORD_NAME = "replay-record.json"
 REPLAY_COMPARE_REQUEST_NAME = "replay-compare.request.json"
@@ -100,7 +104,8 @@ def _one(entries: list[dict], role: str, required: bool = True) -> dict | None:
 
 
 def check_repeated(request: dict, response: dict) -> None:
-    """Rule 6 of the run contract: the response repeats stage, run id, release, changes, and selection."""
+    """Rule 6 of the run contract: the response repeats stage, run id, release, changes, selection, and
+    the target of a target-only run."""
     if response["stage"] != request["stage"]:
         raise Rejection("stage_mismatch", "The response names another stage than its request.")
     same_changes = (set(response["changes"]["enabled"]) == set(request["changes"]["enabled"])
@@ -111,17 +116,26 @@ def check_repeated(request: dict, response: dict) -> None:
                       and set(response["selection"].get("model_point_ids", []))
                       == set(request["selection"].get("model_point_ids", [])))
     if (response["run_id"] != request["run_id"] or not same_changes or not same_selection
+            or response.get("target") != request.get("target")
             or not same_release(response["release"], request["release"])):
         raise Rejection("request_mismatch", "The response does not repeat the run id, release "
-                        "identity, change set, and selection of its request.")
+                        "identity, change set, selection, and target of its request.")
 
 
-def check_response(request: dict, response: dict, folder: Path) -> dict:
-    """Rules 6 to 13 of the run contract for a succeeded response. Return the export values."""
+def check_response(request: dict, response: dict, folder: Path, values: dict | None = None) -> dict:
+    """Rules 6 to 13 of the run contract for a succeeded response. Return the export values.
+
+    ``values`` are the values of a run this process has just made, as the core wrote them into
+    its export (:attr:`~degelmann.deltarecon.run.RunResult.values`). With them only rules 6 and 7
+    are applied and the export is not read: rules 8 to 13 hold by construction, because the core
+    wrote the export and the response from those values.
+    """
     check_repeated(request, response)  # rule 6
     problem = quantity_errors(response["stage"], [q["name"] for q in response["quantities"]])  # rule 7
     if problem:
         raise Rejection("quantity_mismatch", f"The response declares its quantities wrongly: {problem}.")
+    if values is not None:
+        return values
     export_path = check_artifact(folder, response["export"]["artifact"])  # rule 8
     return check_export(response, export_path)  # rules 9 to 13
 
@@ -223,10 +237,10 @@ def replay(record_path: Path, engine: Engine, repositories: Path | None = None,
         raise UsageError(f"no tolerance file at {tolerance}")
 
     recorded = read_recorded_run(record_path, engine.stages, allow_error=True)
-    if recorded.record["contract_version"] != CONTRACT_VERSION:
+    if recorded.record["contract_version"] not in REPLAY_VERSIONS:
         raise Rejection("unsupported_version",
-                        f"The replay repeats only runs recorded under contract version {CONTRACT_VERSION}, "
-                        f"not {recorded.record['contract_version']}.")
+                        f"The replay repeats only runs recorded under contract version "
+                        f"{' or '.join(REPLAY_VERSIONS)}, not {recorded.record['contract_version']}.")
     record, request, manifest = recorded.record, recorded.request, recorded.manifest
     request_ref, manifest_ref = recorded.request_ref, recorded.manifest_ref
     failed_before = recorded.response["outcome"] == "error"
@@ -298,9 +312,19 @@ def replay(record_path: Path, engine: Engine, repositories: Path | None = None,
 
 
 def _replay_of_an_error(recorded: RecordedRun, result, replay_record_path: Path) -> ReplayResult:
-    """Write the replay record of a run that ended with an error. Nothing is compared."""
+    """Write the replay record of a run that ended with an error. Nothing is compared.
+
+    The repeated response must equal the recorded one byte for byte. For a run recorded under an
+    earlier version the two may differ in ``contract_version`` only: the recorded version is written
+    into the repeated response before the bytes are compared.
+    """
     folder = recorded.folder
-    same = result.response_path.read_bytes() == (folder / recorded.response_ref["path"]).read_bytes()
+    repeated = result.response_path.read_bytes()
+    stored = (folder / recorded.response_ref["path"]).read_bytes()
+    version = recorded.response["contract_version"]
+    if version != CONTRACT_VERSION:
+        repeated = document_bytes({**parse_document(repeated), "contract_version": version})
+    same = repeated == stored
     outcome = "reproduced_exactly" if same else "not_reproduced"
     replay_record = run_record(
         recorded.record["stage"], "replay", outcome,

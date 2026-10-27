@@ -1,0 +1,32 @@
+{
+  "document": "run_response",
+  "contract_version": "3.0",
+  "stage": "liability_cashflow",
+  "run_id": "run-no-model-point",
+  "outcome": "error",
+  "release": {
+    "label": "N",
+    "references": [
+      {
+        "kind": "code_state",
+        "value": "revision 1047"
+      },
+      {
+        "kind": "input_data",
+        "value": "extract 2026-09-30"
+      }
+    ]
+  },
+  "changes": {
+    "enabled": []
+  },
+  "selection": {
+    "mode": "full"
+  },
+  "diagnostics": [
+    {
+      "code": "no_model_point",
+      "message": "The release state holds no model point."
+    }
+  ]
+}

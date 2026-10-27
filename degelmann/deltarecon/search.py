@@ -1,4 +1,4 @@
-"""The search of ``contracts/v2/localise.md``: halving the history between two recorded results.
+"""The search of ``contracts/v3/localise.md``: halving the history between two recorded results.
 
 A search starts, as the walk does, from the records of two succeeded runs without enabled
 changes, the older one first, and needs no walk. Its checks before the first run are those
@@ -7,8 +7,9 @@ against the two recorded results, then halves the history for a target: the quan
 and periods asked about, by default every coordinate.
 
 - An interval ``(a, b)`` is judged by comparing state ``a`` with state ``b`` on the target's
-  coordinates only: the runs are restricted to the target periods, counted from the valuation
-  date, and to the target quantities, and the tolerance profile to the entries of those
+  coordinates only: both runs are aligned on projection periods, as every comparison is, each
+  model point counted from its own valuation date in that run, then restricted to the target
+  periods and to the target quantities, and the tolerance profile to the entries of those
   quantities, so a quantity outside the target cannot change the judgement. It differs for a quantity when a coordinate of it deviates
   under the tolerance rule or a coordinate is added or removed; a comparison without the
   outcome ``compared`` differs for every quantity it judges.
@@ -27,7 +28,18 @@ and periods asked about, by default every coordinate.
 
 With a walk folder of the same two records the search reads it under the reader rules of a
 walk folder before anything runs, copies it into ``walk/``, recomputes from its state
-exports which steps change the target, and names the contributions it missed.
+exports which steps change the target, and names the contributions it missed. The opt-in
+switch ``reuse_walk`` takes every state the search needs from that copy instead of running
+it: a reused state is no run, keeps the walk's run id, and is counted in ``runs.reused``.
+
+The opt-in switch ``target_only`` needs a narrowed target. Every inner state the search runs
+itself is then a target-only run: its request carries the target, and the engine computes the
+target alone and evaluates no model check. State 0 and state n stay full runs; a reused state
+stays as the walk ran it. The kept comparison of a contribution is then on the target only: a
+side that is a target-only run is referenced as it is, and a full state is replaced by its
+target view, ``<state>.target/``: the response and the export of the state restricted to the
+target, as a target-only run of it would return them, with no run record. It is derived and is
+no run. The compare request carries the tolerance profile restricted to the target quantities.
 
 This module knows no engine and no kind of reference, and starts no process.
 """
@@ -38,38 +50,38 @@ from collections import OrderedDict
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from .compare import CheckedRun, compare_runs
+from .compare import ISSUE_ORIGIN, CheckedRun, align
 from .documents import (CONTRACT_VERSION, RUN_SCHEMA, Rejection, artifact_reference, copy_files, read_document,
-                        write_document)
+                        write_document, write_new)
+from .export import write_export
 from .replay import check_response
-from .run import Engine, RunResult, UsageError, repositories_folder
+from .run import (EXPORT_NAME, RECORD_NAME as STATE_RECORD_NAME, RESPONSE_NAME, Engine, RunResult, UsageError,
+                  repositories_folder, written_values)
 from .walk import (LOCALISE_SCHEMA, MANIFEST_NAME, NEWER, OLDER, REQUEST_NAME, RESULT_NAME as WALK_RESULT_NAME,
-                   Prepared, States, WalkFolder, flags, new_folder, prepare, read_walk_folder)
+                   Prepared, States, WalkFolder, as_checked, compare_in_memory, flags, new_folder, prepare,
+                   read_walk_folder)
 
 RESULT_NAME = "search.result.json"
 RECORD_NAME = "search.run-record.json"
 WALK_FOLDER = "walk"
+# The opt-in switch that takes every state from the copied walk folder instead of running it.
+REUSE_WALK = "reuse_walk"
+# The opt-in switch that runs the inner states of the search on the target alone.
+TARGET_ONLY = "target_only"
+# The suffix of the folder of the target view of a full state.
+VIEW_SUFFIX = ".target"
 # The checked states kept in memory at one time; the others are read again from their exports.
 _CACHED = 4
 
 
-# The time basis whose origin is the issue date of a model point; target periods are shifted on it.
-ISSUE_ORIGIN = "policy_month"
-
-
 @dataclass(frozen=True)
 class Target:
-    """The coordinates a search judges: quantities in the order of the response, and periods counted
-    from the valuation date.
-
-    ``offsets`` holds, on a basis whose origin is the issue date, the first period of every model point
-    of the older recorded export: the period of the valuation date. ``None`` on a basis whose origin is
-    the valuation date, where target periods are used as they are."""
+    """The coordinates a search judges: quantities in the order of the response, and projection
+    periods, counted from the valuation date of each model point in each run."""
 
     quantities: tuple[str, ...]
     periods: tuple[int, int] | None = None
     narrowed: bool = False  # a proper subset of the quantities or a period range was asked for
-    offsets: dict[str, int] | None = field(default=None, compare=False, repr=False)
 
     def document(self) -> dict:
         target = {"quantities": list(self.quantities)}
@@ -77,31 +89,13 @@ class Target:
             target["periods"] = {"first": self.periods[0], "last": self.periods[1]}
         return target
 
-    def projection(self, values) -> dict[tuple[str, int], int]:
-        """The projection period of every coordinate of ``values``: its period counted from the valuation
-        date. On a basis whose origin is the issue date the period less the model point's offset, which
-        for a model point absent from the older recorded export is its first period in ``values``."""
-        if self.offsets is None:
-            return {key: key[1] for key in values}
-        own = first_periods(values)
-        return {key: key[1] - self.offsets.get(key[0], own[key[0]]) for key in values}
-
     def within(self, values) -> list[tuple[str, int]]:
-        """The coordinates of ``values`` inside the target periods, in their order."""
+        """The coordinates of ``values``, aligned on projection periods, inside the target periods,
+        in their order."""
         if self.periods is None:
             return list(values)
         first, last = self.periods
-        projection = self.projection(values)
-        return [key for key in values if first <= projection[key] <= last]
-
-
-def first_periods(values) -> dict[str, int]:
-    """The first period of every model point of ``values``."""
-    first: dict[str, int] = {}
-    for point, period in values:
-        if point not in first or period < first[point]:
-            first[point] = period
-    return first
+        return [key for key in values if first <= key[1] <= last]
 
 
 def read_target(quantities, periods: str | None, prepared: Prepared) -> Target:
@@ -117,29 +111,29 @@ def read_target(quantities, periods: str | None, prepared: Prepared) -> Target:
         if not match or int(match[1]) > int(match[2]):
             raise UsageError(f"the period range {periods!r} is not FIRST-LAST with integers 0 <= FIRST <= LAST")
         span = (int(match[1]), int(match[2]))
-    offsets = (first_periods(prepared.older.values)
-               if span is not None and prepared.older.response["time_basis"]["id"] == ISSUE_ORIGIN else None)
     chosen = tuple(name for name in names if name in asked) if asked else tuple(names)
     # A quantity list that names every quantity, without a period range, narrows nothing: the
     # search is the one without a target and keeps the signature rows of its contributions.
     narrowed = set(chosen) != set(names) or span is not None
-    target = Target(chosen, span, narrowed, offsets)
-    if span is not None and not any(target.within(run.values) for run in (prepared.older, prepared.newer)):
+    target = Target(chosen, span, narrowed)
+    if span is not None and not any(target.within(align(as_checked(run)).values)
+                                    for run in (prepared.older, prepared.newer)):
         raise UsageError(f"neither recorded export has a coordinate in the projection periods {periods}")
     return target
 
 
 def restrict(checked: CheckedRun, target: Target) -> CheckedRun:
-    """A run restricted to the target: the rows of the target periods, counted from the valuation date,
-    and the target quantities only, in the quantity order of the response. Without a target the run
-    itself."""
+    """A run aligned on projection periods (:func:`~degelmann.deltarecon.compare.align`) and restricted
+    to the target: the rows of the target periods and the target quantities only, in the quantity order
+    of the response. Without a target the run itself."""
     if not target.narrowed:
         return checked
+    checked = align(checked)
     quantities = checked.response["quantities"]
     keep = [i for i, quantity in enumerate(quantities) if quantity["name"] in target.quantities]
     response = {**checked.response, "quantities": [quantities[i] for i in keep]}
     values = {key: [checked.values[key][i] for i in keep] for key in target.within(checked.values)}
-    return CheckedRun(response, values)
+    return CheckedRun(response, values, aligned=True)
 
 
 def restrict_profile(profile: dict, target: Target) -> dict:
@@ -155,9 +149,8 @@ def judgement(stage: str, compare_id: str, profile: dict, left: CheckedRun, righ
               target: Target, quantities) -> tuple[list[str], dict]:
     """The target quantities among ``quantities`` for which two states differ on the target, and the
     comparison that judges it."""
-    result, deviations = compare_runs({"stage": stage, "compare_id": compare_id,
-                                       "tolerance": restrict_profile(profile, target)},
-                                      restrict(left, target), restrict(right, target))
+    result, deviations = compare_in_memory(stage, compare_id, restrict_profile(profile, target),
+                                           restrict(left, target), restrict(right, target))
     differs = flags(result, deviations, list(target.quantities))
     return [name for name, flag in zip(target.quantities, differs) if flag and name in quantities], result
 
@@ -182,9 +175,15 @@ class _Search(States):
     record_name = RECORD_NAME
 
     def __init__(self, output: Path, engine: Engine, repositories: Path, prepared: Prepared, prefix: str,
-                 target: Target):
+                 target: Target, reused: list[dict] | None = None, target_only: bool = False):
         super().__init__(output, engine, repositories, prepared, prefix)
         self.target = target
+        # Under the switch reuse_walk: the states of the walk result, read from the copy under walk/.
+        self.reused = reused
+        # Under the switch target_only: the inner states run on the target, and the target views of
+        # the full states a kept comparison names, by state: the response path and the checked view.
+        self.target_only = target_only
+        self.views: dict[int, tuple[Path, CheckedRun]] = {}
         self.ran: dict[int, tuple[RunResult, dict] | None] = {}  # None: the state did not run
         self.cache: OrderedDict[int, CheckedRun] = OrderedDict()
         self.intervals, self.found = [], []
@@ -196,11 +195,22 @@ class _Search(States):
                 "the interval that runs.")
 
     def ensure(self, k: int) -> bool:
-        """Run state ``k`` unless it has run. Whether it succeeded."""
+        """Run state ``k``, or under the switch reuse_walk take it from the walk, unless that is done.
+        Whether it succeeded."""
         if k not in self.ran:
-            run, request = self.run_state(k)
+            inner = self.target_only and 0 < k < len(self.ids)
+            run, request = (self.run_state(k, self.target.document() if inner else None) if self.reused is None
+                            else self.reuse_state(k))
             self.ran[k] = (run, request) if run.outcome == "succeeded" else None
         return self.ran[k] is not None
+
+    def reuse_state(self, k: int) -> tuple[RunResult, dict]:
+        """State ``k`` as the walk ran it, read from the copy under ``walk/``: no run and no folder of
+        its own. Its entry keeps the walk's run id and references the copy."""
+        walked = self.reused[k]
+        run, request = read_walk_state(self.output / WALK_FOLDER, walked)
+        self.add_state(k, walked["revision"] if k else None, walked["run_id"], run, reused=True)
+        return run, request
 
     def state(self, k: int) -> CheckedRun:
         """The checked values of a state that succeeded, read again when they are not cached."""
@@ -246,14 +256,70 @@ class _Search(States):
                     "state": b, "revisions": self.ids[a:b], "quantity": name})
         return differs
 
+    def target_view(self, k: int) -> tuple[Path, CheckedRun]:
+        """The target view of the full state ``k``, written once into ``<state>.target/``: its response and
+        export restricted to the target, as a target-only run of the state returns them, in the periods of
+        the time basis. A point without a period in its target window is left out. The view has no run
+        record."""
+        if k in self.views:
+            return self.views[k]
+        run, _ = self.ran[k]
+        response, values = run.response, self.state(k).values
+        quantities = response["quantities"]
+        keep = [i for i, quantity in enumerate(quantities) if quantity["name"] in self.target.quantities]
+        # The window of a point: its periods whose projection period lies in the target periods.
+        issue_origin = response["time_basis"]["id"] in ISSUE_ORIGIN
+        rows, ranges = [], []
+        for point in response["model_points"]:
+            start, end = point["first_period"], point["last_period"]
+            first, last = start, end
+            if self.target.periods is not None:
+                offset = start if issue_origin else 0  # the period of projection period 0
+                first = max(start, offset + self.target.periods[0])
+                last = min(end, offset + self.target.periods[1])
+            if first > last:
+                continue
+            identifier = point["model_point_id"]
+            ranges.append({"model_point_id": identifier, "first_period": first, "last_period": last})
+            rows.extend((identifier, t, [values[(identifier, t)][i] for i in keep]) for t in range(first, last + 1))
+        folder = self.output / f"{self.name(k)}{VIEW_SUFFIX}"
+        folder.mkdir()
+        if "manifest" in response["changes"]:  # the manifest the repeated change set names, beside the view
+            write_new(folder / MANIFEST_NAME, self.manifest_bytes)
+        write_export(folder / EXPORT_NAME, [quantities[i]["name"] for i in keep], rows)
+        view = {}
+        for member, value in response.items():
+            if member == "quantities":
+                value = [quantities[i] for i in keep]
+            elif member == "model_points":
+                value = ranges
+            elif member == "export":
+                value = {"artifact": artifact_reference(folder, folder / EXPORT_NAME), "data_rows": len(rows)}
+            view[member] = value
+            if member == "selection":
+                view["target"] = self.target.document()
+        write_document(folder / RESPONSE_NAME, view, RUN_SCHEMA)
+        self.views[k] = (folder / RESPONSE_NAME, CheckedRun(view, written_values(rows)))
+        return self.views[k]
+
+    def kept_side(self, k: int) -> tuple[tuple[Path, Path | None], CheckedRun]:
+        """One side of the comparison kept for a contribution: the response and the run record of state
+        ``k`` and its checked values; under the switch target_only on the target, a full state by its
+        target view."""
+        run, _ = self.ran[k]
+        if not self.target_only or "target" in run.response:
+            return (run.response_path, run.record_path), self.state(k)
+        path, view = self.target_view(k)
+        return (path, None), view
+
     def contribute(self, a: int, b: int, differs: list[str], judged: dict) -> None:
         """An interval of one revision that differs, or one without an inner state that runs."""
         revisions = self.ids[a:b]
-        (left_run, _), (right_run, _) = self.ran[a], self.ran[b]
+        (left, left_checked), (right, right_checked) = self.kept_side(a), self.kept_side(b)
         compared = self.write_compare(f"interval-{a:0{self.width}d}-{b:0{self.width}d}.compare",
-                                      f"{self.prefix}-interval-{a}-{b}",
-                                      (left_run.response_path, left_run.record_path),
-                                      (right_run.response_path, right_run.record_path))
+                                      f"{self.prefix}-interval-{a}-{b}", left, right,
+                                      (left_checked, right_checked),
+                                      restrict_profile(self.profile, self.target) if self.target_only else None)
         entry = {"from_state": a, "to_state": b, "revisions": revisions, "compare": self.reference(compared)}
         if judged["outcome"] != "compared":
             self.findings.append({
@@ -289,6 +355,28 @@ class _Search(States):
         return zero, last
 
 
+def read_walk_state(folder: Path, state: dict, values: bool = False) -> tuple[RunResult, dict]:
+    """A state of a walk result, read from the walk folder ``folder``: its run, with the paths of its
+    response, run record, and export in the folder, and its request. A state that succeeded has the
+    export the walk result names; with ``values`` its export is read and checked into ``run.values``.
+    A state that is not readable raises ``walk_mismatch``."""
+    k = state["state"]
+    response_path = folder / state["response"]["path"]
+    try:
+        request = read_document(response_path.parent / REQUEST_NAME, RUN_SCHEMA, "run_request")
+        response = read_document(response_path, RUN_SCHEMA, "run_response")
+        run = RunResult(state["outcome"], response, response_path, response_path.parent / STATE_RECORD_NAME)
+        if state["outcome"] == "succeeded":
+            if response["export"]["artifact"]["sha256"] != state["export"]["sha256"]:
+                raise Rejection("artifact_hash_mismatch", f"The export of state {k} is not the one of the walk result.")
+            run.export_path = response_path.parent / response["export"]["artifact"]["path"]
+            if values:
+                run.values = check_response(request, response, response_path.parent)
+    except Rejection as rejection:
+        raise Rejection("walk_mismatch", f"State {k} of the walk is not readable: {rejection.message}") from None
+    return run, request
+
+
 def walk_changes(walk: WalkFolder, prepared: Prepared, target: Target) -> list[tuple[list[str], list[str]]]:
     """Per step of the walk: its revisions and the target quantities it changes, recomputed from the
     state exports of the walk folder under the tolerance of the walk, without a run."""
@@ -296,15 +384,8 @@ def walk_changes(walk: WalkFolder, prepared: Prepared, target: Target) -> list[t
     states = {state["state"]: state for state in result["states"]}
 
     def read(k: int) -> CheckedRun:
-        response_path = folder / states[k]["response"]["path"]
-        try:
-            request = read_document(response_path.parent / REQUEST_NAME, RUN_SCHEMA, "run_request")
-            response = read_document(response_path, RUN_SCHEMA, "run_response")
-            if response["export"]["artifact"]["sha256"] != states[k]["export"]["sha256"]:
-                raise Rejection("artifact_hash_mismatch", f"The export of state {k} is not the one of the walk result.")
-            return CheckedRun(response, check_response(request, response, response_path.parent))
-        except Rejection as rejection:
-            raise Rejection("walk_mismatch", f"State {k} of the walk is not readable: {rejection.message}") from None
+        run, _ = read_walk_state(folder, states[k], values=True)
+        return as_checked(run)
 
     changes = []
     previous = None
@@ -331,14 +412,22 @@ def missed(changes: list[tuple[list[str], list[str]]], contributions: list[dict]
 
 def search(older_record: Path | str, newer_record: Path | str, output: Path | str, engine: Engine,
            repositories: Path | None = None, tolerance: Path | str | None = None, quantities=(),
-           periods: str | None = None, walk: Path | str | None = None) -> SearchResult:
-    """Search the history between two recorded runs and write the search result into ``output``."""
+           periods: str | None = None, walk: Path | str | None = None, reuse: bool = False,
+           target_only: bool = False) -> SearchResult:
+    """Search the history between two recorded runs and write the search result into ``output``.
+    With ``reuse``, the switch reuse_walk, every state is taken from the copy of ``walk``. With
+    ``target_only``, the switch target_only, the inner states the search runs are target-only runs."""
+    if reuse and walk is None:
+        raise UsageError("the switch --reuse-walk takes the states from a walk folder and needs --walk")
     output = Path(output).resolve()
     repositories = repositories_folder(repositories)
     if output.exists():
         raise UsageError(f"{output} exists already; a search overwrites no file")
     prepared = prepare(older_record, newer_record, engine, repositories, tolerance, procedure="search")
     target = read_target(quantities, periods, prepared)
+    if target_only and not target.narrowed:
+        raise UsageError("the switch --target-only runs the inner states on the target and needs a target "
+                         "narrowed by --quantity or --periods")
     reference = changes = None
     if walk is not None:
         if not Path(walk).is_dir():
@@ -350,12 +439,15 @@ def search(older_record: Path | str, newer_record: Path | str, output: Path | st
     n = len(prepared.ids)
 
     with new_folder(output):
+        # The switches that are on, in the order run_record writes them, so result and record agree.
+        switches = sorted(name for name, on in ((REUSE_WALK, reuse), (TARGET_ONLY, target_only)) if on)
         state = _Search(output, engine, repositories, prepared,
-                        f"search-{older.request['run_id']}-{newer.request['run_id']}", target)
+                        f"search-{older.request['run_id']}-{newer.request['run_id']}", target,
+                        reference.result["states"] if reuse else None, target_only)
         state.setup(tolerance)
         further = []
         head = {"document": "search_result", "contract_version": CONTRACT_VERSION, "stage": prepared.stage,
-                "search_id": state.prefix}
+                "search_id": state.prefix, **({"switches": switches} if switches else {})}
         if reference is not None:
             copy_files(reference.folder, output / WALK_FOLDER, reference.files)  # byte copies, in their layout
             copied = output / WALK_FOLDER / WALK_RESULT_NAME
@@ -374,8 +466,10 @@ def search(older_record: Path | str, newer_record: Path | str, output: Path | st
             "remainder": prepared.manifest["history"]["remainder"],
             "ends": {"zero": zero, "n": last}, "states": states, "target": target.document(),
             "intervals": state.intervals, "contributions": sorted(state.found, key=lambda e: e["from_state"]),
-            "runs": {"walk": n + 1, "search": len(states), "saved": n + 1 - len(states)},
         }
+        reused = sum(1 for entry in states if entry.get("reused"))
+        ran = len(states) - reused
+        result["runs"] = {"walk": n + 1, "search": ran, "saved": n + 1 - ran, **({"reused": reused} if reuse else {})}
         if changes is not None:
             # A search that stops judges no interval; it names no missed contribution.
             searched = zero["outcome"] == last["outcome"] == "reproduced"
@@ -384,5 +478,5 @@ def search(older_record: Path | str, newer_record: Path | str, output: Path | st
         result_path = output / RESULT_NAME
         write_document(result_path, result, LOCALISE_SCHEMA)
         outcome = "searched" if zero["outcome"] == last["outcome"] == "reproduced" else "stopped"
-        record_path = state.write_record(outcome, result_path, tolerance, further)
+        record_path = state.write_record(outcome, result_path, tolerance, further, switches)
     return SearchResult(result, result_path, record_path)

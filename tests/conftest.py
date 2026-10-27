@@ -1,6 +1,7 @@
 """Shared fixtures and helpers: the clone of the reference model repository, throw-away
-repositories, one full run of release N through the run contract with its replay, the stub
-engines, and the helpers the test modules share. A test module imports a shared helper from
+repositories, one full run of the start commit of the reference chain (release N on the fixed
+model) through the run contract with its replay, the stub engines, and the helpers the test
+modules share. A test module imports a shared helper from
 here, never from another test module.
 
 The reference model is read from the local clone ``repositories/delib-history``. A session
@@ -21,6 +22,7 @@ import subprocess
 import sys
 import tempfile
 import threading
+import time
 from contextlib import contextmanager
 from decimal import ROUND_HALF_UP, Decimal
 from pathlib import Path
@@ -29,8 +31,8 @@ import pytest
 
 from degelmann.deltarecon import changes as changes_contract
 from degelmann.deltarecon.__main__ import main
-from degelmann.deltarecon.documents import (RECORD_SCHEMA, RUN_SCHEMA, Rejection, document_bytes, schema_errors,
-                                            sha256_file)
+from degelmann.deltarecon.documents import (CONTRACT_VERSION, RECORD_SCHEMA, RUN_REQUEST, RUN_SCHEMA, Rejection,
+                                            document_bytes, schema_errors, sha256_file)
 from degelmann.deltarecon.regression import read_regression_input, regression
 from degelmann.deltarecon.run import History, ModelPointFailure, Revision, run_request
 
@@ -40,8 +42,10 @@ CLONE_NAME = "delib-history"
 CLONE = REPOSITORIES / CLONE_NAME
 REPOSITORY_URL = "https://github.com/Degelmann-Solutions/delib-history"
 RELEASE_N = "b64334e09613c45a7a12468dfddc0d9ec47819bb"  # the first commit of delib-history
+START = "fa368575a66d97c94e96dffc62b273ec95511b12"  # release N on the fixed model, the older end of the reference walk
+NEWER = "887b7181d22550eda2fb52fa1a6bd77376d4eb2e"  # the newer revision of the reference walk
 PRODUCT_FOLDER = "risikolebensversicherung"
-EXAMPLES = ROOT / "contracts" / "v2" / "examples"
+EXAMPLES = ROOT / "contracts" / "v3" / "examples"
 
 
 def folder_hashes(folder: Path) -> dict[str, str]:
@@ -75,12 +79,12 @@ def clone_state(clone: Path = CLONE) -> tuple[bytes, bytes, bytes]:
             git(clone, "for-each-ref"))
 
 
-def committed(path: str, revision: str = RELEASE_N, clone: Path = CLONE) -> bytes:
+def committed(path: str, revision: str = START, clone: Path = CLONE) -> bytes:
     """The bytes of a file of a commit, read from the object store."""
     return git(clone, "cat-file", "blob", f"{revision}:{path}")
 
 
-def require_clone(clone: Path = CLONE, revision: str = RELEASE_N) -> None:
+def require_clone(clone: Path = CLONE, revision: str = START) -> None:
     """End the test session unless ``clone`` is a clone that holds the pinned commit."""
     found = clone.is_dir() and subprocess.run(
         ["git", "--no-optional-locks", "-C", str(clone), "cat-file", "-e", f"{revision}^{{commit}}"],
@@ -91,7 +95,7 @@ def require_clone(clone: Path = CLONE, revision: str = RELEASE_N) -> None:
 
 
 # The modules that stamp the contract version on the documents they write.
-WRITER_MODULES = ("run", "compare", "signature", "derive", "walk", "search", "replay")
+WRITER_MODULES = ("run", "compare", "signature", "derive", "walk", "search")
 
 
 @contextmanager
@@ -108,7 +112,8 @@ def written_under(version: str):
 
 
 def pytest_sessionstart(session):
-    require_clone()
+    for revision in (RELEASE_N, START, NEWER):
+        require_clone(revision=revision)
 
 
 def export_coordinates(path: Path) -> dict[tuple[str, int, str], float]:
@@ -118,12 +123,31 @@ def export_coordinates(path: Path) -> dict[tuple[str, int, str], float]:
             for row in rows[1:] for quantity, value in zip(rows[0][2:], row[2:])}
 
 
-def expected_deviations(left: Path, right: Path, per_quantity: dict) -> list[dict]:
+def projection_periods(values: dict[tuple, object]) -> dict[tuple, object]:
+    """``values`` on projection periods: each key starts with a model point and a period, and the period
+    becomes the period less the first period of its model point in ``values``, as on ``policy_month``,
+    whose origin is the issue date. Further members of a key, such as a quantity, are kept."""
+    first: dict[str, int] = {}
+    for point, period, *_ in values:
+        first[point] = min(period, first.get(point, period))
+    return {(point, period - first[point], *rest): value for (point, period, *rest), value in values.items()}
+
+
+def without_volatile(record: dict, *extra: str) -> dict:
+    """A run record without the members that name its execution, ``record_id`` and ``recorded_at``,
+    and without the members ``extra``."""
+    return {key: value for key, value in record.items() if key not in ("record_id", "recorded_at", *extra)}
+
+
+def expected_deviations(left: Path, right: Path, per_quantity: dict, issue_origin: bool = True) -> list[dict]:
     """The deviation list of two exports, recomputed without ``degelmann/deltarecon/compare.py``.
 
-    The tolerance rule is that of :func:`deviates`.
+    The tolerance rule is that of :func:`deviates`. With ``issue_origin``, the time basis of the stub
+    and of the model, both exports are aligned on projection periods first.
     """
     old, new = export_coordinates(left), export_coordinates(right)
+    if issue_origin:
+        old, new = projection_periods(old), projection_periods(new)
     order = next(csv.reader(io.StringIO(left.read_text("utf-8"), newline="")))[2:]
     keys = sorted(set(old) & set(new), key=lambda key: (key[0], key[1], order.index(key[2])))
     exact = {"upper": {"abs_tol": 0, "rel_tol": 0}, "lower": {"abs_tol": 0, "rel_tol": 0}}
@@ -152,13 +176,13 @@ def deviation_rows(result_path: Path) -> list[dict]:
 def throwaway(tmp_path: Path) -> tuple[Path, Path]:
     """A repositories folder with a clone of the reference model that a test may commit to.
 
-    Its branch ``work`` starts at release N.
+    Its branch ``work`` starts at the start commit of the reference chain, release N on the fixed model.
     """
     repositories = tmp_path / "repositories"
     repositories.mkdir()
     clone = repositories / CLONE_NAME
     git(ROOT, "clone", "--quiet", "--no-hardlinks", str(CLONE), str(clone))
-    git(clone, "checkout", "--quiet", "-B", "work", RELEASE_N)
+    git(clone, "checkout", "--quiet", "-B", "work", START)
     return repositories, clone
 
 
@@ -265,12 +289,20 @@ MODEL_CODE = f"{PRODUCT_FOLDER}/RLV_DE_S/Projection/__init__.py"
 
 
 class StubSession:
-    """A release state of two text files: ``points.csv`` and ``params.csv``."""
+    """A release state of two text files: ``points.csv`` and ``params.csv``.
+
+    A base that ends with ``!`` names a point whose model check is false: a full run fails it, a
+    target-only run, which evaluates no check, computes it. ``project_target`` restricts the
+    periods of ``project`` to the target window: on ``policy_month`` counted from the first period
+    of a point, its valuation month, on another time basis the periods as they are.
+    """
 
     time_basis = "policy_month"
     quantities = [("Anzahl Verträge", "policies"), ("Netto-Cashflow", "EUR")]
+    checks = True  # whether ``project`` evaluates the model check
 
     def __init__(self, folder: Path):
+        self.folder = folder
         lines = (folder / "points.csv").read_text("utf-8").splitlines()[1:]
         self.points = [line.split(",") for line in lines]
         self.params = [line.split(",") for line in
@@ -283,8 +315,31 @@ class StubSession:
         _, first, last, base = next(p for p in self.points if p[0] == model_point_id)
         if base == "raise":
             raise ModelPointFailure("The stub cannot calculate this model point.")
+        if base.endswith("!") and self.checks:
+            raise ModelPointFailure("check_stub is false")
+        base = base.rstrip("!")
         return [(period, [float(base), float(base) * (period + 1)])
                 for period in range(int(first), int(last) + 1)]
+
+    def project_target(self, model_point_ids, quantities, periods):
+        keep = [i for i, (name, _) in enumerate(self.quantities) if name in quantities]
+        outcomes = []
+        for model_point_id in model_point_ids:
+            self.checks = False
+            try:
+                full = self.project(model_point_id)
+            except ModelPointFailure as failure:
+                outcomes.append(failure)
+                continue
+            finally:
+                self.checks = True
+            start, end = full[0][0], full[-1][0]
+            offset = start if self.time_basis == "policy_month" else 0  # the period of projection period 0
+            first, last = (start, end) if periods is None else (max(start, offset + periods[0]),
+                                                                min(end, offset + periods[1]))
+            outcomes.append([(period, [values[i] for i in keep]) for period, values in full
+                             if first <= period <= last])
+        return outcomes
 
     def parameters(self):
         def value(text):
@@ -381,6 +436,58 @@ class StubEngine:
             yield StubSession(state)
 
 
+# --- a stub engine whose sessions project in worker processes ---
+
+_stub_session = None  # the session of a stub worker process
+
+
+def _stub_start(folder: str) -> None:
+    global _stub_session
+    _stub_session = StubSession(Path(folder))
+
+
+def _stub_project(model_point_id: str):
+    """One point in a stub worker. An earlier point in writer order sleeps longer, so that the
+    points finish in reverse; the base ``crash`` raises an error that is no model point failure."""
+    ids = sorted(_stub_session.model_point_ids())
+    time.sleep(0.05 * (len(ids) - ids.index(model_point_id)))
+    if next(p for p in _stub_session.points if p[0] == model_point_id)[3] == "crash":
+        raise RuntimeError("the stub worker crashes")
+    try:
+        return "ok", _stub_session.project(model_point_id)
+    except ModelPointFailure as failure:
+        return "failed", str(failure)
+
+
+class WorkerSession(StubSession):
+    """The stub session whose ``project_many`` projects the points in worker processes."""
+
+    def __init__(self, folder: Path, engine: "WorkerStub"):
+        super().__init__(folder)
+        self.engine = engine
+
+    def project_many(self, model_point_ids):
+        from degelmann.deltarecon.workers import ordered_map
+        self.engine.asked.append(list(model_point_ids))
+        results = ordered_map(_stub_start, (str(self.folder),), _stub_project, model_point_ids,
+                              self.engine.workers)
+        return [value if kind == "ok" else ModelPointFailure(value) for kind, value in results]
+
+
+class WorkerStub(StubEngine):
+    """The stub engine with ``workers`` worker processes per session. ``asked`` holds the ids of
+    every call of ``project_many``."""
+
+    def __init__(self, workers: int):
+        super().__init__()
+        self.workers, self.asked = workers, []
+
+    @contextmanager
+    def open(self, release, enabled, manifest_dir, repositories, hold=frozenset()):
+        with super().open(release, enabled, manifest_dir, repositories, hold) as session:
+            yield WorkerSession(session.folder, self)
+
+
 @pytest.fixture
 def world(tmp_path):
     """A folder with a stub release ``rel`` and an empty run folder ``run``.
@@ -397,7 +504,7 @@ def world(tmp_path):
 
 def stub_request(world: Path, **members) -> dict:
     request = {
-        "document": "run_request", "contract_version": "2.0", "stage": "liability_cashflow",
+        "document": "run_request", "contract_version": CONTRACT_VERSION, "stage": "liability_cashflow",
         "run_id": "run-stub",
         "release": {"label": "N", "references": StubEngine.references(world / "rel", "rel")},
         "changes": {"enabled": []}, "selection": {"mode": "full"},
@@ -461,7 +568,7 @@ def change(change_id: str, patch: str | None, folder: Path, **members) -> dict:
 def with_manifest(world: Path, entries: list[dict], enabled: list[str], folder: str = "run",
                   **manifest_members) -> dict:
     """Store a manifest beside the request and return the ``changes`` member that enables it."""
-    manifest = {"document": "change_manifest", "contract_version": "2.0",
+    manifest = {"document": "change_manifest", "contract_version": CONTRACT_VERSION,
                 "stage": "liability_cashflow", "manifest_id": "changes-stub", "base_release": "N",
                 "changes": entries}
     manifest.update(manifest_members)
@@ -500,6 +607,32 @@ def stub_regression(world: Path, release: dict, engine=None, tolerance=None):
 def cli(monkeypatch, *arguments) -> int:
     monkeypatch.chdir(ROOT)
     return main([str(argument) for argument in arguments])
+
+
+def text(path: str) -> str:
+    """A file of the start commit of the reference chain, as committed. Its data files are those of release N."""
+    return committed(path).decode("utf-8")
+
+
+def model_request(monkeypatch, folder: Path, *ids: str, revision: str = START,
+                  repositories: Path = REPOSITORIES, run_id: str = "run-n-subset", path: str | None = None) -> Path:
+    arguments = ["request", "--revision", revision, "--repositories", repositories, "--label", "N",
+                 "--run-id", run_id, "--output", folder / "request.json"]
+    if path is not None:
+        arguments += ["--path", path]
+    if ids:
+        arguments += ["--subset", *ids]
+    assert cli(monkeypatch, *arguments) == 0
+    assert not schema_errors(stored(folder / "request.json"), RUN_REQUEST)
+    return folder / "request.json"
+
+
+def with_columns(columns: list[str], line: str, **changes: str) -> str:
+    values = line.split(",")
+    for column, value in changes.items():
+        assert values[columns.index(column)] != value
+        values[columns.index(column)] = value
+    return ",".join(values)
 
 
 def edit_file(clone: Path, path: str, old: str, new: str) -> None:
@@ -653,7 +786,7 @@ def reference(world: Path, relative: str) -> dict:
 def compare_request(world: Path, per_quantity: dict | None = None, records: bool = True,
                     left: str = "left", right: str = "right", **members) -> Path:
     """Store a compare request in ``world`` that names the runs in the folders ``left`` and ``right``."""
-    request = {"document": "compare_request", "contract_version": "2.0", "stage": "liability_cashflow",
+    request = {"document": "compare_request", "contract_version": CONTRACT_VERSION, "stage": "liability_cashflow",
                "compare_id": "compare-stub"}
     for name, folder in (("left", left), ("right", right)):
         request[name] = {"response": reference(world, f"{folder}/response.json")}
@@ -676,7 +809,7 @@ def full_chain_process(tmp_path_factory):
     """
     folder = tmp_path_factory.mktemp("full-chain") / "run"
     commands = [
-        ["request", "--revision", RELEASE_N, "--label", "N", "--run-id", "run-n-full",
+        ["request", "--revision", START, "--label", "N", "--run-id", "run-n-full",
          "--output", str(folder / "request.json")],
         ["run", str(folder / "request.json")],
         ["replay", str(folder / "run-record.json")],

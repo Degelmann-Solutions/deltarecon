@@ -33,15 +33,16 @@ from degelmann.deltarecon.replay import check_response, replay
 from degelmann.deltarecon.run import SCRATCH_PREFIX, ModelPointFailure, UsageError, run_request
 
 from conftest import (CLONE, CLONE_NAME, EXACT, LAPSE_TABLE, MODEL_CODE, NEW_BUSINESS, PARAMS, PARAMS_RATE,
-                      POINTS, POINTS_B, POINT_TABLE, PRODUCT_FOLDER, RECORD_ID, RELEASE_N, REPOSITORIES,
+                      POINTS, POINTS_B, POINT_TABLE, PRODUCT_FOLDER, RECORD_ID, RELEASE_N, REPOSITORIES, START,
                       REPOSITORY_URL, ROOT, StubEngine, StubSession, assert_documents_valid, change, cli,
                       clone_state, commit, committed, deviation_rows, edit_file, expected_deviations,
                       folder_hashes, git, patch_text, rehash, require_clone, roles, run_stub, stored,
-                      stub_regression, stub_release, stub_request, throwaway, with_manifest)
+                      stub_regression, stub_release, stub_request, text, throwaway, with_columns, with_manifest,
+                      model_request, without_volatile)
 
 CORE_MODULES = ["documents", "export", "changes", "run", "compare", "signature", "replay", "regression",
-                "derive", "walk", "search", "__main__"]
-POINTS_E = POINTS + "MP-E,0,1,7\n"
+                "derive", "walk", "search", "workers", "__main__"]
+POINTS_PLUS_E = POINTS + "MP-E,0,1,7\n"
 
 
 # --- full and subset runs -----------------------------------------------------------
@@ -60,7 +61,7 @@ def test_full_run_exports_every_model_point_and_writes_the_record(world):
         stored(folder / "request.json")
     for member in ("stage", "run_id", "release", "changes", "selection"):
         assert response[member] == request[member]
-    assert response["contract_version"] == record["contract_version"] == "2.0"
+    assert response["contract_version"] == record["contract_version"] == "3.0"
     assert response["time_basis"] == {"id": "policy_month"}
     assert response["model_points"] == [
         {"model_point_id": "MP-A", "first_period": 12, "last_period": 13},
@@ -135,12 +136,12 @@ def test_bad_request_is_rejected_with_the_response_alone(world, case, code):
         "byte-order-mark": b"\xef\xbb\xbf" + valid,
         "lone-surrogate": text.replace('"run-stub"', '"run-\\ud800"', 1).encode("utf-8"),
         "duplicate-member": text.replace('"run_id"', '"run_id": "other",\n  "run_id"', 1).encode("utf-8"),
-        "wrong-version": request_bytes(world, contract_version="3.0"),
+        "wrong-version": request_bytes(world, contract_version="4.0"),
         "empty-selection": request_bytes(world, selection={"mode": "subset", "model_point_ids": []}),
         "duplicate-selection": request_bytes(
             world, selection={"mode": "subset", "model_point_ids": ["MP-A", "MP-A"]}),
         "unknown-member": request_bytes(world, priority="high"),
-        "a-response": document_bytes({"document": "run_response", "contract_version": "2.0",
+        "a-response": document_bytes({"document": "run_response", "contract_version": "3.0",
                                       "stage": "liability_cashflow", "run_id": "run-stub",
                                       "outcome": "rejected",
                                       "diagnostics": [{"code": "invalid_json", "message": "x"}]}),
@@ -154,7 +155,7 @@ def test_bad_request_is_rejected_with_the_response_alone(world, case, code):
     response = stored(folder / "response.json")
     assert not schema_errors(response, RUN_SCHEMA)
     assert [d["code"] for d in response["diagnostics"]] == [code]
-    assert response["contract_version"] == "2.0"
+    assert response["contract_version"] == "3.0"
     # Stage and run id are repeated where they can be read.
     readable = case not in {"not-json", "non-finite", "too-large", "not-an-object", "byte-order-mark",
                             "duplicate-member", "lone-surrogate"}
@@ -162,7 +163,7 @@ def test_bad_request_is_rejected_with_the_response_alone(world, case, code):
 
 
 def test_the_version_is_checked_before_the_schema(world):
-    result, _ = run_stub(world, request_bytes(world, contract_version="3.0", selection={"mode": "none"}))
+    result, _ = run_stub(world, request_bytes(world, contract_version="4.0", selection={"mode": "none"}))
     assert result.response["diagnostics"][0]["code"] == "unsupported_version"
 
 
@@ -264,7 +265,7 @@ def test_a_file_of_any_realisation_is_checked_by_the_run_and_copied_by_the_repla
                        "file": {"path": f"files/{change_id}.csv", "sha256": sha256_file(path)}}
         return change(change_id, None, world / "run", realisation=realisation)
 
-    entries = [replace("chg-replace", POINTS_B), replace("chg-unused", POINTS_E)]
+    entries = [replace("chg-replace", POINTS_B), replace("chg-unused", POINTS_PLUS_E)]
     changes = with_manifest(world, entries, ["chg-replace"])
     (world / "run" / "files" / "chg-unused.csv").unlink()  # no file of a change that is not enabled is read
     result, _ = run_stub(world, stub_request(world, changes=changes), ReplaceEngine())
@@ -276,7 +277,7 @@ def test_a_file_of_any_realisation_is_checked_by_the_run_and_copied_by_the_repla
 
     # A replay with an altered file is rejected and writes nothing more.
     remove_replay(world / "run")
-    (world / "run" / "files" / "chg-replace.csv").write_text(POINTS_E, "utf-8")
+    (world / "run" / "files" / "chg-replace.csv").write_text(POINTS_PLUS_E, "utf-8")
     with pytest.raises(Rejection) as caught:
         replay(record, ReplaceEngine(), repositories=world)
     assert caught.value.code == "artifact_hash_mismatch" and not (world / "run" / "replay").exists()
@@ -297,7 +298,7 @@ def test_enabled_changes_are_applied_in_manifest_order_to_a_scratch_copy(world):
         change("chg-point-b", patch_text("points.csv", POINTS, POINTS_B), world / "run"),
         change("chg-rate", patch_text("params.csv", PARAMS, PARAMS_RATE), world / "run",
                **{"class": "parameter"}),
-        change("chg-add-e", patch_text("points.csv", POINTS_B, POINTS_E.replace("MP-B,0,2,2", "MP-B,0,2,4")),
+        change("chg-add-e", patch_text("points.csv", POINTS_B, POINTS_PLUS_E.replace("MP-B,0,2,2", "MP-B,0,2,4")),
                world / "run", prerequisites=["chg-point-b"]),
         change("chg-unused", patch_text("params.csv", PARAMS, PARAMS.replace("base", "other")), world / "run"),
     ]
@@ -754,7 +755,7 @@ class AnyRelease(StubEngine):
     ("state-not-readable", lambda: AnyRelease(raises=True)),
 ])
 def test_the_error_examples_of_the_pack_are_written_by_the_core(world, case, engine):
-    example = ROOT / "contracts" / "v2" / "examples" / "negative" / case
+    example = ROOT / "contracts" / "v3" / "examples" / "negative" / case
     shutil.copyfile(example / "request.json", world / "run" / "request.json")
     result = run_request(world / "run" / "request.json", engine(), repositories=world)
     assert result.outcome == "error"
@@ -792,8 +793,7 @@ def test_a_run_of_one_request_repeated_differs_only_in_its_record(world):
     records = [stored(world / name / "run-record.json") for name in ("first", "second")]
     assert records[0]["record_id"] != records[1]["record_id"]
     assert all(RECORD_ID.fullmatch(record["record_id"]) for record in records)
-    assert {k: v for k, v in records[0].items() if k not in ("record_id", "recorded_at")} == \
-        {k: v for k, v in records[1].items() if k not in ("record_id", "recorded_at")}
+    assert without_volatile(records[0]) == without_volatile(records[1])
 
 
 TABLE = {"name": "table", "type": "keyed_table", "key_columns": ["year", "kind"], "value_columns": ["rate"],
@@ -968,7 +968,7 @@ def test_replay_of_an_unchanged_run_is_reproduced_exactly(world, with_changes):
     record = stored(folder / "replay-record.json")
     assert not schema_errors(record, RECORD_SCHEMA)
     assert record["procedure"] == {"type": "replay"} and record["outcome"] == "reproduced_exactly"
-    assert record["stage"] == "liability_cashflow" and record["contract_version"] == "2.0"
+    assert record["stage"] == "liability_cashflow" and record["contract_version"] == "3.0"
     # Every execution has its own record id: the replay, the repeated run, and the recorded run.
     repeated = stored(folder / "replay" / "run-record.json")
     assert RECORD_ID.fullmatch(record["record_id"]) and RECORD_ID.fullmatch(repeated["record_id"])
@@ -1100,11 +1100,12 @@ def test_replay_with_other_values_is_not_reproduced(world):
     alter_export(folder)
     lines = (folder / "results.csv").read_text("utf-8").splitlines()
     lines = [line for line in lines if not line.startswith("MP-C,")]
-    lines.insert(1, "MP-A,11,1.5,18")
+    # The recorded run exports one more period of MP-A, at its end: projection period 2.
+    lines.insert(lines.index(next(line for line in lines if line.startswith("MP-A,13,"))) + 1, "MP-A,14,1.5,22.5")
     (folder / "results.csv").write_text("\n".join(lines) + "\n", "utf-8")
     response = stored(folder / "response.json")
     response["model_points"] = [
-        {"model_point_id": "MP-A", "first_period": 11, "last_period": 13},
+        {"model_point_id": "MP-A", "first_period": 12, "last_period": 14},
         {"model_point_id": "MP-B", "first_period": 0, "last_period": 2},
         {"model_point_id": "MP-D", "first_period": 3, "last_period": 4}]
     (folder / "response.json").write_bytes(document_bytes(response))
@@ -1124,7 +1125,7 @@ def test_replay_with_other_values_is_not_reproduced(world):
     assert deviation_rows(folder / "replay-compare.result.json") == [
         {"model_point_id": "MP-B", "period": 1, "quantity": "Netto-Cashflow", "left": 4.5, "right": 4.0}]
     assert compared["deviating_model_points"] == ["MP-B"]
-    assert compared["removed"] == [{"model_point_id": "MP-A", "first_period": 11, "last_period": 11}]
+    assert compared["removed"] == [{"model_point_id": "MP-A", "first_period": 2, "last_period": 2}]
     assert compared["added"] == [{"model_point_id": "MP-C", "first_period": 0, "last_period": 0}]
     for entry in record["inputs"] + record["outputs"]:
         assert sha256_file(folder / entry["artifact"]["path"]) == entry["artifact"]["sha256"]
@@ -1418,8 +1419,8 @@ class OtherTimeBasis(StubEngine):
 def test_regression_never_reports_no_deviation_for_a_coverage_difference_or_no_comparison(world, capsys, case):
     from degelmann.deltarecon.__main__ import print_comparison
     recorded_run(world)
-    if case == "coverage":  # only the period range of MP-B differs
-        done = stub_regression(world, stub_release(world, "rel-new", POINTS.replace("MP-B,0,2,2", "MP-B,1,4,2")))
+    if case == "coverage":  # only the period range of MP-B differs: it ends two periods later
+        done = stub_regression(world, stub_release(world, "rel-new", POINTS.replace("MP-B,0,2,2", "MP-B,0,4,2")))
     else:
         done = stub_regression(world, stub_release(world, "rel-new"), OtherTimeBasis())
     assert not done.no_deviation and print_comparison("regression", done.comparison) == 1
@@ -1429,9 +1430,8 @@ def test_regression_never_reports_no_deviation_for_a_coverage_difference_or_no_c
     if case == "coverage":
         assert deviation_rows(world / "out" / "compare.result.json") == []
         assert compared["added"] == [{"model_point_id": "MP-B", "first_period": 3, "last_period": 4}]
-        assert compared["removed"] == [{"model_point_id": "MP-B", "first_period": 0, "last_period": 0}]
+        assert compared["removed"] == []
         assert "added: liability_cashflow / model point MP-B, periods 3 to 4" in output
-        assert "removed: liability_cashflow / model point MP-B, periods 0 to 0" in output
     else:
         assert compared["outcome"] == "incompatible"
         assert "regression: incompatible" in output and "diagnostic: time_basis_mismatch:" in output
@@ -1494,8 +1494,7 @@ def test_a_repeated_regression_and_replay_differ_only_in_records_and_the_request
     assert set(one) == set(two)
     for name in ("compare.run-record.json", "run/run-record.json"):
         records = [stored(world / out / name) for out in ("out-1", "out-2")]
-        assert {k: v for k, v in records[0].items() if k not in ("record_id", "recorded_at", "inputs")} == \
-            {k: v for k, v in records[1].items() if k not in ("record_id", "recorded_at", "inputs")}
+        assert without_volatile(records[0], "inputs") == without_volatile(records[1], "inputs")
     requests = [stored(world / out / "compare.request.json") for out in ("out-1", "out-2")]
     requests[0]["right"]["run_record"] = requests[1]["right"]["run_record"]
     assert requests[0] == requests[1]
@@ -1573,12 +1572,7 @@ def test_only_the_adapter_imports_the_engine_and_calls_git():
 
 # --- the reference model ------------------------------------------------------------
 
-RELEASE_VALUE = f"git:{REPOSITORY_URL}@{RELEASE_N}"
-
-
-def text(path: str) -> str:
-    """A file of release N, as committed."""
-    return committed(path).decode("utf-8")
+RELEASE_VALUE = f"git:{REPOSITORY_URL}@{START}"
 
 
 def in_force_id() -> str:
@@ -1588,33 +1582,15 @@ def in_force_id() -> str:
     return row[columns.index("policy_id")]
 
 
-def model_request(monkeypatch, folder: Path, *ids: str, revision: str = RELEASE_N,
-                  repositories: Path = REPOSITORIES, run_id: str = "run-n-subset") -> Path:
-    arguments = ["request", "--revision", revision, "--repositories", repositories, "--label", "N",
-                 "--run-id", run_id, "--output", folder / "request.json"]
-    if ids:
-        arguments += ["--subset", *ids]
-    assert cli(monkeypatch, *arguments) == 0
-    assert not schema_errors(stored(folder / "request.json"), RUN_REQUEST)
-    return folder / "request.json"
-
-
 def named_revisions(request: dict) -> dict[str, str]:
     return {r["kind"]: r["value"] for r in request["release"]["references"]}
 
 
 def point_line(policy_id: str) -> tuple[list[str], str]:
-    """The columns of the model point table and the line of one model point of release N."""
+    """The columns of the model point table and the line of one model point of the start commit of the reference chain
+    (release N on the fixed model)."""
     lines = text(POINT_TABLE).split("\n")
     return lines[0].split(","), next(line for line in lines if line.split(",")[1:2] == [policy_id])
-
-
-def with_columns(columns: list[str], line: str, **changes: str) -> str:
-    values = line.split(",")
-    for column, value in changes.items():
-        assert values[columns.index(column)] != value
-        values[columns.index(column)] = value
-    return ",".join(values)
 
 
 def test_request_command_names_the_complete_release_identity(monkeypatch, tmp_path):
@@ -1624,13 +1600,13 @@ def test_request_command_names_the_complete_release_identity(monkeypatch, tmp_pa
     assert [r["kind"] for r in references] == ["code_state", "parameter_set", "input_data", "engine_version"]
     # One reference per kind a revision determines, all three with the same value.
     assert [r["value"] for r in references[:3]] == [RELEASE_VALUE] * 3
-    assert RELEASE_VALUE == "git:https://github.com/Degelmann-Solutions/delib-history@" + RELEASE_N
-    assert re.fullmatch(r"[0-9a-f]{40}", RELEASE_N)
+    assert RELEASE_VALUE == "git:https://github.com/Degelmann-Solutions/delib-history@" + START
+    assert re.fullmatch(r"[0-9a-f]{40}", START)
     version = references[3]["value"]
     assert all(name in version for name in ("modelx ", "pandas ", "numpy ", "Python "))
     assert request["selection"] == {"mode": "full"} and request["changes"] == {"enabled": []}
     # The command overwrites no request.
-    assert cli(monkeypatch, "request", "--revision", RELEASE_N, "--repositories", REPOSITORIES, "--label", "N",
+    assert cli(monkeypatch, "request", "--revision", START, "--repositories", REPOSITORIES, "--label", "N",
                "--run-id", "x", "--output", tmp_path / "run" / "request.json") == 2
 
     from degelmann.deltarecon.engines.reference_model import ReferenceModel
@@ -1641,15 +1617,15 @@ def test_request_command_names_the_complete_release_identity(monkeypatch, tmp_pa
 
 def test_request_command_resolves_any_name_of_a_commit_to_the_full_hash(monkeypatch, tmp_path):
     repositories, clone = throwaway(tmp_path)
-    git(clone, "branch", "release-n", RELEASE_N)
-    for number, name in enumerate(["HEAD", "work", "release-n", RELEASE_N[:10], RELEASE_N]):
+    git(clone, "branch", "start", START)
+    for number, name in enumerate(["HEAD", "work", "start", START[:10], START]):
         request = stored(model_request(monkeypatch, tmp_path / f"run-{number}", revision=name,
                                        repositories=repositories))
         assert named_revisions(request)["code_state"] == RELEASE_VALUE, name
 
 
 @pytest.mark.parametrize("name", ["no-such-branch", "0123456789abcdef0123456789abcdef01234567",
-                                  f"{RELEASE_N}^{{tree}}", "--all", ""])
+                                  f"{START}^{{tree}}", "--all", ""])
 def test_request_command_refuses_a_name_that_names_no_commit(monkeypatch, tmp_path, capsys, name):
     output = tmp_path / "run" / "request.json"
     assert cli(monkeypatch, "request", f"--revision={name}", "--repositories", REPOSITORIES, "--label", "N",
@@ -1690,7 +1666,7 @@ def test_request_command_without_a_clone_names_where_it_is_expected(monkeypatch,
     output = tmp_path / "run" / "request.json"
     (tmp_path / "empty" / CLONE_NAME).mkdir(parents=True)  # a folder that is no repository
     for repositories in (tmp_path / "absent", tmp_path / "empty"):
-        assert cli(monkeypatch, "request", "--revision", RELEASE_N, "--repositories", repositories,
+        assert cli(monkeypatch, "request", "--revision", START, "--repositories", repositories,
                    "--label", "N", "--run-id", "x", "--output", output) == 1
         printed = capsys.readouterr().out
         assert printed.startswith("request: rejected\ndiagnostic: unknown_reference: ")
@@ -1778,6 +1754,10 @@ IDENTITY_EDITS = {
         value=refs[2]["value"].replace("delib-history", "other-history")),
     "no-engine": lambda refs: refs.pop(3),
     "other-engine": lambda refs: refs[3].update(value="modelx 0.0.1"),
+    # A value of the export form that names another Python, and one whose suffix stands elsewhere.
+    "other-engine-on-the-export-path": lambda refs: refs[3].update(value=refs[3]["value"].replace(", Python ", ", Python 0.")),
+    "export-suffix-on-another-part": lambda refs: refs[3].update(
+        value=refs[3]["value"].replace(" export,", ",").replace(", numpy", " export, numpy")),
     "with-artifact": lambda refs: refs[2].update(artifact={"path": "request.json", "sha256": "0" * 64}),
     # The value does not name a commit of the repository the engine knows.
     "other-repository": lambda refs: [r.update(value=r["value"].replace("delib-history", "other-history"))
@@ -1811,7 +1791,7 @@ def test_a_hash_that_names_no_commit_is_an_unknown_reference(monkeypatch, tmp_pa
     request = stored(model_request(monkeypatch, tmp_path / "base", NEW_BUSINESS, repositories=repositories))
     for kind, object_id in objects.items():
         object_id = object_id.decode("ascii").strip()
-        assert object_id != RELEASE_N and git(clone, "cat-file", "-t", object_id).strip() == kind.encode()
+        assert object_id != START and git(clone, "cat-file", "-t", object_id).strip() == kind.encode()
         for reference in request["release"]["references"][:3]:
             reference["value"] = f"git:{REPOSITORY_URL}@{object_id}"
         folder = tmp_path / kind
@@ -1847,7 +1827,7 @@ def test_without_git_no_command_starts(monkeypatch, tmp_path, capsys):
     assert cli(monkeypatch, "replay", recorded / "run-record.json", "--repositories", REPOSITORIES) == 2
     assert "git is not installed" in capsys.readouterr().err
     assert not (recorded / "replay").exists() and not (recorded / "replay-record.json").exists()
-    assert cli(monkeypatch, "request", "--revision", RELEASE_N, "--repositories", REPOSITORIES, "--label", "N",
+    assert cli(monkeypatch, "request", "--revision", START, "--repositories", REPOSITORIES, "--label", "N",
                "--run-id", "x", "--output", tmp_path / "other" / "request.json") == 2
     assert "git is not installed" in capsys.readouterr().err
     # Neither does a command start when the repositories folder is absent as well.
@@ -1860,7 +1840,7 @@ def test_without_git_no_command_starts(monkeypatch, tmp_path, capsys):
 def test_a_missing_clone_ends_the_test_session_with_the_clone_command(tmp_path):
     require_clone()  # the clone of this session passes
     (tmp_path / "empty").mkdir()  # a folder inside no repository must not pass as a clone
-    for clone, revision in ((tmp_path / "absent", RELEASE_N), (tmp_path / "empty", RELEASE_N),
+    for clone, revision in ((tmp_path / "absent", START), (tmp_path / "empty", START),
                             (CLONE, "1" * 40)):
         with pytest.raises(pytest.exit.Exception) as caught:
             require_clone(clone, revision)
@@ -1891,7 +1871,7 @@ def test_the_restored_files_are_the_committed_bytes_whatever_the_line_ending_set
     assert sorted(restored) == sorted(files) == sorted(
         git(CLONE, "ls-tree", "-r", "--name-only", RELEASE_N).decode("utf-8").splitlines())
     for path, data in restored.items():
-        assert data == committed(path), path
+        assert data == committed(path, RELEASE_N), path
         assert b"\r" not in data, path
     # The hashes UPSTREAM.md records for the files copied from lifelib, and the portfolio hash.
     recorded = dict(re.findall(r"^\| `([^`]+)` \| `([0-9a-f]{64})` \|$",
@@ -1935,7 +1915,8 @@ def test_a_later_revision_is_run_as_committed(monkeypatch, tmp_path, capsys, ful
                                      ("request.json", "response.json", "run-record.json"))
         return request, check_response(request, response, folder), {p["name"]: p for p in record["parameters"]}
 
-    # The working tree holds the change, the commit does not: the run is that of release N.
+    # The working tree holds the change, the commit does not: the run is that of the start commit
+    # of the reference chain (release N on the fixed model).
     request, first, parameters = run("first", "HEAD")
     assert named_revisions(request)["input_data"] == RELEASE_VALUE
     assert parameters["lapse_table"]["rows"][0] == {"key": [1], "values": [0.06]}
@@ -1945,7 +1926,7 @@ def test_a_later_revision_is_run_as_committed(monkeypatch, tmp_path, capsys, ful
     assert clone_state(clone) == dirty
 
     second_hash = commit(clone, "Lower the lapse rate of policy year 1")
-    assert second_hash != RELEASE_N
+    assert second_hash != START
     committed_state = clone_state(clone)
     request, second, parameters = run("second", "work")
     assert set(named_revisions(request).values()) - {named_revisions(request)["engine_version"]} == {
@@ -1956,7 +1937,7 @@ def test_a_later_revision_is_run_as_committed(monkeypatch, tmp_path, capsys, ful
     assert second[(NEW_BUSINESS, 1)] != first[(NEW_BUSINESS, 1)]
     assert clone_state(clone) == committed_state
 
-    # The first commit is still run as release N, and the replay of the second is reproduced.
+    # The first commit is still run as the start commit, and the replay of the second is reproduced.
     assert cli(monkeypatch, "replay", tmp_path / "first" / "run-record.json", "--repositories", repositories) == 0
     assert cli(monkeypatch, "replay", tmp_path / "second" / "run-record.json", "--repositories", repositories) == 0
     assert capsys.readouterr().out.count("replay: reproduced_exactly") == 2
@@ -1977,11 +1958,11 @@ def test_a_replace_reference_does_not_change_what_a_hash_names(monkeypatch, tmp_
     # Git itself now reads the other commit under the hash of release N.
     replaced = subprocess.run(["git", "-C", str(clone), "cat-file", "blob", f"{RELEASE_N}:{LAPSE_TABLE}"],
                               capture_output=True, env={"PATH": os.environ["PATH"]}).stdout
-    assert b"\n1,0.05," in replaced and b"\n1,0.06," in committed(LAPSE_TABLE)
+    assert b"\n1,0.05," in replaced and b"\n1,0.06," in committed(LAPSE_TABLE, RELEASE_N)
 
     folder = tmp_path / "run"
-    path = model_request(monkeypatch, folder, NEW_BUSINESS, repositories=repositories)
-    assert named_revisions(stored(path))["code_state"] == RELEASE_VALUE
+    path = model_request(monkeypatch, folder, NEW_BUSINESS, revision=RELEASE_N, repositories=repositories)
+    assert named_revisions(stored(path))["code_state"] == f"git:{REPOSITORY_URL}@{RELEASE_N}"
     assert cli(monkeypatch, "run", path, "--repositories", repositories) == 0
     parameters = {p["name"]: p for p in stored(folder / "run-record.json")["parameters"]}
     assert parameters["lapse_table"]["rows"][0] == {"key": [1], "values": [0.06]}
@@ -2032,6 +2013,98 @@ def test_false_built_in_check_is_a_failed_model_point(monkeypatch, tmp_path, cap
     assert "check_pols_roll_fwd is false" in response["failed_model_points"][0]["message"]
     assert not (folder / "results.csv").exists()
     assert record["outcome"] == "failed" and len(record["parameters"]) > 20
+
+
+@pytest.mark.parametrize("path", ["export", "modelx"])
+def test_projection_releases_the_item_space_of_each_point(tmp_path, path):
+    """A run keeps no ItemSpace of a projected point alive, after a point that fails neither, on both paths."""
+    from degelmann.deltarecon.engines.reference_model import ReferenceModel, release_references
+    repositories, clone = throwaway(tmp_path)
+    lines = text(POINT_TABLE).splitlines()
+    columns = lines[0].split(",")
+    term = lines[15].split(",")[columns.index("policy_term")]
+    broken = lines[15].split(",")[columns.index("policy_id")]
+    edit_file(clone, POINT_TABLE, lines[15] + "\n", with_columns(columns, lines[15], duration_y=term) + "\n")
+    revision = commit(clone, "Set a duration that equals the term")
+    release = {"label": "N", "references": release_references(revision, path=path)}
+    with ReferenceModel().open(release, [], None, repositories) as session:
+        projection = session._computing.Projection
+        assert (projection is session._model.Projection) == (path == "modelx")
+
+        def item_spaces() -> dict:  # modelx and the exported package name them differently
+            return dict(projection.itemspaces if path == "modelx" else projection._mx_itemspaces)
+
+        projection[1]
+        assert item_spaces()  # the probe sees an ItemSpace that is alive
+        del projection[1]
+        for point in (NEW_BUSINESS, in_force_id()):
+            assert session.project(point)
+            assert item_spaces() == {}
+        with pytest.raises(ModelPointFailure, match="check_pols_roll_fwd is false"):
+            session.project(broken)
+        assert item_spaces() == {}
+
+
+def test_projection_keeps_the_failure_when_no_item_space_was_created():
+    import pandas as pd
+    from degelmann.deltarecon.engines.reference_model import ReferenceModelSession
+
+    class Projection:
+        deleted = []
+
+        def __getitem__(self, index):
+            raise ValueError("no item space")
+
+        def __delitem__(self, index):
+            self.deleted.append(index)
+            raise KeyError(index)
+
+    class Data:
+        @staticmethod
+        def model_point_table():
+            return pd.DataFrame({"policy_id": ["RLV-000001"]})
+
+    class Model:
+        pass
+
+    model = Model()
+    model.Projection, model.Data = Projection(), Data()
+    with pytest.raises(ModelPointFailure, match="result_cf raised ValueError: no item space"):
+        ReferenceModelSession(model).project("RLV-000001")
+    assert Projection.deleted == [0]
+
+
+def test_projection_releases_the_item_space_when_result_cf_raises():
+    import pandas as pd
+    from degelmann.deltarecon.engines.reference_model import ReferenceModelSession
+
+    class ItemSpace:
+        @staticmethod
+        def result_cf():
+            raise ValueError("no result")
+
+    class Projection:
+        itemspaces = {}
+
+        def __getitem__(self, index):
+            return self.itemspaces.setdefault(index, ItemSpace())
+
+        def __delitem__(self, index):
+            del self.itemspaces[index]
+
+    class Data:
+        @staticmethod
+        def model_point_table():
+            return pd.DataFrame({"policy_id": ["RLV-000001"]})
+
+    class Model:
+        pass
+
+    model = Model()
+    model.Projection, model.Data = Projection(), Data()
+    with pytest.raises(ModelPointFailure, match="result_cf raised ValueError: no result"):
+        ReferenceModelSession(model).project("RLV-000001")
+    assert Projection.itemspaces == {}
 
 
 FORMULA_MESSAGE = (
@@ -2099,10 +2172,10 @@ def test_unsupported_realisation_over_a_revision_is_rejected_and_names_the_chang
                folder, **{"class": "parameter"}),
         change("chg-switch", None, folder, realisation={"type": "engine_switch", "switch": "RC-1"}),
     ]
-    manifest = {"document": "change_manifest", "contract_version": "2.0", "stage": "liability_cashflow",
+    manifest = {"document": "change_manifest", "contract_version": "3.0", "stage": "liability_cashflow",
                 "manifest_id": "changes-synthetic", "base_release": "N", "changes": entries}
     (folder / "changes.json").write_bytes(document_bytes(manifest))
-    assert cli(monkeypatch, "request", "--revision", RELEASE_N, "--repositories", REPOSITORIES, "--label", "N",
+    assert cli(monkeypatch, "request", "--revision", START, "--repositories", REPOSITORIES, "--label", "N",
                "--run-id", "run-switch", "--output", folder / "request.json", "--subset", NEW_BUSINESS,
                "--enable", "chg-switch", "chg-lapse-year-1", "--manifest", folder / "changes.json") == 0
     assert cli(monkeypatch, "run", folder / "request.json", "--repositories", REPOSITORIES) == 1
@@ -2121,16 +2194,16 @@ def test_an_enabled_revision_the_clone_does_not_hold_ends_with_the_outcome_error
     folder = tmp_path / "run"
     folder.mkdir()
     manifest = {
-        "document": "change_manifest", "contract_version": "2.0", "stage": "liability_cashflow",
-        "manifest_id": f"history-{RELEASE_N}-{'1' * 40}", "base_release": "N",
-        "history": {"source": "git", "from": RELEASE_N, "to": "1" * 40,
+        "document": "change_manifest", "contract_version": "3.0", "stage": "liability_cashflow",
+        "manifest_id": f"history-{START}-{'1' * 40}", "base_release": "N",
+        "history": {"source": "git", "from": START, "to": "1" * 40,
                     "determines": ["code_state", "input_data", "parameter_set"], "remainder": []},
         "changes": [{"id": "1" * 40, "class": ["parameter"], "description": "A later revision.",
                      "prerequisites": [], "conflicts": [],
                      "realisation": {"type": "revision", "source": "git", "revision": "1" * 40}}]}
     assert not schema_errors(manifest, CHANGES_SCHEMA)
     (folder / "changes.json").write_bytes(document_bytes(manifest))
-    assert cli(monkeypatch, "request", "--revision", RELEASE_N, "--repositories", REPOSITORIES, "--label", "N",
+    assert cli(monkeypatch, "request", "--revision", START, "--repositories", REPOSITORIES, "--label", "N",
                "--run-id", "run-revision", "--output", folder / "request.json", "--subset", NEW_BUSINESS,
                "--enable", "1" * 40, "--manifest", folder / "changes.json") == 0
     state = clone_state()
@@ -2168,11 +2241,11 @@ def test_changes_over_a_revision_and_replay_without_the_clone(monkeypatch, tmp_p
         change("chg-claim-expense", patch_text(MODEL_CODE, code, new_code), folder, **{"class": "code"}),
         change("chg-rename-point", patch_text(POINT_TABLE, points, new_points), folder),
     ]
-    manifest = {"document": "change_manifest", "contract_version": "2.0", "stage": "liability_cashflow",
+    manifest = {"document": "change_manifest", "contract_version": "3.0", "stage": "liability_cashflow",
                 "manifest_id": "changes-synthetic", "base_release": "N", "changes": entries}
     (folder / "changes.json").write_bytes(document_bytes(manifest))
     assert not schema_errors(manifest, CHANGES_SCHEMA)
-    assert cli(monkeypatch, "request", "--revision", RELEASE_N, "--repositories", REPOSITORIES,
+    assert cli(monkeypatch, "request", "--revision", START, "--repositories", REPOSITORIES,
                "--label", "N", "--run-id", "run-changes", "--output", folder / "request.json",
                "--subset", in_force, NEW_BUSINESS, "RLV-NEW-0002",
                "--enable", "chg-rename-point", "chg-claim-expense", "chg-lapse-year-1",
@@ -2202,7 +2275,7 @@ def test_changes_over_a_revision_and_replay_without_the_clone(monkeypatch, tmp_p
     other.mkdir()
     shutil.copytree(folder / "patches", other / "patches")
     shutil.copy(folder / "changes.json", other / "changes.json")
-    assert cli(monkeypatch, "request", "--revision", RELEASE_N, "--repositories", REPOSITORIES,
+    assert cli(monkeypatch, "request", "--revision", START, "--repositories", REPOSITORIES,
                "--label", "N", "--run-id", "run-unknown", "--output", other / "request.json",
                "--subset", "RLV-000002", "--enable", "chg-rename-point",
                "--manifest", other / "changes.json") == 0
@@ -2228,9 +2301,10 @@ def test_changes_over_a_revision_and_replay_without_the_clone(monkeypatch, tmp_p
 
 @pytest.fixture(scope="module")
 def recorded_subset(tmp_path_factory) -> Path:
-    """The folder of a recorded subset run of release N: one in-force and one new-business point."""
+    """The folder of a recorded subset run of the start commit of the reference chain (release N on the
+    fixed model): one in-force and one new-business point."""
     folder = tmp_path_factory.mktemp("recorded-n") / "run"
-    assert main(["request", "--revision", RELEASE_N, "--repositories", str(REPOSITORIES), "--label", "N",
+    assert main(["request", "--revision", START, "--repositories", str(REPOSITORIES), "--label", "N",
                  "--run-id", "run-n-subset", "--output", str(folder / "request.json"),
                  "--subset", in_force_id(), NEW_BUSINESS]) == 0
     assert main(["run", str(folder / "request.json"), "--repositories", str(REPOSITORIES)]) == 0
@@ -2249,7 +2323,7 @@ def test_regression_command_without_a_clone_is_rejected_and_writes_nothing(
     for repositories in (tmp_path / "absent", tmp_path / "empty"):
         capsys.readouterr()
         output = tmp_path / f"out-{repositories.name}"
-        assert regress(monkeypatch, recorded_subset, RELEASE_N, repositories, output) == 1
+        assert regress(monkeypatch, recorded_subset, START, repositories, output) == 1
         printed = capsys.readouterr()
         assert printed.out.startswith("regression: rejected\ndiagnostic: unknown_reference: ")
         assert f"git clone {REPOSITORY_URL} {repositories / CLONE_NAME}" in printed.out
@@ -2366,11 +2440,11 @@ def test_regression_uses_the_model_point_table_of_the_recorded_run(monkeypatch, 
     assert compared["added"] == compared["removed"] == []
 
     # A run of the newer commit with its own table has another period range for that policy,
-    # and so has a run of release N that names the newer commit as its input data.
+    # and so has a run of the start commit that names the newer commit as its input data.
     from degelmann.deltarecon.engines import reference_model
     ranges = {p["model_point_id"]: p for p in recorded["model_points"]}
     for name, references in (("own", reference_model.release_references(newer)),
-                             ("mixed", reference_model.release_references(RELEASE_N, newer))):
+                             ("mixed", reference_model.release_references(START, newer))):
         folder = tmp_path / name
         path = model_request(monkeypatch, folder, NEW_BUSINESS, revision=newer, repositories=repositories)
         request = stored(path)
@@ -2389,14 +2463,14 @@ def test_regression_uses_the_model_point_table_of_the_recorded_run(monkeypatch, 
     folder = tmp_path / "without"
     path = model_request(monkeypatch, folder, NEW_BUSINESS, repositories=repositories)
     request = stored(path)
-    request["release"]["references"] = reference_model.release_references(RELEASE_N, without)
+    request["release"]["references"] = reference_model.release_references(START, without)
     assert f"The commit {without} lacks the release file {POINT_TABLE}" in assert_unknown_reference(
         run_model(path, request, repositories), folder)
     # The state commit may lack it: its table is not read.
     folder = tmp_path / "state-without"
     path = model_request(monkeypatch, folder, NEW_BUSINESS, repositories=repositories)
     request = stored(path)
-    request["release"]["references"] = reference_model.release_references(without, RELEASE_N)
+    request["release"]["references"] = reference_model.release_references(without, START)
     assert run_model(path, request, repositories).outcome == "succeeded"
 
 
@@ -2442,9 +2516,10 @@ def test_full_changed_case_on_all_model_points_of_release_n(monkeypatch, tmp_pat
     # table is the one that main wrote before the deviations left the result (story 9).
     assert compared["deviations"]["path"] == "compare.deviations.csv"
     assert (out / "compare.result.json").stat().st_size < 64 * 1024
-    # Contract version 2.0: the table of 1.0 (4fc28fbd...) with "contract_version": "2.0", byte for byte.
+    # Contract version 3.0: the 2.0 table 7ba6c115... with "contract_version": "3.0", byte for byte; that
+    # table was the table of 1.0 (4fc28fbd...) with "contract_version": "2.0".
     assert sha256_file(out / "signature-table.json") == \
-        "7ba6c115a2c42d3688a0589a759f664ebe298306fb77ea9ee7a3d73d66109821"
+        "5ddfe21969e468cbfe7e38bf25ce65e4086fa89cd0c7a980ad580b5047b73fc9"
     assert len(stored(recorded / "response.json")["model_points"]) == 350
     # Exactly the new business deviates: no in-force point lies in policy year 1.
     lines = text(POINT_TABLE).splitlines()
@@ -2465,7 +2540,387 @@ def test_full_changed_case_on_all_model_points_of_release_n(monkeypatch, tmp_pat
               f"{len(new_business)} of 350")
 
 
-# --- the full run of release N and its replay ---------------------------------------
+# --- the computation paths -----------------------------------------------------------
+
+
+def test_the_engine_version_names_the_computation_path():
+    from degelmann.deltarecon.engines.reference_model import DEFAULT_PATH, PATHS, engine_version, path_of
+    assert PATHS == ("export", "modelx") and DEFAULT_PATH == "export"
+    export, modelx = engine_version("export"), engine_version("modelx")
+    assert engine_version() == export
+    assert re.fullmatch(r"modelx \S+, pandas \S+, numpy \S+, Python \S+", modelx)
+    assert export == modelx.replace(", pandas ", " export, pandas ", 1)
+    assert (path_of(export), path_of(modelx)) == ("export", "modelx")
+    # The rule for any recorded value: the first comma-separated part ends with " export" or not.
+    for version, path in (("modelx 0.30.0, pandas 2.2.3, numpy 2.1.0, Python 3.12.7", "modelx"),
+                          ("modelx 0.30.0 export, pandas 2.2.3, numpy 2.1.0, Python 3.12.7", "export"),
+                          ("12.4.1", "modelx"), ("another engine export", "export"),
+                          ("modelx 0.33.0, pandas 3.0.6 export, numpy 2.5.3", "modelx"),
+                          ("engine, export", "modelx"), ("modelx export", "export"), ("", "modelx")):
+        assert path_of(version) == path, version
+    with pytest.raises(ValueError):
+        engine_version("lifelib")
+
+
+@pytest.mark.parametrize("path", [None, "export", "modelx"])
+def test_request_command_names_the_engine_version_of_the_path(monkeypatch, tmp_path, path):
+    from degelmann.deltarecon.engines.reference_model import engine_version
+    request = stored(model_request(monkeypatch, tmp_path / "run", NEW_BUSINESS, path=path))
+    assert named_revisions(request)["engine_version"] == engine_version(path or "export")
+
+
+def test_request_command_refuses_an_unknown_path(monkeypatch, tmp_path, capsys):
+    with pytest.raises(SystemExit) as caught:
+        cli(monkeypatch, "request", "--revision", START, "--repositories", REPOSITORIES, "--label", "N",
+            "--run-id", "x", "--output", tmp_path / "run" / "request.json", "--path", "lifelib")
+    assert caught.value.code == 2 and "invalid choice: 'lifelib'" in capsys.readouterr().err
+    assert not (tmp_path / "run").exists()
+
+
+@contextmanager
+def counted_exports(monkeypatch):
+    """Count the calls of ``mx.export_model``; the export itself runs as it is."""
+    from degelmann.deltarecon.engines import reference_model
+    calls = []
+    real = reference_model.mx.export_model
+
+    def export_model(model, path, *arguments, **options):
+        calls.append(Path(path))
+        return real(model, path, *arguments, **options)
+
+    with monkeypatch.context() as patch:
+        patch.setattr(reference_model.mx, "export_model", export_model)
+        yield calls
+
+
+def exported_modules() -> list[str]:
+    return [name for name in sys.modules if name.startswith("_deltarecon_export_")]
+
+
+def without_engine_version(document: dict) -> dict:
+    """A request or a response with the value of its engine version blanked."""
+    copy = json.loads(json.dumps(document))
+    for reference in copy["release"]["references"]:
+        if reference["kind"] == "engine_version":
+            reference["value"] = ""
+    return copy
+
+
+def test_both_paths_give_the_same_export_and_each_replays_on_its_own(monkeypatch, tmp_path, capsys):
+    from degelmann.deltarecon.engines.reference_model import EXPORT_FOLDER, PATHS, engine_version
+    documents = {}
+    for path in PATHS:
+        folder = tmp_path / path
+        request_path = model_request(monkeypatch, folder, in_force_id(), NEW_BUSINESS, path=path)
+        with counted_exports(monkeypatch) as calls:
+            assert cli(monkeypatch, "run", request_path, "--repositories", REPOSITORIES) == 0
+            # The export lies directly in the product folder of the scratch state of the run.
+            assert [(call.name, call.parent.name, call.parent.parent.parent.name.startswith(SCRATCH_PREFIX))
+                    for call in calls] == ([(EXPORT_FOLDER, PRODUCT_FOLDER, True)] if path == "export" else [])
+            assert cli(monkeypatch, "replay", folder / "run-record.json", "--repositories", REPOSITORIES) == 0
+            assert len(calls) == (2 if path == "export" else 0)  # the replay repeats the run on its path
+        assert "replay: reproduced_exactly" in capsys.readouterr().out
+        assert_documents_valid(folder)
+        documents[path] = {name: stored(folder / name) for name in ("request.json", "response.json", "run-record.json")}
+        assert named_revisions(documents[path]["response.json"])["engine_version"] == engine_version(path)
+        assert named_revisions(stored(folder / "replay" / "response.json"))["engine_version"] == engine_version(path)
+    assert exported_modules() == []  # the imported packages left sys.modules with their sessions
+    assert (tmp_path / "export" / "results.csv").read_bytes() == (tmp_path / "modelx" / "results.csv").read_bytes()
+    export, modelx = documents["export"], documents["modelx"]
+    for name in ("request.json", "response.json"):
+        assert export[name] != modelx[name]
+        assert without_engine_version(export[name]) == without_engine_version(modelx[name]), name
+    assert export["run-record.json"]["parameters"] == modelx["run-record.json"]["parameters"]
+    assert ([without_engine_version({"release": r}) for r in export["run-record.json"]["releases"]]
+            == [without_engine_version({"release": r}) for r in modelx["run-record.json"]["releases"]])
+
+
+def test_a_request_written_before_the_paths_runs_on_modelx(monkeypatch, tmp_path):
+    """The requests of the oracle before this story name the modelx string; they still run, on modelx."""
+    from degelmann.deltarecon.engines.reference_model import engine_version, path_of
+    request = stored(ROOT / "oracle" / "n.request.json")
+    for reference in request["release"]["references"]:
+        if reference["kind"] == "engine_version":  # the value as the request command wrote it before
+            reference["value"] = engine_version("modelx")
+    assert path_of(named_revisions(request)["engine_version"]) == "modelx"
+    request["selection"] = {"mode": "subset", "model_point_ids": [NEW_BUSINESS, in_force_id()]}
+    request["contract_version"] = "3.0"
+    folder = tmp_path / "run"
+    folder.mkdir()
+    with counted_exports(monkeypatch) as calls:
+        result = run_model(folder / "request.json", request)
+    assert result.outcome == "succeeded" and calls == []
+    assert result.response["release"] == request["release"]
+
+
+@pytest.mark.parametrize("where", ["export", "import"])
+def test_an_export_that_fails_ends_the_run_with_an_error_and_does_not_fall_back(monkeypatch, tmp_path, capsys, where):
+    from degelmann.deltarecon.engines import reference_model
+    real = reference_model.mx.export_model
+
+    def export_model(model, path, *arguments, **options):
+        if where == "export":
+            raise RuntimeError("the model cannot be exported")
+        real(model, path, *arguments, **options)
+        (Path(path) / "__init__.py").write_text("raise ImportError('the package cannot be imported')\n")
+
+    monkeypatch.setattr(reference_model.mx, "export_model", export_model)
+    folder = tmp_path / "run"
+    request_path = model_request(monkeypatch, folder, NEW_BUSINESS)
+    assert cli(monkeypatch, "run", request_path, "--repositories", REPOSITORIES) == 1
+    assert "outcome: error" in capsys.readouterr().out
+    response = stored(folder / "response.json")
+    message = ("RuntimeError: the model cannot be exported" if where == "export"
+               else "ImportError: the package cannot be imported")
+    assert response["outcome"] == "error"
+    assert response["diagnostics"] == [{"code": "state_not_readable", "message": message}]
+    assert not (folder / "results.csv").exists() and exported_modules() == []
+    assert_documents_valid(folder)
+
+
+def test_a_projection_that_raises_names_result_cf_on_a_full_run_and_projection_on_a_target_run():
+    from degelmann.deltarecon.engines.reference_model import ReferenceModelSession
+
+    class Projections:
+        def __init__(self):
+            self.released = []
+
+        def __getitem__(self, index):
+            raise ValueError("no such point")
+
+        def __delitem__(self, index):
+            self.released.append(index)
+            raise KeyError(index)  # as modelx does for an item space that was never built
+
+    class Model:
+        Projection = Projections()
+
+    session = ReferenceModelSession(Model())
+    with pytest.raises(ModelPointFailure, match=r"^result_cf raised ValueError: no such point$"):
+        session._project_index(7)
+    with pytest.raises(ModelPointFailure, match=r"^Projection raised ValueError: no such point$"):
+        session._project_target_index(7, ("Bruttobeitrag",), (0, 59))
+    assert Model.Projection.released == [7, 7]  # released on both paths, also after the failure
+
+
+def test_a_point_that_raises_under_the_export_is_a_failed_model_point(monkeypatch, tmp_path, capsys):
+    from degelmann.deltarecon.engines.reference_model import PATHS
+    repositories, clone = throwaway(tmp_path)
+    lines = text(POINT_TABLE).splitlines()
+    columns = lines[0].split(",")
+    broken = lines[15].split(",")[columns.index("policy_id")]
+    index = lines[15].split(",")[columns.index("point_id")]  # the model reads the table by point_id
+    edit_file(clone, POINT_TABLE, lines[15] + "\n", with_columns(columns, lines[15], sex="X") + "\n")
+    revision = commit(clone, "Give one model point an unknown sex")
+    messages = {}
+    for path in PATHS:
+        folder = tmp_path / path
+        request_path = model_request(monkeypatch, folder, NEW_BUSINESS, broken, revision=revision,
+                                     repositories=repositories, path=path)
+        assert cli(monkeypatch, "run", request_path, "--repositories", repositories) == 1
+        assert "outcome: failed" in capsys.readouterr().out
+        response = stored(folder / "response.json")
+        assert response["outcome"] == "failed" and not (folder / "results.csv").exists()
+        assert [f["model_point_id"] for f in response["failed_model_points"]] == [broken]
+        messages[path] = response["failed_model_points"][0]["message"]
+        assert_documents_valid(folder)
+    assert messages == dict.fromkeys(
+        PATHS, f"result_cf raised ValueError: invalid sex in RLV_DE_S.Projection[{index}].sex()")
+
+
+def test_a_formula_of_t_and_a_check_that_raise_name_their_formula_alike_on_both_paths(monkeypatch, tmp_path,
+                                                                                       capsys):
+    from degelmann.deltarecon.engines.reference_model import PATHS
+    repositories, clone = throwaway(tmp_path)
+    lines = text(POINT_TABLE).splitlines()
+    columns = lines[0].split(",")
+    points = {line.split(",")[columns.index("policy_id")]: line.split(",")[columns.index("point_id")]
+              for line in lines[1:3]}
+    (lapse_id, lapse_index), (check_id, check_index) = points.items()
+    edit_file(clone, MODEL_CODE, "    return lapse_rate_base(t) * shock_lapse_factor(t)\n",
+              f"    if point_id == {lapse_index} and t == 3:  # noqa: F821\n"
+              "        raise ValueError('no lapse rate\\nfor month 3')\n"
+              "    return lapse_rate_base(t) * shock_lapse_factor(t)\n")
+    edit_file(clone, MODEL_CODE,
+              "    tol = val_tol * max(sum_assured(), 1.0)                          # noqa: F821\n"
+              "    return all(abs(check_net_cf_resid(t))",
+              f"    if point_id == {check_index}:  # noqa: F821\n"
+              "        raise TypeError('no reconciliation')\n"
+              "    tol = val_tol * max(sum_assured(), 1.0)                          # noqa: F821\n"
+              "    return all(abs(check_net_cf_resid(t))")
+    revision = commit(clone, "Raise in a formula of t and in a check")
+    expected = {
+        lapse_id: f"result_cf raised ValueError: no lapse rate in RLV_DE_S.Projection[{lapse_index}].lapse_rate(t=3)",
+        check_id: f"check_net_cf raised TypeError: no reconciliation in RLV_DE_S.Projection[{check_index}].check_net_cf()",
+    }
+    for path in PATHS:
+        folder = tmp_path / path
+        request_path = model_request(monkeypatch, folder, lapse_id, check_id, revision=revision,
+                                     repositories=repositories, path=path)
+        assert cli(monkeypatch, "run", request_path, "--repositories", repositories) == 1
+        assert "outcome: failed" in capsys.readouterr().out
+        response = stored(folder / "response.json")
+        assert {f["model_point_id"]: f["message"] for f in response["failed_model_points"]} == expected, path
+        assert_documents_valid(folder)
+
+
+def test_a_failure_under_the_export_names_the_innermost_exported_formula():
+    """Stub spaces of a stub exported package: a library frame below a formula, a formula of another
+    space, a cause of two lines, and a check that raises beside one that is false."""
+    import pandas as pd
+    from degelmann.deltarecon.engines.reference_model import ReferenceModelSession
+
+    with pytest.raises(ValueError) as caught:
+        pd.to_numeric(pd.Series(["x"]))
+    library_cause = f"ValueError: {str(caught.value).splitlines()[0]}"
+
+    class Data:
+        _name = "Data"
+
+        @staticmethod
+        def model_point_table():
+            return pd.DataFrame({"policy_id": ["MP-0", "MP-1", "MP-2"]})
+
+        def _f_lapse_table(self):
+            return {}["policy_year"]
+
+    data = Data()
+
+    class ItemSpace:
+        _name = "Projection"
+
+        def __init__(self, index):
+            self.index = index
+
+        def result_cf(self):
+            return self._f_result_cf()
+
+        def _f_result_cf(self):
+            if self.index == 0:
+                return self._f_premiums(0, "AFT_DECR")
+            if self.index == 2:
+                return self._f_sex()
+            return pd.DataFrame()
+
+        def _f_premiums(self, t, timing):
+            return pd.to_numeric(pd.Series(["x"]))  # raises inside pandas
+
+        def _f_sex(self):
+            raise ValueError("invalid sex\nX is neither M nor F")
+
+        def check_net_cf(self):
+            return self._f_check_net_cf()
+
+        def _f_check_net_cf(self):
+            return data._f_lapse_table()
+
+        def check_prem_split(self):
+            return False
+
+        def __getattr__(self, name):  # every other check holds
+            return lambda: True
+
+    class Projection:
+        def __getitem__(self, index):
+            return ItemSpace(index)
+
+        def __delitem__(self, index):
+            pass
+
+    class Exported:
+        pass
+
+    class Model:
+        Data = data
+
+    exported = Exported()
+    exported.Projection = Projection()
+    session = ReferenceModelSession(Model(), exported)
+    messages = {}
+    for point in ("MP-0", "MP-1", "MP-2"):
+        with pytest.raises(ModelPointFailure) as failure:
+            session.project(point)
+        messages[point] = str(failure.value)
+    assert messages == {
+        "MP-0": f"result_cf raised {library_cause} in RLV_DE_S.Projection[0].premiums(t=0, timing=AFT_DECR)",
+        "MP-1": "check_net_cf raised KeyError: 'policy_year' in RLV_DE_S.Data.lapse_table(); check_prem_split is false",
+        "MP-2": "result_cf raised ValueError: invalid sex in RLV_DE_S.Projection[2].sex()",
+    }
+
+
+def test_a_failure_without_a_formula_keeps_its_last_line():
+    """A raise outside every exported formula, on the path export: the last line of the message."""
+    import pandas as pd
+    from degelmann.deltarecon.engines.reference_model import ReferenceModelSession
+
+    class ItemSpace:
+        _name = "Projection"
+
+        def result_cf(self):
+            raise ValueError("first line\nlast line")
+
+        def check_net_cf(self):
+            raise TypeError()
+
+        def __getattr__(self, name):  # every other check holds
+            return lambda: True
+
+    class Projection:
+        def __getitem__(self, index):
+            return ItemSpace()
+
+        def __delitem__(self, index):
+            pass
+
+    class Data:
+        @staticmethod
+        def model_point_table():
+            return pd.DataFrame({"policy_id": ["MP-0"]})
+
+    class Exported:
+        pass
+
+    class Model:
+        pass
+
+    model, exported = Model(), Exported()
+    model.Data, exported.Projection = Data(), Projection()
+    with pytest.raises(ModelPointFailure, match="^result_cf raised ValueError: last line$"):
+        ReferenceModelSession(model, exported).project("MP-0")
+    ItemSpace.result_cf = lambda self: None
+    with pytest.raises(ModelPointFailure, match="^check_net_cf raised TypeError$"):
+        ReferenceModelSession(model, exported).project("MP-0")
+
+
+def test_a_state_takes_the_computation_path_of_the_older_record():
+    from degelmann.deltarecon.engines.reference_model import ReferenceModel, engine_version, release_references
+    other = "1" * 40
+    for version, path in ((engine_version("export"), "export"), (engine_version("modelx"), "modelx"),
+                          ("modelx 0.30.0, pandas 2.2.3, numpy 2.1.0, Python 3.12.7", "modelx"),
+                          ("modelx 0.30.0 export, pandas 2.2.3, numpy 2.1.0, Python 3.12.7", "export")):
+        base = {"label": "N", "references": release_references(START)[:3]
+                + [{"kind": "engine_version", "value": version}]}
+        for revision, hold in ((None, frozenset()), (other, frozenset()), (other, frozenset({"input_data"}))):
+            state = ReferenceModel().state_release(base, revision, hold, REPOSITORIES)
+            assert state["label"] == "N"
+            assert named_revisions({"release": state})["engine_version"] == engine_version(path), version
+
+
+def test_regression_runs_on_the_path_it_is_given(monkeypatch, tmp_path, capsys, recorded_subset):
+    from degelmann.deltarecon.engines.reference_model import engine_version
+    recorded = named_revisions(stored(recorded_subset / "request.json"))["engine_version"]
+    assert recorded == engine_version("export")
+    for options, path in (((), "export"), (("--path", "modelx"), "modelx")):
+        out = tmp_path / path
+        assert regress(monkeypatch, recorded_subset, START, REPOSITORIES, out, *options) == 0
+        assert "regression: no deviation above tolerance" in capsys.readouterr().out
+        assert named_revisions(stored(out / "run" / "request.json"))["engine_version"] == engine_version(path)
+        compared = stored(out / "compare.result.json")
+        assert compared.get("engine_version") == (
+            None if path == "export" else {"left": engine_version("export"), "right": engine_version("modelx")})
+
+
+# --- the full run of the start commit (release N on the fixed model) and its replay ---
 
 
 def test_full_run_of_release_n_is_reproduced_by_its_replay(full_chain):
@@ -2502,3 +2957,257 @@ def test_runs_through_the_contract_leave_the_clone_untouched(full_chain):
     """Status, ``HEAD``, and the references of the clone are as before the run and the replay."""
     assert full_chain["after"] == full_chain["before"]
     assert full_chain["before"][1].decode("ascii").strip() == git(CLONE, "rev-parse", "HEAD").decode().strip()
+
+
+# --- the values a run keeps in memory ---------------------------------------------------
+
+
+def test_the_values_in_memory_are_the_values_read_back_from_the_export(world):
+    """A succeeded run hands on its values as ``check_export`` reads them back: ``-0.0`` as ``0.0``,
+    a ``numpy.float64`` as a float, a subnormal and ``0.1`` unchanged, in writer order."""
+    import numpy as np
+
+    (world / "rel" / "points.csv").write_text(
+        "id,first,last,base\nMP-D,2,3,3\nMP-A,0,1,-0.0\nMP-B,0,1,0.1\nMP-C,0,0,1e-310\n", "utf-8")
+
+    class Float64Stub(StubEngine):
+        @contextmanager
+        def open(self, *arguments, **options):
+            with super().open(*arguments, **options) as session:
+                plain = session.project
+                session.project = lambda point: [
+                    (period, [np.float64(value) for value in values]) if point == "MP-D" else (period, values)
+                    for period, values in plain(point)]
+                yield session
+
+    result, _ = run_stub(world, engine=Float64Stub())
+    assert result.outcome == "succeeded"
+    request = stored(world / "run" / "request.json")
+    read_back = check_response(request, result.response, world / "run")
+    assert result.values == read_back and list(result.values) == list(read_back)
+    assert all(type(value) is float and str(value) != "-0.0" for numbers in result.values.values() for value in numbers)
+    assert all(type(period) is int for _, period in result.values)
+    assert result.values[("MP-A", 0)] == [0.0, 0.0] and result.values[("MP-C", 0)] == [1e-310, 1e-310]
+    # With the values, rules 6 and 7 still apply and the export is not read.
+    (world / "run" / "results.csv").unlink()
+    assert check_response(request, result.response, world / "run", result.values) is result.values
+    with pytest.raises(Rejection) as raised:
+        check_response({**request, "run_id": "another"}, result.response, world / "run", result.values)
+    assert raised.value.code == "request_mismatch"
+
+
+def test_a_run_that_has_not_succeeded_holds_no_values(world):
+    (world / "rel" / "points.csv").write_text("id,first,last,base\nMP-A,0,1,raise\n", "utf-8")
+    result, _ = run_stub(world)
+    assert result.outcome == "failed" and result.values is None
+
+
+def test_the_reference_engine_exports_a_product_folder_once_per_engine_object(tmp_path, monkeypatch):
+    """Same release twice: exported once, the same periods. Another product tree: exported again. A
+    state with a text patch: exported, neither kept nor served from the kept packages."""
+    import modelx as mx
+    from degelmann.deltarecon.engines import reference_model
+    from degelmann.deltarecon.engines.reference_model import ReferenceModel, release_references
+    from conftest import NEWER
+
+    require_clone()
+    exports = []
+    plain = mx.export_model
+
+    def counting(model, path, *arguments, **options):
+        exports.append(Path(path))
+        return plain(model, path, *arguments, **options)
+
+    monkeypatch.setattr(reference_model.mx, "export_model", counting)
+    engine = ReferenceModel(workers=1)
+    release = {"label": "N", "references": release_references(START)}
+    points = [NEW_BUSINESS, in_force_id()]
+
+    def projected(enabled=(), manifest_dir=None, use=release) -> list:
+        with engine.open(use, list(enabled), manifest_dir, REPOSITORIES) as session:
+            assert (session._state / PRODUCT_FOLDER / reference_model.EXPORT_FOLDER).is_dir()
+            return [session.project(point) for point in points] if use is release else []
+
+    first = projected()
+    assert len(exports) == 1 and len(engine._exports) == 1
+    kept = next(iter(engine._exports.values()))
+    assert kept.is_dir() and not list(kept.rglob("__pycache__"))
+    second = projected()
+    assert len(exports) == 1 and second == first  # served from the kept package
+
+    newer = {"label": "N+1", "references": release_references(NEWER)}
+    projected(use=newer)
+    assert len(exports) == 2 and len(engine._exports) == 2  # another product tree: exported again
+
+    folder = tmp_path / "patched"
+    folder.mkdir()
+    code = text(MODEL_CODE)
+    entry = change("chg-comment", patch_text(MODEL_CODE, code, code + "# a comment\n"), folder, **{"class": "code"})
+    projected([entry], folder)
+    assert len(exports) == 3 and len(engine._exports) == 2  # exported, not kept
+    assert Path(engine._export_folder.name).name.startswith(SCRATCH_PREFIX)
+    folder_name = engine._export_folder.name
+    del engine
+    import gc
+    gc.collect()
+    assert not Path(folder_name).exists()
+
+
+# --- target-only runs ------------------------------------------------------------------
+
+CASH_TARGET = {"quantities": ["Netto-Cashflow"], "periods": {"first": 1, "last": 1}}
+ALL_FOUR = {"mode": "subset", "model_point_ids": ["MP-A", "MP-B", "MP-C", "MP-D"]}
+
+
+def test_a_target_only_stub_run_computes_the_target_window_of_each_point(world):
+    full, _ = run_stub(world, folder="full")
+    request = stub_request(world, selection=ALL_FOUR, target=CASH_TARGET)
+    result, _ = run_stub(world, request)
+    assert result.outcome == "succeeded"
+    folder = world / "run"
+    assert_documents_valid(folder)
+    response = stored(folder / "response.json")
+    assert response["target"] == CASH_TARGET and list(response)[7:9] == ["selection", "target"]
+    assert response["quantities"] == [{"name": "Netto-Cashflow", "unit": "EUR"}]
+    # MP-C has projection period 0 alone: its window is empty, and it is absent although selected.
+    assert response["model_points"] == [{"model_point_id": "MP-A", "first_period": 13, "last_period": 13},
+                                        {"model_point_id": "MP-B", "first_period": 1, "last_period": 1},
+                                        {"model_point_id": "MP-D", "first_period": 4, "last_period": 4}]
+    assert response["export"]["data_rows"] == 3
+    values = check_response(request, response, folder)
+    whole = check_response(stub_request(world), full.response, world / "full")
+    assert values == {key: [whole[key][1]] for key in [("MP-A", 13), ("MP-B", 1), ("MP-D", 4)]}
+    assert (folder / "results.csv").read_text("utf-8") == (
+        "model_point_id,period,Netto-Cashflow\nMP-A,13,21\nMP-B,1,4\nMP-D,4,5e16\n")
+
+
+def test_a_target_only_run_without_a_target_period_succeeds_with_no_model_point(world):
+    request = stub_request(world, target={"quantities": ["Anzahl Verträge"], "periods": {"first": 5, "last": 9}})
+    result, _ = run_stub(world, request)
+    assert result.outcome == "succeeded"
+    assert_documents_valid(world / "run")
+    response = stored(world / "run" / "response.json")
+    assert response["model_points"] == [] and response["export"]["data_rows"] == 0
+    assert (world / "run" / "results.csv").read_text("utf-8") == "model_point_id,period,Anzahl Verträge\n"
+    assert check_response(request, response, world / "run") == {}
+    assert roles(stored(world / "run" / "run-record.json")["outputs"]) == {"response": "response.json",
+                                                                         "export": "results.csv"}
+    # Without a target the schema keeps requiring a model point and a row.
+    assert schema_errors({key: value for key, value in response.items() if key != "target"}, RUN_SCHEMA)
+
+
+def test_a_target_only_run_evaluates_no_model_check(world):
+    release = stub_release(world, "checked", POINTS.replace("MP-B,0,2,2", "MP-B,0,2,2!"))
+    full, _ = run_stub(world, stub_request(world, release=release), folder="full")
+    assert full.outcome == "failed"
+    assert full.response["failed_model_points"] == [{"model_point_id": "MP-B", "message": "check_stub is false"}]
+    result, _ = run_stub(world, stub_request(world, release=release, target={"quantities": ["Anzahl Verträge"]}))
+    assert result.outcome == "succeeded"
+    assert {p["model_point_id"]: (p["first_period"], p["last_period"]) for p in result.response["model_points"]}[
+        "MP-B"] == (0, 2)
+
+
+class _NoTargetEngine(StubEngine):
+    @contextmanager
+    def open(self, release, enabled, manifest_dir, repositories, hold=frozenset()):
+        with super().open(release, enabled, manifest_dir, repositories, hold) as session:
+            session.project_target = None  # a session that cannot compute a target
+            yield session
+
+
+@pytest.mark.parametrize("target, engine, code", [
+    ({"quantities": ["Bruttobeitrag"]}, None, "unknown_quantity"),
+    ({"quantities": ["Netto-Cashflow"], "periods": {"first": 3, "last": 2}}, None, "schema_violation"),
+    ({"quantities": ["Netto-Cashflow"]}, _NoTargetEngine(), "target_not_supported"),
+], ids=["undeclared-quantity", "reversed-periods", "not-supported"])
+def test_a_target_the_engine_cannot_run_is_rejected(world, target, engine, code):
+    result, _ = run_stub(world, stub_request(world, target=target), engine)
+    assert result.outcome == "rejected"
+    assert [d["code"] for d in result.response["diagnostics"]] == [code]
+    assert not (world / "run" / "results.csv").exists()
+    assert_documents_valid(world / "run")
+
+
+def test_a_target_only_response_repeats_the_target_and_holds_no_longer_window(world):
+    request = stub_request(world, selection=ALL_FOUR, target=CASH_TARGET)
+    result, _ = run_stub(world, request)
+    response, folder = result.response, world / "run"
+    for other in ({key: value for key, value in response.items() if key != "target"},
+                  {**response, "target": {"quantities": ["Netto-Cashflow"]}}):
+        with pytest.raises(Rejection) as caught:
+            check_response(request, other, folder)
+        assert caught.value.code == "request_mismatch"
+    # A full response read as one of the target 1-1 holds ranges longer than the window.
+    full, _ = run_stub(world, folder="full")
+    with pytest.raises(Rejection) as caught:
+        check_export({**full.response, "target": CASH_TARGET}, world / "full" / "results.csv")
+    assert caught.value.code == "unrequested_coordinate" and caught.value.model_point_ids == ["MP-A", "MP-B", "MP-D"]
+    assert check_export({**full.response, "target": {"quantities": ["Netto-Cashflow"]}},
+                        world / "full" / "results.csv")
+
+
+@pytest.mark.parametrize("workers", [1, 2])
+def test_a_target_only_run_of_release_n_is_the_full_run_restricted_to_the_target(tmp_path, full_chain, workers):
+    """Bit for bit, on the default computation path, in the parent and in worker processes."""
+    from degelmann.deltarecon.engines.reference_model import ReferenceModel
+    assert full_chain["steps"][1][0] == 0, full_chain["steps"][1][2]
+    chain = full_chain["folder"]
+    request, full = stored(chain / "request.json"), stored(chain / "response.json")
+    target = {"quantities": ["Bruttobeitrag", "Netto-Cashflow"], "periods": {"first": 12, "last": 59}}
+    folder = tmp_path / "target"
+    folder.mkdir()
+    targeted = {**request, "run_id": "run-n-target", "target": target}
+    (folder / "request.json").write_bytes(document_bytes(targeted))
+    run = run_request(folder / "request.json", ReferenceModel(workers), REPOSITORIES)
+    assert run.outcome == "succeeded", run.response
+    assert_documents_valid(folder)
+    response = run.response
+    assert response["target"] == target and [q["name"] for q in response["quantities"]] == target["quantities"]
+    whole = check_response(request, full, chain)
+    names = [q["name"] for q in full["quantities"]]
+    keep = [names.index(name) for name in target["quantities"]]
+    ranges, rows = [], []
+    for point in full["model_points"]:
+        start, end = point["first_period"], point["last_period"]
+        first, last = start + 12, min(start + 59, end)
+        if first <= last:
+            ranges.append({"model_point_id": point["model_point_id"], "first_period": first, "last_period": last})
+            rows.extend((point["model_point_id"], t, [whole[(point["model_point_id"], t)][i] for i in keep])
+                        for t in range(first, last + 1))
+    assert response["model_points"] == ranges
+    assert (folder / "results.csv").read_bytes() == export_bytes(target["quantities"], rows)
+    assert check_response(targeted, response, folder)
+    # The in-force point is computed from its valuation month on: its window starts 12 months after it.
+    in_force = in_force_id()
+    start = next(p["first_period"] for p in full["model_points"] if p["model_point_id"] == in_force)
+    assert start >= 144 and next(p for p in response["model_points"] if p["model_point_id"] == in_force)[
+        "first_period"] == start + 12
+
+
+def test_a_target_cell_that_returns_no_number_fails_its_point_alone():
+    """A cell value that is not a number fails the point with one line naming the cell, as the full path does."""
+    from degelmann.deltarecon.engines.reference_model import ReferenceModelSession
+
+    class Point:
+        def proj_start(self):
+            return 0
+
+        def proj_len(self):
+            return 2
+
+        def prem_gross(self, t):
+            return None if t == 1 else 1.5
+
+    class Computing:
+        Projection: dict = {}
+
+    computing = Computing()
+    session = ReferenceModelSession(None, computing)
+    computing.Projection = {0: Point()}
+    session._index = lambda model_point_id: 0
+    (failure,) = session.project_target(["P"], ["Bruttobeitrag"], None)
+    assert isinstance(failure, ModelPointFailure)
+    assert str(failure) == "prem_gross has not the expected form: TypeError"
+    assert computing.Projection == {}  # the point's space is released
+    computing.Projection = {0: Point()}
+    assert session.project_target(["P"], ["Bruttobeitrag"], (0, 0)) == [[(0, [1.5])]]

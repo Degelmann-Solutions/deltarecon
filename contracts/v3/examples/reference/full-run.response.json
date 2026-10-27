@@ -1,0 +1,123 @@
+{
+  "document": "run_response",
+  "contract_version": "3.0",
+  "stage": "liability_cashflow",
+  "run_id": "run-n-full",
+  "outcome": "succeeded",
+  "release": {
+    "label": "N",
+    "references": [
+      {
+        "kind": "input_data",
+        "value": "model_points.csv",
+        "artifact": {
+          "path": "release/model_points.csv",
+          "sha256": "7dfb54a154b5dcbedd09760c4de68942d15160461430942025d56a8a6e1fee3c"
+        }
+      },
+      {
+        "kind": "parameter_set",
+        "value": "lapse_table.csv",
+        "artifact": {
+          "path": "release/lapse_table.csv",
+          "sha256": "c681368d4183b28d61af7cbe9d8c3c0840f556307b13da5152bef379f708b606"
+        }
+      },
+      {
+        "kind": "parameter_set",
+        "value": "parameters.csv",
+        "artifact": {
+          "path": "release/parameters.csv",
+          "sha256": "3193e7f0cf6a6b3b4d30642a93d9bf8b682111f825358c8211dfa44a9548aa1b"
+        }
+      },
+      {
+        "kind": "code_state",
+        "value": "projection.rules",
+        "artifact": {
+          "path": "release/projection.rules",
+          "sha256": "bd7fe003be5e9b7eed088ecc2e747676e83e323acbf899e7a9419655f090031f"
+        }
+      },
+      {
+        "kind": "engine_version",
+        "value": "engine build 2026.09"
+      }
+    ]
+  },
+  "changes": {
+    "enabled": []
+  },
+  "selection": {
+    "mode": "full"
+  },
+  "time_basis": {
+    "id": "policy_month"
+  },
+  "quantities": [
+    {
+      "name": "Anzahl Verträge",
+      "unit": "policies"
+    },
+    {
+      "name": "Bruttobeitrag",
+      "unit": "EUR"
+    },
+    {
+      "name": "Zahlbeitrag",
+      "unit": "EUR"
+    },
+    {
+      "name": "Beitragsverrechnung",
+      "unit": "EUR"
+    },
+    {
+      "name": "garantierte Todesfallleistung",
+      "unit": "EUR"
+    },
+    {
+      "name": "garantierter Rückkaufswert",
+      "unit": "EUR"
+    },
+    {
+      "name": "garantierte Erlebensfallleistung",
+      "unit": "EUR"
+    },
+    {
+      "name": "Kosten 2. Ordnung ohne Provisionen",
+      "unit": "EUR"
+    },
+    {
+      "name": "Provisionen",
+      "unit": "EUR"
+    },
+    {
+      "name": "Netto-Cashflow",
+      "unit": "EUR"
+    }
+  ],
+  "model_points": [
+    {
+      "model_point_id": "MP-0001",
+      "first_period": 0,
+      "last_period": 2
+    },
+    {
+      "model_point_id": "MP-0002",
+      "first_period": 144,
+      "last_period": 145
+    },
+    {
+      "model_point_id": "MP-0003",
+      "first_period": 0,
+      "last_period": 1
+    }
+  ],
+  "export": {
+    "artifact": {
+      "path": "full-run.results.csv",
+      "sha256": "c2174a0d56248bb9e6df01e59a93f02335631c37bfeda63d2625e7d74bcab4cc"
+    },
+    "data_rows": 7
+  }
+}

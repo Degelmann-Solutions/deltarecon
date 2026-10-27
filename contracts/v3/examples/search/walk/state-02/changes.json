@@ -1,0 +1,97 @@
+{
+  "document": "change_manifest",
+  "contract_version": "3.0",
+  "stage": "liability_cashflow",
+  "manifest_id": "history-1d6a0d0cde197b83580e5e17c93192c34572d838-a58186a2a54cedfe17ef8ab4c0851a10a18bf59f",
+  "base_release": "N",
+  "history": {
+    "source": "git",
+    "from": "1d6a0d0cde197b83580e5e17c93192c34572d838",
+    "to": "a58186a2a54cedfe17ef8ab4c0851a10a18bf59f",
+    "determines": [
+      "code_state",
+      "input_data",
+      "parameter_set"
+    ],
+    "remainder": [
+      {
+        "kind": "engine_version",
+        "from": [
+          {
+            "kind": "engine_version",
+            "value": "engine build 2026.09"
+          }
+        ],
+        "to": [
+          {
+            "kind": "engine_version",
+            "value": "engine build 2026.10"
+          }
+        ]
+      }
+    ]
+  },
+  "changes": [
+    {
+      "id": "f291e79376fd8157cefa009bc06d213711b6490b",
+      "class": [
+        "parameter"
+      ],
+      "description": "Lower the lapse rate of policy year 1 from 0.06 to 0.05",
+      "prerequisites": [],
+      "conflicts": [],
+      "realisation": {
+        "type": "revision",
+        "source": "git",
+        "revision": "f291e79376fd8157cefa009bc06d213711b6490b"
+      }
+    },
+    {
+      "id": "0b2f58ed2d975f2ebd8bc4ac58a1c37d3d62997f",
+      "class": [
+        "parameter",
+        "code"
+      ],
+      "description": "Read the claim expense from a parameter\n\nAdd the parameter claim_expense with value 300 and read the claim expense\nper death from it instead of the constant 250.",
+      "prerequisites": [
+        "f291e79376fd8157cefa009bc06d213711b6490b"
+      ],
+      "conflicts": [],
+      "realisation": {
+        "type": "revision",
+        "source": "git",
+        "revision": "0b2f58ed2d975f2ebd8bc4ac58a1c37d3d62997f"
+      }
+    },
+    {
+      "id": "0767d650b32a037f9a98260a8a7531c7ade3d8af",
+      "class": [],
+      "description": "Describe the release folder in the README",
+      "prerequisites": [
+        "0b2f58ed2d975f2ebd8bc4ac58a1c37d3d62997f"
+      ],
+      "conflicts": [],
+      "realisation": {
+        "type": "revision",
+        "source": "git",
+        "revision": "0767d650b32a037f9a98260a8a7531c7ade3d8af"
+      }
+    },
+    {
+      "id": "a58186a2a54cedfe17ef8ab4c0851a10a18bf59f",
+      "class": [
+        "data"
+      ],
+      "description": "Merge branch 'portfolio-2026-10'\n\nCorrect the sum assured of model point MP-0003 and add two model points.",
+      "prerequisites": [
+        "0767d650b32a037f9a98260a8a7531c7ade3d8af"
+      ],
+      "conflicts": [],
+      "realisation": {
+        "type": "revision",
+        "source": "git",
+        "revision": "a58186a2a54cedfe17ef8ab4c0851a10a18bf59f"
+      }
+    }
+  ]
+}

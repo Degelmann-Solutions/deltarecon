@@ -1,12 +1,12 @@
 """JSON documents of the stage contracts: reading, checking, hashing, and writing.
 
-Reading follows the order of ``contracts/v2/README.md``: the JSON profile, the contract
+Reading follows the order of ``contracts/v3/README.md``: the JSON profile, the contract
 version, and then the schema. Every broken rule raises a :class:`Rejection` that carries
 the diagnostic of the contract.
 
-The tool writes contract version 2.0 and reads 1.0 and 2.0. A document is checked against
-the schemas of its own version: a 1.0 document against ``contracts/v1/schemas``, a 2.0
-document against ``contracts/v2/schemas``.
+The tool writes contract version 3.0 and reads 1.0, 2.0, and 3.0. A document is checked
+against the schemas of its own version: a 1.0 document against ``contracts/v1/schemas``, a
+2.0 document against ``contracts/v2/schemas``, a 3.0 document against ``contracts/v3/schemas``.
 """
 from __future__ import annotations
 
@@ -20,10 +20,11 @@ from pathlib import Path
 from jsonschema import Draft202012Validator
 from referencing import Registry, Resource
 
-CONTRACT_VERSION = "2.0"
+CONTRACT_VERSION = "3.0"
 CONTRACTS = Path(__file__).resolve().parents[2] / "contracts"
 # The versions a reader accepts, each with the schemas of its pack.
-SCHEMA_FOLDERS = {"1.0": CONTRACTS / "v1" / "schemas", "2.0": CONTRACTS / "v2" / "schemas"}
+SCHEMA_FOLDERS = {"1.0": CONTRACTS / "v1" / "schemas", "2.0": CONTRACTS / "v2" / "schemas",
+                  "3.0": CONTRACTS / "v3" / "schemas"}
 SCHEMA_NAMES = ["common", "run", "changes", "compare", "localise", "run-record"]
 
 RUN_SCHEMA = "run.schema.json"
@@ -115,7 +116,7 @@ def check_version(document: dict) -> None:
     if not isinstance(version, str) or version not in SCHEMA_FOLDERS:
         raise Rejection(
             "unsupported_version",
-            f"This reader implements the contract versions {' and '.join(SCHEMA_FOLDERS)} only, "
+            f"This reader implements the contract versions {', '.join(SCHEMA_FOLDERS)} only, "
             f"not {json.dumps(document['contract_version'], ensure_ascii=False)[:40]}.")
 
 

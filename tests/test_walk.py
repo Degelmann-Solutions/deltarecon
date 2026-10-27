@@ -1,4 +1,4 @@
-"""The walk of ``contracts/v2/localise.md``: ``degelmann/deltarecon/walk.py`` and the revision states of the adapter.
+"""The walk of ``contracts/v3/localise.md``: ``degelmann/deltarecon/walk.py`` and the revision states of the adapter.
 
 The core is tested on the stub engine with a main line of ``conftest.py``: a revision of the stub
 is a folder, and ``line`` is its main line. The reference engine is tested on a throw-away
@@ -23,9 +23,9 @@ from degelmann.deltarecon.run import STAGE_QUANTITIES, UsageError, run_request
 from degelmann.deltarecon.walk import exact_sums, held_kinds, walk, written
 
 from conftest import (LAPSE_TABLE, MODEL_CODE, PARAMS, PARAMS_RATE, POINTS, POINTS_B, POINTS_E, POINT_TABLE,
-                      RELEASE_N, ROOT, StubEngine, TwoStages, WalkStub, build, change, cli, clone_state, commit,
-                      export_coordinates, folder_hashes, git, patch_text, record, stored, stub_request, throwaway,
-                      with_manifest, write_files)
+                      START, ROOT, StubEngine, TwoStages, WalkStub, build, change, cli, clone_state, commit,
+                      export_coordinates, folder_hashes, git, patch_text, projection_periods, record, stored,
+                      stub_request, throwaway, with_manifest, write_files)
 
 QUANTITIES = ["Anzahl Verträge", "Netto-Cashflow"]
 
@@ -413,14 +413,86 @@ def test_a_tolerance_file_is_copied_listed_and_applied_to_the_ends_and_the_steps
 def test_exact_sums_are_exact_and_rounded_once():
     from degelmann.deltarecon.compare import CheckedRun
     names = ["Anzahl Verträge"]
-    response = {"quantities": [{"name": names[0], "unit": "policies"}]}
+    response = {"quantities": [{"name": names[0], "unit": "policies"}], "time_basis": {"id": "policy_month"}}
     left = CheckedRun(response, {("A", 0): [0.1], ("B", 0): [1e16]})
     right = CheckedRun(response, {("A", 0): [0.2], ("C", 0): [1.0]})
     signed, absolute = exact_sums(left, right, names)
     expected = Fraction(0.2) - Fraction(0.1) - Fraction(1e16) + Fraction(1.0)
-    assert Fraction(signed[0], 1 << 1074) == expected and written(signed[0]) == float(expected)
-    assert Fraction(absolute[0], 1 << 1074) == Fraction(0.2) - Fraction(0.1) + Fraction(1e16) + 1
+    assert signed[0] == float(expected)
+    assert absolute[0] == float(Fraction(0.2) - Fraction(0.1) + Fraction(1e16) + 1)
     assert written(10 ** 400 << 1074) is None
+
+
+def _one_quantity(left: dict, right: dict):
+    from degelmann.deltarecon.compare import CheckedRun
+    response = {"quantities": [{"name": "Anzahl Verträge", "unit": "policies"}],
+                "time_basis": {"id": "policy_month"}}
+    return CheckedRun(response, left), CheckedRun(response, right)
+
+
+def _integer_sums(left: dict, right: dict) -> tuple[float | None, float | None]:
+    """The sums by the integer method: exact in units of 2**-1074, rounded once by ``written``."""
+    left, right = projection_periods(left), projection_periods(right)  # on policy_month
+    signed = absolute = 0
+    for key in left.keys() | right.keys():
+        a, b = left.get(key, [0.0])[0], right.get(key, [0.0])[0]
+        difference = Fraction(b) - Fraction(a)
+        signed += difference * (1 << 1074)
+        absolute += abs(difference) * (1 << 1074)
+    assert signed.denominator == absolute.denominator == 1
+    return written(int(signed)), written(int(absolute))
+
+
+def test_fsum_gives_the_float_of_the_integer_method():
+    import random
+    generator = random.Random(37)
+    specials = [0.0, -0.0, 5e-324, -5e-324, 2.2250738585072014e-308, 1e-310, 1e308, -1e308, 0.1, 0.2, 0.3,
+                1.0, 1.0 + 2 ** -52, 2.0 ** 53, 2.0 ** 53 + 2, 0.5, 1.5, 2.5]
+    for _ in range(300):
+        def value():
+            choice = generator.random()
+            if choice < 0.3:
+                return generator.choice(specials)
+            if choice < 0.6:
+                return generator.uniform(-1e6, 1e6)
+            return generator.choice((1, -1)) * generator.random() * 10.0 ** generator.randint(-320, 300)
+        keys = [(f"P{i}", t) for i in range(generator.randint(0, 4)) for t in range(generator.randint(1, 5))]
+        left = {key: [value()] for key in keys if generator.random() < 0.9}
+        right = {key: ([value()] if generator.random() < 0.5 else list(left.get(key, [value()])))
+                 for key in keys if generator.random() < 0.9}
+        signed, absolute = exact_sums(*_one_quantity(left, right), ["Anzahl Verträge"])
+        expected = _integer_sums(left, right)
+        assert (signed[0], absolute[0]) == expected, (left, right)
+        for value_ in (signed[0], absolute[0]):
+            assert value_ is None or str(value_) != "-0.0"
+
+
+def test_an_exact_tie_rounds_to_even_and_a_cancellation_is_positive_zero():
+    # 2**53 + 1 lies halfway between two binary64 values; the even one is 2**53.
+    signed, _ = exact_sums(*_one_quantity({("A", 0): [0.0], ("B", 0): [0.0]},
+                                          {("A", 0): [2.0 ** 53], ("B", 0): [1.0]}), ["Anzahl Verträge"])
+    assert signed[0] == 2.0 ** 53
+    signed, absolute = exact_sums(*_one_quantity({("A", 0): [0.1], ("B", 0): [0.0]},
+                                                 {("A", 0): [0.0], ("B", 0): [0.1]}), ["Anzahl Verträge"])
+    assert signed[0] == 0.0 and str(signed[0]) == "0.0" and absolute[0] == 0.2
+
+
+def test_an_intermediate_overflow_falls_back_to_the_integer_method():
+    big = 1.7976931348623157e308
+    # The terms overflow in fsum, the exact sum is 0 and finite: 2 * big - 2 * big.
+    left = {("A", 0): [-big], ("B", 0): [big]}
+    right = {("A", 0): [big], ("B", 0): [-big]}
+    with pytest.raises(OverflowError):
+        import math
+        math.fsum([big, big, -big, -big])
+    signed, absolute = exact_sums(*_one_quantity(left, right), ["Anzahl Verträge"])
+    assert signed[0] == 0.0 and absolute[0] is None
+
+
+def test_a_final_overflow_is_not_written():
+    big = 1.7976931348623157e308
+    signed, absolute = exact_sums(*_one_quantity({("A", 0): [-big]}, {("A", 0): [big]}), ["Anzahl Verträge"])
+    assert signed == [None] and absolute == [None]
 
 
 def test_only_a_determined_kind_is_held():
@@ -618,16 +690,16 @@ def test_a_regression_pair_holds_the_input_data_on_the_reference_engine(adapter_
 
 def test_records_with_two_different_foreign_input_data_commits_are_refused(adapter_walk, monkeypatch, capsys):
     tmp, repositories, revisions = adapter_walk["tmp"], adapter_walk["repositories"], adapter_walk["revisions"]
-    # The older record runs the base on the input data of release N, the newer one revision 1 on
+    # The older record runs the base on the input data of the start commit, the newer one revision 1 on
     # its own: the input data moves, and the base revision does not name what the older record names.
-    assert cli(monkeypatch, "request", "--revision", RELEASE_N, "--repositories", repositories, "--label", "n",
+    assert cli(monkeypatch, "request", "--revision", START, "--repositories", repositories, "--label", "n",
                "--run-id", "run-n", "--output", tmp / "n" / "request.json") == 0
     capsys.readouterr()
     state = clone_state(adapter_walk["clone"])
     request = stored(tmp / "n" / "request.json")
     for reference in request["release"]["references"]:
         if reference["kind"] in ("code_state", "parameter_set"):
-            reference["value"] = reference["value"].replace(RELEASE_N, adapter_walk["base"])
+            reference["value"] = reference["value"].replace(START, adapter_walk["base"])
     request["selection"] = {"mode": "subset", "model_point_ids": [first_point(adapter_walk)]}
     (tmp / "foreign").mkdir()
     (tmp / "foreign" / "request.json").write_bytes(document_bytes(request))
@@ -676,3 +748,38 @@ def test_a_shallow_clone_does_not_start_the_walk(adapter_walk, tmp_path):
 def test_usage_errors_are_usage_errors(world):
     with pytest.raises(UsageError):
         walk(world / "absent.json", world / "absent.json", world / "walk", WalkStub(), repositories=world)
+
+
+@pytest.mark.parametrize("drift", [None, {"w4": 0.5}])
+def test_a_walk_reads_no_state_export_and_writes_the_same_folder(linear, monkeypatch, drift):
+    """The states hand their values to the walk in memory: only the two recorded exports are read,
+    and the folder is the one of a walk that reads every export back."""
+    from degelmann.deltarecon import compare as compare_module, export, replay, run, walk as walk_module
+    world, older, newer = linear
+    read = []
+    plain = export.check_export
+
+    def counting(response, path):
+        read.append(Path(path))
+        return plain(response, path)
+
+    monkeypatch.setattr(replay, "check_export", counting)
+    monkeypatch.setattr(compare_module, "check_export", counting)
+    memory = run_walk(world, older, newer, WalkStub(drift=drift), output="memory/walk").result
+    assert sorted(read) == sorted([older.parent / "results.csv", newer.parent / "results.csv"])
+    assert (memory["ends"]["n"]["outcome"] == "reproduced") == (drift is None)
+
+    # The same walk with every value read back from the exports and every comparison reading both runs.
+    monkeypatch.setattr(run, "written_values", lambda rows: None)
+    plain_compare = compare_module.compare
+    monkeypatch.setattr(walk_module, "compare", lambda *arguments, runs=None, **options: plain_compare(
+        *arguments, **options))
+    run_walk(world, older, newer, WalkStub(drift=drift), output="files/walk")
+    assert len(read) > 2
+    first, second = world / "memory" / "walk", world / "files" / "walk"
+    assert (first / "walk.result.json").read_bytes() == (second / "walk.result.json").read_bytes()
+    one, two = folder_hashes(first), folder_hashes(second)
+    assert set(one) == set(two)
+    # Run records differ in record_id and recorded_at, and so do the compare requests that name them.
+    assert all(path.endswith("run-record.json") or (path.endswith(".request.json") and "/" not in path)
+               for path in one if one[path] != two[path])

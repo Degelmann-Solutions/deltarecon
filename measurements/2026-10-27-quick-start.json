@@ -1,0 +1,57 @@
+{
+  "date": "2026-10-27T07:07:20Z",
+  "commit": "6dbfd451f1c249435740260ba1c422049dad4606",
+  "dirty": false,
+  "platform": "Linux-6.6.87.2-microsoft-standard-WSL2-x86_64-with-glibc2.43",
+  "cpu_count": 24,
+  "engine_version": "modelx 0.33.0 export, pandas 3.0.6, numpy 2.5.3, Python 3.14.9",
+  "note": "fresh clones of deltarecon and delib-history from GitHub in an empty folder under /tmp, deltarecon then detached at the story commit fetched from the local repository; uv cache and uv-managed Python 3.14.9 already present; Linux 6.6.87.2 under WSL2, Intel Core i7-12800HX, 24 logical processors; commit 6dbfd45 is an earlier form of the commit that publishes the three-minute quick start, amended afterwards with files no run reads (this record, the README durations, the reproduction row)",
+  "beside": [
+    {
+      "name": "git-clone",
+      "seconds": 2.0
+    },
+    {
+      "name": "uv-sync",
+      "seconds": 0.9
+    }
+  ],
+  "steps": [
+    {
+      "name": "request",
+      "seconds": 1.6423023639999883,
+      "peak_mib": 106.3203125
+    },
+    {
+      "name": "run",
+      "seconds": 2.8246156150000843,
+      "peak_mib": 230.7578125
+    },
+    {
+      "name": "replay",
+      "seconds": 6.292036787999905,
+      "peak_mib": 399.90234375
+    },
+    {
+      "name": "regression",
+      "seconds": 14.20554373899995,
+      "peak_mib": 717.8125
+    },
+    {
+      "name": "derive",
+      "seconds": 2.5488108369997917,
+      "peak_mib": 259.80078125
+    },
+    {
+      "name": "search",
+      "seconds": 34.343364286999986,
+      "peak_mib": 398.11328125,
+      "states": 17,
+      "seconds_per_state": 2.0201978992352934
+    }
+  ],
+  "total": {
+    "seconds": 61.856673629999705,
+    "peak_mib": 717.8125
+  }
+}

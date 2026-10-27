@@ -1,0 +1,21 @@
+{
+  "document": "change_manifest",
+  "contract_version": "3.0",
+  "stage": "liability_cashflow",
+  "manifest_id": "changes-n-to-n1",
+  "base_release": "N",
+  "changes": [
+    {
+      "id": "chg-lapse-year-1-down",
+      "class": "parameter",
+      "description": "Lower the lapse rate of policy year 1 from 0.06 to 0.05.",
+      "prerequisites": [],
+      "conflicts": [],
+      "realisation": {
+        "type": "revision",
+        "source": "git",
+        "revision": "f291e79376fd8157cefa009bc06d213711b6490b"
+      }
+    }
+  ]
+}

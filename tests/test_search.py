@@ -1,4 +1,4 @@
-"""The search of ``contracts/v2/localise.md``: ``degelmann/deltarecon/search.py`` and its check against the walk.
+"""The search of ``contracts/v3/localise.md``: ``degelmann/deltarecon/search.py`` and its check against the walk.
 
 The core is tested on the stub engine with a main line of ``conftest.py``: a revision of the
 stub is a folder, and ``line`` is its main line. The quantities of the stub are ``Anzahl Verträge``, the
@@ -28,8 +28,8 @@ from degelmann.deltarecon.walk import prepare, read_walk_folder, walk
 
 from conftest import (CANCEL, CASH, HISTORY, LAPSE_TABLE, LINE, PARAMS, PARAMS_RATE, POINTS, POINTS_B,
                       POINT_TABLE, ROOT, StubEngine, TwoStages, WalkStub, build, clone_state, commit,
-                      export_coordinates, folder_hashes, record, stored, stub_request, throwaway, write_files,
-                      written_under)
+                      export_coordinates, folder_hashes, projection_periods, record, stored, stub_request, throwaway,
+                      write_files, written_under)
 
 COUNT = "Anzahl Verträge"
 PROFILE = {"per_quantity": {COUNT: {"upper": {"abs_tol": 0.01, "rel_tol": 0}, "lower": {"abs_tol": 0.01, "rel_tol": 0},
@@ -111,24 +111,14 @@ def assert_search_folder_valid(folder: Path) -> dict:
     return result
 
 
-def exact(left: Path, right: Path, quantities, periods=None, origin: Path | None = None) -> dict[str, Fraction]:
+def exact(left: Path, right: Path, quantities, periods=None) -> dict[str, Fraction]:
     """The sum of ``right - left`` per quantity over the coordinates of a target, read without ``degelmann.deltarecon``.
 
-    Target periods count from the valuation date: on ``policy_month`` a period less the first period of
-    its model point in the export ``origin`` (the older recorded export), or, for a model point absent
-    there, its first period on its own side."""
-    def firsts(coordinates) -> dict[str, int]:
-        first = {}
-        for point, period, _ in coordinates:
-            first[point] = min(period, first.get(point, period))
-        return first
-
-    offsets = firsts(export_coordinates(origin or left))
-
+    Target periods are projection periods: on ``policy_month`` a period less the first period of its model
+    point in the same export."""
     def kept(coordinates) -> dict:
-        own = firsts(coordinates)
-        return {key: value for key, value in coordinates.items() if key[2] in quantities and (
-            periods is None or periods[0] <= key[1] - offsets.get(key[0], own[key[0]]) <= periods[1])}
+        return {key: value for key, value in projection_periods(coordinates).items() if key[2] in quantities and (
+            periods is None or periods[0] <= key[1] <= periods[1])}
 
     old, new = kept(export_coordinates(left)), kept(export_coordinates(right))
     totals = {name: Fraction(0) for name in quantities}
@@ -179,7 +169,7 @@ def test_a_targeted_search_saves_runs_and_names_what_it_missed(history, monkeypa
     walked = stored(world / "walk" / "walk.result.json")
     step = next(s for s in walked["steps"] if s["revisions"] == ["h7"])
     exports = {s["state"]: world / "walk" / s["export"]["path"] for s in walked["states"]}
-    assert float(exact(exports[6], exports[7], [COUNT], (0, 2), exports[0])[COUNT]) == found["contributions"][0]["sum"]
+    assert float(exact(exports[6], exports[7], [COUNT], (0, 2))[COUNT]) == found["contributions"][0]["sum"]
     assert next(c for c in step["contributions"] if c["quantity"] == COUNT)["contributes"]
     # The walk is copied with what it references, and listed as an input.
     record = stored(folder / "search.run-record.json")
@@ -318,27 +308,29 @@ def test_only_a_proper_subset_of_the_quantities_or_a_period_range_narrows_the_ta
     assert all(c["quantity"] == CASH for c in every_contribution(result))
 
 
-def test_a_walk_folder_written_under_1_0_is_a_reference(cancel):
+@pytest.mark.parametrize("version", ["1.0", "2.0"])
+def test_a_walk_folder_written_under_an_earlier_version_is_a_reference(cancel, version):
     world, older, newer = cancel
-    with written_under("1.0"):
+    with written_under(version):
         run_walk(world, older, newer, WalkStub(CANCEL))
     walked = world / "walk"
-    assert stored(walked / "walk.result.json")["contract_version"] == "1.0"
-    assert stored(walked / "changes.json")["contract_version"] == "1.0"
-    assert stored(walked / "state-02" / "changes.json")["contract_version"] == "1.0"
+    assert stored(walked / "walk.result.json")["contract_version"] == version
+    assert stored(walked / "changes.json")["contract_version"] == version
+    assert stored(walked / "state-02" / "changes.json")["contract_version"] == version
     run_walk(world, older, newer, WalkStub(CANCEL), output="walk-2")
     result = run_search(world, older, newer, WalkStub(CANCEL), walk=walked).result
     again = run_search(world, older, newer, WalkStub(CANCEL), output="search-2", walk=world / "walk-2").result
-    assert result["contract_version"] == "2.0"
+    assert result["contract_version"] == "3.0"
     assert result["missed"] == again["missed"] == [{"revision": "c1", "quantity": CASH},
                                                    {"revision": "c2", "quantity": CASH}]
     # The copy of the walk keeps its bytes and its version.
     assert (world / "search" / "walk" / "walk.result.json").read_bytes() == (walked / "walk.result.json").read_bytes()
 
 
-def test_a_1_0_walk_folder_whose_manifest_differs_otherwise_is_refused(cancel):
+@pytest.mark.parametrize("version", ["1.0", "2.0"])
+def test_an_earlier_walk_folder_whose_manifest_differs_otherwise_is_refused(cancel, version):
     world, older, newer = cancel
-    with written_under("1.0"):
+    with written_under(version):
         run_walk(world, older, newer, WalkStub(CANCEL))
     rewrite_state(world / "walk", 2, edit_manifest=redescribe)
     with pytest.raises(Rejection) as caught:
@@ -347,7 +339,7 @@ def test_a_1_0_walk_folder_whose_manifest_differs_otherwise_is_refused(cancel):
     assert not (world / "search").exists()
 
 
-@pytest.mark.parametrize("version", [["1.0"], "3.0"])
+@pytest.mark.parametrize("version", [["1.0"], "4.0"])
 def test_a_walk_manifest_of_a_version_the_tool_does_not_read_is_refused(cancel, version):
     world, older, newer = cancel
     run_walk(world, older, newer, WalkStub(CANCEL))
@@ -503,6 +495,139 @@ def test_a_state_of_the_walk_on_another_manifest_or_a_malformed_request_is_refus
         run_search(world, older, newer, WalkStub(CANCEL), walk=world / "walk")
     assert caught.value.code == "walk_mismatch", caught.value.message
     assert not (world / "search").exists()
+
+
+# --- reuse of the walk's states -------------------------------------------------------
+
+
+class Counting(WalkStub):
+    """The walk stub that counts the states it is asked to compute."""
+
+    def __init__(self, *args, **options):
+        super().__init__(*args, **options)
+        self.calls = 0
+
+    def open(self, release, enabled, manifest_dir, repositories, hold=frozenset()):
+        self.calls += 1
+        return super().open(release, enabled, manifest_dir, repositories, hold)
+
+
+def without_compare(node):
+    """A document without its comparison references, whose paths name the states compared."""
+    if isinstance(node, dict):
+        return {key: without_compare(value) for key, value in node.items() if key != "compare"}
+    if isinstance(node, list):
+        return [without_compare(value) for value in node]
+    return node
+
+
+def assert_same_search(reused: dict, ran: dict) -> None:
+    """The halving, the ends, the contributions and their sums, the findings and the missed are those
+    of the search that ran its states."""
+    for member in ("ends", "target", "intervals", "contributions", "findings", "missed"):
+        assert without_compare(reused[member]) == without_compare(ran[member]), member
+    assert [s["state"] for s in reused["states"]] == [s["state"] for s in ran["states"]]
+    assert [s["outcome"] for s in reused["states"]] == [s["outcome"] for s in ran["states"]]
+
+
+@pytest.mark.parametrize("options", [
+    {"quantities": [COUNT], "periods": "0-2", "tolerance": "tolerance.json"}, {}], ids=["target", "every-coordinate"])
+def test_reuse_over_a_full_walk_runs_no_state_and_finds_what_the_search_finds(history, options):
+    world, older, newer = history
+    if "tolerance" in options:
+        options = {**options, "tolerance": world / options["tolerance"]}
+    run_walk(world, older, newer, WalkStub(HISTORY), tolerance=options.get("tolerance"))
+    ran = run_search(world, older, newer, WalkStub(HISTORY), walk=world / "walk", **options).result
+    engine = Counting(HISTORY)
+    reused = run_search(world, older, newer, engine, output="reused", walk=world / "walk", reuse=True,
+                        **options).result
+    assert engine.calls == 0
+    assert_same_search(reused, ran)
+    folder = world / "reused"
+    assert assert_search_folder_valid(folder) == reused
+    count = len(ran["states"])
+    assert reused["runs"] == {"walk": 9, "search": 0, "saved": 9, "reused": count}
+    assert ran["runs"] == {"walk": 9, "search": count, "saved": 9 - count}
+    # A reused state is the walk's run: its run id, its files under walk/, and no folder of the search.
+    walked = {s["state"]: s for s in stored(world / "walk" / "walk.result.json")["states"]}
+    for entry in reused["states"]:
+        k = entry["state"]
+        assert entry["reused"] is True and entry["run_id"] == walked[k]["run_id"] == f"walk-run-h0-run-h8-state-{k}"
+        assert entry["response"] == {**walked[k]["response"], "path": "walk/" + walked[k]["response"]["path"]}
+        assert entry["export"] == {**walked[k]["export"], "path": "walk/" + walked[k]["export"]["path"]}
+        assert not (folder / f"state-{k:02d}").exists()
+    assert list(reused["states"][1]) == ["state", "revision", "run_id", "outcome", "reused", "response", "export"]
+    # The comparisons kept reference the reused responses and run records under walk/.
+    for entry in reused["contributions"]:
+        request = stored(folder / entry["compare"]["result"]["path"].replace(".result.", ".request."))
+        assert all(side["path"].startswith("walk/state-") for side in (*request["left"].values(),
+                                                                        *request["right"].values()))
+    # The result and the run record name the switch; without it neither does.
+    record = stored(folder / "search.run-record.json")
+    assert reused["switches"] == record["switches"] == ["reuse_walk"]
+    assert list(reused)[:5] == ["document", "contract_version", "stage", "search_id", "switches"]
+    assert "switches" not in ran and "switches" not in stored(world / "search" / "search.run-record.json")
+    assert "reused" not in json.dumps(ran)
+
+
+def test_a_walk_state_that_did_not_run_is_reused_as_a_state_that_did_not_run(world):
+    build(world, CARRY)
+    engine = WalkStub(CARRY)
+    older, newer = record(world, "x0", engine, label="N"), record(world, "x4", engine, label="N+1")
+    assert run_walk(world, older, newer, WalkStub(CARRY, broken={"x2"})).attributed
+    ran = run_search(world, older, newer, WalkStub(CARRY, broken={"x2"}), walk=world / "walk").result
+    counting = Counting(CARRY, broken={"x2"})
+    reused = run_search(world, older, newer, counting, output="reused", walk=world / "walk", reuse=True).result
+    assert counting.calls == 0
+    assert_same_search(reused, ran)
+    assert_search_folder_valid(world / "reused")
+    (finding,) = [f for f in reused["findings"] if f["code"] == "state_did_not_run"]
+    assert finding["state"] == 2 and finding["revisions"] == ["x2"]
+    walked = stored(world / "walk" / "walk.result.json")["states"][2]
+    failed = next(s for s in reused["states"] if s["state"] == 2)
+    assert failed == {"state": 2, "revision": "x2", "run_id": walked["run_id"], "outcome": walked["outcome"],
+                      "reused": True, "response": {**walked["response"], "path": "walk/" + walked["response"]["path"]}}
+    assert finding["diagnostic"] == stored(world / "walk" / walked["response"]["path"])["diagnostics"][0]
+    assert reused["runs"]["search"] == 0 and reused["runs"]["reused"] == len(reused["states"])
+
+
+def test_the_switch_without_a_walk_is_a_usage_error_and_writes_nothing(history, monkeypatch, capsys):
+    world, older, newer = history
+    before = folder_hashes(world)
+    monkeypatch.setattr("degelmann.deltarecon.__main__.engine", lambda: WalkStub(HISTORY))
+    assert main(["search", str(older), str(newer), "--output", str(world / "search"), "--repositories", str(world),
+                 "--reuse-walk"]) == 2
+    assert "--walk" in capsys.readouterr().err
+    assert folder_hashes(world) == before and not (world / "search").exists()
+    with pytest.raises(UsageError):
+        run_search(world, older, newer, WalkStub(HISTORY), reuse=True)
+
+
+def test_a_refused_walk_is_refused_under_the_switch_before_anything_runs(cancel):
+    world, older, newer = cancel
+    run_walk(world, older, newer, WalkStub(CANCEL, drift={"c4": 1}))
+    engine = Counting(CANCEL)
+    with pytest.raises(Rejection) as caught:
+        run_search(world, older, newer, engine, walk=world / "walk", reuse=True)
+    assert caught.value.code == "walk_not_attributed" and not (world / "search").exists() and engine.calls == 0
+
+
+def test_a_moved_reuse_search_folder_resolves_inside_itself(history, tmp_path_factory, monkeypatch, capsys):
+    world, older, newer = history
+    run_walk(world, older, newer, WalkStub(HISTORY), tolerance=world / "tolerance.json")
+    monkeypatch.setattr("degelmann.deltarecon.__main__.engine", lambda: Counting(HISTORY))
+    monkeypatch.chdir(world)
+    assert main(["search", str(older), str(newer), "--output", str(world / "search"), "--repositories", str(world),
+                 "--quantity", COUNT, "--periods", "0-2", "--tolerance", str(world / "tolerance.json"),
+                 "--walk", str(world / "walk"), "--reuse-walk"]) == 0
+    out = capsys.readouterr().out
+    assert out.splitlines()[0] == "search: searched; 0 states run, 6 reused from the walk, 9 for a walk, 9 saved"
+    assert "  missed: " in out
+    moved = tmp_path_factory.mktemp("moved") / "search"
+    shutil.move(str(world / "search"), str(moved))
+    shutil.rmtree(world / "walk")
+    assert_references_resolve(moved)
+    assert_search_folder_valid(moved)
 
 
 # --- the halving --------------------------------------------------------------------
@@ -661,8 +786,46 @@ def test_an_in_force_point_is_judged_on_its_projection_periods(world):
     assert found["contributions"] == [{"quantity": COUNT, "contributes": True, "sum": 3.0, "absolute_sum": 3.0}]
     exports = {s["state"]: world / "walk" / s["export"]["path"] for s in stored(world / "walk" / "walk.result.json")[
         "states"]}
-    assert float(exact(exports[1], exports[2], [COUNT], (0, 2), exports[0])[COUNT]) == 3.0
+    assert float(exact(exports[1], exports[2], [COUNT], (0, 2))[COUNT]) == 3.0
     # The walk shows i1 as a change of the full runs, but not of the target: nothing is missed.
+    assert result["missed"] == [] and not result["findings"]
+
+
+# M1 moves the valuation month of the in-force point B from period 144 to 156; its count stays.
+# M2 raises B.
+MOVED = (
+    ("m0", "The base.\n", (), "id,first,last,base\nMP-A,0,150,1\nMP-B,144,150,2\n", PARAMS),
+    ("m1", "Move the valuation month of MP-B\n", ("data",), "id,first,last,base\nMP-A,0,150,1\nMP-B,156,162,2\n",
+     PARAMS),
+    ("m2", "Raise MP-B\n", ("data",), "id,first,last,base\nMP-A,0,150,1\nMP-B,156,162,3\n", PARAMS),
+)
+
+
+def test_each_state_is_judged_on_its_own_valuation_month(world):
+    """Target 0-2: B is judged on policy months 144 to 146 of the older state and 156 to 158 of a later one."""
+    build(world, MOVED)
+    engine = WalkStub(MOVED)
+    older, newer = record(world, "m0", engine, label="N"), record(world, "m2", engine, label="N+1")
+    walked = run_walk(world, older, newer, WalkStub(MOVED))
+    assert walked.attributed
+    # The walk pairs B by projection period: m1 keeps its count; only the cash flow, which the stub
+    # computes from the policy month, moves.
+    first = walked.result["steps"][0]
+    assert first["revisions"] == ["m1"] and [(c["quantity"], c["contributes"]) for c in first["contributions"]] == [
+        (COUNT, False), (CASH, True)]
+    step = stored(world / "walk" / first["compare"]["result"]["path"])
+    assert step["added"] == step["removed"] == []
+    result = run_search(world, older, newer, WalkStub(MOVED), quantities=[COUNT], periods="0-2",
+                        walk=world / "walk").result
+    assert_search_folder_valid(world / "search")
+    assert [(i["from_state"], i["to_state"], i["differs"]) for i in result["intervals"]] == [
+        (0, 2, [COUNT]), (0, 1, []), (1, 2, [COUNT])]
+    (found,) = result["contributions"]
+    assert found["revisions"] == ["m2"]
+    assert found["contributions"] == [{"quantity": COUNT, "contributes": True, "sum": 3.0, "absolute_sum": 3.0}]
+    exports = {s["state"]: world / "walk" / s["export"]["path"] for s in stored(world / "walk" / "walk.result.json")[
+        "states"]}
+    assert float(exact(exports[1], exports[2], [COUNT], (0, 2))[COUNT]) == 3.0
     assert result["missed"] == [] and not result["findings"]
 
 
@@ -671,10 +834,10 @@ def test_restrict_counts_target_periods_from_the_valuation_date_on_policy_month(
     response = {"quantities": [{"name": COUNT, "unit": "policies"}], "time_basis": {"id": "policy_month"}}
     values = {**{("A", t): [1.0] for t in range(0, 150)}, **{("B", t): [2.0] for t in range(144, 150)},
               **{("C", t): [3.0] for t in range(30, 40)}}
-    narrowed = restrict(CheckedRun(response, values), Target((COUNT,), (0, 2), True, {"A": 0, "B": 144}))
-    # C, absent from the older export, counts from its own first period.
-    assert sorted(narrowed.values) == [("A", 0), ("A", 1), ("A", 2), ("B", 144), ("B", 145), ("B", 146),
-                                       ("C", 30), ("C", 31), ("C", 32)]
+    narrowed = restrict(CheckedRun(response, values), Target((COUNT,), (0, 2), True))
+    # Every model point counts from its own first period in this run; the result is aligned.
+    assert narrowed.aligned and narrowed.values == {
+        (point, t): [value] for point, value in (("A", 1.0), ("B", 2.0), ("C", 3.0)) for t in range(3)}
 
 
 class ValuationStub(WalkStub):
@@ -715,7 +878,8 @@ def test_on_a_valuation_origin_basis_target_periods_are_used_as_they_are(world):
 
 def test_restrict_keeps_the_target_periods_and_quantities_in_response_order():
     from degelmann.deltarecon.compare import CheckedRun
-    response = {"quantities": [{"name": COUNT, "unit": "policies"}, {"name": CASH, "unit": "EUR"}]}
+    response = {"quantities": [{"name": COUNT, "unit": "policies"}, {"name": CASH, "unit": "EUR"}],
+                "time_basis": {"id": "valuation_year"}}
     run = CheckedRun(response, {("A", 0): [1.0, 2.0], ("A", 5): [3.0, 4.0]})
     narrowed = restrict(run, Target((CASH,), (0, 2), True))
     assert narrowed.response["quantities"] == [{"name": CASH, "unit": "EUR"}]
@@ -978,3 +1142,232 @@ def test_the_cancelling_pair_on_the_reference_engine(tmp_path):
     assert clone_state(clone) == state
     assert {n: folder_hashes(p.parent) for n, p in records.items()} == before
     assert folder_hashes(tmp_path / "walk") == walk_hashes
+
+
+def test_a_walk_runs_on_the_path_of_the_older_record_and_a_walk_on_another_path_is_refused(
+        tmp_path, monkeypatch, capsys):
+    """Two model points and one revision; the records run on the export path, the default."""
+    from degelmann.deltarecon.engines.reference_model import ReferenceModel, engine_version
+    repositories, clone = throwaway(tmp_path)
+    lines = (clone / POINT_TABLE).read_text("utf-8").splitlines(keepends=True)
+    write_files(clone, {POINT_TABLE: lines[0] + lines[1] + lines[2]})
+    base = commit(clone, "Keep two model points")
+    lapse = (clone / LAPSE_TABLE).read_text("utf-8")
+    write_files(clone, {LAPSE_TABLE: lapse.replace("\n2,0.04,", "\n2,0.02,")})
+    newest = commit(clone, "Halve the lapse rate of policy year 2")
+    records = {}
+    for name, revision in (("older", base), ("newer", newest)):
+        folder = tmp_path / name
+        assert main(["request", "--revision", revision, "--repositories", str(repositories), "--label", name,
+                     "--run-id", f"run-{name}", "--output", str(folder / "request.json")]) == 0
+        assert main(["run", str(folder / "request.json"), "--repositories", str(repositories)]) == 0
+        records[name] = str(folder / "run-record.json")
+
+    def walk_on(output: str) -> None:
+        assert main(["walk", records["older"], records["newer"], "--output", str(tmp_path / output),
+                     "--repositories", str(repositories)]) == 0
+
+    def versions(output: str) -> set[str]:
+        return {reference["value"] for state in ("state-00", "state-01")
+                for reference in stored(tmp_path / output / state / "request.json")["release"]["references"]
+                if reference["kind"] == "engine_version"}
+
+    walk_on("walk")
+    assert versions("walk") == {engine_version("export")}
+    # The same two records walked by an engine that names the modelx path for every state.
+    real = ReferenceModel.state_release
+
+    def on_modelx(self, base, revision, hold, repositories):
+        state = real(self, base, revision, hold, repositories)
+        return {**state, "references": [{**r, "value": engine_version("modelx")} if r["kind"] == "engine_version"
+                                        else r for r in state["references"]]}
+
+    with monkeypatch.context() as patch:
+        patch.setattr(ReferenceModel, "state_release", on_modelx)
+        walk_on("walk-modelx")
+    assert versions("walk-modelx") == {engine_version("modelx")}
+    capsys.readouterr()
+    before = folder_hashes(tmp_path / "walk-modelx")
+    assert main(["search", records["older"], records["newer"], "--output", str(tmp_path / "refused"),
+                 "--repositories", str(repositories), "--walk", str(tmp_path / "walk-modelx")]) == 1
+    out = capsys.readouterr().out
+    assert out.startswith("search: rejected") and "diagnostic: walk_mismatch: " in out
+    assert not (tmp_path / "refused").exists() and folder_hashes(tmp_path / "walk-modelx") == before
+    # The walk on the path of the older record is a reference.
+    assert main(["search", records["older"], records["newer"], "--output", str(tmp_path / "search"),
+                 "--repositories", str(repositories), "--walk", str(tmp_path / "walk")]) == 0
+    assert versions("search") == {engine_version("export")}
+
+
+# --- target-only inner states ------------------------------------------------------------
+
+# The search result of the targeted search and of the search without a target over HISTORY, checked against
+# the walk, as the code before the switch target_only wrote them: a search without the switch keeps its bytes.
+SWITCH_OFF_RESULTS = {
+    "target": "706582bb4a41248a6a99294fe7c09a9f4e635dc88217c5fed1a92366249c2f56",
+    "every-coordinate": "bc3af57bdd2215c64f13dd4d6fe5a5abebd38023bc599436306032227154faf2",
+}
+# Revision 1 changes the count of MP-B; revision 3 the cash flow alone.
+ENDS = (
+    ("y0", "The base.\n", (), POINTS, PARAMS),
+    ("y1", "Raise MP-B\n", ("data",), POINTS_B, PARAMS),
+    ("y2", "Touch nothing\n", (), POINTS_B, PARAMS),
+    ("y3", "Raise the rate\n", ("parameter",), POINTS_B, PARAMS_RATE),
+    ("y4", "Touch nothing again\n", (), POINTS_B, PARAMS_RATE),
+)
+
+
+def state_requests(folder: Path) -> dict[int, dict]:
+    """The requests of the states the search ran, by state."""
+    return {int(path.parent.name.split("-")[1]): stored(path) for path in folder.glob("state-*/request.json")}
+
+
+def kept_request(folder: Path, entry: dict) -> dict:
+    return stored(folder / entry["compare"]["result"]["path"].replace(".result.", ".request."))
+
+
+@pytest.mark.parametrize("options", [{"quantities": [COUNT], "periods": "0-2"}, {}],
+                         ids=["target", "every-coordinate"])
+def test_a_search_without_the_switch_writes_the_bytes_it_wrote_before(history, options):
+    world, older, newer = history
+    run_walk(world, older, newer, WalkStub(HISTORY), tolerance=world / "tolerance.json")
+    done = run_search(world, older, newer, WalkStub(HISTORY), tolerance=world / "tolerance.json", walk=world / "walk",
+                      **options)
+    name = "target" if options else "every-coordinate"
+    assert sha256_file(done.result_path) == SWITCH_OFF_RESULTS[name]
+    assert not list((world / "search").glob("*.target"))
+    assert all("target" not in request for request in state_requests(world / "search").values())
+
+
+def test_target_only_inner_states_find_what_the_search_finds(history, monkeypatch, capsys):
+    world, older, newer = history
+    tolerance = world / "tolerance.json"
+    run_walk(world, older, newer, WalkStub(HISTORY), tolerance=tolerance)
+    full = run_search(world, older, newer, WalkStub(HISTORY), tolerance=tolerance, walk=world / "walk",
+                      quantities=[COUNT], periods="0-2").result
+    monkeypatch.setattr("degelmann.deltarecon.__main__.engine", lambda: WalkStub(HISTORY))
+    assert main(["search", str(older), str(newer), "--output", str(world / "targeted"), "--repositories", str(world),
+                 "--quantity", COUNT, "--periods", "0-2", "--tolerance", str(tolerance), "--walk", str(world / "walk"),
+                 "--target-only"]) == 0
+    assert "inner states: run on the target only, without the model checks" in capsys.readouterr().out
+    folder = world / "targeted"
+    targeted = assert_search_folder_valid(folder)
+    assert_same_search(targeted, full)
+    assert targeted["runs"] == full["runs"] and targeted["states"][0]["run_id"] == full["states"][0]["run_id"]
+    record = stored(folder / "search.run-record.json")
+    assert targeted["switches"] == record["switches"] == ["target_only"]
+    # The inner states carry the target in request and response; the two ends are full runs.
+    n = len(HISTORY) - 1
+    requests = state_requests(folder)
+    assert sorted(requests) == [s["state"] for s in targeted["states"]]
+    for k, request in requests.items():
+        response = stored(folder / f"state-{k:02d}" / "response.json")
+        if k in (0, n):
+            assert "target" not in request and "target" not in response
+            assert [q["name"] for q in response["quantities"]] == [COUNT, CASH]
+        else:
+            assert request["target"] == response["target"] == targeted["target"]
+            assert [q["name"] for q in response["quantities"]] == [COUNT]
+    # The comparison kept for the contribution (6, 7) is between two target-only runs, on the target profile.
+    (entry,) = targeted["contributions"]
+    request = kept_request(folder, entry)
+    assert request["left"]["response"]["path"] == "state-06/response.json"
+    assert request["right"]["run_record"]["path"] == "state-07/run-record.json"
+    assert request["tolerance"] == PROFILE
+    compared = stored(folder / entry["compare"]["result"]["path"])
+    assert compared["outcome"] == "compared" and [q["name"] for q in compared["quantities"]] == [COUNT]
+    assert not list(folder.glob("*.target"))  # no full state is compared: no target view
+
+
+def test_a_contribution_at_an_end_is_kept_on_the_target_view_of_the_end(world):
+    build(world, ENDS)
+    engine = WalkStub(ENDS)
+    older, newer = record(world, "y0", engine, label="N"), record(world, "y4", engine, label="N+1")
+    options = {"quantities": [COUNT], "periods": "0-1"}
+    full = run_search(world, older, newer, WalkStub(ENDS), **options).result
+    targeted = run_search(world, older, newer, WalkStub(ENDS), output="targeted", target_only=True, **options).result
+    folder = world / "targeted"
+    assert assert_search_folder_valid(folder) == targeted
+    for member in ("ends", "target", "intervals", "contributions", "findings", "runs"):
+        assert without_compare(targeted[member]) == without_compare(full[member]), member
+    (entry,) = targeted["contributions"]
+    assert (entry["from_state"], entry["to_state"], entry["revisions"]) == (0, 1, ["y1"])
+    request = kept_request(folder, entry)
+    assert request["left"] == {"response": {"path": "state-00.target/response.json",
+                                            "sha256": sha256_file(folder / "state-00.target" / "response.json")}}
+    assert request["right"]["response"]["path"] == "state-01/response.json" and "run_record" in request["right"]
+    compared = stored(folder / entry["compare"]["result"]["path"])
+    assert compared["outcome"] == "compared" and "parameter_diff" not in compared
+    assert sorted(path.name for path in (folder / "state-00.target").iterdir()) == ["response.json", "results.csv"]
+    # The view is what a target-only run of state 0 returns, but for its run id, and is no run.
+    view = stored(folder / "state-00.target" / "response.json")
+    state = stored(folder / "state-00" / "request.json")
+    again = world / "again"
+    again.mkdir()
+    (again / "request.json").write_bytes(document_bytes({**state, "target": targeted["target"]}))
+    ran = run_request(again / "request.json", WalkStub(ENDS), repositories=world)
+    assert ran.outcome == "succeeded"
+    assert view == {**ran.response, "run_id": state["run_id"]}
+    assert (folder / "state-00.target" / "results.csv").read_bytes() == (again / "results.csv").read_bytes()
+    assert view["model_points"] == [{"model_point_id": "MP-A", "first_period": 12, "last_period": 13},
+                                    {"model_point_id": "MP-B", "first_period": 0, "last_period": 1},
+                                    {"model_point_id": "MP-C", "first_period": 0, "last_period": 0},
+                                    {"model_point_id": "MP-D", "first_period": 3, "last_period": 4}]
+    assert all(s["outcome"] == "succeeded" for s in targeted["states"])
+
+
+def test_both_switches_run_no_state_and_keep_comparisons_on_target_views(history):
+    world, older, newer = history
+    tolerance = world / "tolerance.json"
+    run_walk(world, older, newer, WalkStub(HISTORY), tolerance=tolerance)
+    options = {"quantities": [COUNT], "periods": "0-2", "tolerance": tolerance, "walk": world / "walk"}
+    full = run_search(world, older, newer, WalkStub(HISTORY), **options).result
+    engine = Counting(HISTORY)
+    both = run_search(world, older, newer, engine, output="both", reuse=True, target_only=True, **options).result
+    assert engine.calls == 0
+    folder = world / "both"
+    assert assert_search_folder_valid(folder) == both
+    assert_same_search(both, full)
+    assert both["switches"] == stored(folder / "search.run-record.json")["switches"] == ["reuse_walk", "target_only"]
+    assert both["runs"]["search"] == 0
+    for entry in both["contributions"]:
+        request = kept_request(folder, entry)
+        for side, k in (("left", entry["from_state"]), ("right", entry["to_state"])):
+            assert request[side] == {"response": {
+                "path": f"state-{k:02d}.target/response.json",
+                "sha256": sha256_file(folder / f"state-{k:02d}.target" / "response.json")}}
+            assert stored(folder / request[side]["response"]["path"])["target"] == both["target"]
+        assert stored(folder / entry["compare"]["result"]["path"])["outcome"] == "compared"
+
+
+def test_the_switch_target_only_without_a_narrowed_target_is_a_usage_error(history, monkeypatch, capsys):
+    world, older, newer = history
+    before = folder_hashes(world)
+    monkeypatch.setattr("degelmann.deltarecon.__main__.engine", lambda: WalkStub(HISTORY))
+    assert main(["search", str(older), str(newer), "--output", str(world / "search"), "--repositories", str(world),
+                 "--target-only"]) == 2
+    assert "--target-only" in capsys.readouterr().err
+    assert main(["search", str(older), str(newer), "--output", str(world / "search"), "--repositories", str(world),
+                 "--quantity", COUNT, "--quantity", CASH, "--target-only"]) == 2
+    assert folder_hashes(world) == before and not (world / "search").exists()
+
+
+@pytest.mark.parametrize("reuse", [False, True], ids=["target-only", "both-switches"])
+def test_on_a_valuation_origin_basis_target_windows_are_the_target_periods_as_they_are(world, reuse):
+    build(world, VALUATION)
+    engine = ValuationStub(VALUATION)
+    older, newer = record(world, "v0", engine, label="N"), record(world, "v2", engine, label="N+1")
+    run_walk(world, older, newer, ValuationStub(VALUATION))
+    options = {"quantities": [COUNT], "periods": "1-2", "walk": world / "walk"}
+    full = run_search(world, older, newer, ValuationStub(VALUATION), **options).result
+    targeted = run_search(world, older, newer, ValuationStub(VALUATION), output="targeted", target_only=True,
+                          reuse=reuse, **options).result
+    folder = world / "targeted"
+    assert assert_search_folder_valid(folder) == targeted
+    assert_same_search(targeted, full)
+    # The end state 2 is compared through its view: A's period 2 alone; B starts at period 3.
+    view = stored(folder / "state-02.target" / "response.json")
+    assert view["model_points"] == [{"model_point_id": "MP-A", "first_period": 2, "last_period": 2}]
+    if not reuse:
+        inner = stored(folder / "state-01" / "response.json")
+        assert inner["model_points"] == view["model_points"] and inner["target"] == view["target"]

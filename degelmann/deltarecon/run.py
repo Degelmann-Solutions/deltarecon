@@ -1,4 +1,4 @@
-"""The run procedure of ``contracts/v2/run.md``.
+"""The run procedure of ``contracts/v3/run.md``.
 
 A run reads a run request and writes, beside it, the response, the per-model-point
 export, and the run record. The calculation sits behind the :class:`Engine` protocol; this
@@ -15,7 +15,16 @@ run with the outcome ``error`` and the diagnostic ``state_not_readable``; a
 :class:`~degelmann.deltarecon.documents.Rejection` and a :class:`UsageError` keep their meaning. A
 state without a model point gives ``no_model_point``, an id the schema forbids
 ``invalid_model_point_id``. A :class:`ModelPointFailure` of ``project`` still fails the
-model point, and an error of the core still stops the procedure.
+model point, and an error of the core still stops the procedure. A session may project the
+selection at once through ``project_many``; its outcomes are checked in writer order as
+those of ``project``.
+
+A request with ``target`` is a target-only run: the session computes the target quantities
+in the target window of each model point through ``project_target`` and evaluates no model
+check. A target quantity the session does not declare is rejected with ``unknown_quantity``,
+a target the session cannot compute with ``target_not_supported``, and a target period range
+whose first period lies after its last with ``schema_violation``. A model point without a
+period in its window is not computed and is absent from the response and the export.
 """
 from __future__ import annotations
 
@@ -78,6 +87,20 @@ class Session(Protocol):
 
         Raises :class:`ModelPointFailure` when the model point cannot be calculated.
         """
+
+    # A session may also offer ``project_many(model_point_ids)``: the outcome of each id in
+    # the given order, its periods as ``project`` returns them or the ModelPointFailure that
+    # ``project`` would raise. Any other exception propagates. A session without it is
+    # projected point by point through ``project``.
+    #
+    # A session that computes a target offers ``project_target(model_point_ids, quantities,
+    # periods)``: ``quantities`` are names the session declares, in its declared order, and
+    # ``periods`` is ``(first, last)`` in projection periods or ``None``. The outcome of each id
+    # in the given order is a ModelPointFailure or the periods of its target window, with one
+    # value per name of ``quantities``: from the period of its valuation date s plus ``first`` to
+    # the lesser of s plus ``last`` and its last period, or every period without ``periods``. A
+    # point whose window is empty has no period. No model check is evaluated: a point fails only
+    # when a target value cannot be calculated. A session without it cannot run a target.
 
     def parameters(self) -> list[dict]:
         """The parameter inventory of the release state, in the form of the run record.
@@ -170,7 +193,8 @@ class Engine(Protocol):
         """The release identity of the state after ``revision``, as this engine would record it.
 
         ``base`` is a recorded release identity, of any engine version. The result has the
-        label of ``base``, names the present engine, and names the state after ``revision``
+        label of ``base``, names the present engine, on the computation path ``base`` names
+        when the engine has several, and names the state after ``revision``
         with the kinds in ``hold`` taken from ``base``; for ``revision`` ``None`` it names
         the state of ``base`` itself. Nothing is restored and nothing is written.
 
@@ -187,6 +211,9 @@ class RunResult:
     record_path: Path | None = None
     export_path: Path | None = None
     record: dict | None = field(default=None, repr=False)
+    # The values of a succeeded run as ``check_export`` reads them back from the export, by model
+    # point id and period; ``None`` for a run that has not succeeded or once a caller took them.
+    values: dict[tuple[str, int], list[float]] | None = field(default=None, repr=False)
 
 
 def quantity_errors(stage: str, names: list[str]) -> str | None:
@@ -379,23 +406,75 @@ def read_inventory(session: Session) -> list[dict]:
     return sorted(ordered, key=lambda parameter: parameter["name"])
 
 
+def _one_outcome_per_point(outcomes: list, model_point_ids: list[str]) -> list:
+    """``outcomes`` when the engine returns one per model point, else an engine error."""
+    if len(outcomes) != len(model_point_ids):
+        raise RuntimeError(f"the engine returns {len(outcomes)} outcomes for {len(model_point_ids)} "
+                           "model points")
+    return outcomes
+
+
+def project_selection(session: Session, model_point_ids: list[str]) -> list:
+    """The outcome of each id, in the given order: its periods, or its :class:`ModelPointFailure`.
+
+    Through ``session.project_many`` when the session offers it, else ``project`` per id.
+    """
+    many = getattr(session, "project_many", None)
+    if many is not None:
+        return _one_outcome_per_point(list(many(model_point_ids)), model_point_ids)
+    outcomes = []
+    for model_point_id in model_point_ids:
+        try:
+            outcomes.append(session.project(model_point_id))
+        except ModelPointFailure as failure:
+            outcomes.append(failure)
+    return outcomes
+
+
+def target_names(target: dict, names: list[str]) -> list[str]:
+    """The target quantities among the declared ``names``, in declared order."""
+    return [name for name in names if name in target["quantities"]]
+
+
+def project_target(session: Session, model_point_ids: list[str], target: dict, names: list[str]) -> list:
+    """The outcome of each id, in the given order, through ``session.project_target``."""
+    periods = target.get("periods")
+    window = None if periods is None else (periods["first"], periods["last"])
+    return _one_outcome_per_point(list(session.project_target(model_point_ids, target_names(target, names), window)),
+                                  model_point_ids)
+
+
 def calculate(session: Session, stage: str, selected: list[str], available: list[str],
-              names: list[str] | None = None):
+              names: list[str] | None = None, target: dict | None = None):
     """Project the selection. Return the export rows, the period ranges, and the failures.
 
-    ``names`` are the quantity names the session declares; without them they are read.
+    ``names`` are the quantity names the session declares; without them they are read. With
+    ``target`` only the target quantities are projected, in the target window of each point; a
+    point without a period in its window is left out.
     """
     if names is None:
         names = [name for name, _ in _engine(lambda: list(session.quantities))]
     problem = quantity_errors(stage, names)
     if problem:
         raise RuntimeError(f"the engine declares quantities the stage does not allow: {problem}")
+    # An id the release holds more than once fails in the core and is never projected.
+    single = [model_point_id for model_point_id in dict.fromkeys(selected)
+              if available.count(model_point_id) <= 1]
+    if target is None:
+        outcomes = dict(zip(single, project_selection(session, single)))
+    else:
+        outcomes = dict(zip(single, project_target(session, single, target, names)))
+        names = target_names(target, names)
     rows, ranges, failures = [], [], []
     for model_point_id in selected:
         try:
             if available.count(model_point_id) > 1:
                 raise ModelPointFailure("The release holds this model point id more than once.")
-            periods = session.project(model_point_id)
+            periods = outcomes[model_point_id]
+            if isinstance(periods, ModelPointFailure):
+                raise periods
+            if not periods and target is not None:
+                continue  # no period in the target window: the point is not computed
             if not periods:
                 raise ModelPointFailure("The model point has no period.")
             first = periods[0][0]
@@ -440,28 +519,49 @@ def recorded_now() -> str:
 
 
 def run_record(stage: str, procedure: str, outcome: str, inputs: list[dict], releases: list[dict],
-               parameters: list[dict], outputs: list[dict]) -> dict:
-    """The run record of one execution of ``procedure``, with a new record id and the present time."""
+               parameters: list[dict], outputs: list[dict], switches: list[str] = ()) -> dict:
+    """The run record of one execution of ``procedure``, with a new record id and the present time.
+    ``switches`` are the opt-in switches that were on, by name; the member is absent when none was on."""
     return {
         "document": "run_record", "contract_version": CONTRACT_VERSION, "stage": stage,
         "record_id": new_record_id(), "procedure": {"type": procedure},
+        **({"switches": sorted(switches)} if switches else {}),
         "outcome": outcome, "recorded_at": recorded_now(), "inputs": inputs,
         "releases": releases, "parameters": parameters, "outputs": outputs,
     }
 
 
 def run_request_document(stage: str, run_id: str, release: dict, changes: dict, selection: dict,
-                         subject: str) -> dict:
-    """A run request the tool writes. A request that would violate its schema is a usage error
-    that names ``subject``, for example "the request of state 3"."""
+                         subject: str, target: dict | None = None) -> dict:
+    """A run request the tool writes; with ``target`` a target-only run. A request that would
+    violate its schema is a usage error that names ``subject``, for example "the request of state 3"."""
     request = {
         "document": "run_request", "contract_version": CONTRACT_VERSION, "stage": stage,
         "run_id": run_id, "release": release, "changes": changes, "selection": selection,
+        **({"target": target} if target is not None else {}),
     }
     errors = schema_errors(request, RUN_REQUEST)
     if errors:
         raise UsageError(f"{subject} would violate its schema at {errors[0]}")
     return request
+
+
+def check_target_periods(target: dict | None) -> None:
+    """The period range of a target names its first period before or at its last."""
+    periods = (target or {}).get("periods")
+    if periods is not None and periods["first"] > periods["last"]:
+        raise Rejection("schema_violation", "The period range of the target starts after its last period.")
+
+
+def check_target(session: Session, target: dict) -> None:
+    """A target names quantities the session declares, and the session can compute a target."""
+    declared = _engine(lambda: [name for name, _ in session.quantities])
+    unknown = [name for name in target["quantities"] if name not in declared]
+    if unknown:
+        raise Rejection("unknown_quantity", f"The target names the quantity {unknown[0]}, which the engine "
+                        "does not declare.")
+    if getattr(session, "project_target", None) is None:
+        raise Rejection("target_not_supported", "The engine cannot compute a target-only run.")
 
 
 def repositories_folder(repositories: Path | str | None) -> Path:
@@ -489,15 +589,17 @@ def run_request(request_path: Path, engine: Engine, repositories: Path | None = 
         request = parse_document(request_path.read_bytes())
         check_version(request)
         check_schema(request, RUN_REQUEST)
+        check_target_periods(request.get("target"))
     except Rejection as rejection:
         response = rejected_response(request, rejection)
         write_document(response_path, response, RUN_SCHEMA)
         return RunResult("rejected", response, response_path)
 
     repeated = {name: request[name] for name in ("stage", "run_id")}
-    carried = {name: request[name] for name in ("release", "changes", "selection")}
+    carried = {name: request[name] for name in ("release", "changes", "selection", "target") if name in request}
+    target = request.get("target")
     head = {"document": "run_response", "contract_version": CONTRACT_VERSION, **repeated}
-    manifest_path, parameters, rows = None, [], None
+    manifest_path, parameters, rows, values = None, [], None, None
     try:
         if request["stage"] not in engine.stages or request["stage"] not in STAGE_QUANTITIES:
             raise Rejection("unsupported_stage", f"The stage {request['stage']} is not supported.")
@@ -515,6 +617,8 @@ def run_request(request_path: Path, engine: Engine, repositories: Path | None = 
             if any(not isinstance(model_point_id, str) for model_point_id in available):
                 _check_model_point_ids(available)
             selected = select(request, available)
+            if target is not None:
+                check_target(session, target)
             # The request is accepted. From here the outcome is succeeded, failed, or error.
             if not selected:
                 raise _StateError("no_model_point", "The release state holds no model point.")
@@ -522,8 +626,9 @@ def run_request(request_path: Path, engine: Engine, repositories: Path | None = 
             declared = _engine(lambda: [(name, unit) for name, unit in session.quantities])
             time_basis = {"id": _engine(lambda: session.time_basis)}
             rows, ranges, failures = calculate(session, request["stage"], selected, available,
-                                               [name for name, _ in declared])
-            quantities = [{"name": name, "unit": unit} for name, unit in declared]
+                                               [name for name, _ in declared], target)
+            quantities = [{"name": name, "unit": unit} for name, unit in declared
+                          if target is None or name in target["quantities"]]
     except Rejection as rejection:
         response, parameters = rejected_response(request, rejection), []
     except _EngineError as error:
@@ -536,6 +641,7 @@ def run_request(request_path: Path, engine: Engine, repositories: Path | None = 
             response = {**head, "outcome": "failed", **carried, "failed_model_points": failures}
         else:
             write_export(export_path, [quantity["name"] for quantity in quantities], rows)
+            values = written_values(rows)
             response = {**head, "outcome": "succeeded", **carried, "time_basis": time_basis,
                         "quantities": quantities, "model_points": ranges,
                         "export": {"artifact": artifact_reference(folder, export_path),
@@ -561,4 +667,12 @@ def run_request(request_path: Path, engine: Engine, repositories: Path | None = 
     record = run_record(request["stage"], "run", outcome, inputs, [request["release"]], parameters, outputs)
     write_document(record_path, record, RECORD_SCHEMA)
     return RunResult(outcome, response, response_path, record_path,
-                     export_path if outcome == "succeeded" else None, record)
+                     export_path if outcome == "succeeded" else None, record, values)
+
+
+def written_values(rows) -> dict[tuple[str, int], list[float]]:
+    """The export rows as ``check_export`` reads them back from the written export: in writer order,
+    keyed by model point id and period, each value a float. The writer form writes every zero as
+    ``0``, so ``-0.0`` becomes ``0.0``; every other finite value round-trips exactly."""
+    return {(model_point_id, int(period)): [float(value) + 0.0 for value in numbers]
+            for model_point_id, period, numbers in sorted(rows, key=lambda row: (row[0], row[1]))}

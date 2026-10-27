@@ -1,0 +1,16 @@
+{
+  "document": "compare_result",
+  "contract_version": "3.0",
+  "stage": "liability_cashflow",
+  "compare_id": "compare-non-finite-difference",
+  "outcome": "rejected",
+  "diagnostics": [
+    {
+      "code": "non_finite_difference",
+      "message": "The difference of the right and the left value of a coordinate is not a finite number.",
+      "model_point_ids": [
+        "MP-0001"
+      ]
+    }
+  ]
+}

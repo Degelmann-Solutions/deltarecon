@@ -1,10 +1,11 @@
-"""Stage contracts version 2: schemas, examples, hashes, number format and neutrality.
+"""Stage contracts version 3: schemas, examples, hashes, number format and neutrality.
 
-The tests check the published pack under ``contracts/v2``. They validate the examples
+The tests check the published pack under ``contracts/v3``. They validate the examples
 against the schemas and check the stored bytes. They do not implement a contract reader:
-the semantic reader rules are normative text, shown by indexed examples. The pack of
-version 1.0 under ``contracts/v1`` stays published; its examples still validate under its
-own schemas, which the tool uses to read 1.0 documents.
+the semantic reader rules are normative text, shown by indexed examples. The packs of
+versions 1.0 and 2.0 under ``contracts/v1`` and ``contracts/v2`` stay published; their
+examples still validate under their own schemas, which the tool uses to read 1.0 and 2.0
+documents.
 """
 from __future__ import annotations
 
@@ -23,12 +24,13 @@ from degelmann.deltarecon.export import (INTEGER, READER_INTEGER, export_errors,
 from conftest import EXACT, EXAMPLES, deviates, rounded
 
 ROOT = Path(__file__).resolve().parent.parent
-PACK = ROOT / "contracts" / "v2"
-V1_PACK = ROOT / "contracts" / "v1"
+PACK = ROOT / "contracts" / "v3"
+# The published packs of the earlier versions the tool reads, by version.
+EARLIER_PACKS = {"1.0": ROOT / "contracts" / "v1", "2.0": ROOT / "contracts" / "v2"}
 SCHEMAS = PACK / "schemas"
 TEXT_FILES = ["README.md", "run.md", "changes.md", "compare.md", "localise.md", "domain/liability_cashflow.md"]
 
-# The rows of the behaviour matrix in contracts/v2/README.md.
+# The rows of the behaviour matrix in contracts/v3/README.md.
 MATRIX_ROWS = {
     "complete-run", "malformed-input", "opaque-release-identity", "inconsistent-result",
     "model-point-failure", "incompatible-compare", "coverage-difference",
@@ -347,6 +349,31 @@ def test_a_request_may_name_held_kinds(changes, valid):
     assert (not list(validator("run.schema.json").iter_errors(request))) == valid
 
 
+@pytest.mark.parametrize("target, valid", [
+    ({"quantities": ["Bruttobeitrag"], "periods": {"first": 0, "last": 59}}, True),
+    ({"quantities": ["Bruttobeitrag"]}, True),
+    ({"quantities": []}, False),
+    ({"quantities": ["Bruttobeitrag", "Bruttobeitrag"]}, False),
+    ({"quantities": ["Bruttobeitrag"], "periods": {"first": -1, "last": 59}}, False),
+    ({"quantities": ["Bruttobeitrag"], "periods": {"first": 0}}, False),
+    ({"quantities": ["Bruttobeitrag"], "offset": 0}, False),
+])
+def test_a_request_may_name_a_target(target, valid):
+    request = json.loads((EXAMPLES / "reference" / "full-run.request.json").read_text("utf-8"))
+    request["target"] = target
+    assert (not list(validator("run.schema.json").iter_errors(request))) == valid
+
+
+def test_a_response_without_a_model_point_is_valid_under_a_target_only():
+    response = json.loads((EXAMPLES / "reference" / "full-run.response.json").read_text("utf-8"))
+    empty = {**response, "model_points": [], "export": {**response["export"], "data_rows": 0}}
+    assert list(validator("run.schema.json").iter_errors(empty))
+    assert not list(validator("run.schema.json").iter_errors({**empty, "target": {"quantities": ["Bruttobeitrag"]}}))
+    for switches, valid in ((["reuse_walk", "target_only"], True), (["target_only"], True), (["walk_only"], False)):
+        record = json.loads((EXAMPLES / "reference" / "full-run.run-record.json").read_text("utf-8"))
+        assert (not list(validator("run-record.schema.json").iter_errors({**record, "switches": switches}))) == valid
+
+
 def walk_example() -> dict:
     return json.loads((EXAMPLES / "walk" / "walk.result.json").read_text("utf-8"))
 
@@ -516,7 +543,7 @@ def test_localise_contract_is_no_stage_contract_and_names_its_findings():
 
 def test_index_names_every_case_once_and_completely():
     index = json.loads((EXAMPLES / "index.json").read_text("utf-8"))
-    assert index["contract_version"] == "2.0"
+    assert index["contract_version"] == "3.0"
     assert len(case_ids()) == len(set(case_ids()))
     for example in cases():
         assert example["expected"] in {"accept", "reject", "failed", "error", "incompatible"}, example["id"]
@@ -613,38 +640,44 @@ def test_example_documents_match_their_expected_outcome(case_id):
         assert failing in [d["path"] for d in example["documents"]]
 
 
-@pytest.mark.parametrize("case_id", [c["id"] for c in json.loads(
-    (V1_PACK / "examples" / "index.json").read_text("utf-8"))["cases"]])
-def test_the_1_0_examples_still_match_their_outcome_under_the_1_0_schemas(case_id):
-    """The 1.0 pack stays as published: its documents validate, or fail, under its own schemas,
-    the schemas the tool reads a 1.0 document with, and its artifact references resolve."""
-    examples = V1_PACK / "examples"
+@pytest.mark.parametrize("version,case_id", [(version, c["id"]) for version, pack in EARLIER_PACKS.items()
+                                             for c in json.loads((pack / "examples" / "index.json")
+                                                                 .read_text("utf-8"))["cases"]])
+def test_the_earlier_examples_still_match_their_outcome_under_their_own_schemas(version, case_id):
+    """The 1.0 and 2.0 packs stay as published: their documents validate, or fail, under the
+    schemas of their own version, the schemas the tool reads a 1.0 or 2.0 document with."""
+    pack = EARLIER_PACKS[version]
+    examples = pack / "examples"
     example = next(c for c in json.loads((examples / "index.json").read_text("utf-8"))["cases"]
                    if c["id"] == case_id)
-    assert load_schemas("1.0") == {path.name: json.loads(path.read_text("utf-8"))
-                                   for path in (V1_PACK / "schemas").iterdir()}
+    assert load_schemas(version) == {path.name: json.loads(path.read_text("utf-8"))
+                                     for path in (pack / "schemas").iterdir()}
     level, failing = example.get("level"), example.get("failing")
     for document in example["documents"]:
         path = examples / document["path"]
         if level == "parse" and document["path"] == failing:
             continue
         value = strict_json(path)
-        errors = list(validator(document["schema"], "1.0").iter_errors(value))
+        errors = list(validator(document["schema"], version).iter_errors(value))
         if level == "schema" and document["path"] == failing:
             assert errors, document["path"]
         else:
             assert not errors, f"{document['path']}: {errors[0].message}"
-            assert value.get("contract_version", "1.0") == "1.0"
+            assert value.get("contract_version", version) == version
 
 
-def test_the_two_versions_have_their_own_schemas():
-    """A 1.0 document passes the 1.0 schemas and fails the 2.0 schemas, and the reverse."""
-    for version, other in (("1.0", "2.0"), ("2.0", "1.0")):
+def test_each_version_has_its_own_schemas():
+    """A document of 1.0, 2.0, or 3.0 passes the schemas of its own version and fails those of
+    the two others."""
+    versions = ("1.0", "2.0", "3.0")
+    for version in versions:
         pack = ROOT / "contracts" / f"v{version[0]}"
         request = strict_json(pack / "examples" / "reference" / "full-run.request.json")
         assert request["contract_version"] == version
         assert not list(validator("run.schema.json", version).iter_errors(request))
-        assert list(validator("run.schema.json", other).iter_errors(request))
+        for other in versions:
+            if other != version:
+                assert list(validator("run.schema.json", other).iter_errors(request)), (version, other)
 
 
 def test_schema_level_cases_exist():

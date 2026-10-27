@@ -1,4 +1,4 @@
-"""The compare procedure of ``contracts/v2/compare.md``.
+"""The compare procedure of ``contracts/v3/compare.md``.
 
 A comparison reads a compare request and writes, beside it, the compare result, the
 deviation file and the signature table when the outcome is ``compared``, and the run
@@ -19,8 +19,20 @@ Rule 1 names no diagnostic of its own for a response that has not succeeded. A f
 response is rejected with ``model_point_failed``, the code its outcome implies, and a
 rejected response or one with the outcome ``error`` with the code of its first diagnostic.
 
+Values are paired by projection period (:func:`align`): on a time basis whose origin is the
+issue date, ``ISSUE_ORIGIN``, each run counts a model point from its own valuation date, its first
+exported period, or for a target-only run with target periods that period less the first target
+period; on every other basis the periods stay as they are. The coverage lists, the deviation file and the
+signature table write projection periods; the responses and exports of the runs are not changed.
+
 The signature table is built from the compare result and the deviation file as written:
 the file is read back under rules 8 to 13 before the table is derived from it.
+
+A walk or a search that has just run both sides passes them as checked runs (``runs``): the
+two runs are then not checked again (rule 1 with rules 7 to 13 of the run contract) and their
+exports are not read; the responses are still read for their release identities, the
+artifacts the request names are still checked, and the run records, the deviation file, and
+the signature table are read and written as without them.
 """
 from __future__ import annotations
 
@@ -48,12 +60,47 @@ DEVIATIONS_NAME = "compare.deviations.csv"
 _ROUNDING = Context(prec=400, rounding=ROUND_HALF_UP)
 
 
+# The time bases whose origin is the issue date of a model point. On them a run is aligned on
+# projection periods before it is compared; every other identifier keeps its periods as they are.
+ISSUE_ORIGIN = frozenset({"policy_month"})
+
+
 @dataclass
 class CheckedRun:
-    """A succeeded run that passed rule 1: its response and its values by model point and period."""
+    """A succeeded run that passed rule 1: its response and its values by model point and period.
+
+    ``aligned`` marks values whose periods are projection periods already (:func:`align`)."""
 
     response: dict
     values: dict[tuple[str, int], list[float]] = field(repr=False)
+    aligned: bool = False
+    _view: CheckedRun | None = field(default=None, init=False, repr=False, compare=False)
+
+
+def first_periods(values) -> dict[str, int]:
+    """The first period of every model point of ``values``."""
+    first: dict[str, int] = {}
+    for point, period in values:
+        if point not in first or period < first[point]:
+            first[point] = period
+    return first
+
+
+def align(run: CheckedRun) -> CheckedRun:
+    """The run on projection periods: on a time basis whose origin is the issue date, coordinate
+    (p, t) becomes (p, t - s_p), where s_p is the period of the valuation date of p in this run:
+    its first exported period, or, for a target-only run whose target names periods, its first
+    exported period less the first target period. On any other basis the run itself. An aligned
+    run is not aligned again, and the aligned view of a run is built once."""
+    if run.aligned or run.response["time_basis"]["id"] not in ISSUE_ORIGIN:
+        return run
+    if run._view is None:
+        first = first_periods(run.values)
+        # A target window starts at the first target period after the valuation date; it is never clipped there.
+        offset = run.response.get("target", {}).get("periods", {}).get("first", 0)
+        run._view = CheckedRun(run.response, {(point, period - first[point] + offset): numbers
+                                              for (point, period), numbers in run.values.items()}, True)
+    return run._view
 
 
 @dataclass
@@ -249,8 +296,9 @@ def compare_runs(request: dict, left: CheckedRun, right: CheckedRun) -> tuple[di
 
     Return the compare result without a parameter diff and without the reference to the
     deviation file, and the deviations in the order of the deviation file. Rules 2 to 6
-    are applied here, then the check that every difference is finite, alignment,
-    coverage, and the tolerance rule.
+    are applied here, then alignment on projection periods (:func:`align`), the check that
+    every difference is finite, coverage, and the tolerance rule. Coverage ranges and the
+    deviations carry projection periods.
     """
     try:
         _check_compatible(request, left.response, right.response)
@@ -266,6 +314,7 @@ def compare_runs(request: dict, left: CheckedRun, right: CheckedRun) -> tuple[di
             "unknown_quantity", f"The request sets a tolerance for {unknown[0]}, which the two runs "
             "do not declare.")), []
 
+    left, right = align(left), align(right)
     common = sorted(set(left.values) & set(right.values))
     # Every difference of the exported values is finite, before any rounding or tolerance.
     overflow = sorted({key[0] for key in common
@@ -388,8 +437,12 @@ def _with_engine_versions(result: dict, paths: dict) -> dict:
                          "engine_version", member)
 
 
-def _compare_request(request: dict, folder: Path) -> tuple[dict, list[dict]]:
-    """Every check after the schema of the request. Return the compare result and the deviations."""
+def _compare_request(request: dict, folder: Path,
+                     preloaded: tuple[CheckedRun, CheckedRun] | None = None) -> tuple[dict, list[dict]]:
+    """Every check after the schema of the request. Return the compare result and the deviations.
+
+    ``preloaded`` are the two runs, already checked, of the responses the request names.
+    """
     paths = {}
     try:
         if request["stage"] not in STAGE_QUANTITIES:
@@ -399,10 +452,13 @@ def _compare_request(request: dict, folder: Path) -> tuple[dict, list[dict]]:
             for member in ("response", "run_record"):
                 if member in side:
                     paths[name, member] = check_artifact(folder, side[member])
-        responses = {name: read_document(paths[name, "response"], RUN_SCHEMA, "run_response")
-                     for name, _ in sides}
-        runs = {name: check_run(responses[name], paths[name, "response"].parent, name)
-                for name, _ in sides}
+        if preloaded is not None:
+            runs = dict(zip(("left", "right"), preloaded))
+        else:
+            responses = {name: read_document(paths[name, "response"], RUN_SCHEMA, "run_response")
+                         for name, _ in sides}
+            runs = {name: check_run(responses[name], paths[name, "response"].parent, name)
+                    for name, _ in sides}
     except Rejection as rejection:
         return _with_engine_versions(_not_compared(request, "rejected", rejection), paths), []
 
@@ -422,28 +478,34 @@ def _compare_request(request: dict, folder: Path) -> tuple[dict, list[dict]]:
     return _with_engine_versions(result, paths), deviations
 
 
-def compare_request_document(stage: str, compare_id: str, left: tuple[dict, dict], right: tuple[dict, dict],
-                             tolerance: dict) -> dict:
+def compare_request_document(stage: str, compare_id: str, left: tuple[dict, dict | None],
+                             right: tuple[dict, dict | None], tolerance: dict) -> dict:
     """A compare request the tool writes. ``left`` and ``right`` hold the artifact references
-    of the response and the run record of each side."""
+    of the response and the run record of each side; a side without a run record names its
+    response alone."""
+    def side(references: tuple[dict, dict | None]) -> dict:
+        response, record = references
+        return {"response": response, **({"run_record": record} if record is not None else {})}
+
     return {
         "document": "compare_request", "contract_version": CONTRACT_VERSION, "stage": stage,
-        "compare_id": compare_id,
-        "left": {"response": left[0], "run_record": left[1]},
-        "right": {"response": right[0], "run_record": right[1]},
-        "tolerance": tolerance,
+        "compare_id": compare_id, "left": side(left), "right": side(right), "tolerance": tolerance,
     }
 
 
 def compare(request_path: Path | str, *, result_name: str = RESULT_NAME,
             record_name: str | None = RECORD_NAME,
             signature_name: str | None = SIGNATURE_NAME,
-            deviations_name: str = DEVIATIONS_NAME) -> CompareResult:
+            deviations_name: str = DEVIATIONS_NAME,
+            runs: tuple[CheckedRun, CheckedRun] | None = None) -> CompareResult:
     """Compare the two runs a stored compare request names and write the documents beside it.
 
     ``record_name`` and ``signature_name`` are ``None`` for a caller that records the
     comparison itself and wants no table, such as the replay. The deviation file is
-    written for every comparison with the outcome ``compared``.
+    written for every comparison with the outcome ``compared``. ``runs`` are the left and
+    the right run, already checked, of the two responses the request names; with them the two
+    runs are not checked again (rule 1 with rules 7 to 13) and their exports are not read. The
+    responses are still read for their release identities.
     """
     request_path = Path(request_path).resolve()
     folder = request_path.parent
@@ -461,7 +523,7 @@ def compare(request_path: Path | str, *, result_name: str = RESULT_NAME,
     check_version(request)
     check_schema(request, COMPARE_REQUEST)
 
-    result, deviations = _compare_request(request, folder)
+    result, deviations = _compare_request(request, folder, runs)
     outcome = result["outcome"]
     releases = [_read_release(folder, request[name]) for name in ("left", "right")]
 

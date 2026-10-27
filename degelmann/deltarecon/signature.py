@@ -1,4 +1,4 @@
-"""The deviation signature table of ``contracts/v2/compare.md``.
+"""The deviation signature table of ``contracts/v3/compare.md``.
 
 The table condenses one compare result with the outcome ``compared`` and its deviation
 file: one row per stage and quantity that deviates. It is a function of that result and the

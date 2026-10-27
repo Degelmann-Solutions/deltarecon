@@ -1,4 +1,4 @@
-"""The walk of ``contracts/v2/localise.md``: every state between two recorded results.
+"""The walk of ``contracts/v3/localise.md``: every state between two recorded results.
 
 A walk reads the records of two succeeded runs without enabled changes, the older one
 first, derives the change manifest of the history between the revisions they name, runs
@@ -33,8 +33,9 @@ folder must not exist; a walk that is interrupted leaves no folder behind. It re
   that is not reproduced;
 - ``walk.result.json`` and ``walk.run-record.json``.
 
-Sums are exact: every binary64 value is an integer multiple of 2**-1074, so the walk adds
-integers and rounds once, to the nearest binary64 value, when it writes a sum.
+Sums are exact: ``math.fsum`` rounds the exact sum once, to the nearest binary64 value, ties
+to even. Where ``fsum`` overflows on the way, the walk adds the values as integer multiples of
+2**-1074, which every binary64 value is, and rounds that exact sum once in the same way.
 
 The checks before the first run, the folder setup, the run of a state, the checks of the
 ends, and the comparisons kept are shared with the search of ``degelmann/deltarecon/search.py``
@@ -44,14 +45,15 @@ ends, and the comparisons kept are shared with the search of ``degelmann/deltare
 from __future__ import annotations
 
 import json
+import math
 import shutil
 from contextlib import contextmanager
 from dataclasses import dataclass, field
 from pathlib import Path
 
 from . import changes as changes_contract
-from .compare import (COMPARE_REQUEST, CheckedRun, CompareResult, compare, compare_request_document, compare_runs,
-                      read_tolerance, shows_no_deviation)
+from .compare import (COMPARE_REQUEST, CheckedRun, CompareResult, align, compare, compare_request_document,
+                      compare_runs, read_tolerance, shows_no_deviation)
 from .derive import CLASS_ORDER, build_manifest, read_derive_input, remainder
 from .documents import (CONTRACT_VERSION, RECORD_SCHEMA, RUN_SCHEMA, SCHEMA_FOLDERS, Rejection, artifact_reference,
                         check_artifact, copy_files, document_bytes, parse_document, read_document, sha256_file,
@@ -101,14 +103,33 @@ def written(total: int) -> float | None:
         return None
 
 
-def exact_sums(left: CheckedRun, right: CheckedRun, names: list[str]) -> tuple[list[int], list[int]]:
+def _sum(terms: list[float], pairs: list[tuple[float, float]], absolute: bool) -> float | None:
+    """The exact sum of ``terms`` rounded once to the nearest binary64 value; ``None`` when it does
+    not fit a finite one. ``pairs`` are the ``(a, b)`` the terms come from, for the integer method
+    when ``fsum`` overflows on the way."""
+    try:
+        total = math.fsum(terms)
+    except OverflowError:
+        total = math.inf
+    if math.isfinite(total):
+        return total + 0.0
+    if absolute:
+        return written(sum(_scaled(max(a, b)) - _scaled(min(a, b)) for a, b in pairs))
+    return written(sum(_scaled(b) - _scaled(a) for a, b in pairs))
+
+
+def exact_sums(left: CheckedRun, right: CheckedRun,
+               names: list[str]) -> tuple[list[float | None], list[float | None]]:
     """Per quantity of ``names``: the sum of ``right - left`` over every coordinate and the sum of
-    its absolute values, both exact in units of 2**-1074. A missing coordinate counts as 0."""
+    its absolute values, each the exact sum rounded once to the nearest binary64 value, ``None``
+    when it does not fit a finite one. Both runs are aligned on projection periods first, as in a
+    comparison; a missing coordinate counts as 0."""
+    left, right = align(left), align(right)
     left_index = {quantity["name"]: i for i, quantity in enumerate(left.response["quantities"])}
     right_index = {quantity["name"]: i for i, quantity in enumerate(right.response["quantities"])}
     positions = [(j, left_index.get(name), right_index.get(name)) for j, name in enumerate(names)]
     same_layout = all(a == b for _, a, b in positions)
-    signed, absolute = [0] * len(names), [0] * len(names)
+    pairs: list[list[tuple[float, float]]] = [[] for _ in names]
     for key in left.values.keys() | right.values.keys():
         old, new = left.values.get(key), right.values.get(key)
         if same_layout and old == new:
@@ -116,11 +137,12 @@ def exact_sums(left: CheckedRun, right: CheckedRun, names: list[str]) -> tuple[l
         for j, at_left, at_right in positions:
             a = old[at_left] if old is not None and at_left is not None else 0.0
             b = new[at_right] if new is not None and at_right is not None else 0.0
-            if a == b:
-                continue
-            difference = _scaled(b) - _scaled(a)
-            signed[j] += difference
-            absolute[j] += abs(difference)
+            if a != b:
+                pairs[j].append((a, b))
+    signed, absolute = [], []
+    for found in pairs:
+        signed.append(_sum([term for a, b in found for term in (b, -a)], found, False))
+        absolute.append(_sum([term for a, b in found for term in (max(a, b), -min(a, b))], found, True))
     return signed, absolute
 
 
@@ -144,8 +166,16 @@ def _selection(request: dict) -> tuple[str, frozenset]:
     return selection["mode"], frozenset(selection.get("model_point_ids", []))
 
 
-def _checked(recorded: RecordedRun) -> CheckedRun:
-    return CheckedRun(recorded.response, recorded.values)
+def as_checked(run) -> CheckedRun:
+    """The checked values of a recorded run, or of a run whose values were read, as they are held."""
+    return CheckedRun(run.response, run.values)
+
+
+def compare_in_memory(stage: str, compare_id: str, tolerance: dict, left: CheckedRun,
+                      right: CheckedRun) -> tuple[dict, list[dict]]:
+    """:func:`~degelmann.deltarecon.compare.compare_runs` on two checked runs, with a request held in
+    memory only: nothing is written."""
+    return compare_runs({"stage": stage, "compare_id": compare_id, "tolerance": tolerance}, left, right)
 
 
 # --- the checks before the first run --------------------------------------------------
@@ -287,8 +317,8 @@ class States:
         return (f"State {k} ended with the outcome {outcome}; its revisions are carried "
                 "by the next state that runs.")
 
-    # One state: a normal run of the run contract in a folder of its own.
-    def run_state(self, k: int) -> tuple[RunResult, dict]:
+    # One state: a normal run of the run contract in a folder of its own; with ``target`` a target-only run.
+    def run_state(self, k: int, target: dict | None = None) -> tuple[RunResult, dict]:
         folder = self.output / self.name(k)
         folder.mkdir()
         enabled, hold = self.state_changes(k)
@@ -299,45 +329,64 @@ class States:
             if hold:
                 changes["hold"] = hold
         request = run_request_document(self.stage, f"{self.prefix}-state-{k}", self.base, changes,
-                                       self.older.request["selection"], f"the request of state {k}")
+                                       self.older.request["selection"], f"the request of state {k}", target)
         write_new(folder / REQUEST_NAME, document_bytes(request))
         run = run_request(folder / REQUEST_NAME, self.engine, self.repositories)
-        entry = {"state": k, **({"revision": self.ids[k - 1]} if k else {}), "run_id": request["run_id"],
-                 "outcome": run.outcome, "response": artifact_reference(self.output, run.response_path)}
+        self.add_state(k, self.ids[k - 1] if k else None, request["run_id"], run)
+        return run, request
+
+    def add_state(self, k: int, revision: str | None, run_id: str, run: RunResult, reused: bool = False) -> None:
+        """The entry of state ``k`` among the states of the result, and its finding when it did not
+        succeed. ``reused``: the state is taken from a walk; the member stands before ``response``."""
+        entry = {"state": k, **({"revision": revision} if k else {}), "run_id": run_id, "outcome": run.outcome,
+                 **({"reused": True} if reused else {}),
+                 "response": artifact_reference(self.output, run.response_path)}
         if run.outcome == "succeeded":
             entry["export"] = artifact_reference(self.output, run.export_path)
         self.states.append(entry)
         if run.outcome != "succeeded":
-            response = run.response
-            if run.outcome == "failed":
-                diagnostic = Rejection("model_point_failed", "A model point of the state could not be calculated.",
-                                       model_point_ids=sorted({point["model_point_id"]
-                                                               for point in response["failed_model_points"]}))
-                diagnostic = diagnostic.diagnostic()
-            else:
-                diagnostic = response["diagnostics"][0]
-            finding = {"code": "state_did_not_run", "message": self.carried(k, run.outcome), "state": k}
-            if k:
-                finding["revisions"] = [self.ids[k - 1]]
-            finding["diagnostic"] = diagnostic
-            self.findings.append(finding)
-        return run, request
+            self.did_not_run(k, run)
+
+    def did_not_run(self, k: int, run: RunResult) -> None:
+        """The finding ``state_did_not_run`` of state ``k``, built from the response of its run."""
+        response = run.response
+        if run.outcome == "failed":
+            diagnostic = Rejection("model_point_failed", "A model point of the state could not be calculated.",
+                                   model_point_ids=sorted({point["model_point_id"]
+                                                           for point in response["failed_model_points"]}))
+            diagnostic = diagnostic.diagnostic()
+        else:
+            diagnostic = response["diagnostics"][0]
+        finding = {"code": "state_did_not_run", "message": self.carried(k, run.outcome), "state": k}
+        if k:
+            finding["revisions"] = [self.ids[k - 1]]
+        finding["diagnostic"] = diagnostic
+        self.findings.append(finding)
 
     def checked(self, run: RunResult, request: dict) -> CheckedRun:
-        return CheckedRun(run.response, check_response(request, run.response, run.response_path.parent))
+        """The checked values of a state. The values the run holds in memory are taken from it, so
+        that it does not keep them; a run whose values were taken is read again from its export."""
+        values, run.values = run.values, None
+        return CheckedRun(run.response, check_response(request, run.response, run.response_path.parent, values))
 
-    # A comparison the procedure keeps, written at the root of the folder.
-    def write_compare(self, prefix: str, compare_id: str, left: tuple[Path, Path],
-                      right: tuple[Path, Path]) -> CompareResult:
-        request = compare_request_document(
-            self.stage, compare_id, tuple(artifact_reference(self.output, path) for path in left),
-            tuple(artifact_reference(self.output, path) for path in right), self.profile)
+    # A comparison the procedure keeps, written at the root of the folder. ``runs`` are the two
+    # sides, already checked, so that the comparison does not read their exports again. A side
+    # without a run record names its response alone; ``profile`` replaces the tolerance profile.
+    def write_compare(self, prefix: str, compare_id: str, left: tuple[Path, Path | None],
+                      right: tuple[Path, Path | None],
+                      runs: tuple[CheckedRun, CheckedRun] | None = None,
+                      profile: dict | None = None) -> CompareResult:
+        def side(paths: tuple[Path, Path | None]) -> tuple[dict, dict | None]:
+            return tuple(None if path is None else artifact_reference(self.output, path) for path in paths)
+
+        request = compare_request_document(self.stage, compare_id, side(left), side(right),
+                                           self.profile if profile is None else profile)
         request_path = self.output / f"{prefix}.request.json"
         write_document(request_path, request, COMPARE_REQUEST)
         compared = compare(request_path, result_name=f"{prefix}.result.json",
                            record_name=f"{prefix}.run-record.json",
                            signature_name=f"{prefix}.signature-table.json",
-                           deviations_name=f"{prefix}.deviations.csv")
+                           deviations_name=f"{prefix}.deviations.csv", runs=runs)
         self.compares.append(compared.result_path)
         return compared
 
@@ -350,12 +399,13 @@ class States:
     def check_end(self, k: int, state: CheckedRun, run: RunResult, recorded: RecordedRun, side: str) -> dict:
         """State ``k`` against the recorded result of one end: no deviation, no added or removed coordinate."""
         compare_id = f"{self.prefix}-state-{k}-check-{side}"
-        result, deviations = compare_runs({"stage": self.stage, "compare_id": compare_id,
-                                           "tolerance": self.profile}, _checked(recorded), state)
+        checked = as_checked(recorded)  # built once, so that its alignment is built once
+        result, deviations = compare_in_memory(self.stage, compare_id, self.profile, checked, state)
         if shows_no_deviation(result, deviations):
             return {"state": k, "outcome": "reproduced"}
         compared = self.write_compare(f"{self.name(k)}.check-{side}", compare_id,
-                                      self.recorded_files(recorded, side), (run.response_path, run.record_path))
+                                      self.recorded_files(recorded, side), (run.response_path, run.record_path),
+                                      (checked, state))
         end = {"state": k, "outcome": "not_reproduced", "compare": self.reference(compared)}
         code = "state_zero_not_reproduced" if side == OLDER else "state_n_not_reproduced"
         self.findings.append({"code": code, "message": f"State {k} does not reproduce the {side} recorded result "
@@ -372,7 +422,7 @@ class States:
         entries = []
         for name, flag, total, size in zip(names, contributes, signed, absolute):
             contribution = {"quantity": name, "contributes": flag}
-            for member, value in (("sum", written(total)), ("absolute_sum", written(size))):
+            for member, value in (("sum", total), ("absolute_sum", size)):
                 if value is None:
                     self.findings.append({
                         "code": "non_finite_difference",
@@ -387,9 +437,9 @@ class States:
         return entries
 
     def write_record(self, outcome: str, result_path: Path, tolerance: Path | str | None,
-                     further_inputs: list[dict] = ()) -> Path:
+                     further_inputs: list[dict] = (), switches: list[str] = ()) -> Path:
         """The run record of the procedure: the two recorded runs as copied, the tolerance file, the
-        manifest, the result, and every comparison kept."""
+        manifest, the result, every comparison kept, and the opt-in switches that were on."""
         output = self.output
         inputs = [{"role": "older_record",
                    "artifact": artifact_reference(output, self.recorded_files(self.older, OLDER)[1])},
@@ -402,7 +452,8 @@ class States:
                    {"role": "result", "artifact": artifact_reference(output, result_path)}]
         outputs += [{"role": "compare_result", "artifact": artifact_reference(output, path)}
                     for path in self.compares]
-        record = run_record(self.stage, self.procedure, outcome, inputs, list(self.prepared.releases), [], outputs)
+        record = run_record(self.stage, self.procedure, outcome, inputs, list(self.prepared.releases), [], outputs,
+                            switches)
         record_path = output / self.record_name
         write_document(record_path, record, RECORD_SCHEMA)
         return record_path
@@ -419,15 +470,14 @@ class _Walk(States):
         """The step from state ``from_k`` to state ``to_k`` and the revisions it carries."""
         revisions = self.ids[from_k:to_k]
         compare_id = f"{self.prefix}-step-{to_k}"
-        result, deviations = compare_runs({"stage": self.stage, "compare_id": compare_id,
-                                           "tolerance": self.profile}, left, right)
+        result, deviations = compare_in_memory(self.stage, compare_id, self.profile, left, right)
         contributes = flags(result, deviations, self.names)
         entry = {"from_state": from_k, "to_state": to_k, "revisions": revisions}
         table = None
         if any(contributes):
             compared = self.write_compare(f"step-{to_k:0{self.width}d}.compare", compare_id,
                                           (left_run.response_path, left_run.record_path),
-                                          (right_run.response_path, right_run.record_path))
+                                          (right_run.response_path, right_run.record_path), (left, right))
             entry["compare"] = self.reference(compared)
             table = compared.table
             if compared.outcome != "compared":
@@ -442,10 +492,9 @@ class _Walk(States):
 
     def totals(self) -> list[dict]:
         """The deviation between the two recorded results, per quantity."""
-        signed, _ = exact_sums(_checked(self.older), _checked(self.newer), self.names)
+        signed, _ = exact_sums(as_checked(self.older), as_checked(self.newer), self.names)
         totals = []
-        for name, total in zip(self.names, signed):
-            value = written(total)
+        for name, value in zip(self.names, signed):
             totals.append({"quantity": name, **({"sum": value} if value is not None else {})})
             if value is None:
                 self.findings.append({"code": "non_finite_difference",

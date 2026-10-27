@@ -1,0 +1,25 @@
+{
+  "document": "run_request",
+  "contract_version": "3.0",
+  "stage": "liability_cashflow",
+  "run_id": "run-no-model-point",
+  "release": {
+    "label": "N",
+    "references": [
+      {
+        "kind": "code_state",
+        "value": "revision 1047"
+      },
+      {
+        "kind": "input_data",
+        "value": "extract 2026-09-30"
+      }
+    ]
+  },
+  "changes": {
+    "enabled": []
+  },
+  "selection": {
+    "mode": "full"
+  }
+}

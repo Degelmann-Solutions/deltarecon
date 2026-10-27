@@ -1,0 +1,8 @@
+model_point_id,period,Anzahl Verträge,Bruttobeitrag,Netto-Cashflow
+MP-0001,0,1,1200,380
+MP-0001,1,0.995,0,-32.5
+MP-0001,2,0.99,0,-32.5
+MP-0002,0,1,600,150
+MP-0002,1,0.99,0,-20
+MP-0003,0,1,300,75
+MP-0003,1,1,0,-10

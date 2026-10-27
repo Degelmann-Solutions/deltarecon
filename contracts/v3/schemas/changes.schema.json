@@ -1,0 +1,178 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "changes.schema.json",
+  "title": "Stage contracts version 3: change manifest",
+  "$ref": "#/$defs/change_manifest",
+  "$defs": {
+    "change_manifest": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["document", "contract_version", "stage", "manifest_id", "base_release", "changes"],
+      "properties": {
+        "document": { "const": "change_manifest" },
+        "contract_version": { "$ref": "common.schema.json#/$defs/contract_version" },
+        "stage": { "$ref": "common.schema.json#/$defs/stage" },
+        "manifest_id": { "$ref": "common.schema.json#/$defs/id" },
+        "base_release": { "$ref": "common.schema.json#/$defs/id" },
+        "history": { "$ref": "#/$defs/history" },
+        "changes": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/change" }
+        }
+      },
+      "if": { "required": ["history"] },
+      "then": {
+        "description": "A derived manifest: it may hold no change, and every change is one revision of the history.",
+        "properties": {
+          "changes": { "items": { "$ref": "#/$defs/derived_change" } }
+        }
+      },
+      "else": {
+        "description": "An authored manifest: at least one change, every change has at least one class, and no change is realised as a revision.",
+        "properties": {
+          "changes": {
+            "minItems": 1,
+            "items": {
+              "properties": {
+                "class": { "not": { "type": "array", "maxItems": 0 } },
+                "realisation": { "not": { "required": ["type"], "properties": { "type": { "const": "revision" } } } }
+              }
+            }
+          }
+        }
+      }
+    },
+    "history": {
+      "description": "Where a derived manifest comes from: the two revisions, the kinds of release reference a revision fixes, and the references of other kinds that differ between the two results.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["source", "from", "to", "determines", "remainder"],
+      "properties": {
+        "source": { "$ref": "#/$defs/history_source" },
+        "from": { "$ref": "common.schema.json#/$defs/id" },
+        "to": { "$ref": "common.schema.json#/$defs/id" },
+        "determines": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": { "$ref": "#/$defs/reference_kind" }
+        },
+        "remainder": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["kind", "from", "to"],
+            "properties": {
+              "kind": { "$ref": "#/$defs/reference_kind" },
+              "from": { "$ref": "#/$defs/reference_list" },
+              "to": { "$ref": "#/$defs/reference_list" }
+            }
+          }
+        }
+      }
+    },
+    "history_source": {
+      "description": "The kind of history. Version 3 defines git.",
+      "const": "git"
+    },
+    "reference_kind": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9_]*$"
+    },
+    "reference_list": {
+      "description": "The complete references of one kind in one release identity. It is empty when the identity holds none.",
+      "type": "array",
+      "uniqueItems": true,
+      "items": { "$ref": "common.schema.json#/$defs/release_reference" }
+    },
+    "derived_change": {
+      "description": "What holds for a change of a derived manifest beyond the shape of a change.",
+      "properties": {
+        "class": { "type": "array" },
+        "prerequisites": { "maxItems": 1 },
+        "conflicts": { "maxItems": 0 },
+        "realisation": {
+          "properties": { "type": { "const": "revision" } }
+        }
+      }
+    },
+    "change": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "class", "description", "prerequisites", "conflicts", "realisation"],
+      "properties": {
+        "id": { "$ref": "common.schema.json#/$defs/id" },
+        "class": {
+          "description": "What the change alters: one class, or a list of distinct classes. The list is empty only in a derived manifest.",
+          "anyOf": [
+            { "$ref": "#/$defs/change_class" },
+            {
+              "type": "array",
+              "uniqueItems": true,
+              "items": { "$ref": "#/$defs/change_class" }
+            }
+          ]
+        },
+        "description": { "$ref": "common.schema.json#/$defs/text" },
+        "prerequisites": { "$ref": "#/$defs/change_ids" },
+        "conflicts": { "$ref": "#/$defs/change_ids" },
+        "realisation": { "$ref": "#/$defs/realisation" }
+      }
+    },
+    "change_class": {
+      "enum": ["data", "parameter", "code"]
+    },
+    "change_ids": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": { "$ref": "common.schema.json#/$defs/id" }
+    },
+    "realisation": {
+      "description": "How an engine realises the change. The type member selects the shape. The types text_patch and revision are closed; every other type is declared by the engine and may carry its own members.",
+      "type": "object",
+      "required": ["type"],
+      "properties": {
+        "type": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9_]*$"
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": { "type": { "const": "text_patch" } }
+          },
+          "then": { "$ref": "#/$defs/text_patch" }
+        },
+        {
+          "if": {
+            "properties": { "type": { "const": "revision" } }
+          },
+          "then": { "$ref": "#/$defs/revision" }
+        }
+      ]
+    },
+    "text_patch": {
+      "description": "Reference realisation profile: one unified diff stored as a file.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "format", "artifact"],
+      "properties": {
+        "type": { "const": "text_patch" },
+        "format": { "const": "unified_diff" },
+        "artifact": { "$ref": "common.schema.json#/$defs/artifact" }
+      }
+    },
+    "revision": {
+      "description": "Revision profile: one revision of a versioned model state, which the engine restores itself.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "source", "revision"],
+      "properties": {
+        "type": { "const": "revision" },
+        "source": { "$ref": "#/$defs/history_source" },
+        "revision": { "$ref": "common.schema.json#/$defs/id" }
+      }
+    }
+  }
+}

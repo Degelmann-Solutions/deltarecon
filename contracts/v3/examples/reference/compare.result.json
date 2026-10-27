@@ -1,0 +1,170 @@
+{
+  "document": "compare_result",
+  "contract_version": "3.0",
+  "stage": "liability_cashflow",
+  "compare_id": "compare-n-full-vs-subset-changes",
+  "outcome": "compared",
+  "left": {
+    "run_id": "run-n-full",
+    "release_label": "N"
+  },
+  "right": {
+    "run_id": "run-n-subset-changes",
+    "release_label": "N"
+  },
+  "tolerance": {
+    "per_quantity": {
+      "Bruttobeitrag": {
+        "upper": {
+          "abs_tol": 0,
+          "rel_tol": 0.001
+        },
+        "lower": {
+          "abs_tol": 0,
+          "rel_tol": 0.001
+        },
+        "derivation": "Synthetic example. The two release states apply the instalment surcharge before and after rounding; the difference is at most 0.1 percent of the premium, in either direction."
+      },
+      "Kosten 2. Ordnung ohne Provisionen": {
+        "upper": {
+          "abs_tol": 0.25,
+          "rel_tol": 0
+        },
+        "lower": {
+          "abs_tol": 0,
+          "rel_tol": 0
+        },
+        "derivation": "Synthetic example. The right run rounds the collection cost of each instalment up to a quarter; it can come out higher by at most 0.25 per period and never lower."
+      },
+      "Provisionen": {
+        "decimals": 2,
+        "upper": {
+          "abs_tol": 0,
+          "rel_tol": 0
+        },
+        "lower": {
+          "abs_tol": 0,
+          "rel_tol": 0
+        },
+        "derivation": "Synthetic example. Commissions are settled in whole cents; the two runs differ only beyond the cent."
+      },
+      "Netto-Cashflow": {
+        "upper": {
+          "abs_tol": 0,
+          "rel_tol": 0
+        },
+        "lower": {
+          "abs_tol": 0.25,
+          "rel_tol": 0
+        },
+        "derivation": "Synthetic example. Follows from the bound on the expenses: the net cash flow can come out lower by at most 0.25 per period and never higher."
+      }
+    }
+  },
+  "time_basis": {
+    "id": "policy_month"
+  },
+  "quantities": [
+    {
+      "name": "Anzahl Verträge",
+      "unit": "policies"
+    },
+    {
+      "name": "Bruttobeitrag",
+      "unit": "EUR"
+    },
+    {
+      "name": "Zahlbeitrag",
+      "unit": "EUR"
+    },
+    {
+      "name": "Beitragsverrechnung",
+      "unit": "EUR"
+    },
+    {
+      "name": "garantierte Todesfallleistung",
+      "unit": "EUR"
+    },
+    {
+      "name": "garantierter Rückkaufswert",
+      "unit": "EUR"
+    },
+    {
+      "name": "garantierte Erlebensfallleistung",
+      "unit": "EUR"
+    },
+    {
+      "name": "Kosten 2. Ordnung ohne Provisionen",
+      "unit": "EUR"
+    },
+    {
+      "name": "Provisionen",
+      "unit": "EUR"
+    },
+    {
+      "name": "Netto-Cashflow",
+      "unit": "EUR"
+    }
+  ],
+  "compared_coordinates": 50,
+  "deviations": {
+    "path": "compare.deviations.csv",
+    "sha256": "6a71ec4a393849be82d34b622a72766c61d866f2a283fee6d51aab80a47d1d9f"
+  },
+  "deviating_model_points": [
+    "MP-0001"
+  ],
+  "added": [
+    {
+      "model_point_id": "MP-0002",
+      "first_period": 2,
+      "last_period": 2
+    }
+  ],
+  "removed": [
+    {
+      "model_point_id": "MP-0003",
+      "first_period": 0,
+      "last_period": 1
+    }
+  ],
+  "parameter_diff": [
+    {
+      "name": "claim_expense",
+      "change": "added",
+      "new": {
+        "name": "claim_expense",
+        "type": "scalar",
+        "value": 300
+      }
+    },
+    {
+      "name": "lapse_table",
+      "change": "changed",
+      "type": "keyed_table",
+      "rows": [
+        {
+          "key": [
+            1
+          ],
+          "change": "changed",
+          "old": [
+            0.06
+          ],
+          "new": [
+            0.05
+          ]
+        }
+      ]
+    },
+    {
+      "name": "legacy_loading",
+      "change": "removed",
+      "old": {
+        "name": "legacy_loading",
+        "type": "scalar",
+        "value": 0
+      }
+    }
+  ]
+}

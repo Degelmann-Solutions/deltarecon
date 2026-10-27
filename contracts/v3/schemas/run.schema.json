@@ -1,0 +1,137 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "run.schema.json",
+  "title": "Stage contracts version 3: run request and run response",
+  "oneOf": [
+    { "$ref": "#/$defs/run_request" },
+    { "$ref": "#/$defs/run_response_succeeded" },
+    { "$ref": "#/$defs/run_response_failed" },
+    { "$ref": "#/$defs/run_response_error" },
+    { "$ref": "#/$defs/run_response_rejected" }
+  ],
+  "$defs": {
+    "run_request": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["document", "contract_version", "stage", "run_id", "release", "changes", "selection"],
+      "properties": {
+        "document": { "const": "run_request" },
+        "contract_version": { "$ref": "common.schema.json#/$defs/contract_version" },
+        "stage": { "$ref": "common.schema.json#/$defs/stage" },
+        "run_id": { "$ref": "common.schema.json#/$defs/id" },
+        "release": { "$ref": "common.schema.json#/$defs/release" },
+        "changes": { "$ref": "common.schema.json#/$defs/change_set" },
+        "selection": { "$ref": "common.schema.json#/$defs/selection" },
+        "target": { "$ref": "common.schema.json#/$defs/target" }
+      }
+    },
+    "run_response_succeeded": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "document", "contract_version", "stage", "run_id", "outcome", "release", "changes",
+        "selection", "time_basis", "quantities", "model_points", "export"
+      ],
+      "if": { "not": { "required": ["target"] } },
+      "then": {
+        "properties": {
+          "model_points": { "minItems": 1 },
+          "export": { "properties": { "data_rows": { "minimum": 1 } } }
+        }
+      },
+      "properties": {
+        "document": { "const": "run_response" },
+        "contract_version": { "$ref": "common.schema.json#/$defs/contract_version" },
+        "stage": { "$ref": "common.schema.json#/$defs/stage" },
+        "run_id": { "$ref": "common.schema.json#/$defs/id" },
+        "outcome": { "const": "succeeded" },
+        "release": { "$ref": "common.schema.json#/$defs/release" },
+        "changes": { "$ref": "common.schema.json#/$defs/change_set" },
+        "selection": { "$ref": "common.schema.json#/$defs/selection" },
+        "target": { "$ref": "common.schema.json#/$defs/target" },
+        "time_basis": { "$ref": "common.schema.json#/$defs/time_basis" },
+        "quantities": { "$ref": "common.schema.json#/$defs/quantities" },
+        "model_points": {
+          "description": "Every exported model point with its period range. Empty only for a target-only run.",
+          "type": "array",
+          "items": { "$ref": "common.schema.json#/$defs/period_range" }
+        },
+        "export": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["artifact", "data_rows"],
+          "properties": {
+            "artifact": { "$ref": "common.schema.json#/$defs/artifact" },
+            "data_rows": { "type": "integer", "minimum": 0 }
+          }
+        }
+      }
+    },
+    "run_response_failed": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "document", "contract_version", "stage", "run_id", "outcome", "release", "changes",
+        "selection", "failed_model_points"
+      ],
+      "properties": {
+        "document": { "const": "run_response" },
+        "contract_version": { "$ref": "common.schema.json#/$defs/contract_version" },
+        "stage": { "$ref": "common.schema.json#/$defs/stage" },
+        "run_id": { "$ref": "common.schema.json#/$defs/id" },
+        "outcome": { "const": "failed" },
+        "release": { "$ref": "common.schema.json#/$defs/release" },
+        "changes": { "$ref": "common.schema.json#/$defs/change_set" },
+        "selection": { "$ref": "common.schema.json#/$defs/selection" },
+        "target": { "$ref": "common.schema.json#/$defs/target" },
+        "failed_model_points": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["model_point_id", "message"],
+            "properties": {
+              "model_point_id": { "$ref": "common.schema.json#/$defs/id" },
+              "message": { "$ref": "common.schema.json#/$defs/text" }
+            }
+          }
+        }
+      }
+    },
+    "run_response_error": {
+      "description": "The engine accepted the request and could not restore or read the state it names.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "document", "contract_version", "stage", "run_id", "outcome", "release", "changes",
+        "selection", "diagnostics"
+      ],
+      "properties": {
+        "document": { "const": "run_response" },
+        "contract_version": { "$ref": "common.schema.json#/$defs/contract_version" },
+        "stage": { "$ref": "common.schema.json#/$defs/stage" },
+        "run_id": { "$ref": "common.schema.json#/$defs/id" },
+        "outcome": { "const": "error" },
+        "release": { "$ref": "common.schema.json#/$defs/release" },
+        "changes": { "$ref": "common.schema.json#/$defs/change_set" },
+        "selection": { "$ref": "common.schema.json#/$defs/selection" },
+        "target": { "$ref": "common.schema.json#/$defs/target" },
+        "diagnostics": { "$ref": "common.schema.json#/$defs/diagnostics" }
+      }
+    },
+    "run_response_rejected": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["document", "contract_version", "outcome", "diagnostics"],
+      "properties": {
+        "document": { "const": "run_response" },
+        "contract_version": { "$ref": "common.schema.json#/$defs/contract_version" },
+        "stage": { "$ref": "common.schema.json#/$defs/stage" },
+        "run_id": { "$ref": "common.schema.json#/$defs/id" },
+        "outcome": { "const": "rejected" },
+        "diagnostics": { "$ref": "common.schema.json#/$defs/diagnostics" }
+      }
+    }
+  }
+}

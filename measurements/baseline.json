@@ -1,0 +1,59 @@
+{
+  "date": "2026-10-23T15:49:08Z",
+  "commit": "54c223015290440ce79a6c88623114cc0c4dc539",
+  "dirty": true,
+  "platform": "Linux-6.6.87.2-microsoft-standard-WSL2-x86_64-with-glibc2.43",
+  "cpu_count": 24,
+  "engine_version": "modelx 0.33.0, pandas 3.0.6, numpy 2.5.3, Python 3.12.13",
+  "note": "Baseline without the ItemSpace release: worktree of deltarecon 54c223015290440ce79a6c88623114cc0c4dc539 with tools/measure_quick_start.py of 13922295ef1e5fa9c98bb059ea15955e68d40252 copied in (hence dirty). Ran beside the after-change measurement and the oracle reproduction on the same machine. The machine also carried an unrelated parallel workload throughout: load average 66 to 82 on 24 logical CPUs, so the absolute times are inflated and the two records compare under the same load only.",
+  "steps": [
+    {
+      "name": "request",
+      "seconds": 1.7715098320004472,
+      "peak_mib": 98.8828125
+    },
+    {
+      "name": "run",
+      "seconds": 104.45669555600034,
+      "peak_mib": 8277.11328125
+    },
+    {
+      "name": "replay",
+      "seconds": 113.59311642399916,
+      "peak_mib": 8435.09375
+    },
+    {
+      "name": "regression",
+      "seconds": 120.00415079400045,
+      "peak_mib": 8749.421875
+    },
+    {
+      "name": "derive",
+      "seconds": 3.0431662360024347,
+      "peak_mib": 252.0625
+    },
+    {
+      "name": "walk",
+      "seconds": 4650.609744831003,
+      "peak_mib": 10248.8828125,
+      "states": 36,
+      "seconds_per_state": 129.1836040230834
+    },
+    {
+      "name": "search",
+      "seconds": 2820.2780225900024,
+      "peak_mib": 10451.25,
+      "states": 23,
+      "seconds_per_state": 122.62078359086966
+    },
+    {
+      "name": "tests",
+      "seconds": 270.2302028749982,
+      "peak_mib": 8434.77734375
+    }
+  ],
+  "total": {
+    "seconds": 8083.986609138006,
+    "peak_mib": 10451.25
+  }
+}

@@ -1,0 +1,54 @@
+{
+  "document": "signature_table",
+  "contract_version": "3.0",
+  "stage": "liability_cashflow",
+  "compare_id": "compare-n-vs-n1",
+  "left": {
+    "run_id": "run-n-full",
+    "release_label": "N"
+  },
+  "right": {
+    "run_id": "run-n1-full",
+    "release_label": "N+1"
+  },
+  "rows": [
+    {
+      "stage": "liability_cashflow",
+      "quantity": "Anzahl Verträge",
+      "deviating_model_points": 1,
+      "deviating_coordinates": 1,
+      "right_above_left": 0,
+      "right_below_left": 1,
+      "first_period": 1,
+      "last_period": 1,
+      "largest_decrease": {
+        "model_point_id": "MP-0003",
+        "period": 1,
+        "absolute": -0.25,
+        "relative": -0.25
+      }
+    },
+    {
+      "stage": "liability_cashflow",
+      "quantity": "Netto-Cashflow",
+      "deviating_model_points": 3,
+      "deviating_coordinates": 4,
+      "right_above_left": 3,
+      "right_below_left": 1,
+      "first_period": 0,
+      "last_period": 2,
+      "largest_increase": {
+        "model_point_id": "MP-0002",
+        "period": 0,
+        "absolute": 5.0,
+        "relative": 0.03225806451612903
+      },
+      "largest_decrease": {
+        "model_point_id": "MP-0001",
+        "period": 2,
+        "absolute": -3.0,
+        "relative": -0.08450704225352113
+      }
+    }
+  ]
+}

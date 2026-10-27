@@ -1,0 +1,80 @@
+{
+  "document": "signature_table",
+  "contract_version": "3.0",
+  "stage": "liability_cashflow",
+  "compare_id": "compare-n-full-vs-subset-changes",
+  "left": {
+    "run_id": "run-n-full",
+    "release_label": "N"
+  },
+  "right": {
+    "run_id": "run-n-subset-changes",
+    "release_label": "N"
+  },
+  "rows": [
+    {
+      "stage": "liability_cashflow",
+      "quantity": "Anzahl Verträge",
+      "deviating_model_points": 1,
+      "deviating_coordinates": 1,
+      "right_above_left": 1,
+      "right_below_left": 0,
+      "first_period": 2,
+      "last_period": 2,
+      "largest_increase": {
+        "model_point_id": "MP-0001",
+        "period": 2,
+        "absolute": 0.000500000000000056,
+        "relative": 0.0005047955577991478
+      }
+    },
+    {
+      "stage": "liability_cashflow",
+      "quantity": "Beitragsverrechnung",
+      "deviating_model_points": 1,
+      "deviating_coordinates": 1,
+      "right_above_left": 1,
+      "right_below_left": 0,
+      "first_period": 0,
+      "last_period": 0,
+      "largest_increase": {
+        "model_point_id": "MP-0001",
+        "period": 0,
+        "absolute": 1.0,
+        "relative": 0.0024937655860349127
+      }
+    },
+    {
+      "stage": "liability_cashflow",
+      "quantity": "garantierte Todesfallleistung",
+      "deviating_model_points": 1,
+      "deviating_coordinates": 1,
+      "right_above_left": 1,
+      "right_below_left": 0,
+      "first_period": 1,
+      "last_period": 1,
+      "largest_increase": {
+        "model_point_id": "MP-0001",
+        "period": 1,
+        "absolute": 6.0,
+        "relative": 0.16666666666666666
+      }
+    },
+    {
+      "stage": "liability_cashflow",
+      "quantity": "Netto-Cashflow",
+      "deviating_model_points": 1,
+      "deviating_coordinates": 1,
+      "right_above_left": 0,
+      "right_below_left": 1,
+      "first_period": 1,
+      "last_period": 1,
+      "largest_decrease": {
+        "model_point_id": "MP-0001",
+        "period": 1,
+        "absolute": -6.0,
+        "relative": -0.15584415584415584
+      }
+    }
+  ]
+}

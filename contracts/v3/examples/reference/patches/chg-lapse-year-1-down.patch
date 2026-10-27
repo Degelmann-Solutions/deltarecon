@@ -1,0 +1,9 @@
+--- lapse_table.csv
++++ lapse_table.csv
+@@ -1,5 +1,5 @@
+ policy_year,lapse_rate
+-1,0.06
++1,0.05
+ 2,0.04
+ 3,0.04
+ 4,0.03

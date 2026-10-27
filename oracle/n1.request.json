@@ -1,6 +1,6 @@
 {
   "document": "run_request",
-  "contract_version": "2.0",
+  "contract_version": "3.0",
   "stage": "liability_cashflow",
   "run_id": "oracle-n1",
   "release": {
@@ -8,19 +8,19 @@
     "references": [
       {
         "kind": "code_state",
-        "value": "git:https://github.com/Degelmann-Solutions/delib-history@ab5dc790f5bed52f94a4c8fb8d6b710bc31f0a33"
+        "value": "git:https://github.com/Degelmann-Solutions/delib-history@887b7181d22550eda2fb52fa1a6bd77376d4eb2e"
       },
       {
         "kind": "parameter_set",
-        "value": "git:https://github.com/Degelmann-Solutions/delib-history@ab5dc790f5bed52f94a4c8fb8d6b710bc31f0a33"
+        "value": "git:https://github.com/Degelmann-Solutions/delib-history@887b7181d22550eda2fb52fa1a6bd77376d4eb2e"
       },
       {
         "kind": "input_data",
-        "value": "git:https://github.com/Degelmann-Solutions/delib-history@ab5dc790f5bed52f94a4c8fb8d6b710bc31f0a33"
+        "value": "git:https://github.com/Degelmann-Solutions/delib-history@887b7181d22550eda2fb52fa1a6bd77376d4eb2e"
       },
       {
         "kind": "engine_version",
-        "value": "modelx 0.33.0, pandas 3.0.6, numpy 2.5.3, Python 3.12.13"
+        "value": "modelx 0.33.0 export, pandas 3.0.6, numpy 2.5.3, Python 3.14.9"
       }
     ]
   },
