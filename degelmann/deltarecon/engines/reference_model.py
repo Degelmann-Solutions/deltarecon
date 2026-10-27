@@ -613,8 +613,24 @@ def _exported_formula(exc: Exception, package: str, projection, index: int) -> s
     return f"{space}.{code.co_name[len('_f_'):]}({arguments})"
 
 
+def _form_failure(output: str, exc: Exception) -> ModelPointFailure:
+    """The failure of ``output`` whose value does not have the expected form."""
+    return ModelPointFailure(f"{output} has not the expected form: {type(exc).__name__}")
+
+
 def _is_scalar(value) -> bool:
     return isinstance(value, (bool, int, float, str, np.bool_, np.integer, np.floating))
+
+
+def _export_module_name() -> str:
+    """A module name of its own for one import of an exported package."""
+    return f"_deltarecon_export_{uuid.uuid4().hex}"
+
+
+def _read_model(product: Path):
+    """The modelx model of the product folder ``product``, its formula errors made readable."""
+    with _readable_formula_errors():
+        return mx.read_model(product / MODEL_NAME)
 
 
 def _load_package(package: Path, name: str):
@@ -631,7 +647,7 @@ def _load_package(package: Path, name: str):
 def _import_exported(package: Path):
     """The model of the exported package ``package``, imported under a name of its own. Its
     modules leave ``sys.modules`` when the block ends."""
-    name = f"_deltarecon_export_{uuid.uuid4().hex}"
+    name = _export_module_name()
     try:
         yield _load_package(package, name)
     finally:
@@ -673,10 +689,9 @@ def _start_worker(state: str, path: str) -> None:
     global _worker_session
     product = Path(state) / PRODUCT_FOLDER
     if path == "modelx":
-        with _readable_formula_errors():
-            _worker_session = ReferenceModelSession(mx.read_model(product / MODEL_NAME))
+        _worker_session = ReferenceModelSession(_read_model(product))
     else:
-        exported = _load_package(product / EXPORT_FOLDER, f"_deltarecon_export_{uuid.uuid4().hex}")
+        exported = _load_package(product / EXPORT_FOLDER, _export_module_name())
         _worker_session = ReferenceModelSession(None, exported)
 
 
@@ -698,8 +713,9 @@ class ReferenceModelSession:
         """``model`` is the modelx model; ``computing`` the model the points are projected
         through: the exported one on the path ``export``, ``model`` itself on ``modelx``.
 
-        ``project_many`` projects the points in ``workers`` worker processes that open the
-        restored state ``state``; without a state, or with one worker, it projects them here.
+        ``project_many`` and ``project_target`` project the points in ``workers`` worker processes
+        that open the restored state ``state``; without a state, or with one worker, they project
+        them here.
         """
         self._model = model
         self._workers, self._state = workers, state
@@ -727,6 +743,21 @@ class ReferenceModelSession:
             return f"{output} raised {readable}"
         reason = str(exc).strip().splitlines()
         return f"{output} raised {type(exc).__name__}" + (f": {reason[-1]}" if reason else "")
+
+    @contextmanager
+    def _projection(self, index: int, output: str):
+        """The projection of the point of row ``index``. When ``Projection[index]`` raises, the
+        failure names ``output``. The point's ItemSpace is released when the block ends, also
+        after a failure: a run would otherwise keep one per point alive (memory per run)."""
+        try:
+            try:
+                projection = self._computing.Projection[index]
+            except Exception as exc:  # a modelx FormulaError wraps the cause
+                raise ModelPointFailure(self._failure(output, exc, None, index)) from None
+            yield projection
+        finally:
+            with suppress(KeyError):  # absent when Projection[index] raised
+                del self._computing.Projection[index]
 
     def _points(self):
         if self._table is None:
@@ -782,8 +813,7 @@ class ReferenceModelSession:
                               periods: tuple[int, int] | None) -> list[tuple[int, list[float]]]:
         """The target window of the point of row ``index``. Raises :class:`ModelPointFailure`."""
         calls = [call for name, _, _, call in QUANTITIES if name in quantities]
-        projection = None
-        try:
+        with self._projection(index, "Projection") as projection:
             def value(cell: str, *arguments, convert=float):
                 try:
                     result = getattr(projection, cell)(*arguments)
@@ -792,21 +822,13 @@ class ReferenceModelSession:
                 try:
                     return convert(result)
                 except Exception as exc:
-                    raise ModelPointFailure(f"{cell} has not the expected form: {type(exc).__name__}") from None
+                    raise _form_failure(cell, exc) from None
 
-            try:
-                projection = self._computing.Projection[index]
-            except Exception as exc:
-                raise ModelPointFailure(self._failure("Projection", exc, projection, index)) from None
             month = VALUATION_MONTH if hasattr(projection, VALUATION_MONTH) else BEFORE_RENAME
             start, end = value(month, convert=int), value("proj_len", convert=int) - 1
             first, last = (start, end) if periods is None else (start + periods[0], min(start + periods[1], end))
             return [(t, [value(cell, t, *arguments) for cell, *arguments in calls])
                     for t in range(first, last + 1)]
-        finally:
-            # Release the point's ItemSpace, as ``_project_index`` does.
-            with suppress(KeyError):  # absent when Projection[index] raised
-                del self._computing.Projection[index]
 
     def _index(self, model_point_id: str) -> int:
         """The row of the model point table that holds ``model_point_id``."""
@@ -818,10 +840,8 @@ class ReferenceModelSession:
 
     def _project_index(self, index: int) -> list[tuple[int, list[float]]]:
         """The periods of the point of row ``index``. Raises :class:`ModelPointFailure`."""
-        projection = None
-        try:
+        with self._projection(index, "result_cf") as projection:
             try:
-                projection = self._computing.Projection[index]
                 frame = projection.result_cf()
             except Exception as exc:  # a modelx FormulaError wraps the cause
                 raise ModelPointFailure(self._failure("result_cf", exc, projection, index)) from None
@@ -838,13 +858,8 @@ class ReferenceModelSession:
                 columns = [[float(value) for value in frame[column]] for _, _, column, _ in QUANTITIES]
                 periods = [int(period) for period in frame.index]
             except Exception as exc:
-                raise ModelPointFailure(f"result_cf has not the expected form: {type(exc).__name__}") from None
+                raise _form_failure("result_cf", exc) from None
             return [(period, [column[row] for column in columns]) for row, period in enumerate(periods)]
-        finally:
-            # Release the point's ItemSpace, on both paths: a run would otherwise keep one per point
-            # alive (memory per run).
-            with suppress(KeyError):  # absent when Projection[index] raised
-                del self._computing.Projection[index]
 
     def parameters(self) -> list[dict]:
         with _readable_formula_errors():
@@ -984,19 +999,18 @@ class ReferenceModel:
             export_tree(clone, files, state)
             if patches:
                 changes_contract.apply_changes(state, patches, manifest_dir)
-            with _readable_formula_errors():
-                model = mx.read_model(state / PRODUCT_FOLDER / MODEL_NAME)
+            model = _read_model(state / PRODUCT_FOLDER)
             try:
                 if path == "modelx":
                     yield ReferenceModelSession(model, workers=self.workers, state=state)
-                elif patches:  # no fallback: an export or an import that fails ends the run with an error
-                    with _exported(model, state / PRODUCT_FOLDER) as exported:
-                        yield ReferenceModelSession(model, exported, self.workers, state)
-                else:  # the package of an unpatched product folder is exported once per engine object
-                    key, cached, keep = self._export_slot(files)
+                else:
+                    # No fallback: an export or an import that fails ends the run with an error. The
+                    # package of an unpatched product folder is exported once per engine object; a
+                    # patched one is exported anew, neither cached nor kept.
+                    key, cached, keep = (None, None, None) if patches else self._export_slot(files)
                     with _exported(model, state / PRODUCT_FOLDER, cached,
-                                   None if cached is not None else keep) as exported:
-                        if cached is None:
+                                   keep if cached is None else None) as exported:
+                        if key is not None and cached is None:
                             self._exports[key] = keep
                         yield ReferenceModelSession(model, exported, self.workers, state)
             finally:

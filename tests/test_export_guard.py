@@ -22,12 +22,11 @@ import os
 import pytest
 
 from degelmann.deltarecon.documents import Rejection
-from degelmann.deltarecon.engines.reference_model import ReferenceModel, release_references
+from degelmann.deltarecon.engines.reference_model import PATHS, ReferenceModel, release_references
 from degelmann.deltarecon.run import ModelPointFailure
 
 from conftest import CLONE, NEWER, REPOSITORIES, START, require_clone
 
-PATHS = ("export", "modelx")
 LISTED = 20  # the differences a failing guard lists
 
 

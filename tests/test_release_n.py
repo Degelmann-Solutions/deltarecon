@@ -27,4 +27,5 @@ def test_the_export_is_written_into_the_scratch_state_only():
     calls = [line.strip() for line in ENGINE.read_text(encoding="utf-8").splitlines()
              if "export_model(" in line and not line.lstrip().startswith(("#", "``", "-"))]
     assert calls == ["mx.export_model(model, package)"]
-    assert "with _exported(model, state / PRODUCT_FOLDER) as exported:" in ENGINE.read_text(encoding="utf-8")
+    uses = [line.strip() for line in ENGINE.read_text(encoding="utf-8").splitlines() if "with _exported(" in line]
+    assert uses and all(use.startswith("with _exported(model, state / PRODUCT_FOLDER,") for use in uses)

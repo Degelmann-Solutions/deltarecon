@@ -82,8 +82,8 @@ def in_policy_months(walk: Path, name: str) -> bytes:
     result = parse_document((walk / f"{prefix}.result.json").read_bytes())
     request = parse_document((walk / f"{prefix}.request.json").read_bytes())
     deviations = read_result_deviations(result, walk)
-    stored = parse_document((walk / name).read_bytes())
-    assert stored["contract_version"] == "3.0" and stored == signature_table(result, deviations), name
+    table = parse_document((walk / name).read_bytes())
+    assert table["contract_version"] == "3.0" and table == signature_table(result, deviations), name
     left = walk / request["left"]["response"]["path"]
     export = left.parent / parse_document(left.read_bytes())["export"]["artifact"]["path"]
     offsets = first_periods({(point, period) for point, period, _ in export_coordinates(export)})

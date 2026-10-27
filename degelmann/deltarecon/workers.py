@@ -10,7 +10,8 @@ The number of workers is ``--workers N``, else the environment variable
 written to a document: every worker count gives the same bytes.
 
 ``multiprocessing`` and ``concurrent.futures`` are imported when a pool starts, so that the
-core, which imports this module, loads no module that can start a process.
+command line and the engine, which import this module, load no module that can start a
+process before a pool starts.
 """
 from __future__ import annotations
 
@@ -39,7 +40,7 @@ def worker_count(given: int | None = None) -> int:
     """
     if given is not None:
         if isinstance(given, bool) or not isinstance(given, int) or given < 1:
-            raise UsageError(f"--workers must be a whole number of at least 1, not {given!r}")
+            raise UsageError(f"the number of workers must be a whole number of at least 1, not {given!r}")
         return given
     text = os.environ.get(WORKERS_VARIABLE)
     if text is not None:

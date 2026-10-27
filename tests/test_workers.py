@@ -11,15 +11,12 @@ from concurrent import futures
 import pytest
 
 from degelmann.deltarecon import workers
+from degelmann.deltarecon.engines.reference_model import PATHS
 from degelmann.deltarecon.run import ModelPointFailure, UsageError
 from degelmann.deltarecon.workers import WORKERS_VARIABLE, ordered_map, worker_count
 
 from conftest import (POINTS, POINT_TABLE, StubEngine, WorkerStub, _stub_project, _stub_start, cli, commit,
-                      edit_file, model_request, run_stub, stored, text, throwaway, with_columns)
-
-
-def record_without_execution(path) -> dict:
-    return {key: value for key, value in stored(path).items() if key not in ("record_id", "recorded_at")}
+                      edit_file, model_request, run_stub, stored, text, throwaway, with_columns, without_volatile)
 
 
 # --- stub engine ----------------------------------------------------------------------
@@ -35,8 +32,8 @@ def test_every_worker_count_writes_the_bytes_of_the_loop_in_the_order_of_the_sel
         assert result.outcome == "succeeded"
         assert engine.asked == [["MP-A", "MP-B", "MP-C", "MP-D"]]  # writer order, early points finish last
         assert {name: (folder / name).read_bytes() for name in expected} == expected, count
-        assert record_without_execution(folder / "run-record.json") == \
-            record_without_execution(world / "loop" / "run-record.json")
+        assert without_volatile(stored(folder / "run-record.json")) == \
+            without_volatile(stored(world / "loop" / "run-record.json"))
 
 
 def test_a_failed_stub_point_and_a_repeated_id_fail_as_in_the_loop(world):
@@ -92,7 +89,7 @@ def test_the_worker_count_is_the_option_else_the_variable_else_the_processors(mo
         monkeypatch.setenv(WORKERS_VARIABLE, value)
         with pytest.raises(UsageError, match=f"^{WORKERS_VARIABLE} must be a whole number of at least 1"):
             worker_count()
-    with pytest.raises(UsageError, match="^--workers must be a whole number"):
+    with pytest.raises(UsageError, match="^the number of workers must be a whole number"):
         worker_count(0)
 
 
@@ -142,11 +139,11 @@ def test_a_failed_point_among_others_gives_the_same_response_on_every_worker_cou
     assert responses["3"] == responses["1"]
     assert stored(tmp_path / "3" / "response.json")["failed_model_points"] == [
         {"model_point_id": ids[2], "message": f"result_cf raised ValueError: invalid sex in RLV_DE_S.Projection[{index}].sex()"}]
-    assert record_without_execution(tmp_path / "3" / "run-record.json") == \
-        record_without_execution(tmp_path / "1" / "run-record.json")
+    assert without_volatile(stored(tmp_path / "3" / "run-record.json")) == \
+        without_volatile(stored(tmp_path / "1" / "run-record.json"))
 
 
-@pytest.mark.parametrize("path", ["export", "modelx"])
+@pytest.mark.parametrize("path", PATHS)
 def test_the_workers_give_the_bits_and_the_messages_of_the_parent(path, unknown_sex):
     """One state, projected in three workers and then point by point in the parent."""
     from degelmann.deltarecon.engines.reference_model import ReferenceModel, release_references

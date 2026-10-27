@@ -121,7 +121,7 @@ from pathlib import Path
 from .documents import Rejection, document_bytes, sha256_file, write_new
 from .compare import CompareResult, compare
 from .derive import derive
-from .search import search
+from .search import TARGET_ONLY, search
 from .walk import walk
 from .regression import read_regression_input, regression
 from .replay import replay
@@ -290,8 +290,9 @@ def command_regression(args) -> int:
     if output.exists():
         raise UsageError(f"{output} exists already; a regression run overwrites no file")
     repositories = repositories_folder(args.repositories)
+    states = state_engine(args)
     try:
-        recorded = read_regression_input(Path(args.run_record), state_engine(args).stages)
+        recorded = read_regression_input(Path(args.run_record), states.stages)
     except Rejection as rejection:
         print("regression: rejected")
         print_diagnostic(rejection.diagnostic())
@@ -308,7 +309,7 @@ def command_regression(args) -> int:
         return 1
     release = {"label": args.label,
                "references": reference_model.release_references(revision, input_revision, args.path)}
-    result = regression(recorded, release, output, state_engine(args), repositories, args.tolerance)
+    result = regression(recorded, release, output, states, repositories, args.tolerance)
     if result.comparison is None:
         print(f"regression: the run of the revision has the outcome {result.run.outcome}; nothing is compared")
         for diagnostic in result.run.response.get("diagnostics", []):
@@ -414,7 +415,7 @@ def command_search(args) -> int:
     periods = target.get("periods")
     say(f"target: {', '.join(target['quantities'])}"
         + (f"; periods {periods['first']} to {periods['last']}" if periods else "; every period"))
-    if "target_only" in result.get("switches", []):
+    if TARGET_ONLY in result.get("switches", []):
         say("inner states: run on the target only, without the model checks")
     for held in result["held"]:
         say(f"held: {held['kind']}; the effect on it of {len(held['not_shown'])} revisions is not shown")
@@ -524,6 +525,7 @@ def main(argv: list[str] | None = None) -> int:
                                   f"state (default: {WORKERS_VARIABLE}, else one per processor)")
 
     for command in (request, regress):
+        # The choices are reference_model.PATHS, written out so that loading this module does not import modelx.
         command.add_argument("--path", choices=("export", "modelx"), default="export",
                              help="the computation path the engine version of the release names: "
                                   "export, through the modelx export of the model (default), or "

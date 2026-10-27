@@ -11,7 +11,6 @@ import os
 import re
 import shlex
 import sys
-from pathlib import Path
 
 import pytest
 
