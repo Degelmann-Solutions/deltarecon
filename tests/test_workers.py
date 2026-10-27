@@ -92,7 +92,7 @@ def test_the_worker_count_is_the_option_else_the_variable_else_the_processors(mo
         monkeypatch.setenv(WORKERS_VARIABLE, value)
         with pytest.raises(UsageError, match=f"^{WORKERS_VARIABLE} must be a whole number of at least 1"):
             worker_count()
-    with pytest.raises(UsageError, match="^--workers must be a whole number"):
+    with pytest.raises(UsageError, match="^the number of workers must be a whole number"):
         worker_count(0)
 
 
