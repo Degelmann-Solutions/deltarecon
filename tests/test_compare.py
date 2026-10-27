@@ -28,8 +28,8 @@ from degelmann.deltarecon.run import UsageError
 from degelmann.deltarecon.signature import render_table, signature_table
 
 from conftest import (EXACT, EXAMPLES, POINTS, RECORD_ID, StubEngine, StubSession, compare_request, deviates,
-                      deviation_rows, expected_deviations, folder_hashes, rehash, roles, rounded, run_side,
-                      stored)
+                      deviation_rows, expected_deviations, folder_hashes, projection_periods, rehash, roles,
+                      rounded, run_side, stored, without_volatile)
 
 COUNT, CASH = "Anzahl Verträge", "Netto-Cashflow"
 OUTPUTS = ["compare.deviations.csv", "compare.result.json", "compare.run-record.json", "signature-table.json"]
@@ -997,15 +997,6 @@ def ranges_of(keys) -> list[dict]:
     return result
 
 
-def on_projection_periods(values: dict) -> dict:
-    """``values`` with every period less the lowest period of its model point."""
-    lowest = {}
-    for model_point_id, period in values:
-        lowest[model_point_id] = min(period, lowest.get(model_point_id, period))
-    return {(model_point_id, period - lowest[model_point_id]): numbers
-            for (model_point_id, period), numbers in values.items()}
-
-
 def test_whole_comparisons_agree_with_an_oracle_of_another_construction():
     """Eleven quantities in no alphabetical order, values of any sign, odd ids, rows in any order."""
     rnd = random.Random(20261012)
@@ -1047,7 +1038,7 @@ def test_whole_comparisons_agree_with_an_oracle_of_another_construction():
                                           CheckedRun(response("right"), right))
 
         # On policy_month both sides are compared on projection periods.
-        left, right = on_projection_periods(left), on_projection_periods(right)
+        left, right = projection_periods(left), projection_periods(right)
         common = set(left) & set(right)
         expected = [{"model_point_id": key[0], "period": key[1], "quantity": name,
                      "left": left[key][index], "right": right[key][index]}
@@ -1096,8 +1087,7 @@ def test_the_reference_example_is_recomputed_by_the_core(tmp_path):
     record = stored(folder / "compare.run-record.json")
     example = stored(EXAMPLES / "reference" / "compare.run-record.json")
     assert RECORD_ID.fullmatch(record["record_id"]) and record["record_id"] != example["record_id"]
-    assert {k: v for k, v in record.items() if k not in ("record_id", "recorded_at")} == {
-        k: v for k, v in example.items() if k not in ("record_id", "recorded_at")}
+    assert without_volatile(record) == without_volatile(example)
 
 
 @pytest.mark.parametrize("name", ["signature-table", "signature-empty"])

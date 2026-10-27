@@ -24,8 +24,8 @@ from degelmann.deltarecon.walk import exact_sums, held_kinds, walk, written
 
 from conftest import (LAPSE_TABLE, MODEL_CODE, PARAMS, PARAMS_RATE, POINTS, POINTS_B, POINTS_E, POINT_TABLE,
                       START, ROOT, StubEngine, TwoStages, WalkStub, build, change, cli, clone_state, commit,
-                      export_coordinates, folder_hashes, git, patch_text, record, stored, stub_request, throwaway,
-                      with_manifest, write_files)
+                      export_coordinates, folder_hashes, git, patch_text, projection_periods, record, stored,
+                      stub_request, throwaway, with_manifest, write_files)
 
 QUANTITIES = ["Anzahl Verträge", "Netto-Cashflow"]
 
@@ -432,13 +432,7 @@ def _one_quantity(left: dict, right: dict):
 
 def _integer_sums(left: dict, right: dict) -> tuple[float | None, float | None]:
     """The sums by the integer method: exact in units of 2**-1074, rounded once by ``written``."""
-    def aligned(values: dict) -> dict:  # on policy_month: each period less its model point's first one
-        first = {}
-        for point, period in values:
-            first[point] = min(period, first.get(point, period))
-        return {(point, period - first[point]): numbers for (point, period), numbers in values.items()}
-
-    left, right = aligned(left), aligned(right)
+    left, right = projection_periods(left), projection_periods(right)  # on policy_month
     signed = absolute = 0
     for key in left.keys() | right.keys():
         a, b = left.get(key, [0.0])[0], right.get(key, [0.0])[0]

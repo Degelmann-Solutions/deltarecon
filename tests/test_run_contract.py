@@ -38,11 +38,11 @@ from conftest import (CLONE, CLONE_NAME, EXACT, LAPSE_TABLE, MODEL_CODE, NEW_BUS
                       clone_state, commit, committed, deviation_rows, edit_file, expected_deviations,
                       folder_hashes, git, patch_text, rehash, require_clone, roles, run_stub, stored,
                       stub_regression, stub_release, stub_request, text, throwaway, with_columns, with_manifest,
-                      model_request)
+                      model_request, without_volatile)
 
 CORE_MODULES = ["documents", "export", "changes", "run", "compare", "signature", "replay", "regression",
                 "derive", "walk", "search", "workers", "__main__"]
-POINTS_E = POINTS + "MP-E,0,1,7\n"
+POINTS_PLUS_E = POINTS + "MP-E,0,1,7\n"
 
 
 # --- full and subset runs -----------------------------------------------------------
@@ -265,7 +265,7 @@ def test_a_file_of_any_realisation_is_checked_by_the_run_and_copied_by_the_repla
                        "file": {"path": f"files/{change_id}.csv", "sha256": sha256_file(path)}}
         return change(change_id, None, world / "run", realisation=realisation)
 
-    entries = [replace("chg-replace", POINTS_B), replace("chg-unused", POINTS_E)]
+    entries = [replace("chg-replace", POINTS_B), replace("chg-unused", POINTS_PLUS_E)]
     changes = with_manifest(world, entries, ["chg-replace"])
     (world / "run" / "files" / "chg-unused.csv").unlink()  # no file of a change that is not enabled is read
     result, _ = run_stub(world, stub_request(world, changes=changes), ReplaceEngine())
@@ -277,7 +277,7 @@ def test_a_file_of_any_realisation_is_checked_by_the_run_and_copied_by_the_repla
 
     # A replay with an altered file is rejected and writes nothing more.
     remove_replay(world / "run")
-    (world / "run" / "files" / "chg-replace.csv").write_text(POINTS_E, "utf-8")
+    (world / "run" / "files" / "chg-replace.csv").write_text(POINTS_PLUS_E, "utf-8")
     with pytest.raises(Rejection) as caught:
         replay(record, ReplaceEngine(), repositories=world)
     assert caught.value.code == "artifact_hash_mismatch" and not (world / "run" / "replay").exists()
@@ -298,7 +298,7 @@ def test_enabled_changes_are_applied_in_manifest_order_to_a_scratch_copy(world):
         change("chg-point-b", patch_text("points.csv", POINTS, POINTS_B), world / "run"),
         change("chg-rate", patch_text("params.csv", PARAMS, PARAMS_RATE), world / "run",
                **{"class": "parameter"}),
-        change("chg-add-e", patch_text("points.csv", POINTS_B, POINTS_E.replace("MP-B,0,2,2", "MP-B,0,2,4")),
+        change("chg-add-e", patch_text("points.csv", POINTS_B, POINTS_PLUS_E.replace("MP-B,0,2,2", "MP-B,0,2,4")),
                world / "run", prerequisites=["chg-point-b"]),
         change("chg-unused", patch_text("params.csv", PARAMS, PARAMS.replace("base", "other")), world / "run"),
     ]
@@ -793,8 +793,7 @@ def test_a_run_of_one_request_repeated_differs_only_in_its_record(world):
     records = [stored(world / name / "run-record.json") for name in ("first", "second")]
     assert records[0]["record_id"] != records[1]["record_id"]
     assert all(RECORD_ID.fullmatch(record["record_id"]) for record in records)
-    assert {k: v for k, v in records[0].items() if k not in ("record_id", "recorded_at")} == \
-        {k: v for k, v in records[1].items() if k not in ("record_id", "recorded_at")}
+    assert without_volatile(records[0]) == without_volatile(records[1])
 
 
 TABLE = {"name": "table", "type": "keyed_table", "key_columns": ["year", "kind"], "value_columns": ["rate"],
@@ -1495,8 +1494,7 @@ def test_a_repeated_regression_and_replay_differ_only_in_records_and_the_request
     assert set(one) == set(two)
     for name in ("compare.run-record.json", "run/run-record.json"):
         records = [stored(world / out / name) for out in ("out-1", "out-2")]
-        assert {k: v for k, v in records[0].items() if k not in ("record_id", "recorded_at", "inputs")} == \
-            {k: v for k, v in records[1].items() if k not in ("record_id", "recorded_at", "inputs")}
+        assert without_volatile(records[0], "inputs") == without_volatile(records[1], "inputs")
     requests = [stored(world / out / "compare.request.json") for out in ("out-1", "out-2")]
     requests[0]["right"]["run_record"] = requests[1]["right"]["run_record"]
     assert requests[0] == requests[1]
@@ -2609,16 +2607,16 @@ def without_engine_version(document: dict) -> dict:
 
 
 def test_both_paths_give_the_same_export_and_each_replays_on_its_own(monkeypatch, tmp_path, capsys):
-    from degelmann.deltarecon.engines.reference_model import engine_version
+    from degelmann.deltarecon.engines.reference_model import EXPORT_FOLDER, PATHS, engine_version
     documents = {}
-    for path in ("export", "modelx"):
+    for path in PATHS:
         folder = tmp_path / path
         request_path = model_request(monkeypatch, folder, in_force_id(), NEW_BUSINESS, path=path)
         with counted_exports(monkeypatch) as calls:
             assert cli(monkeypatch, "run", request_path, "--repositories", REPOSITORIES) == 0
             # The export lies directly in the product folder of the scratch state of the run.
             assert [(call.name, call.parent.name, call.parent.parent.parent.name.startswith(SCRATCH_PREFIX))
-                    for call in calls] == ([("_deltarecon_export", PRODUCT_FOLDER, True)] if path == "export" else [])
+                    for call in calls] == ([(EXPORT_FOLDER, PRODUCT_FOLDER, True)] if path == "export" else [])
             assert cli(monkeypatch, "replay", folder / "run-record.json", "--repositories", REPOSITORIES) == 0
             assert len(calls) == (2 if path == "export" else 0)  # the replay repeats the run on its path
         assert "replay: reproduced_exactly" in capsys.readouterr().out
@@ -2681,6 +2679,7 @@ def test_an_export_that_fails_ends_the_run_with_an_error_and_does_not_fall_back(
 
 
 def test_a_point_that_raises_under_the_export_is_a_failed_model_point(monkeypatch, tmp_path, capsys):
+    from degelmann.deltarecon.engines.reference_model import PATHS
     repositories, clone = throwaway(tmp_path)
     lines = text(POINT_TABLE).splitlines()
     columns = lines[0].split(",")
@@ -2689,7 +2688,7 @@ def test_a_point_that_raises_under_the_export_is_a_failed_model_point(monkeypatc
     edit_file(clone, POINT_TABLE, lines[15] + "\n", with_columns(columns, lines[15], sex="X") + "\n")
     revision = commit(clone, "Give one model point an unknown sex")
     messages = {}
-    for path in ("export", "modelx"):
+    for path in PATHS:
         folder = tmp_path / path
         request_path = model_request(monkeypatch, folder, NEW_BUSINESS, broken, revision=revision,
                                      repositories=repositories, path=path)
@@ -2701,11 +2700,12 @@ def test_a_point_that_raises_under_the_export_is_a_failed_model_point(monkeypatc
         messages[path] = response["failed_model_points"][0]["message"]
         assert_documents_valid(folder)
     assert messages == dict.fromkeys(
-        ("export", "modelx"), f"result_cf raised ValueError: invalid sex in RLV_DE_S.Projection[{index}].sex()")
+        PATHS, f"result_cf raised ValueError: invalid sex in RLV_DE_S.Projection[{index}].sex()")
 
 
 def test_a_formula_of_t_and_a_check_that_raise_name_their_formula_alike_on_both_paths(monkeypatch, tmp_path,
                                                                                        capsys):
+    from degelmann.deltarecon.engines.reference_model import PATHS
     repositories, clone = throwaway(tmp_path)
     lines = text(POINT_TABLE).splitlines()
     columns = lines[0].split(",")
@@ -2728,7 +2728,7 @@ def test_a_formula_of_t_and_a_check_that_raise_name_their_formula_alike_on_both_
         lapse_id: f"result_cf raised ValueError: no lapse rate in RLV_DE_S.Projection[{lapse_index}].lapse_rate(t=3)",
         check_id: f"check_net_cf raised TypeError: no reconciliation in RLV_DE_S.Projection[{check_index}].check_net_cf()",
     }
-    for path in ("export", "modelx"):
+    for path in PATHS:
         folder = tmp_path / path
         request_path = model_request(monkeypatch, folder, lapse_id, check_id, revision=revision,
                                      repositories=repositories, path=path)
@@ -3000,7 +3000,7 @@ def test_the_reference_engine_exports_a_product_folder_once_per_engine_object(tm
 
     def projected(enabled=(), manifest_dir=None, use=release) -> list:
         with engine.open(use, list(enabled), manifest_dir, REPOSITORIES) as session:
-            assert (session._state / PRODUCT_FOLDER / "_deltarecon_export").is_dir()
+            assert (session._state / PRODUCT_FOLDER / reference_model.EXPORT_FOLDER).is_dir()
             return [session.project(point) for point in points] if use is release else []
 
     first = projected()

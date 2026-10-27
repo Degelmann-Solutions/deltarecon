@@ -123,14 +123,20 @@ def export_coordinates(path: Path) -> dict[tuple[str, int, str], float]:
             for row in rows[1:] for quantity, value in zip(rows[0][2:], row[2:])}
 
 
-def projection_periods(coordinates: dict[tuple[str, int, str], float]) -> dict[tuple[str, int, str], float]:
-    """The values of one export on projection periods: each period less the first period of its model
-    point in that export, as on ``policy_month``, whose origin is the issue date."""
+def projection_periods(values: dict[tuple, object]) -> dict[tuple, object]:
+    """``values`` on projection periods: each key starts with a model point and a period, and the period
+    becomes the period less the first period of its model point in ``values``, as on ``policy_month``,
+    whose origin is the issue date. Further members of a key, such as a quantity, are kept."""
     first: dict[str, int] = {}
-    for point, period, _ in coordinates:
+    for point, period, *_ in values:
         first[point] = min(period, first.get(point, period))
-    return {(point, period - first[point], quantity): value
-            for (point, period, quantity), value in coordinates.items()}
+    return {(point, period - first[point], *rest): value for (point, period, *rest), value in values.items()}
+
+
+def without_volatile(record: dict, *extra: str) -> dict:
+    """A run record without the members that name its execution, ``record_id`` and ``recorded_at``,
+    and without the members ``extra``."""
+    return {key: value for key, value in record.items() if key not in ("record_id", "recorded_at", *extra)}
 
 
 def expected_deviations(left: Path, right: Path, per_quantity: dict, issue_origin: bool = True) -> list[dict]:
