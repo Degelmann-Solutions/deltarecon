@@ -2678,6 +2678,31 @@ def test_an_export_that_fails_ends_the_run_with_an_error_and_does_not_fall_back(
     assert_documents_valid(folder)
 
 
+def test_a_projection_that_raises_names_result_cf_on_a_full_run_and_projection_on_a_target_run():
+    from degelmann.deltarecon.engines.reference_model import ReferenceModelSession
+
+    class Projections:
+        def __init__(self):
+            self.released = []
+
+        def __getitem__(self, index):
+            raise ValueError("no such point")
+
+        def __delitem__(self, index):
+            self.released.append(index)
+            raise KeyError(index)  # as modelx does for an item space that was never built
+
+    class Model:
+        Projection = Projections()
+
+    session = ReferenceModelSession(Model())
+    with pytest.raises(ModelPointFailure, match=r"^result_cf raised ValueError: no such point$"):
+        session._project_index(7)
+    with pytest.raises(ModelPointFailure, match=r"^Projection raised ValueError: no such point$"):
+        session._project_target_index(7, ("Bruttobeitrag",), (0, 59))
+    assert Model.Projection.released == [7, 7]  # released on both paths, also after the failure
+
+
 def test_a_point_that_raises_under_the_export_is_a_failed_model_point(monkeypatch, tmp_path, capsys):
     from degelmann.deltarecon.engines.reference_model import PATHS
     repositories, clone = throwaway(tmp_path)
