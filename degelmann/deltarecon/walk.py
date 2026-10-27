@@ -166,8 +166,16 @@ def _selection(request: dict) -> tuple[str, frozenset]:
     return selection["mode"], frozenset(selection.get("model_point_ids", []))
 
 
-def _checked(recorded: RecordedRun) -> CheckedRun:
-    return CheckedRun(recorded.response, recorded.values)
+def as_checked(run) -> CheckedRun:
+    """The checked values of a recorded run, or of a run whose values were read, as they are held."""
+    return CheckedRun(run.response, run.values)
+
+
+def compare_in_memory(stage: str, compare_id: str, tolerance: dict, left: CheckedRun,
+                      right: CheckedRun) -> tuple[dict, list[dict]]:
+    """:func:`~degelmann.deltarecon.compare.compare_runs` on two checked runs, with a request held in
+    memory only: nothing is written."""
+    return compare_runs({"stage": stage, "compare_id": compare_id, "tolerance": tolerance}, left, right)
 
 
 # --- the checks before the first run --------------------------------------------------
@@ -324,14 +332,20 @@ class States:
                                        self.older.request["selection"], f"the request of state {k}", target)
         write_new(folder / REQUEST_NAME, document_bytes(request))
         run = run_request(folder / REQUEST_NAME, self.engine, self.repositories)
-        entry = {"state": k, **({"revision": self.ids[k - 1]} if k else {}), "run_id": request["run_id"],
-                 "outcome": run.outcome, "response": artifact_reference(self.output, run.response_path)}
+        self.add_state(k, self.ids[k - 1] if k else None, request["run_id"], run)
+        return run, request
+
+    def add_state(self, k: int, revision: str | None, run_id: str, run: RunResult, reused: bool = False) -> None:
+        """The entry of state ``k`` among the states of the result, and its finding when it did not
+        succeed. ``reused``: the state is taken from a walk; the member stands before ``response``."""
+        entry = {"state": k, **({"revision": revision} if k else {}), "run_id": run_id, "outcome": run.outcome,
+                 **({"reused": True} if reused else {}),
+                 "response": artifact_reference(self.output, run.response_path)}
         if run.outcome == "succeeded":
             entry["export"] = artifact_reference(self.output, run.export_path)
         self.states.append(entry)
         if run.outcome != "succeeded":
             self.did_not_run(k, run)
-        return run, request
 
     def did_not_run(self, k: int, run: RunResult) -> None:
         """The finding ``state_did_not_run`` of state ``k``, built from the response of its run."""
@@ -385,9 +399,8 @@ class States:
     def check_end(self, k: int, state: CheckedRun, run: RunResult, recorded: RecordedRun, side: str) -> dict:
         """State ``k`` against the recorded result of one end: no deviation, no added or removed coordinate."""
         compare_id = f"{self.prefix}-state-{k}-check-{side}"
-        checked = _checked(recorded)  # built once, so that its alignment is built once
-        result, deviations = compare_runs({"stage": self.stage, "compare_id": compare_id,
-                                           "tolerance": self.profile}, checked, state)
+        checked = as_checked(recorded)  # built once, so that its alignment is built once
+        result, deviations = compare_in_memory(self.stage, compare_id, self.profile, checked, state)
         if shows_no_deviation(result, deviations):
             return {"state": k, "outcome": "reproduced"}
         compared = self.write_compare(f"{self.name(k)}.check-{side}", compare_id,
@@ -457,8 +470,7 @@ class _Walk(States):
         """The step from state ``from_k`` to state ``to_k`` and the revisions it carries."""
         revisions = self.ids[from_k:to_k]
         compare_id = f"{self.prefix}-step-{to_k}"
-        result, deviations = compare_runs({"stage": self.stage, "compare_id": compare_id,
-                                           "tolerance": self.profile}, left, right)
+        result, deviations = compare_in_memory(self.stage, compare_id, self.profile, left, right)
         contributes = flags(result, deviations, self.names)
         entry = {"from_state": from_k, "to_state": to_k, "revisions": revisions}
         table = None
@@ -480,7 +492,7 @@ class _Walk(States):
 
     def totals(self) -> list[dict]:
         """The deviation between the two recorded results, per quantity."""
-        signed, _ = exact_sums(_checked(self.older), _checked(self.newer), self.names)
+        signed, _ = exact_sums(as_checked(self.older), as_checked(self.newer), self.names)
         totals = []
         for name, value in zip(self.names, signed):
             totals.append({"quantity": name, **({"sum": value} if value is not None else {})})

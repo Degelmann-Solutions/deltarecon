@@ -50,7 +50,7 @@ from collections import OrderedDict
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from .compare import ISSUE_ORIGIN, CheckedRun, align, compare_runs
+from .compare import ISSUE_ORIGIN, CheckedRun, align
 from .documents import (CONTRACT_VERSION, RUN_SCHEMA, Rejection, artifact_reference, copy_files, read_document,
                         write_document, write_new)
 from .export import write_export
@@ -58,7 +58,8 @@ from .replay import check_response
 from .run import (EXPORT_NAME, RECORD_NAME as STATE_RECORD_NAME, RESPONSE_NAME, Engine, RunResult, UsageError,
                   repositories_folder, written_values)
 from .walk import (LOCALISE_SCHEMA, MANIFEST_NAME, NEWER, OLDER, REQUEST_NAME, RESULT_NAME as WALK_RESULT_NAME,
-                   Prepared, States, WalkFolder, flags, new_folder, prepare, read_walk_folder)
+                   Prepared, States, WalkFolder, as_checked, compare_in_memory, flags, new_folder, prepare,
+                   read_walk_folder)
 
 RESULT_NAME = "search.result.json"
 RECORD_NAME = "search.run-record.json"
@@ -115,7 +116,7 @@ def read_target(quantities, periods: str | None, prepared: Prepared) -> Target:
     # search is the one without a target and keeps the signature rows of its contributions.
     narrowed = set(chosen) != set(names) or span is not None
     target = Target(chosen, span, narrowed)
-    if span is not None and not any(target.within(align(CheckedRun(run.response, run.values)).values)
+    if span is not None and not any(target.within(align(as_checked(run)).values)
                                     for run in (prepared.older, prepared.newer)):
         raise UsageError(f"neither recorded export has a coordinate in the projection periods {periods}")
     return target
@@ -148,9 +149,8 @@ def judgement(stage: str, compare_id: str, profile: dict, left: CheckedRun, righ
               target: Target, quantities) -> tuple[list[str], dict]:
     """The target quantities among ``quantities`` for which two states differ on the target, and the
     comparison that judges it."""
-    result, deviations = compare_runs({"stage": stage, "compare_id": compare_id,
-                                       "tolerance": restrict_profile(profile, target)},
-                                      restrict(left, target), restrict(right, target))
+    result, deviations = compare_in_memory(stage, compare_id, restrict_profile(profile, target),
+                                           restrict(left, target), restrict(right, target))
     differs = flags(result, deviations, list(target.quantities))
     return [name for name, flag in zip(target.quantities, differs) if flag and name in quantities], result
 
@@ -209,14 +209,7 @@ class _Search(States):
         its own. Its entry keeps the walk's run id and references the copy."""
         walked = self.reused[k]
         run, request = read_walk_state(self.output / WALK_FOLDER, walked)
-        entry = {"state": k, **({"revision": walked["revision"]} if k else {}), "run_id": walked["run_id"],
-                 "outcome": run.outcome, "reused": True,
-                 "response": artifact_reference(self.output, run.response_path)}
-        if run.outcome == "succeeded":
-            entry["export"] = artifact_reference(self.output, run.export_path)
-        self.states.append(entry)
-        if run.outcome != "succeeded":
-            self.did_not_run(k, run)
+        self.add_state(k, walked["revision"] if k else None, walked["run_id"], run, reused=True)
         return run, request
 
     def state(self, k: int) -> CheckedRun:
@@ -392,7 +385,7 @@ def walk_changes(walk: WalkFolder, prepared: Prepared, target: Target) -> list[t
 
     def read(k: int) -> CheckedRun:
         run, _ = read_walk_state(folder, states[k], values=True)
-        return CheckedRun(run.response, run.values)
+        return as_checked(run)
 
     changes = []
     previous = None
@@ -446,7 +439,8 @@ def search(older_record: Path | str, newer_record: Path | str, output: Path | st
     n = len(prepared.ids)
 
     with new_folder(output):
-        switches = sorted(([REUSE_WALK] if reuse else []) + ([TARGET_ONLY] if target_only else []))
+        # The switches that are on, in the order run_record writes them, so result and record agree.
+        switches = sorted(name for name, on in ((REUSE_WALK, reuse), (TARGET_ONLY, target_only)) if on)
         state = _Search(output, engine, repositories, prepared,
                         f"search-{older.request['run_id']}-{newer.request['run_id']}", target,
                         reference.result["states"] if reuse else None, target_only)

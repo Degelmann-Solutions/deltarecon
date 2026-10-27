@@ -406,6 +406,14 @@ def read_inventory(session: Session) -> list[dict]:
     return sorted(ordered, key=lambda parameter: parameter["name"])
 
 
+def _one_outcome_per_point(outcomes: list, model_point_ids: list[str]) -> list:
+    """``outcomes`` when the engine returns one per model point, else an engine error."""
+    if len(outcomes) != len(model_point_ids):
+        raise RuntimeError(f"the engine returns {len(outcomes)} outcomes for {len(model_point_ids)} "
+                           "model points")
+    return outcomes
+
+
 def project_selection(session: Session, model_point_ids: list[str]) -> list:
     """The outcome of each id, in the given order: its periods, or its :class:`ModelPointFailure`.
 
@@ -413,11 +421,7 @@ def project_selection(session: Session, model_point_ids: list[str]) -> list:
     """
     many = getattr(session, "project_many", None)
     if many is not None:
-        outcomes = list(many(model_point_ids))
-        if len(outcomes) != len(model_point_ids):
-            raise RuntimeError(f"the engine returns {len(outcomes)} outcomes for {len(model_point_ids)} "
-                               "model points")
-        return outcomes
+        return _one_outcome_per_point(list(many(model_point_ids)), model_point_ids)
     outcomes = []
     for model_point_id in model_point_ids:
         try:
@@ -436,11 +440,8 @@ def project_target(session: Session, model_point_ids: list[str], target: dict, n
     """The outcome of each id, in the given order, through ``session.project_target``."""
     periods = target.get("periods")
     window = None if periods is None else (periods["first"], periods["last"])
-    outcomes = list(session.project_target(model_point_ids, target_names(target, names), window))
-    if len(outcomes) != len(model_point_ids):
-        raise RuntimeError(f"the engine returns {len(outcomes)} outcomes for {len(model_point_ids)} "
-                           "model points")
-    return outcomes
+    return _one_outcome_per_point(list(session.project_target(model_point_ids, target_names(target, names), window)),
+                                  model_point_ids)
 
 
 def calculate(session: Session, stage: str, selected: list[str], available: list[str],
