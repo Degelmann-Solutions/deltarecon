@@ -33,7 +33,7 @@ from degelmann.deltarecon.replay import check_response, replay
 from degelmann.deltarecon.run import SCRATCH_PREFIX, ModelPointFailure, UsageError, run_request
 
 from conftest import (CLONE, CLONE_NAME, EXACT, LAPSE_TABLE, MODEL_CODE, NEW_BUSINESS, PARAMS, PARAMS_RATE,
-                      POINTS, POINTS_B, POINT_TABLE, PRODUCT_FOLDER, RECORD_ID, RELEASE_N, REPOSITORIES,
+                      POINTS, POINTS_B, POINT_TABLE, PRODUCT_FOLDER, RECORD_ID, RELEASE_N, REPOSITORIES, START,
                       REPOSITORY_URL, ROOT, StubEngine, StubSession, assert_documents_valid, change, cli,
                       clone_state, commit, committed, deviation_rows, edit_file, expected_deviations,
                       folder_hashes, git, patch_text, rehash, require_clone, roles, run_stub, stored,
@@ -1574,7 +1574,7 @@ def test_only_the_adapter_imports_the_engine_and_calls_git():
 
 # --- the reference model ------------------------------------------------------------
 
-RELEASE_VALUE = f"git:{REPOSITORY_URL}@{RELEASE_N}"
+RELEASE_VALUE = f"git:{REPOSITORY_URL}@{START}"
 
 
 def in_force_id() -> str:
@@ -1589,7 +1589,8 @@ def named_revisions(request: dict) -> dict[str, str]:
 
 
 def point_line(policy_id: str) -> tuple[list[str], str]:
-    """The columns of the model point table and the line of one model point of release N."""
+    """The columns of the model point table and the line of one model point of the start commit of the reference chain
+    (release N on the fixed model)."""
     lines = text(POINT_TABLE).split("\n")
     return lines[0].split(","), next(line for line in lines if line.split(",")[1:2] == [policy_id])
 
@@ -1601,13 +1602,13 @@ def test_request_command_names_the_complete_release_identity(monkeypatch, tmp_pa
     assert [r["kind"] for r in references] == ["code_state", "parameter_set", "input_data", "engine_version"]
     # One reference per kind a revision determines, all three with the same value.
     assert [r["value"] for r in references[:3]] == [RELEASE_VALUE] * 3
-    assert RELEASE_VALUE == "git:https://github.com/Degelmann-Solutions/delib-history@" + RELEASE_N
-    assert re.fullmatch(r"[0-9a-f]{40}", RELEASE_N)
+    assert RELEASE_VALUE == "git:https://github.com/Degelmann-Solutions/delib-history@" + START
+    assert re.fullmatch(r"[0-9a-f]{40}", START)
     version = references[3]["value"]
     assert all(name in version for name in ("modelx ", "pandas ", "numpy ", "Python "))
     assert request["selection"] == {"mode": "full"} and request["changes"] == {"enabled": []}
     # The command overwrites no request.
-    assert cli(monkeypatch, "request", "--revision", RELEASE_N, "--repositories", REPOSITORIES, "--label", "N",
+    assert cli(monkeypatch, "request", "--revision", START, "--repositories", REPOSITORIES, "--label", "N",
                "--run-id", "x", "--output", tmp_path / "run" / "request.json") == 2
 
     from degelmann.deltarecon.engines.reference_model import ReferenceModel
@@ -1618,15 +1619,15 @@ def test_request_command_names_the_complete_release_identity(monkeypatch, tmp_pa
 
 def test_request_command_resolves_any_name_of_a_commit_to_the_full_hash(monkeypatch, tmp_path):
     repositories, clone = throwaway(tmp_path)
-    git(clone, "branch", "release-n", RELEASE_N)
-    for number, name in enumerate(["HEAD", "work", "release-n", RELEASE_N[:10], RELEASE_N]):
+    git(clone, "branch", "start", START)
+    for number, name in enumerate(["HEAD", "work", "start", START[:10], START]):
         request = stored(model_request(monkeypatch, tmp_path / f"run-{number}", revision=name,
                                        repositories=repositories))
         assert named_revisions(request)["code_state"] == RELEASE_VALUE, name
 
 
 @pytest.mark.parametrize("name", ["no-such-branch", "0123456789abcdef0123456789abcdef01234567",
-                                  f"{RELEASE_N}^{{tree}}", "--all", ""])
+                                  f"{START}^{{tree}}", "--all", ""])
 def test_request_command_refuses_a_name_that_names_no_commit(monkeypatch, tmp_path, capsys, name):
     output = tmp_path / "run" / "request.json"
     assert cli(monkeypatch, "request", f"--revision={name}", "--repositories", REPOSITORIES, "--label", "N",
@@ -1667,7 +1668,7 @@ def test_request_command_without_a_clone_names_where_it_is_expected(monkeypatch,
     output = tmp_path / "run" / "request.json"
     (tmp_path / "empty" / CLONE_NAME).mkdir(parents=True)  # a folder that is no repository
     for repositories in (tmp_path / "absent", tmp_path / "empty"):
-        assert cli(monkeypatch, "request", "--revision", RELEASE_N, "--repositories", repositories,
+        assert cli(monkeypatch, "request", "--revision", START, "--repositories", repositories,
                    "--label", "N", "--run-id", "x", "--output", output) == 1
         printed = capsys.readouterr().out
         assert printed.startswith("request: rejected\ndiagnostic: unknown_reference: ")
@@ -1792,7 +1793,7 @@ def test_a_hash_that_names_no_commit_is_an_unknown_reference(monkeypatch, tmp_pa
     request = stored(model_request(monkeypatch, tmp_path / "base", NEW_BUSINESS, repositories=repositories))
     for kind, object_id in objects.items():
         object_id = object_id.decode("ascii").strip()
-        assert object_id != RELEASE_N and git(clone, "cat-file", "-t", object_id).strip() == kind.encode()
+        assert object_id != START and git(clone, "cat-file", "-t", object_id).strip() == kind.encode()
         for reference in request["release"]["references"][:3]:
             reference["value"] = f"git:{REPOSITORY_URL}@{object_id}"
         folder = tmp_path / kind
@@ -1828,7 +1829,7 @@ def test_without_git_no_command_starts(monkeypatch, tmp_path, capsys):
     assert cli(monkeypatch, "replay", recorded / "run-record.json", "--repositories", REPOSITORIES) == 2
     assert "git is not installed" in capsys.readouterr().err
     assert not (recorded / "replay").exists() and not (recorded / "replay-record.json").exists()
-    assert cli(monkeypatch, "request", "--revision", RELEASE_N, "--repositories", REPOSITORIES, "--label", "N",
+    assert cli(monkeypatch, "request", "--revision", START, "--repositories", REPOSITORIES, "--label", "N",
                "--run-id", "x", "--output", tmp_path / "other" / "request.json") == 2
     assert "git is not installed" in capsys.readouterr().err
     # Neither does a command start when the repositories folder is absent as well.
@@ -1841,7 +1842,7 @@ def test_without_git_no_command_starts(monkeypatch, tmp_path, capsys):
 def test_a_missing_clone_ends_the_test_session_with_the_clone_command(tmp_path):
     require_clone()  # the clone of this session passes
     (tmp_path / "empty").mkdir()  # a folder inside no repository must not pass as a clone
-    for clone, revision in ((tmp_path / "absent", RELEASE_N), (tmp_path / "empty", RELEASE_N),
+    for clone, revision in ((tmp_path / "absent", START), (tmp_path / "empty", START),
                             (CLONE, "1" * 40)):
         with pytest.raises(pytest.exit.Exception) as caught:
             require_clone(clone, revision)
@@ -1872,7 +1873,7 @@ def test_the_restored_files_are_the_committed_bytes_whatever_the_line_ending_set
     assert sorted(restored) == sorted(files) == sorted(
         git(CLONE, "ls-tree", "-r", "--name-only", RELEASE_N).decode("utf-8").splitlines())
     for path, data in restored.items():
-        assert data == committed(path), path
+        assert data == committed(path, RELEASE_N), path
         assert b"\r" not in data, path
     # The hashes UPSTREAM.md records for the files copied from lifelib, and the portfolio hash.
     recorded = dict(re.findall(r"^\| `([^`]+)` \| `([0-9a-f]{64})` \|$",
@@ -1916,7 +1917,8 @@ def test_a_later_revision_is_run_as_committed(monkeypatch, tmp_path, capsys, ful
                                      ("request.json", "response.json", "run-record.json"))
         return request, check_response(request, response, folder), {p["name"]: p for p in record["parameters"]}
 
-    # The working tree holds the change, the commit does not: the run is that of release N.
+    # The working tree holds the change, the commit does not: the run is that of the start commit
+    # of the reference chain (release N on the fixed model).
     request, first, parameters = run("first", "HEAD")
     assert named_revisions(request)["input_data"] == RELEASE_VALUE
     assert parameters["lapse_table"]["rows"][0] == {"key": [1], "values": [0.06]}
@@ -1926,7 +1928,7 @@ def test_a_later_revision_is_run_as_committed(monkeypatch, tmp_path, capsys, ful
     assert clone_state(clone) == dirty
 
     second_hash = commit(clone, "Lower the lapse rate of policy year 1")
-    assert second_hash != RELEASE_N
+    assert second_hash != START
     committed_state = clone_state(clone)
     request, second, parameters = run("second", "work")
     assert set(named_revisions(request).values()) - {named_revisions(request)["engine_version"]} == {
@@ -1937,7 +1939,7 @@ def test_a_later_revision_is_run_as_committed(monkeypatch, tmp_path, capsys, ful
     assert second[(NEW_BUSINESS, 1)] != first[(NEW_BUSINESS, 1)]
     assert clone_state(clone) == committed_state
 
-    # The first commit is still run as release N, and the replay of the second is reproduced.
+    # The first commit is still run as the start commit, and the replay of the second is reproduced.
     assert cli(monkeypatch, "replay", tmp_path / "first" / "run-record.json", "--repositories", repositories) == 0
     assert cli(monkeypatch, "replay", tmp_path / "second" / "run-record.json", "--repositories", repositories) == 0
     assert capsys.readouterr().out.count("replay: reproduced_exactly") == 2
@@ -1958,11 +1960,11 @@ def test_a_replace_reference_does_not_change_what_a_hash_names(monkeypatch, tmp_
     # Git itself now reads the other commit under the hash of release N.
     replaced = subprocess.run(["git", "-C", str(clone), "cat-file", "blob", f"{RELEASE_N}:{LAPSE_TABLE}"],
                               capture_output=True, env={"PATH": os.environ["PATH"]}).stdout
-    assert b"\n1,0.05," in replaced and b"\n1,0.06," in committed(LAPSE_TABLE)
+    assert b"\n1,0.05," in replaced and b"\n1,0.06," in committed(LAPSE_TABLE, RELEASE_N)
 
     folder = tmp_path / "run"
-    path = model_request(monkeypatch, folder, NEW_BUSINESS, repositories=repositories)
-    assert named_revisions(stored(path))["code_state"] == RELEASE_VALUE
+    path = model_request(monkeypatch, folder, NEW_BUSINESS, revision=RELEASE_N, repositories=repositories)
+    assert named_revisions(stored(path))["code_state"] == f"git:{REPOSITORY_URL}@{RELEASE_N}"
     assert cli(monkeypatch, "run", path, "--repositories", repositories) == 0
     parameters = {p["name"]: p for p in stored(folder / "run-record.json")["parameters"]}
     assert parameters["lapse_table"]["rows"][0] == {"key": [1], "values": [0.06]}
@@ -2175,7 +2177,7 @@ def test_unsupported_realisation_over_a_revision_is_rejected_and_names_the_chang
     manifest = {"document": "change_manifest", "contract_version": "3.0", "stage": "liability_cashflow",
                 "manifest_id": "changes-synthetic", "base_release": "N", "changes": entries}
     (folder / "changes.json").write_bytes(document_bytes(manifest))
-    assert cli(monkeypatch, "request", "--revision", RELEASE_N, "--repositories", REPOSITORIES, "--label", "N",
+    assert cli(monkeypatch, "request", "--revision", START, "--repositories", REPOSITORIES, "--label", "N",
                "--run-id", "run-switch", "--output", folder / "request.json", "--subset", NEW_BUSINESS,
                "--enable", "chg-switch", "chg-lapse-year-1", "--manifest", folder / "changes.json") == 0
     assert cli(monkeypatch, "run", folder / "request.json", "--repositories", REPOSITORIES) == 1
@@ -2195,15 +2197,15 @@ def test_an_enabled_revision_the_clone_does_not_hold_ends_with_the_outcome_error
     folder.mkdir()
     manifest = {
         "document": "change_manifest", "contract_version": "3.0", "stage": "liability_cashflow",
-        "manifest_id": f"history-{RELEASE_N}-{'1' * 40}", "base_release": "N",
-        "history": {"source": "git", "from": RELEASE_N, "to": "1" * 40,
+        "manifest_id": f"history-{START}-{'1' * 40}", "base_release": "N",
+        "history": {"source": "git", "from": START, "to": "1" * 40,
                     "determines": ["code_state", "input_data", "parameter_set"], "remainder": []},
         "changes": [{"id": "1" * 40, "class": ["parameter"], "description": "A later revision.",
                      "prerequisites": [], "conflicts": [],
                      "realisation": {"type": "revision", "source": "git", "revision": "1" * 40}}]}
     assert not schema_errors(manifest, CHANGES_SCHEMA)
     (folder / "changes.json").write_bytes(document_bytes(manifest))
-    assert cli(monkeypatch, "request", "--revision", RELEASE_N, "--repositories", REPOSITORIES, "--label", "N",
+    assert cli(monkeypatch, "request", "--revision", START, "--repositories", REPOSITORIES, "--label", "N",
                "--run-id", "run-revision", "--output", folder / "request.json", "--subset", NEW_BUSINESS,
                "--enable", "1" * 40, "--manifest", folder / "changes.json") == 0
     state = clone_state()
@@ -2245,7 +2247,7 @@ def test_changes_over_a_revision_and_replay_without_the_clone(monkeypatch, tmp_p
                 "manifest_id": "changes-synthetic", "base_release": "N", "changes": entries}
     (folder / "changes.json").write_bytes(document_bytes(manifest))
     assert not schema_errors(manifest, CHANGES_SCHEMA)
-    assert cli(monkeypatch, "request", "--revision", RELEASE_N, "--repositories", REPOSITORIES,
+    assert cli(monkeypatch, "request", "--revision", START, "--repositories", REPOSITORIES,
                "--label", "N", "--run-id", "run-changes", "--output", folder / "request.json",
                "--subset", in_force, NEW_BUSINESS, "RLV-NEW-0002",
                "--enable", "chg-rename-point", "chg-claim-expense", "chg-lapse-year-1",
@@ -2275,7 +2277,7 @@ def test_changes_over_a_revision_and_replay_without_the_clone(monkeypatch, tmp_p
     other.mkdir()
     shutil.copytree(folder / "patches", other / "patches")
     shutil.copy(folder / "changes.json", other / "changes.json")
-    assert cli(monkeypatch, "request", "--revision", RELEASE_N, "--repositories", REPOSITORIES,
+    assert cli(monkeypatch, "request", "--revision", START, "--repositories", REPOSITORIES,
                "--label", "N", "--run-id", "run-unknown", "--output", other / "request.json",
                "--subset", "RLV-000002", "--enable", "chg-rename-point",
                "--manifest", other / "changes.json") == 0
@@ -2301,9 +2303,10 @@ def test_changes_over_a_revision_and_replay_without_the_clone(monkeypatch, tmp_p
 
 @pytest.fixture(scope="module")
 def recorded_subset(tmp_path_factory) -> Path:
-    """The folder of a recorded subset run of release N: one in-force and one new-business point."""
+    """The folder of a recorded subset run of the start commit of the reference chain (release N on the
+    fixed model): one in-force and one new-business point."""
     folder = tmp_path_factory.mktemp("recorded-n") / "run"
-    assert main(["request", "--revision", RELEASE_N, "--repositories", str(REPOSITORIES), "--label", "N",
+    assert main(["request", "--revision", START, "--repositories", str(REPOSITORIES), "--label", "N",
                  "--run-id", "run-n-subset", "--output", str(folder / "request.json"),
                  "--subset", in_force_id(), NEW_BUSINESS]) == 0
     assert main(["run", str(folder / "request.json"), "--repositories", str(REPOSITORIES)]) == 0
@@ -2322,7 +2325,7 @@ def test_regression_command_without_a_clone_is_rejected_and_writes_nothing(
     for repositories in (tmp_path / "absent", tmp_path / "empty"):
         capsys.readouterr()
         output = tmp_path / f"out-{repositories.name}"
-        assert regress(monkeypatch, recorded_subset, RELEASE_N, repositories, output) == 1
+        assert regress(monkeypatch, recorded_subset, START, repositories, output) == 1
         printed = capsys.readouterr()
         assert printed.out.startswith("regression: rejected\ndiagnostic: unknown_reference: ")
         assert f"git clone {REPOSITORY_URL} {repositories / CLONE_NAME}" in printed.out
@@ -2439,11 +2442,11 @@ def test_regression_uses_the_model_point_table_of_the_recorded_run(monkeypatch, 
     assert compared["added"] == compared["removed"] == []
 
     # A run of the newer commit with its own table has another period range for that policy,
-    # and so has a run of release N that names the newer commit as its input data.
+    # and so has a run of the start commit that names the newer commit as its input data.
     from degelmann.deltarecon.engines import reference_model
     ranges = {p["model_point_id"]: p for p in recorded["model_points"]}
     for name, references in (("own", reference_model.release_references(newer)),
-                             ("mixed", reference_model.release_references(RELEASE_N, newer))):
+                             ("mixed", reference_model.release_references(START, newer))):
         folder = tmp_path / name
         path = model_request(monkeypatch, folder, NEW_BUSINESS, revision=newer, repositories=repositories)
         request = stored(path)
@@ -2462,14 +2465,14 @@ def test_regression_uses_the_model_point_table_of_the_recorded_run(monkeypatch, 
     folder = tmp_path / "without"
     path = model_request(monkeypatch, folder, NEW_BUSINESS, repositories=repositories)
     request = stored(path)
-    request["release"]["references"] = reference_model.release_references(RELEASE_N, without)
+    request["release"]["references"] = reference_model.release_references(START, without)
     assert f"The commit {without} lacks the release file {POINT_TABLE}" in assert_unknown_reference(
         run_model(path, request, repositories), folder)
     # The state commit may lack it: its table is not read.
     folder = tmp_path / "state-without"
     path = model_request(monkeypatch, folder, NEW_BUSINESS, repositories=repositories)
     request = stored(path)
-    request["release"]["references"] = reference_model.release_references(without, RELEASE_N)
+    request["release"]["references"] = reference_model.release_references(without, START)
     assert run_model(path, request, repositories).outcome == "succeeded"
 
 
@@ -2570,7 +2573,7 @@ def test_request_command_names_the_engine_version_of_the_path(monkeypatch, tmp_p
 
 def test_request_command_refuses_an_unknown_path(monkeypatch, tmp_path, capsys):
     with pytest.raises(SystemExit) as caught:
-        cli(monkeypatch, "request", "--revision", RELEASE_N, "--repositories", REPOSITORIES, "--label", "N",
+        cli(monkeypatch, "request", "--revision", START, "--repositories", REPOSITORIES, "--label", "N",
             "--run-id", "x", "--output", tmp_path / "run" / "request.json", "--path", "lifelib")
     assert caught.value.code == 2 and "invalid choice: 'lifelib'" in capsys.readouterr().err
     assert not (tmp_path / "run").exists()
@@ -2870,7 +2873,7 @@ def test_a_state_takes_the_computation_path_of_the_older_record():
     for version, path in ((engine_version("export"), "export"), (engine_version("modelx"), "modelx"),
                           ("modelx 0.30.0, pandas 2.2.3, numpy 2.1.0, Python 3.12.7", "modelx"),
                           ("modelx 0.30.0 export, pandas 2.2.3, numpy 2.1.0, Python 3.12.7", "export")):
-        base = {"label": "N", "references": release_references(RELEASE_N)[:3]
+        base = {"label": "N", "references": release_references(START)[:3]
                 + [{"kind": "engine_version", "value": version}]}
         for revision, hold in ((None, frozenset()), (other, frozenset()), (other, frozenset({"input_data"}))):
             state = ReferenceModel().state_release(base, revision, hold, REPOSITORIES)
@@ -2884,7 +2887,7 @@ def test_regression_runs_on_the_path_it_is_given(monkeypatch, tmp_path, capsys, 
     assert recorded == engine_version("export")
     for options, path in (((), "export"), (("--path", "modelx"), "modelx")):
         out = tmp_path / path
-        assert regress(monkeypatch, recorded_subset, RELEASE_N, REPOSITORIES, out, *options) == 0
+        assert regress(monkeypatch, recorded_subset, START, REPOSITORIES, out, *options) == 0
         assert "regression: no deviation above tolerance" in capsys.readouterr().out
         assert named_revisions(stored(out / "run" / "request.json"))["engine_version"] == engine_version(path)
         compared = stored(out / "compare.result.json")
@@ -2892,7 +2895,7 @@ def test_regression_runs_on_the_path_it_is_given(monkeypatch, tmp_path, capsys, 
             None if path == "export" else {"left": engine_version("export"), "right": engine_version("modelx")})
 
 
-# --- the full run of release N and its replay ---------------------------------------
+# --- the full run of the start commit (release N on the fixed model) and its replay ---
 
 
 def test_full_run_of_release_n_is_reproduced_by_its_replay(full_chain):
@@ -2992,7 +2995,7 @@ def test_the_reference_engine_exports_a_product_folder_once_per_engine_object(tm
 
     monkeypatch.setattr(reference_model.mx, "export_model", counting)
     engine = ReferenceModel(workers=1)
-    release = {"label": "N", "references": release_references(RELEASE_N)}
+    release = {"label": "N", "references": release_references(START)}
     points = [NEW_BUSINESS, in_force_id()]
 
     def projected(enabled=(), manifest_dir=None, use=release) -> list:

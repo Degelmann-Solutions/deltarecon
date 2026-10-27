@@ -23,7 +23,7 @@ from degelmann.deltarecon.documents import CHANGES_SCHEMA, Rejection, document_b
 from degelmann.deltarecon.replay import replay
 from degelmann.deltarecon.run import STAGE_QUANTITIES, History, Revision, UsageError
 
-from conftest import (CLONE_NAME, LAPSE_TABLE, NEW_BUSINESS, PARAMS, POINTS, POINTS_B, PRODUCT_FOLDER, RELEASE_N,
+from conftest import (CLONE_NAME, LAPSE_TABLE, NEW_BUSINESS, PARAMS, POINTS, POINTS_B, PRODUCT_FOLDER, START,
                       REPOSITORIES, REPOSITORY_URL, ROOT, StubEngine, branch, change, cli, clone_state, commit,
                       commit_message, edit_file, empty_repository, folder_hashes, git, git_environment, merge,
                       patch_text, run_stub, stored, stub_request, throwaway, with_manifest, write_files)
@@ -574,8 +574,8 @@ def test_the_history_does_not_depend_on_the_configuration_of_the_user(repository
 
 @pytest.fixture(scope="module")
 def chain(tmp_path_factory):
-    """A throw-away clone with three main-line revisions after release N, one of them a merge,
-    and the records of a subset run of release N and of the newest revision."""
+    """A throw-away clone with three main-line revisions after the start commit, one of them a merge,
+    and the records of a subset run of the start commit and of the newest revision."""
     tmp_path = tmp_path_factory.mktemp("derive-chain")
     repositories, clone = throwaway(tmp_path)
     edit_file(clone, LAPSE_TABLE, "\n1,0.06,", "\n1,0.05,")
@@ -589,7 +589,7 @@ def chain(tmp_path_factory):
     inside.append(commit(clone, "Add another note"))
     merged = merge(clone, "work", "side", "Merge the branch side")
     records = {}
-    for name, revision, label in (("older", RELEASE_N, "N"), ("newer", merged, "N+1")):
+    for name, revision, label in (("older", START, "N"), ("newer", merged, "N+1")):
         folder = tmp_path / name
         assert main(["request", "--revision", revision, "--repositories", str(repositories), "--label", label,
                      "--run-id", f"run-{name}", "--output", str(folder / "request.json"),
@@ -624,9 +624,9 @@ def test_two_processes_derive_the_same_bytes_from_two_run_records(chain, tmp_pat
 
     manifest = read_document(tmp_path / "manifest-a" / "changes.json", CHANGES_SCHEMA)
     lapse, note, merged = chain["revisions"]
-    assert manifest["manifest_id"] == f"history-{RELEASE_N}-{merged}" and manifest["base_release"] == "N"
+    assert manifest["manifest_id"] == f"history-{START}-{merged}" and manifest["base_release"] == "N"
     assert manifest["stage"] == "liability_cashflow"
-    assert manifest["history"] == {"source": "git", "from": RELEASE_N, "to": merged,
+    assert manifest["history"] == {"source": "git", "from": START, "to": merged,
                                    "determines": ["code_state", "input_data", "parameter_set"], "remainder": []}
     # Every main-line revision between the two, in order; the commits of the branch are not listed.
     assert [c["id"] for c in manifest["changes"]] == [lapse, note, merged]
@@ -641,7 +641,7 @@ def test_two_processes_derive_the_same_bytes_from_two_run_records(chain, tmp_pat
     # No timestamp and no path of the machine.
     text = written.decode("utf-8")
     assert str(chain["tmp"]) not in text and str(ROOT) not in text and "recorded_at" not in text
-    assert first.stdout.splitlines()[0] == f"derive: 3 changes from {RELEASE_N} to {merged}"
+    assert first.stdout.splitlines()[0] == f"derive: 3 changes from {START} to {merged}"
     assert "remainder: none" in first.stdout
     # The clone and the folders of both records are as they were.
     assert clone_state(chain["clone"]) == state
@@ -656,7 +656,7 @@ def test_the_records_in_the_wrong_order_are_unrelated_and_nothing_is_written(cha
 
 
 def test_a_clone_without_the_revision_and_no_clone_are_unknown_references(chain, tmp_path):
-    # The clone of the session holds release N and not the newest revision of the throw-away clone.
+    # The clone of the session holds the start commit and not the newest revision of the throw-away clone.
     state = clone_state()
     for repositories in (REPOSITORIES, tmp_path / "absent"):
         done = derive_process(chain, tmp_path / "changes.json", repositories=repositories)
@@ -702,14 +702,14 @@ def test_one_revision_with_two_engine_versions_gives_no_change_and_names_the_rem
     manifest = read_document(tmp_path / "out" / "changes.json", CHANGES_SCHEMA)
     version = next(r for r in stored(older)["releases"][0]["references"] if r["kind"] == "engine_version")
     assert manifest["changes"] == []
-    assert manifest["history"]["from"] == manifest["history"]["to"] == RELEASE_N
+    assert manifest["history"]["from"] == manifest["history"]["to"] == START
     assert manifest["history"]["remainder"] == [{
         "kind": "engine_version", "from": [version],
         "to": [{"kind": "engine_version", "value": "another engine 2.0"}]}]
     # ``regression`` takes the record of another engine version: it runs the revision on the
     # present engine, compares, and names both versions in its output and in the compare result.
     capsys.readouterr()
-    assert cli(monkeypatch, "regression", newer, "--revision", RELEASE_N, "--repositories", chain["repositories"],
+    assert cli(monkeypatch, "regression", newer, "--revision", START, "--repositories", chain["repositories"],
                "--output", tmp_path / "regression") == 0
     output = capsys.readouterr().out
     present = version["value"]
@@ -740,7 +740,7 @@ def test_the_record_of_a_regression_run_derives_the_manifest_of_two_runs(chain, 
                "--output", tmp_path / "regression") == 1  # the lapse change moves results
     newer = tmp_path / "regression" / "run" / "run-record.json"
     values = {r["kind"]: r["value"] for r in stored(newer)["releases"][0]["references"]}
-    assert values["code_state"].endswith(merged) and values["input_data"].endswith(RELEASE_N)
+    assert values["code_state"].endswith(merged) and values["input_data"].endswith(START)
     regression_folder = folder_hashes(tmp_path / "regression")
     (tmp_path / "out").mkdir()
     assert cli(monkeypatch, "derive", older, newer, "--output", tmp_path / "out" / "regression.json",
