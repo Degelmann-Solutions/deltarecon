@@ -23,7 +23,7 @@ from degelmann.deltarecon.run import STAGE_QUANTITIES, UsageError, run_request
 from degelmann.deltarecon.walk import exact_sums, held_kinds, walk, written
 
 from conftest import (LAPSE_TABLE, MODEL_CODE, PARAMS, PARAMS_RATE, POINTS, POINTS_B, POINTS_E, POINT_TABLE,
-                      RELEASE_N, ROOT, StubEngine, TwoStages, WalkStub, build, change, cli, clone_state, commit,
+                      START, ROOT, StubEngine, TwoStages, WalkStub, build, change, cli, clone_state, commit,
                       export_coordinates, folder_hashes, git, patch_text, record, stored, stub_request, throwaway,
                       with_manifest, write_files)
 
@@ -696,16 +696,16 @@ def test_a_regression_pair_holds_the_input_data_on_the_reference_engine(adapter_
 
 def test_records_with_two_different_foreign_input_data_commits_are_refused(adapter_walk, monkeypatch, capsys):
     tmp, repositories, revisions = adapter_walk["tmp"], adapter_walk["repositories"], adapter_walk["revisions"]
-    # The older record runs the base on the input data of release N, the newer one revision 1 on
+    # The older record runs the base on the input data of the start commit, the newer one revision 1 on
     # its own: the input data moves, and the base revision does not name what the older record names.
-    assert cli(monkeypatch, "request", "--revision", RELEASE_N, "--repositories", repositories, "--label", "n",
+    assert cli(monkeypatch, "request", "--revision", START, "--repositories", repositories, "--label", "n",
                "--run-id", "run-n", "--output", tmp / "n" / "request.json") == 0
     capsys.readouterr()
     state = clone_state(adapter_walk["clone"])
     request = stored(tmp / "n" / "request.json")
     for reference in request["release"]["references"]:
         if reference["kind"] in ("code_state", "parameter_set"):
-            reference["value"] = reference["value"].replace(RELEASE_N, adapter_walk["base"])
+            reference["value"] = reference["value"].replace(START, adapter_walk["base"])
     request["selection"] = {"mode": "subset", "model_point_ids": [first_point(adapter_walk)]}
     (tmp / "foreign").mkdir()
     (tmp / "foreign" / "request.json").write_bytes(document_bytes(request))

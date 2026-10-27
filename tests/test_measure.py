@@ -41,7 +41,10 @@ def quick_start_commands() -> list[list[str]]:
 
 def test_steps_are_the_readme_quick_start_commands_in_order():
     assert [step["argv"] for step in tool.STEPS.values()] == quick_start_commands()
-    assert list(tool.STEPS) == ["request", "run", "replay", "regression", "derive", "walk", "search", "tests"]
+    assert list(tool.STEPS) == ["request", "run", "replay", "regression", "derive", "search"]
+    assert tool.STEPS["search"]["needs"] == ("run", "regression")
+    assert "--target-only" in tool.STEPS["search"]["argv"] and "--walk" not in tool.STEPS["search"]["argv"]
+    assert list(tool.STATES) == ["search"]
     assert {name: step["expect"] for name, step in tool.STEPS.items() if step["expect"] != 0} == {"regression": 1}
 
 
@@ -54,8 +57,8 @@ def test_rewrite_replaces_the_leading_runs_folder_only(tmp_path):
 
 
 def test_needed_steps_are_added_and_only_the_named_ones_reported(tmp_path, monkeypatch, capsys):
-    assert tool.expand(["search"]) == ["request", "run", "regression", "walk", "search"]
-    assert tool.expand(["tests", "request"]) == ["request", "tests"]
+    assert tool.expand(["search"]) == ["request", "run", "regression", "search"]
+    assert tool.expand(["derive", "request"]) == ["request", "run", "regression", "derive"]
     ran = []
 
     def execute(argv, log):
@@ -67,7 +70,7 @@ def test_needed_steps_are_added_and_only_the_named_ones_reported(tmp_path, monke
     assert tool.main(["--steps", "search", "--work", str(work), "--output", str(tmp_path / "m.json"),
                       "--baseline", str(tmp_path / "none.json")]) == 0
     assert ran == [tool.rewrite(tool.STEPS[name]["argv"], work) for name in ("request", "run", "regression",
-                                                                             "walk", "search")]
+                                                                             "search")]
     record = json.loads((tmp_path / "m.json").read_text("utf-8"))
     assert {step["name"] for step in record["steps"]} == {"search"}
     assert record["steps"][0]["states"] is None and record["total"] == {"seconds": 2.0, "peak_mib": 10.0}
@@ -82,12 +85,26 @@ def test_unknown_step_exits_2_with_the_names(tmp_path, capsys):
     assert not (tmp_path / "work").exists()
 
 
+# The records taken before the quick start dropped the walk and the tests hold the earlier eight steps.
+EARLIER_RECORDS = {"baseline.json", "2026-10-23-release-itemspaces.json"}
+EARLIER_STEPS = ["request", "run", "replay", "regression", "derive", "walk", "search", "tests"]
+
+
+def test_the_earlier_records_and_a_record_of_the_present_steps_are_recorded():
+    assert EARLIER_RECORDS < {path.name for path in MEASUREMENTS}
+    assert any(path.name not in EARLIER_RECORDS for path in MEASUREMENTS)
+
+
 @pytest.mark.parametrize("path", MEASUREMENTS, ids=lambda path: path.name)
 def test_recorded_measurement_holds_every_step(path):
     record = json.loads(path.read_text("utf-8"))
-    assert [step["name"] for step in record["steps"]] == list(tool.STEPS)
+    expected = EARLIER_STEPS if path.name in EARLIER_RECORDS else list(tool.STEPS)
+    assert [step["name"] for step in record["steps"]] == expected
     for step in record["steps"]:
         assert isinstance(step["seconds"], (int, float)) and not isinstance(step["seconds"], bool)
+    for entry in record.get("beside", []):
+        assert set(entry) == {"name", "seconds"} and entry["seconds"] >= 0
+    assert record["total"]["seconds"] == pytest.approx(sum(step["seconds"] for step in record["steps"]))
 
 
 SYNTHETIC = {
@@ -172,3 +189,52 @@ def test_peak_memory_is_measured_with_wait4(tmp_path, capsys):
     assert tool.main(["--work", str(tmp_path / "work"), "--output", str(output),
                       "--baseline", str(tmp_path / "none")], steps) == 0
     assert json.loads(output.read_text("utf-8"))["steps"][0]["peak_mib"] >= 64
+
+
+def test_durations_beside_are_recorded_and_printed_but_not_in_the_total(tmp_path, capsys):
+    output = tmp_path / "m.json"
+    steps = {"run": cheap("pass")}
+    assert tool.main(["--work", str(tmp_path / "work"), "--output", str(output), "--baseline", str(tmp_path / "none"),
+                      "--beside", "git-clone=12.3", "--beside", "uv-sync=40.1"], steps) == 0
+    record = json.loads(output.read_text("utf-8"))
+    assert record["beside"] == [{"name": "git-clone", "seconds": 12.3}, {"name": "uv-sync", "seconds": 40.1}]
+    assert record["total"]["seconds"] == record["steps"][0]["seconds"] < 12.3
+    lines = capsys.readouterr().out.splitlines()
+    table_end = next(number for number, line in enumerate(lines) if line.startswith("total "))
+    assert lines[table_end + 1:table_end + 3] == ["beside, not in the total: git-clone 12.3 s",
+                                                  "beside, not in the total: uv-sync 40.1 s"]
+
+
+def test_without_durations_beside_the_record_holds_an_empty_list(tmp_path, capsys):
+    output = tmp_path / "m.json"
+    assert tool.main(["--work", str(tmp_path / "work"), "--output", str(output), "--baseline", str(tmp_path / "none")],
+                     {"run": cheap("pass")}) == 0
+    assert json.loads(output.read_text("utf-8"))["beside"] == []
+    assert "beside, not in the total" not in capsys.readouterr().out
+
+
+@pytest.mark.parametrize("value", ["git-clone", "git-clone=", "=12", "git-clone=-1", "git-clone=ten", "git-clone=nan",
+                                   "git-clone=inf"])
+def test_a_malformed_duration_beside_exits_2_before_any_step_runs(tmp_path, capsys, value):
+    marker = tmp_path / "ran"
+    steps = {"touch": cheap(f"open({str(marker)!r}, 'w').close()")}
+    with pytest.raises(SystemExit) as exit:
+        tool.main(["--work", str(tmp_path / "work"), "--beside", value], steps)
+    assert exit.value.code == 2
+    assert "NAME=SECONDS" in capsys.readouterr().err
+    assert not marker.exists() and not (tmp_path / "work").exists()
+
+
+def test_the_present_steps_beside_the_recorded_baseline_of_the_earlier_steps():
+    baseline = json.loads((ROOT / "measurements" / "baseline.json").read_text("utf-8"))
+    steps = [{"name": name, "seconds": 2.0, "peak_mib": 200.0} for name in tool.STEPS]
+    steps[-1].update(states=10, seconds_per_state=0.2)
+    record = {"steps": steps, "total": {"seconds": 12.0, "peak_mib": 200.0},
+              "beside": [{"name": "uv-sync", "seconds": 40.0}]}
+    lines = tool.report(record, baseline).splitlines()
+    old = {step["name"]: step for step in baseline["steps"]}
+    for line, name in zip(lines[1:], tool.STEPS):
+        assert line.split()[0] == name and line.split()[-1] == f"{old[name]['seconds'] / 2.0:.2f}"
+    assert lines[len(tool.STEPS) + 1].split() == ["total", "12.0", "200", "-", "-", "-"]
+    assert lines[len(tool.STEPS) + 2].startswith("search: 10 states, 0.2 s per state (baseline ")
+    assert lines[-1] == "beside, not in the total: uv-sync 40.0 s"

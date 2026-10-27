@@ -1,8 +1,8 @@
 """Measure the quick start: run the README quick-start commands one by one and record wall time
-and peak memory per step, the cost per state of the walk and the search, and the test suite.
+and peak memory per step and the cost per state of the search.
 
     uv run python tools/measure_quick_start.py [--steps NAME ...] [--work DIR] [--output FILE]
-                                               [--baseline FILE] [--note TEXT]
+                                               [--baseline FILE] [--note TEXT] [--beside NAME=SECONDS ...]
 
 Each step runs from the root of the repository, exactly as the README lists it, with the
 leading ``runs/`` of every path argument replaced by the work folder. ``--steps`` runs the named
@@ -10,19 +10,24 @@ steps and the steps they need before them, and reports only the named ones. The 
 recorded baseline (``measurements/baseline.json`` by default) beside the measurement; the factor
 is the baseline seconds divided by the measured seconds, so a factor above 1 is a gain.
 
+``--beside NAME=SECONDS`` (repeatable) records a duration taken outside the tool, such as the clone
+of both repositories and ``uv sync``: it is stored in ``beside``, printed below the table, and not
+counted in ``total``.
+
 Peak memory is the ``ru_maxrss`` that ``os.wait4`` returns for the step, which includes the
 descendants the step waited for, so the ``uv run`` wrapper reports the Python process it starts.
 Without ``os.wait4`` (Windows) only the times are measured.
 
 Exit status: 0 when every step exits with its expected status, 1 when a step does not (nothing
-is written then), 2 when the tool cannot start (an unknown step, an existing work folder or
-output file). Standard library only.
+is written then), 2 when the tool cannot start (an unknown step, a malformed ``--beside``, an
+existing work folder or output file). Standard library only.
 """
 from __future__ import annotations
 
 import argparse
 import datetime
 import json
+import math
 import os
 import platform
 import shlex
@@ -51,17 +56,13 @@ STEPS: dict[str, dict] = {
                         ("run",), expect=1),
     "derive": _step("uv run deltarecon derive runs/n-full/run-record.json runs/regression-n/run/run-record.json "
                     "--output runs/changes.json", ("run", "regression")),
-    "walk": _step("uv run deltarecon walk runs/n-full/run-record.json runs/regression-n/run/run-record.json "
-                  "--tolerance profiles/tolerance-bruttobeitrag.json --output runs/walk", ("run", "regression")),
     "search": _step("uv run deltarecon search runs/n-full/run-record.json runs/regression-n/run/run-record.json "
                     "--quantity Bruttobeitrag --periods 0-59 --tolerance profiles/tolerance-bruttobeitrag.json "
-                    "--walk runs/walk --output runs/search", ("run", "regression", "walk")),
-    "tests": _step("uv run pytest -q"),
+                    "--target-only --output runs/search", ("run", "regression")),
 }
 
 # Where a step's result names its number of states: the file below the work folder and the reader.
 STATES = {
-    "walk": ("walk/walk.result.json", lambda result: len(result["states"])),
     "search": ("search/search.result.json", lambda result: result["runs"]["search"]),
 }
 
@@ -136,7 +137,7 @@ def _number(value: float | None, digits: int) -> str:
 
 
 def report(record: dict, baseline: dict | None) -> str:
-    """The fixed-width table of a measurement beside a baseline, and the cost per state."""
+    """The fixed-width table of a measurement beside a baseline, the cost per state, and the durations beside."""
     old = {step["name"]: step for step in baseline["steps"]} if baseline else {}
     columns = ("step", "seconds", "peak MiB")
     if baseline:
@@ -165,7 +166,21 @@ def report(record: dict, baseline: dict | None) -> str:
                 line += (f" (baseline {before['states']} states, "
                          f"{_number(before['seconds_per_state'], 1)} s per state)")
             lines.append(line)
+    for entry in record.get("beside", []):
+        lines.append(f"beside, not in the total: {entry['name']} {_number(entry['seconds'], 1)} s")
     return "\n".join(lines)
+
+
+def beside(value: str) -> dict:
+    """One ``--beside NAME=SECONDS``: a name and a non-negative number of seconds."""
+    name, separator, seconds = value.partition("=")
+    try:
+        number = float(seconds)
+    except ValueError:
+        number = None
+    if not separator or not name or number is None or not math.isfinite(number) or number < 0:
+        raise argparse.ArgumentTypeError(f"expected NAME=SECONDS with a non-negative number of seconds: {value!r}")
+    return {"name": name, "seconds": number}
 
 
 def parse(argv: list[str] | None, steps: dict[str, dict]) -> argparse.Namespace:
@@ -179,6 +194,8 @@ def parse(argv: list[str] | None, steps: dict[str, dict]) -> argparse.Namespace:
     parser.add_argument("--baseline", type=Path, default=DEFAULT_BASELINE,
                         help="the recorded baseline (default measurements/baseline.json)")
     parser.add_argument("--note", default="", help="a note stored in the record")
+    parser.add_argument("--beside", action="append", type=beside, default=[], metavar="NAME=SECONDS",
+                        help="a duration taken outside the tool, repeatable; recorded and printed, not in the total")
     return parser.parse_args(argv)
 
 
@@ -225,6 +242,7 @@ def main(argv: list[str] | None = None, steps: dict[str, dict] = STEPS) -> int:
         "cpu_count": os.cpu_count(),
         "engine_version": engine_version(work),
         "note": arguments.note,
+        "beside": arguments.beside,
         "steps": measured,
         "total": {"seconds": sum(step["seconds"] for step in measured),
                   "peak_mib": max(peaks) if peaks else None},

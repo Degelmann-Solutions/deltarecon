@@ -1,6 +1,7 @@
 """Shared fixtures and helpers: the clone of the reference model repository, throw-away
-repositories, one full run of release N through the run contract with its replay, the stub
-engines, and the helpers the test modules share. A test module imports a shared helper from
+repositories, one full run of the start commit of the reference chain (release N on the fixed
+model) through the run contract with its replay, the stub engines, and the helpers the test
+modules share. A test module imports a shared helper from
 here, never from another test module.
 
 The reference model is read from the local clone ``repositories/delib-history``. A session
@@ -78,12 +79,12 @@ def clone_state(clone: Path = CLONE) -> tuple[bytes, bytes, bytes]:
             git(clone, "for-each-ref"))
 
 
-def committed(path: str, revision: str = RELEASE_N, clone: Path = CLONE) -> bytes:
+def committed(path: str, revision: str = START, clone: Path = CLONE) -> bytes:
     """The bytes of a file of a commit, read from the object store."""
     return git(clone, "cat-file", "blob", f"{revision}:{path}")
 
 
-def require_clone(clone: Path = CLONE, revision: str = RELEASE_N) -> None:
+def require_clone(clone: Path = CLONE, revision: str = START) -> None:
     """End the test session unless ``clone`` is a clone that holds the pinned commit."""
     found = clone.is_dir() and subprocess.run(
         ["git", "--no-optional-locks", "-C", str(clone), "cat-file", "-e", f"{revision}^{{commit}}"],
@@ -111,7 +112,8 @@ def written_under(version: str):
 
 
 def pytest_sessionstart(session):
-    require_clone()
+    for revision in (RELEASE_N, START, NEWER):
+        require_clone(revision=revision)
 
 
 def export_coordinates(path: Path) -> dict[tuple[str, int, str], float]:
@@ -168,13 +170,13 @@ def deviation_rows(result_path: Path) -> list[dict]:
 def throwaway(tmp_path: Path) -> tuple[Path, Path]:
     """A repositories folder with a clone of the reference model that a test may commit to.
 
-    Its branch ``work`` starts at release N.
+    Its branch ``work`` starts at the start commit of the reference chain, release N on the fixed model.
     """
     repositories = tmp_path / "repositories"
     repositories.mkdir()
     clone = repositories / CLONE_NAME
     git(ROOT, "clone", "--quiet", "--no-hardlinks", str(CLONE), str(clone))
-    git(clone, "checkout", "--quiet", "-B", "work", RELEASE_N)
+    git(clone, "checkout", "--quiet", "-B", "work", START)
     return repositories, clone
 
 
@@ -602,11 +604,11 @@ def cli(monkeypatch, *arguments) -> int:
 
 
 def text(path: str) -> str:
-    """A file of release N, as committed."""
+    """A file of the start commit of the reference chain, as committed. Its data files are those of release N."""
     return committed(path).decode("utf-8")
 
 
-def model_request(monkeypatch, folder: Path, *ids: str, revision: str = RELEASE_N,
+def model_request(monkeypatch, folder: Path, *ids: str, revision: str = START,
                   repositories: Path = REPOSITORIES, run_id: str = "run-n-subset", path: str | None = None) -> Path:
     arguments = ["request", "--revision", revision, "--repositories", repositories, "--label", "N",
                  "--run-id", run_id, "--output", folder / "request.json"]
@@ -801,7 +803,7 @@ def full_chain_process(tmp_path_factory):
     """
     folder = tmp_path_factory.mktemp("full-chain") / "run"
     commands = [
-        ["request", "--revision", RELEASE_N, "--label", "N", "--run-id", "run-n-full",
+        ["request", "--revision", START, "--label", "N", "--run-id", "run-n-full",
          "--output", str(folder / "request.json")],
         ["run", str(folder / "request.json")],
         ["replay", str(folder / "run-record.json")],
