@@ -34,7 +34,8 @@ from degelmann.deltarecon.__main__ import main
 from degelmann.deltarecon.documents import (CONTRACT_VERSION, RECORD_SCHEMA, RUN_REQUEST, RUN_SCHEMA, Rejection,
                                             document_bytes, schema_errors, sha256_file)
 from degelmann.deltarecon.regression import read_regression_input, regression
-from degelmann.deltarecon.run import History, ModelPointFailure, Revision, run_request
+from degelmann.deltarecon.run import (History, ModelPointFailure, Revision, from_worker_outcome, run_request,
+                                      worker_outcome)
 
 ROOT = Path(__file__).resolve().parent.parent
 REPOSITORIES = ROOT / "repositories"
@@ -436,6 +437,11 @@ class StubEngine:
             yield StubSession(state)
 
 
+def as_bits(periods) -> list[tuple[int, list[str]]]:
+    """The periods of a projection with every value as ``float.hex``, so that equal means bit for bit."""
+    return [(period, [value.hex() for value in values]) for period, values in periods]
+
+
 # --- a stub engine whose sessions project in worker processes ---
 
 _stub_session = None  # the session of a stub worker process
@@ -453,10 +459,7 @@ def _stub_project(model_point_id: str):
     time.sleep(0.05 * (len(ids) - ids.index(model_point_id)))
     if next(p for p in _stub_session.points if p[0] == model_point_id)[3] == "crash":
         raise RuntimeError("the stub worker crashes")
-    try:
-        return "ok", _stub_session.project(model_point_id)
-    except ModelPointFailure as failure:
-        return "failed", str(failure)
+    return worker_outcome(_stub_session.project, model_point_id)
 
 
 class WorkerSession(StubSession):
@@ -471,7 +474,7 @@ class WorkerSession(StubSession):
         self.engine.asked.append(list(model_point_ids))
         results = ordered_map(_stub_start, (str(self.folder),), _stub_project, model_point_ids,
                               self.engine.workers)
-        return [value if kind == "ok" else ModelPointFailure(value) for kind, value in results]
+        return [from_worker_outcome(result) for result in results]
 
 
 class WorkerStub(StubEngine):

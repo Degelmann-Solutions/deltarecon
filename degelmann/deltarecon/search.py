@@ -50,7 +50,7 @@ from collections import OrderedDict
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from .compare import ISSUE_ORIGIN, CheckedRun, align
+from .compare import CheckedRun, align, target_window
 from .documents import (CONTRACT_VERSION, RUN_SCHEMA, Rejection, artifact_reference, copy_files, read_document,
                         write_document, write_new)
 from .export import write_export
@@ -268,15 +268,10 @@ class _Search(States):
         quantities = response["quantities"]
         keep = [i for i, quantity in enumerate(quantities) if quantity["name"] in self.target.quantities]
         # The window of a point: its periods whose projection period lies in the target periods.
-        issue_origin = response["time_basis"]["id"] in ISSUE_ORIGIN
+        basis = response["time_basis"]["id"]
         rows, ranges = [], []
         for point in response["model_points"]:
-            start, end = point["first_period"], point["last_period"]
-            first, last = start, end
-            if self.target.periods is not None:
-                offset = start if issue_origin else 0  # the period of projection period 0
-                first = max(start, offset + self.target.periods[0])
-                last = min(end, offset + self.target.periods[1])
+            first, last = target_window(basis, point["first_period"], point["last_period"], self.target.periods)
             if first > last:
                 continue
             identifier = point["model_point_id"]
@@ -418,7 +413,7 @@ def search(older_record: Path | str, newer_record: Path | str, output: Path | st
     With ``reuse``, the switch reuse_walk, every state is taken from the copy of ``walk``. With
     ``target_only``, the switch target_only, the inner states the search runs are target-only runs."""
     if reuse and walk is None:
-        raise UsageError("the switch --reuse-walk takes the states from a walk folder and needs --walk")
+        raise UsageError("the switch reuse_walk takes the states from a walk folder and needs a walk folder")
     output = Path(output).resolve()
     repositories = repositories_folder(repositories)
     if output.exists():
@@ -426,8 +421,8 @@ def search(older_record: Path | str, newer_record: Path | str, output: Path | st
     prepared = prepare(older_record, newer_record, engine, repositories, tolerance, procedure="search")
     target = read_target(quantities, periods, prepared)
     if target_only and not target.narrowed:
-        raise UsageError("the switch --target-only runs the inner states on the target and needs a target "
-                         "narrowed by --quantity or --periods")
+        raise UsageError("the switch target_only runs the inner states on the target and needs a target "
+                         "that narrows the quantities or the periods")
     reference = changes = None
     if walk is not None:
         if not Path(walk).is_dir():

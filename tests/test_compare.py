@@ -337,6 +337,17 @@ def test_a_target_only_run_is_aligned_from_its_first_target_period():
     assert align(whole).values == {("P", 0): [1.0], ("P", 1): [2.0]}
 
 
+def test_the_target_window_counts_from_the_period_origin_of_the_time_basis():
+    from degelmann.deltarecon.compare import period_origin, target_window
+    assert period_origin("policy_month", 144) == 144 and period_origin("calendar_month", 144) == 0
+    assert target_window("policy_month", 144, 300, None) == (144, 300)
+    assert target_window("policy_month", 144, 300, (12, 14)) == (156, 158)
+    assert target_window("policy_month", 144, 150, (0, 59)) == (144, 150)  # clipped at the last period
+    first, last = target_window("policy_month", 144, 150, (12, 14))
+    assert first > last  # the window is empty
+    assert target_window("calendar_month", 144, 300, (100, 200)) == (144, 200)  # clipped at the first period
+
+
 def test_two_target_only_runs_are_compared_on_projection_periods(world):
     """MP-A starts at month 12 in the left run and at 24 in the right one; the target 1-1 pairs months 13 and 25."""
     target = {"quantities": [COUNT], "periods": {"first": 1, "last": 1}}

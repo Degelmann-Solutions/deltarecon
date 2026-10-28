@@ -19,7 +19,7 @@ import os
 import re
 from typing import Callable, Iterable, Sequence
 
-from .run import UsageError
+from .errors import UsageError
 
 WORKERS_VARIABLE = "DELTARECON_WORKERS"
 _WHOLE = re.compile(r"[0-9]+")

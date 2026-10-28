@@ -224,7 +224,13 @@ def test_a_history_the_contract_does_not_allow_writes_no_manifest(history, messa
 
 
 def derive_command(monkeypatch, world: Path, older, newer, output, engine=HistoryStub) -> int:
-    monkeypatch.setattr("degelmann.deltarecon.__main__.engine", engine)
+    """``derive`` on the command line with the engine factory ``engine``, which takes no worker count:
+    the command asks for one worker."""
+    def factory(workers: int | None = None):
+        assert workers == 1, "derive projects no point and asks for one worker"
+        return engine()
+
+    monkeypatch.setattr("degelmann.deltarecon.__main__.engine", factory)
     return main(["derive", str(older), str(newer), "--output", str(output), "--repositories", str(world)])
 
 
@@ -629,6 +635,19 @@ def derive_process(chain: dict, output: Path, environment: dict | None = None, o
         [sys.executable, "-m", "degelmann.deltarecon", "derive", *(str(chain["records"][name]) for name in order),
          "--output", str(output), "--repositories", str(repositories or chain["repositories"])],
         cwd=ROOT, capture_output=True, text=True, env={**git_environment(), **(environment or {})})
+
+
+def test_request_and_derive_project_no_point_and_ignore_a_faulty_worker_variable(chain, tmp_path, monkeypatch):
+    """``DELTARECON_WORKERS=0`` stops a run, but neither a request nor a derivation, which project no point."""
+    good = derive_process(chain, tmp_path / "good.json")
+    faulty = derive_process(chain, tmp_path / "faulty.json", {"DELTARECON_WORKERS": "0"})
+    assert (good.returncode, faulty.returncode) == (0, 0), good.stderr + faulty.stderr
+    assert (tmp_path / "faulty.json").read_bytes() == (tmp_path / "good.json").read_bytes()
+    assert faulty.stdout == good.stdout.replace("good.json", "faulty.json")
+    monkeypatch.setenv("DELTARECON_WORKERS", "0")
+    assert main(["request", "--revision", START, "--repositories", str(chain["repositories"]), "--label", "N",
+                 "--run-id", "run-faulty", "--output", str(tmp_path / "request" / "request.json")]) == 0
+    assert stored(tmp_path / "request" / "request.json")["run_id"] == "run-faulty"
 
 
 def test_two_processes_derive_the_same_bytes_from_two_run_records(chain, tmp_path):

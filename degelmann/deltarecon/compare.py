@@ -65,6 +65,24 @@ _ROUNDING = Context(prec=400, rounding=ROUND_HALF_UP)
 ISSUE_ORIGIN = frozenset({"policy_month"})
 
 
+def period_origin(time_basis_id: str, valuation_period: int) -> int:
+    """The period of projection period 0 of a model point whose valuation date lies in the period
+    ``valuation_period``: that period on a time basis whose origin is the issue date, else 0."""
+    return valuation_period if time_basis_id in ISSUE_ORIGIN else 0
+
+
+def target_window(time_basis_id: str, first_period: int, last_period: int,
+                  periods: tuple[int, int] | None) -> tuple[int, int]:
+    """The target window of a model point whose periods run from ``first_period``, the period of its
+    valuation date, to ``last_period``: its periods whose projection period lies in ``periods``, a pair
+    ``(first, last)`` of projection periods, or every period when ``periods`` is ``None``. The first and
+    the last period of the window; an empty window has its first period after its last."""
+    if periods is None:
+        return first_period, last_period
+    origin = period_origin(time_basis_id, first_period)
+    return max(first_period, origin + periods[0]), min(last_period, origin + periods[1])
+
+
 @dataclass
 class CheckedRun:
     """A succeeded run that passed rule 1: its response and its values by model point and period.
@@ -95,10 +113,11 @@ def align(run: CheckedRun) -> CheckedRun:
     if run.aligned or run.response["time_basis"]["id"] not in ISSUE_ORIGIN:
         return run
     if run._view is None:
-        first = first_periods(run.values)
+        basis = run.response["time_basis"]["id"]
         # A target window starts at the first target period after the valuation date; it is never clipped there.
         offset = run.response.get("target", {}).get("periods", {}).get("first", 0)
-        run._view = CheckedRun(run.response, {(point, period - first[point] + offset): numbers
+        origin = {point: period_origin(basis, first - offset) for point, first in first_periods(run.values).items()}
+        run._view = CheckedRun(run.response, {(point, period - origin[point]): numbers
                                               for (point, period), numbers in run.values.items()}, True)
     return run._view
 

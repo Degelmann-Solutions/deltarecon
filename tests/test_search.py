@@ -638,10 +638,12 @@ def test_the_switch_without_a_walk_is_a_usage_error_and_writes_nothing(history, 
     monkeypatch.setattr("degelmann.deltarecon.__main__.engine", lambda: WalkStub(HISTORY))
     assert main(["search", str(older), str(newer), "--output", str(world / "search"), "--repositories", str(world),
                  "--reuse-walk"]) == 2
-    assert "--walk" in capsys.readouterr().err
+    error = capsys.readouterr().err
+    assert "--reuse-walk" in error and "--walk" in error
     assert folder_hashes(world) == before and not (world / "search").exists()
-    with pytest.raises(UsageError):
+    with pytest.raises(UsageError) as raised:  # a library caller is told the switch, not a flag
         run_search(world, older, newer, WalkStub(HISTORY), reuse=True)
+    assert "reuse_walk" in str(raised.value) and "--" not in str(raised.value)
 
 
 def test_a_refused_walk_is_refused_under_the_switch_before_anything_runs(cancel):
@@ -669,6 +671,31 @@ def test_a_moved_reuse_search_folder_resolves_inside_itself(history, tmp_path_fa
     shutil.rmtree(world / "walk")
     assert_references_resolve(moved)
     assert_search_folder_valid(moved)
+
+
+def test_both_switches_on_the_command_line_say_that_no_inner_state_ran(history, monkeypatch, capsys):
+    world, older, newer = history
+    run_walk(world, older, newer, WalkStub(HISTORY), tolerance=world / "tolerance.json")
+    monkeypatch.setattr("degelmann.deltarecon.__main__.engine", lambda: Counting(HISTORY))
+    monkeypatch.chdir(world)
+    assert main(["search", str(older), str(newer), "--output", str(world / "search"), "--repositories", str(world),
+                 "--quantity", COUNT, "--periods", "0-2", "--tolerance", str(world / "tolerance.json"),
+                 "--walk", str(world / "walk"), "--reuse-walk", "--target-only"]) == 0
+    lines = capsys.readouterr().out.splitlines()
+    assert lines[0].startswith("search: searched; 0 states run, ")
+    assert "inner states: none run on the target; every inner state was taken from the walk" in lines
+    assert not any(line.startswith("inner states: run on the target only") for line in lines)
+
+
+def test_the_switch_target_only_says_so_when_a_search_stops_before_any_inner_state(history, monkeypatch, capsys):
+    world, older, newer = history
+    monkeypatch.setattr("degelmann.deltarecon.__main__.engine", lambda: WalkStub(HISTORY, drift={"h0": 1}))
+    assert main(["search", str(older), str(newer), "--output", str(world / "search"), "--repositories", str(world),
+                 "--quantity", COUNT, "--periods", "0-2", "--target-only"]) == 1
+    lines = capsys.readouterr().out.splitlines()
+    assert lines[0].startswith("search: stopped")
+    assert "inner states: none run on the target" in lines
+    assert not any(line.startswith("inner states: run on the target only") for line in lines)
 
 
 # --- the halving --------------------------------------------------------------------
@@ -1392,10 +1419,17 @@ def test_the_switch_target_only_without_a_narrowed_target_is_a_usage_error(histo
     monkeypatch.setattr("degelmann.deltarecon.__main__.engine", lambda: WalkStub(HISTORY))
     assert main(["search", str(older), str(newer), "--output", str(world / "search"), "--repositories", str(world),
                  "--target-only"]) == 2
-    assert "--target-only" in capsys.readouterr().err
+    error = capsys.readouterr().err
+    assert all(flag in error for flag in ("--target-only", "--quantity", "--periods"))
     assert main(["search", str(older), str(newer), "--output", str(world / "search"), "--repositories", str(world),
                  "--quantity", COUNT, "--quantity", CASH, "--target-only"]) == 2
+    message = capsys.readouterr().err.removeprefix("error: ")
+    assert "target_only" in message and "--" not in message
     assert folder_hashes(world) == before and not (world / "search").exists()
+    with pytest.raises(UsageError) as raised:  # every quantity named, no periods: a library caller is told the switch
+        run_search(world, older, newer, WalkStub(HISTORY), quantities=[COUNT, CASH], target_only=True)
+    assert "target_only" in str(raised.value) and "--" not in str(raised.value)
+    assert not (world / "search").exists()
 
 
 @pytest.mark.parametrize("reuse", [False, True], ids=["target-only", "both-switches"])

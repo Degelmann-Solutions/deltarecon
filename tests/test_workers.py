@@ -6,6 +6,8 @@ the reference model use one throw-away commit with a point of unknown sex and th
 """
 from __future__ import annotations
 
+import subprocess
+import sys
 from concurrent import futures
 
 import pytest
@@ -15,7 +17,7 @@ from degelmann.deltarecon.engines.reference_model import PATHS
 from degelmann.deltarecon.run import ModelPointFailure, UsageError
 from degelmann.deltarecon.workers import WORKERS_VARIABLE, ordered_map, worker_count
 
-from conftest import (POINTS, POINT_TABLE, StubEngine, WorkerStub, _stub_project, _stub_start, cli, commit,
+from conftest import (POINTS, ROOT, as_bits, POINT_TABLE, StubEngine, WorkerStub, _stub_project, _stub_start, cli, commit,
                       edit_file, model_request, run_stub, stored, text, throwaway, with_columns, without_volatile)
 
 
@@ -93,6 +95,20 @@ def test_the_worker_count_is_the_option_else_the_variable_else_the_processors(mo
         worker_count(0)
 
 
+def test_the_worker_module_loads_the_standard_library_alone():
+    code = ("import sys, degelmann.deltarecon.workers\n"
+            "loaded = [m for m in ('jsonschema', 'degelmann.deltarecon.run', 'degelmann.deltarecon.documents')"
+            " if m in sys.modules]\n"
+            "assert not loaded, loaded\n")
+    done = subprocess.run([sys.executable, "-c", code], cwd=ROOT, capture_output=True, text=True)
+    assert done.returncode == 0, done.stderr
+
+
+def test_the_usage_error_is_one_class_wherever_it_is_imported():
+    from degelmann.deltarecon import errors, run
+    assert run.UsageError is errors.UsageError is workers.UsageError is UsageError
+
+
 def test_a_faulty_worker_count_cannot_start_a_command(monkeypatch, tmp_path, capsys):
     monkeypatch.delenv(WORKERS_VARIABLE, raising=False)
     for command in (["run", tmp_path / "request.json"], ["walk", tmp_path / "a", tmp_path / "b", "--output", tmp_path / "w"]):
@@ -161,7 +177,7 @@ def test_the_workers_give_the_bits_and_the_messages_of_the_parent(path, unknown_
     def plain(outcome):  # a value as its bits
         if isinstance(outcome, ModelPointFailure):
             return "failed", str(outcome)
-        return "ok", [(period, [value.hex() for value in values]) for period, values in outcome]
+        return "ok", as_bits(outcome)
 
     assert [plain(outcome) for outcome in pooled] == [plain(outcome) for outcome in alone]
     assert [kind for kind, _ in map(plain, pooled)] == ["ok", "ok", "failed"]

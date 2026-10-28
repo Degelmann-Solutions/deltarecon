@@ -19,6 +19,7 @@ DeltaRecon is an open-source project. Contributors and agents read and write Eng
 - Actuarial semantics (time basis and period origin, quantity names, cost categories, which benefits are fixed by contract) are confirmed with the maintainer before the build, not inferred.
 - Before adding a helper, search the package for one that already does it. Copying recorded files, assembling run records, and building compare requests are common candidates.
 - A long check (a reference walk, the export-equals-modelx guard, a measurement) names in the plan the commit it ran on. When a later amend touches the checked path, run the check again or record in the plan why not.
-- A check that an epic or a ticket requires before a merge records its commit, command, and outcome in the epic file or the plan. A note kept outside the repository is not that record.
+- A check that an epic or a ticket requires before a merge records its commit, command, and outcome as a line of text in the epic file or the plan. A Supermemory entry alone is not that record.
+- Files under `oracle/` (requests, `SHA256SUMS`, a `REPRODUCTIONS.md` row) are committed only when a run renews the oracle or is required as a new reference reproduction. A run that confirms unchanged values changes nothing there. Walk folders and run outputs are never committed.
 - When an epic is sliced, every gate in its notes (such as a check before the merge) and every deferral dated to a gate gets a ticket that owns it. When a decision supersedes another, change the description and the affected entries in the same edit, not only the notes.
 - When a plan is closed, each of its `deferred:` entries moves to `deferred-work.md`.

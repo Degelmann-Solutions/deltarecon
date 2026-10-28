@@ -90,7 +90,8 @@ and export that is no run. The result and the run record name the switch.
 ``run``, ``replay``, ``regression``, ``walk``, and ``search`` project the model points of each
 state in ``--workers N`` worker processes, else as many as ``DELTARECON_WORKERS`` names, else
 one per processor; ``N`` and the variable must be whole numbers of at least 1. The count changes
-no byte of any document and is not recorded.
+no byte of any document and is not recorded. ``request`` and ``derive`` project no point and do not
+read the variable.
 
 ``compare`` takes its tolerance profile from the request. ``replay``, ``regression``,
 ``walk``, and ``search`` compare exactly unless ``--tolerance FILE`` names a tolerance profile: a JSON file in the
@@ -176,7 +177,8 @@ def command_request(args) -> int:
         revision = reference_model.resolve_revision(args.revision, repositories)
         release = {"label": args.label,
                    "references": reference_model.release_references(revision, path=args.path)}
-        engine().resolve(release, repositories)
+        # One worker: a request projects no point, so DELTARECON_WORKERS does not concern it.
+        engine(1).resolve(release, repositories)
     except Rejection as rejection:  # nothing is written
         print("request: rejected")
         print_diagnostic(rejection.diagnostic())
@@ -325,7 +327,8 @@ def command_regression(args) -> int:
 
 def command_derive(args) -> int:
     try:
-        result = derive(Path(args.older_record), Path(args.newer_record), Path(args.output), engine(),
+        # One worker: a derivation projects no point, so DELTARECON_WORKERS does not concern it.
+        result = derive(Path(args.older_record), Path(args.newer_record), Path(args.output), engine(1),
                         args.repositories)
     except Rejection as rejection:  # nothing is written
         print("derive: rejected")
@@ -392,6 +395,12 @@ def command_walk(args) -> int:
 
 
 def command_search(args) -> int:
+    # The switches are checked here under their flags; search keeps its own checks for library callers.
+    if args.reuse_walk and not args.walk:
+        raise UsageError("the switch --reuse-walk takes the states from a walk folder and needs --walk")
+    if args.target_only and not args.quantity and args.periods is None:
+        raise UsageError("the switch --target-only runs the inner states on the target and needs a target "
+                         "narrowed by --quantity or --periods")
     try:
         done = search(Path(args.older_record), Path(args.newer_record), Path(args.output), state_engine(args),
                       args.repositories, args.tolerance, args.quantity, args.periods,
@@ -418,7 +427,14 @@ def command_search(args) -> int:
     say(f"target: {', '.join(target['quantities'])}"
         + (f"; periods {periods['first']} to {periods['last']}" if periods else "; every period"))
     if TARGET_ONLY in result.get("switches", []):
-        say("inner states: run on the target only, without the model checks")
+        ends_run = {ends["zero"]["state"], ends["n"]["state"]}
+        inner = [entry for entry in result["states"] if not entry.get("reused") and entry["state"] not in ends_run]
+        if inner:
+            say("inner states: run on the target only, without the model checks")
+        elif "reused" in runs:
+            say("inner states: none run on the target; every inner state was taken from the walk")
+        else:
+            say("inner states: none run on the target")
     for held in result["held"]:
         say(f"held: {held['kind']}; the effect on it of {len(held['not_shown'])} revisions is not shown")
     say(f"intervals judged: {len(result['intervals'])}")
