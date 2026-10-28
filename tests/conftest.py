@@ -38,8 +38,8 @@ from degelmann.deltarecon.__main__ import main
 from degelmann.deltarecon.documents import (CONTRACT_VERSION, RECORD_SCHEMA, RUN_REQUEST, RUN_SCHEMA, Rejection,
                                             document_bytes, schema_errors, sha256_file)
 from degelmann.deltarecon.regression import read_regression_input, regression
-from degelmann.deltarecon.run import (History, ModelPointFailure, Revision, from_worker_outcome, run_request,
-                                      worker_outcome)
+from degelmann.deltarecon.run import (REPOSITORIES_VARIABLE, History, ModelPointFailure, Revision, from_worker_outcome,
+                                      run_request, worker_outcome)
 
 ROOT = Path(__file__).resolve().parent.parent
 REPOSITORIES = ROOT / "repositories"
@@ -53,6 +53,10 @@ START = "fa368575a66d97c94e96dffc62b273ec95511b12"  # release N on the fixed mod
 NEWER = "887b7181d22550eda2fb52fa1a6bd77376d4eb2e"  # the newer revision of the reference walk
 PRODUCT_FOLDER = "risikolebensversicherung"
 EXAMPLES = ROOT / "contracts" / "v3" / "examples"
+
+# A folder the user's environment names would move the clone of every test that reads it from the
+# working directory, and of every command a test starts; the session runs without the variable.
+os.environ.pop(REPOSITORIES_VARIABLE, None)
 
 
 def folder_hashes(folder: Path) -> dict[str, str]:

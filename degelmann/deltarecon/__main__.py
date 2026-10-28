@@ -98,8 +98,11 @@ read the variable.
 form of the ``tolerance`` member of a compare request. There is no default profile.
 
 No command overwrites an existing file, and none writes into the clone or uses the network.
-The clone is read from ``repositories/delib-history`` in the working directory. The option
-``--repositories DIR`` names another folder that holds the clone.
+The clone is read from ``delib-history`` in the folder ``--repositories DIR`` names, else in the
+folder the environment variable ``DELTARECON_REPOSITORIES`` names, else in ``repositories/`` in
+the working directory. A relative folder is taken from the working directory. The run folders are
+where ``--output`` or the path of a request or record names them, relative to the working
+directory; neither the option nor the variable moves them.
 
 Exit status: 0 for a succeeded run, a reproduced replay, a comparison or a regression run
 without deviation, a written request, a written manifest, or a walk that attributes every
@@ -128,7 +131,8 @@ from .search import TARGET_ONLY, search
 from .walk import walk
 from .regression import read_regression_input, regression
 from .replay import replay
-from .run import REPOSITORIES_FOLDER, UsageError, repositories_folder, run_request, run_request_document
+from .run import (REPOSITORIES_FOLDER, REPOSITORIES_VARIABLE, UsageError, repositories_folder, run_request,
+                  run_request_document)
 from .signature import render_coverage, render_model_points, render_table
 from .workers import WORKERS_VARIABLE, whole_number
 
@@ -552,7 +556,8 @@ def main(argv: list[str] | None = None) -> int:
     for command in (request, run, again, regress, history, stepper, halver):
         command.add_argument("--repositories", metavar="DIR",
                              help="folder that holds the clone of the reference model repository "
-                                  f"(default: {REPOSITORIES_FOLDER}/ in the working directory)")
+                                  f"(default: the folder {REPOSITORIES_VARIABLE} names, else "
+                                  f"{REPOSITORIES_FOLDER}/ in the working directory)")
 
     args = parser.parse_args(argv)
     try:
