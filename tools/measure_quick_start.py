@@ -14,9 +14,12 @@ is the baseline seconds divided by the measured seconds, so a factor above 1 is 
 of both repositories and ``uv sync``: it is stored in ``beside``, printed below the table, and not
 counted in ``total``.
 
-Peak memory is the ``ru_maxrss`` that ``os.wait4`` returns for the step, which includes the
-descendants the step waited for, so the ``uv run`` wrapper reports the Python process it starts.
-Without ``os.wait4`` (Windows) only the times are measured.
+Peak memory (``peak_mib``) is the ``ru_maxrss`` that ``os.wait4`` returns for the step: the largest
+resident size of a single process among the step and the descendants it waited for, so the ``uv run``
+wrapper reports the Python process it starts. It is not the sum of the processes alive at once, so a
+step whose model points run in worker processes may hold more than it shows; the record says so in
+``peak_mib_covers``. Without ``os.wait4`` (Windows) only the times are measured. The record names the
+steps it reports, in the order of the quick start, in ``measured_steps``.
 
 Exit status: 0 when every step exits with its expected status, 1 when a step does not (nothing
 is written then), 2 when the tool cannot start (an unknown step, a malformed ``--beside``, an
@@ -38,6 +41,10 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 RUNS = "runs/"
+# What the peak memory of a step covers, in the record and below the table.
+PEAK_COVERS = ("the largest single process of the step (ru_maxrss of os.wait4), "
+               "not the sum of processes alive at once")
+PEAK_LINE = "peak MiB: the largest single process of a step, not the sum of its worker processes"
 DEFAULT_BASELINE = ROOT / "measurements" / "baseline.json"
 
 
@@ -157,6 +164,7 @@ def report(record: dict, baseline: dict | None) -> str:
             cells += [_number(seconds, 1), _number(before["peak_mib"] if before else None, 0),
                       _number(factor, 2)]
         lines.append(f"{name:<12}" + "".join(f"{cell:>13}" for cell in cells))
+    lines.append(PEAK_LINE)
     for step in record["steps"]:
         if step.get("states") is not None:
             line = (f"{step['name']}: {step['states']} states, "
@@ -243,6 +251,8 @@ def main(argv: list[str] | None = None, steps: dict[str, dict] = STEPS) -> int:
         "engine_version": engine_version(work),
         "note": arguments.note,
         "beside": arguments.beside,
+        "peak_mib_covers": PEAK_COVERS,
+        "measured_steps": [step["name"] for step in measured],
         "steps": measured,
         "total": {"seconds": sum(step["seconds"] for step in measured),
                   "peak_mib": max(peaks) if peaks else None},

@@ -94,16 +94,39 @@ def test_the_earlier_records_and_a_record_of_the_present_steps_are_recorded():
     assert any(path.name not in EARLIER_RECORDS for path in MEASUREMENTS)
 
 
-@pytest.mark.parametrize("path", MEASUREMENTS, ids=lambda path: path.name)
-def test_recorded_measurement_holds_every_step(path):
-    record = json.loads(path.read_text("utf-8"))
-    expected = EARLIER_STEPS if path.name in EARLIER_RECORDS else list(tool.STEPS)
+def check_record(record: dict, name: str = "") -> None:
+    """A measurement record holds the steps it names in ``measured_steps``, a non-empty part of the
+    present steps in their order; a record without the member holds every step of its time."""
+    if "measured_steps" in record:
+        expected = record["measured_steps"]
+        assert expected and expected == [step for step in tool.STEPS if step in expected]
+    else:
+        expected = EARLIER_STEPS if name in EARLIER_RECORDS else list(tool.STEPS)
     assert [step["name"] for step in record["steps"]] == expected
     for step in record["steps"]:
         assert isinstance(step["seconds"], (int, float)) and not isinstance(step["seconds"], bool)
     for entry in record.get("beside", []):
         assert set(entry) == {"name", "seconds"} and entry["seconds"] >= 0
     assert record["total"]["seconds"] == pytest.approx(sum(step["seconds"] for step in record["steps"]))
+
+
+@pytest.mark.parametrize("path", MEASUREMENTS, ids=lambda path: path.name)
+def test_recorded_measurement_holds_its_steps(path):
+    check_record(json.loads(path.read_text("utf-8")), path.name)
+
+
+def test_a_measurement_of_one_step_names_it_and_passes_the_record_check(tmp_path, monkeypatch, capsys):
+    monkeypatch.setattr(tool, "execute", lambda argv, log: (0, 2.0, 10.0))
+    output = tmp_path / "m.json"
+    assert tool.main(["--steps", "run", "--work", str(tmp_path / "work"), "--output", str(output),
+                      "--baseline", str(tmp_path / "none.json")]) == 0
+    record = json.loads(output.read_text("utf-8"))
+    assert record["measured_steps"] == ["run"] and [step["name"] for step in record["steps"]] == ["run"]
+    assert record["peak_mib_covers"] == tool.PEAK_COVERS
+    check_record(record)
+    for wrong in ([], ["run", "request"], ["walk"]):  # empty, out of order, or not a present step
+        with pytest.raises(AssertionError):
+            check_record({**record, "measured_steps": wrong, "steps": [{"name": n} for n in wrong]})
 
 
 SYNTHETIC = {
@@ -120,7 +143,8 @@ def test_report_without_a_baseline():
     assert lines[0].split() == ["step", "seconds", "peak", "MiB"]
     assert lines[1].split() == ["run", "10.0", "155"]
     assert lines[3].split() == ["total", "370.0", "160"]
-    assert lines[4] == "walk: 36 states, 10.0 s per state"
+    assert lines[4] == "peak MiB: the largest single process of a step, not the sum of its worker processes"
+    assert lines[5] == "walk: 36 states, 10.0 s per state"
 
 
 def test_report_beside_a_baseline():
@@ -133,7 +157,8 @@ def test_report_beside_a_baseline():
     assert lines[1].split() == ["run", "10.0", "155", "100.0", "8000", "10.00"]
     assert lines[2].split() == ["walk", "360.0", "160", "720.0", "160", "2.00"]
     assert lines[3].split() == ["total", "370.0", "160", "820.0", "160", "2.22"]
-    assert lines[4] == "walk: 36 states, 10.0 s per state (baseline 36 states, 20.0 s per state)"
+    assert lines[4] == tool.PEAK_LINE
+    assert lines[5] == "walk: 36 states, 10.0 s per state (baseline 36 states, 20.0 s per state)"
     # A baseline of other steps gives no total to compare with.
     baseline["steps"].pop()
     assert tool.report(SYNTHETIC, baseline).splitlines()[3].split() == ["total", "370.0", "160", "-", "-", "-"]
@@ -200,8 +225,8 @@ def test_durations_beside_are_recorded_and_printed_but_not_in_the_total(tmp_path
     assert record["total"]["seconds"] == record["steps"][0]["seconds"] < 12.3
     lines = capsys.readouterr().out.splitlines()
     table_end = next(number for number, line in enumerate(lines) if line.startswith("total "))
-    assert lines[table_end + 1:table_end + 3] == ["beside, not in the total: git-clone 12.3 s",
-                                                  "beside, not in the total: uv-sync 40.1 s"]
+    assert lines[table_end + 1:table_end + 4] == [
+        tool.PEAK_LINE, "beside, not in the total: git-clone 12.3 s", "beside, not in the total: uv-sync 40.1 s"]
 
 
 def test_without_durations_beside_the_record_holds_an_empty_list(tmp_path, capsys):
@@ -235,5 +260,6 @@ def test_the_present_steps_beside_the_recorded_baseline_of_the_earlier_steps():
     for line, name in zip(lines[1:], tool.STEPS):
         assert line.split()[0] == name and line.split()[-1] == f"{old[name]['seconds'] / 2.0:.2f}"
     assert lines[len(tool.STEPS) + 1].split() == ["total", "12.0", "200", "-", "-", "-"]
-    assert lines[len(tool.STEPS) + 2].startswith("search: 10 states, 0.2 s per state (baseline ")
+    assert lines[len(tool.STEPS) + 2] == tool.PEAK_LINE
+    assert lines[len(tool.STEPS) + 3].startswith("search: 10 states, 0.2 s per state (baseline ")
     assert lines[-1] == "beside, not in the total: uv-sync 40.0 s"
