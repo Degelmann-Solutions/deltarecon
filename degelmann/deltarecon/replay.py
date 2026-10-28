@@ -205,7 +205,7 @@ def refuse_target_only(recorded: RecordedRun) -> None:
     a search: those compare whole recorded results. Rule 1 of ``contracts/v3/localise.md``, "Before
     the first run"; the replay does not apply it."""
     if "target" in recorded.request:
-        raise Rejection("target_only_record", f"The record {recorded.record_path.name} is that of a target-only "
+        raise Rejection("target_only_record", f"The record {recorded.record_path} is that of a target-only "
                         "run; a regression, a derivation, a walk, and a search take the records of full runs.")
 
 

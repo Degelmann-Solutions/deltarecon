@@ -236,11 +236,18 @@ def test_the_record_of_a_target_only_run_is_refused_and_nothing_is_written(world
     older = record(world, "r0", label="N", **({"target": TARGET} if side == "older" else {}))
     newer = record(world, "r3", **({"target": TARGET} if side == "newer" else {}))
     before = folder_hashes(world)
-    engine = HistoryStub()
-    assert derive_command(monkeypatch, world, older, newer, world / "changes.json", lambda: engine) == 1
+    looked_up = []
+
+    class Counting(HistoryStub):
+        def history(self, older, newer, repositories):
+            looked_up.append((older, newer))
+            return super().history(older, newer, repositories)
+
+    assert derive_command(monkeypatch, world, older, newer, world / "changes.json", Counting) == 1
     out = capsys.readouterr().out
     assert out.splitlines()[0] == "derive: rejected" and "diagnostic: target_only_record: " in out
-    assert engine.opened == 0 and folder_hashes(world) == before and not (world / "changes.json").exists()
+    assert f"run-r{'0' if side == 'older' else '3'}" in out  # the message names the refused record
+    assert looked_up == [] and folder_hashes(world) == before and not (world / "changes.json").exists()
 
 
 def test_derive_command_prints_the_changes_and_the_remainder(world, monkeypatch, capsys):

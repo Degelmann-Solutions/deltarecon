@@ -132,7 +132,8 @@ Reader rule for documents of versions 1.0, 2.0, and 3.0:
 ### Changes from 3.0
 
 Version 3.1 is a minor version. It adds one diagnostic code and one reader rule
-of a walk folder, and it removes and redefines nothing:
+of a walk folder, extends the replay criterion of a run that ended with an error
+to runs recorded under 3.0, and removes nothing:
 
 - The diagnostic `target_only_record`: a regression, a derivation, a walk, and
   a search take the records of full runs, and refuse the record of a
