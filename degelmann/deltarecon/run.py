@@ -30,6 +30,7 @@ from __future__ import annotations
 
 import json
 import math
+import os
 import re
 import tempfile
 from contextlib import contextmanager
@@ -51,6 +52,8 @@ EXPORT_NAME = "results.csv"
 RECORD_NAME = "run-record.json"
 # The folder that holds what an engine restores a release from, below the working directory.
 REPOSITORIES_FOLDER = "repositories"
+# The environment variable that names that folder when no option does.
+REPOSITORIES_VARIABLE = "DELTARECON_REPOSITORIES"
 # An engine restores a release into a folder of the system's temporary folder whose name
 # starts with this prefix. A message of the outcome ``error`` names it ``<scratch>``.
 SCRATCH_PREFIX = "deltarecon-"
@@ -577,8 +580,13 @@ def check_target(session: Session, target: dict) -> None:
 
 
 def repositories_folder(repositories: Path | str | None) -> Path:
-    """The repositories folder: the given one, or ``repositories/`` in the working directory."""
-    return Path.cwd() / REPOSITORIES_FOLDER if repositories is None else Path(repositories)
+    """The repositories folder: the given one, else the one ``DELTARECON_REPOSITORIES`` names, else
+    ``repositories/`` in the working directory. An empty variable counts as unset; a relative
+    folder is taken from the working directory."""
+    if repositories is not None:
+        return Path(repositories)
+    named = os.environ.get(REPOSITORIES_VARIABLE)
+    return Path(named) if named else Path.cwd() / REPOSITORIES_FOLDER
 
 
 def run_request(request_path: Path, engine: Engine, repositories: Path | None = None) -> RunResult:
