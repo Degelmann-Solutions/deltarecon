@@ -687,6 +687,17 @@ def test_both_switches_on_the_command_line_say_that_no_inner_state_ran(history, 
     assert not any(line.startswith("inner states: run on the target only") for line in lines)
 
 
+def test_the_switch_target_only_says_so_when_a_search_stops_before_any_inner_state(history, monkeypatch, capsys):
+    world, older, newer = history
+    monkeypatch.setattr("degelmann.deltarecon.__main__.engine", lambda: WalkStub(HISTORY, drift={"h0": 1}))
+    assert main(["search", str(older), str(newer), "--output", str(world / "search"), "--repositories", str(world),
+                 "--quantity", COUNT, "--periods", "0-2", "--target-only"]) == 1
+    lines = capsys.readouterr().out.splitlines()
+    assert lines[0].startswith("search: stopped")
+    assert "inner states: none run on the target" in lines
+    assert not any(line.startswith("inner states: run on the target only") for line in lines)
+
+
 # --- the halving --------------------------------------------------------------------
 
 
@@ -1412,7 +1423,8 @@ def test_the_switch_target_only_without_a_narrowed_target_is_a_usage_error(histo
     assert all(flag in error for flag in ("--target-only", "--quantity", "--periods"))
     assert main(["search", str(older), str(newer), "--output", str(world / "search"), "--repositories", str(world),
                  "--quantity", COUNT, "--quantity", CASH, "--target-only"]) == 2
-    assert "target_only" in capsys.readouterr().err
+    message = capsys.readouterr().err.removeprefix("error: ")
+    assert "target_only" in message and "--" not in message
     assert folder_hashes(world) == before and not (world / "search").exists()
     with pytest.raises(UsageError) as raised:  # every quantity named, no periods: a library caller is told the switch
         run_search(world, older, newer, WalkStub(HISTORY), quantities=[COUNT, CASH], target_only=True)
