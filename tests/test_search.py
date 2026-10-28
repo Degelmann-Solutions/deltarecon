@@ -673,6 +673,20 @@ def test_a_moved_reuse_search_folder_resolves_inside_itself(history, tmp_path_fa
     assert_search_folder_valid(moved)
 
 
+def test_both_switches_on_the_command_line_say_that_no_inner_state_ran(history, monkeypatch, capsys):
+    world, older, newer = history
+    run_walk(world, older, newer, WalkStub(HISTORY), tolerance=world / "tolerance.json")
+    monkeypatch.setattr("degelmann.deltarecon.__main__.engine", lambda: Counting(HISTORY))
+    monkeypatch.chdir(world)
+    assert main(["search", str(older), str(newer), "--output", str(world / "search"), "--repositories", str(world),
+                 "--quantity", COUNT, "--periods", "0-2", "--tolerance", str(world / "tolerance.json"),
+                 "--walk", str(world / "walk"), "--reuse-walk", "--target-only"]) == 0
+    lines = capsys.readouterr().out.splitlines()
+    assert lines[0].startswith("search: searched; 0 states run, ")
+    assert "inner states: none run on the target; every inner state was taken from the walk" in lines
+    assert not any(line.startswith("inner states: run on the target only") for line in lines)
+
+
 # --- the halving --------------------------------------------------------------------
 
 
