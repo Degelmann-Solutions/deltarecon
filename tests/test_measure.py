@@ -5,7 +5,6 @@ of the quick start changes the measurement with it.
 """
 from __future__ import annotations
 
-import importlib.util
 import json
 import os
 import re
@@ -14,20 +13,11 @@ import sys
 
 import pytest
 
-from conftest import ROOT
+from conftest import ROOT, load_measure_tool
 
-TOOL = ROOT / "tools" / "measure_quick_start.py"
 MEASUREMENTS = sorted((ROOT / "measurements").glob("*.json"))
 
-
-def load_tool():
-    spec = importlib.util.spec_from_file_location("measure_quick_start", TOOL)
-    module = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(module)
-    return module
-
-
-tool = load_tool()
+tool = load_measure_tool()
 
 
 def quick_start_commands() -> list[list[str]]:

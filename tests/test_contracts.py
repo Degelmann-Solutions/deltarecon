@@ -21,7 +21,7 @@ from degelmann.deltarecon.documents import load_schemas, strict_json_text, valid
 from degelmann.deltarecon.export import (INTEGER, READER_INTEGER, export_errors, export_rows,
                                is_profile_number, is_readable_number)
 
-from conftest import EXACT, EXAMPLES, deviates, rounded
+from conftest import EXACT, EXAMPLES, artifacts, deviates, rounded
 
 ROOT = Path(__file__).resolve().parent.parent
 PACK = ROOT / "contracts" / "v3"
@@ -65,20 +65,6 @@ def case(case_id: str) -> dict:
 def strict_json(path: Path):
     """Parse a file under the JSON profile, which also fixes UTF-8."""
     return strict_json_text(path.read_bytes().decode("utf-8"))
-
-
-def artifacts(node, found=None) -> list[dict]:
-    """Every artifact reference in a document: an object with exactly path and sha256."""
-    found = [] if found is None else found
-    if isinstance(node, dict):
-        if set(node) == {"path", "sha256"}:
-            found.append(node)
-        for value in node.values():
-            artifacts(value, found)
-    elif isinstance(node, list):
-        for value in node:
-            artifacts(value, found)
-    return found
 
 
 def artifact_states(example: dict) -> list[tuple[str, str]]:
