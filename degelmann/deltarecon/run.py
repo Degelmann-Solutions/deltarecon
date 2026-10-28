@@ -70,6 +70,21 @@ class ModelPointFailure(Exception):
     """The engine could not calculate one model point."""
 
 
+def worker_outcome(call, *arguments) -> tuple[str, object]:
+    """The outcome of ``call(*arguments)`` in a form a worker process returns: ``("ok", value)``, or
+    ``("failed", message)`` when it raises :class:`ModelPointFailure`. Any other exception propagates."""
+    try:
+        return "ok", call(*arguments)
+    except ModelPointFailure as failure:
+        return "failed", str(failure)
+
+
+def from_worker_outcome(outcome: tuple[str, object]):
+    """The value of a :func:`worker_outcome`, or the :class:`ModelPointFailure` it holds."""
+    kind, value = outcome
+    return value if kind == "ok" else ModelPointFailure(value)
+
+
 class Session(Protocol):
     """One release state, opened for a run."""
 

@@ -155,8 +155,10 @@ import numpy as np
 import pandas as pd
 
 from .. import changes as changes_contract
+from ..compare import target_window
 from ..documents import Rejection
-from ..run import SCRATCH_PREFIX, History, ModelPointFailure, Revision, UsageError
+from ..run import (SCRATCH_PREFIX, History, ModelPointFailure, Revision, UsageError, from_worker_outcome,
+                   worker_outcome)
 from ..workers import ordered_map, worker_count
 
 STAGE = "liability_cashflow"
@@ -699,10 +701,7 @@ def _project_in_worker(item: tuple) -> tuple[str, object]:
     """One point in a worker, ``item`` being ``(projector, index, *arguments)``: the session method that
     projects a row, the row, and its further arguments. ``("ok", periods)`` or ``("failed", message)``."""
     projector, *arguments = item
-    try:
-        return "ok", getattr(_worker_session, projector)(*arguments)
-    except ModelPointFailure as failure:
-        return "failed", str(failure)
+    return worker_outcome(getattr(_worker_session, projector), *arguments)
 
 
 class ReferenceModelSession:
@@ -805,8 +804,8 @@ class ReferenceModelSession:
             results = ordered_map(_start_worker, (str(self._state), self._path), _project_in_worker,
                                   [(projector, index, *arguments) for index in rows.values()], self._workers,
                                   preload=[__name__])
-            for model_point_id, (kind, value) in zip(rows, results):
-                outcomes[model_point_id] = value if kind == "ok" else ModelPointFailure(value)
+            for model_point_id, result in zip(rows, results):
+                outcomes[model_point_id] = from_worker_outcome(result)
         return [outcomes[model_point_id] for model_point_id in model_point_ids]
 
     def _project_target_index(self, index: int, quantities: tuple[str, ...],
@@ -826,7 +825,7 @@ class ReferenceModelSession:
 
             month = VALUATION_MONTH if hasattr(projection, VALUATION_MONTH) else BEFORE_RENAME
             start, end = value(month, convert=int), value("proj_len", convert=int) - 1
-            first, last = (start, end) if periods is None else (start + periods[0], min(start + periods[1], end))
+            first, last = target_window(TIME_BASIS, start, end, periods)
             return [(t, [value(cell, t, *arguments) for cell, *arguments in calls])
                     for t in range(first, last + 1)]
 

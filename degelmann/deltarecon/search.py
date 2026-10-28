@@ -50,7 +50,7 @@ from collections import OrderedDict
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from .compare import ISSUE_ORIGIN, CheckedRun, align
+from .compare import CheckedRun, align, target_window
 from .documents import (CONTRACT_VERSION, RUN_SCHEMA, Rejection, artifact_reference, copy_files, read_document,
                         write_document, write_new)
 from .export import write_export
@@ -268,15 +268,10 @@ class _Search(States):
         quantities = response["quantities"]
         keep = [i for i, quantity in enumerate(quantities) if quantity["name"] in self.target.quantities]
         # The window of a point: its periods whose projection period lies in the target periods.
-        issue_origin = response["time_basis"]["id"] in ISSUE_ORIGIN
+        basis = response["time_basis"]["id"]
         rows, ranges = [], []
         for point in response["model_points"]:
-            start, end = point["first_period"], point["last_period"]
-            first, last = start, end
-            if self.target.periods is not None:
-                offset = start if issue_origin else 0  # the period of projection period 0
-                first = max(start, offset + self.target.periods[0])
-                last = min(end, offset + self.target.periods[1])
+            first, last = target_window(basis, point["first_period"], point["last_period"], self.target.periods)
             if first > last:
                 continue
             identifier = point["model_point_id"]

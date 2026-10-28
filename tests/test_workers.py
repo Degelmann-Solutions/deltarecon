@@ -17,7 +17,7 @@ from degelmann.deltarecon.engines.reference_model import PATHS
 from degelmann.deltarecon.run import ModelPointFailure, UsageError
 from degelmann.deltarecon.workers import WORKERS_VARIABLE, ordered_map, worker_count
 
-from conftest import (POINTS, ROOT, POINT_TABLE, StubEngine, WorkerStub, _stub_project, _stub_start, cli, commit,
+from conftest import (POINTS, ROOT, as_bits, POINT_TABLE, StubEngine, WorkerStub, _stub_project, _stub_start, cli, commit,
                       edit_file, model_request, run_stub, stored, text, throwaway, with_columns, without_volatile)
 
 
@@ -177,7 +177,7 @@ def test_the_workers_give_the_bits_and_the_messages_of_the_parent(path, unknown_
     def plain(outcome):  # a value as its bits
         if isinstance(outcome, ModelPointFailure):
             return "failed", str(outcome)
-        return "ok", [(period, [value.hex() for value in values]) for period, values in outcome]
+        return "ok", as_bits(outcome)
 
     assert [plain(outcome) for outcome in pooled] == [plain(outcome) for outcome in alone]
     assert [kind for kind, _ in map(plain, pooled)] == ["ok", "ok", "failed"]
