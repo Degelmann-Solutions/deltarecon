@@ -392,6 +392,12 @@ def command_walk(args) -> int:
 
 
 def command_search(args) -> int:
+    # The switches are checked here under their flags; search keeps its own checks for library callers.
+    if args.reuse_walk and not args.walk:
+        raise UsageError("the switch --reuse-walk takes the states from a walk folder and needs --walk")
+    if args.target_only and not args.quantity and args.periods is None:
+        raise UsageError("the switch --target-only runs the inner states on the target and needs a target "
+                         "narrowed by --quantity or --periods")
     try:
         done = search(Path(args.older_record), Path(args.newer_record), Path(args.output), state_engine(args),
                       args.repositories, args.tolerance, args.quantity, args.periods,

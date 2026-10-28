@@ -39,6 +39,7 @@ from pathlib import Path
 from typing import ContextManager, Mapping, Protocol
 
 from . import changes as changes_contract
+from .errors import UsageError  # re-exported: other modules and the tests import it from here
 from .documents import (CHANGES_SCHEMA, CONTRACT_VERSION, RECORD_SCHEMA, RUN_REQUEST, RUN_SCHEMA,
                         Rejection, artifact_reference, check_artifact, check_schema, check_version,
                         new_record_id, parse_document, read_document, schema_errors, validator,
@@ -63,10 +64,6 @@ STAGE_QUANTITIES = {
         "Kosten 2. Ordnung ohne Provisionen", "Provisionen", "Netto-Cashflow",
     ],
 }
-
-
-class UsageError(Exception):
-    """The procedure cannot start: a file is missing or an output exists already."""
 
 
 class ModelPointFailure(Exception):

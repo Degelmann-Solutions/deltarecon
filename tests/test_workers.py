@@ -6,6 +6,8 @@ the reference model use one throw-away commit with a point of unknown sex and th
 """
 from __future__ import annotations
 
+import subprocess
+import sys
 from concurrent import futures
 
 import pytest
@@ -15,7 +17,7 @@ from degelmann.deltarecon.engines.reference_model import PATHS
 from degelmann.deltarecon.run import ModelPointFailure, UsageError
 from degelmann.deltarecon.workers import WORKERS_VARIABLE, ordered_map, worker_count
 
-from conftest import (POINTS, POINT_TABLE, StubEngine, WorkerStub, _stub_project, _stub_start, cli, commit,
+from conftest import (POINTS, ROOT, POINT_TABLE, StubEngine, WorkerStub, _stub_project, _stub_start, cli, commit,
                       edit_file, model_request, run_stub, stored, text, throwaway, with_columns, without_volatile)
 
 
@@ -91,6 +93,20 @@ def test_the_worker_count_is_the_option_else_the_variable_else_the_processors(mo
             worker_count()
     with pytest.raises(UsageError, match="^the number of workers must be a whole number"):
         worker_count(0)
+
+
+def test_the_worker_module_loads_the_standard_library_alone():
+    code = ("import sys, degelmann.deltarecon.workers\n"
+            "loaded = [m for m in ('jsonschema', 'degelmann.deltarecon.run', 'degelmann.deltarecon.documents')"
+            " if m in sys.modules]\n"
+            "assert not loaded, loaded\n")
+    done = subprocess.run([sys.executable, "-c", code], cwd=ROOT, capture_output=True, text=True)
+    assert done.returncode == 0, done.stderr
+
+
+def test_the_usage_error_is_one_class_wherever_it_is_imported():
+    from degelmann.deltarecon import errors, run
+    assert run.UsageError is errors.UsageError is workers.UsageError is UsageError
 
 
 def test_a_faulty_worker_count_cannot_start_a_command(monkeypatch, tmp_path, capsys):
