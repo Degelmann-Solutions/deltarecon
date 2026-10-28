@@ -8,6 +8,10 @@ The tool writes contract version 3.1 and reads 1.0, 2.0, 3.0, and 3.1. A documen
 against the schemas of its own version: a 1.0 document against ``contracts/v1/schemas``, a
 2.0 document against ``contracts/v2/schemas``, a 3.0 or 3.1 document against
 ``contracts/v3/schemas``, which accept both minor versions of 3.
+
+The pack is read from ``contracts/`` at the root of a checkout. A wheel carries a copy of it,
+made at build time, as ``degelmann/deltarecon/contracts`` beside this module; an installed
+package reads that copy.
 """
 from __future__ import annotations
 
@@ -22,7 +26,8 @@ from jsonschema import Draft202012Validator
 from referencing import Registry, Resource
 
 CONTRACT_VERSION = "3.1"
-CONTRACTS = Path(__file__).resolve().parents[2] / "contracts"
+PACKAGED_CONTRACTS = Path(__file__).resolve().parent / "contracts"
+CONTRACTS = PACKAGED_CONTRACTS if PACKAGED_CONTRACTS.is_dir() else Path(__file__).resolve().parents[2] / "contracts"
 # The versions a reader accepts, each with the schemas of its pack.
 SCHEMA_FOLDERS = {"1.0": CONTRACTS / "v1" / "schemas", "2.0": CONTRACTS / "v2" / "schemas",
                   "3.0": CONTRACTS / "v3" / "schemas", "3.1": CONTRACTS / "v3" / "schemas"}

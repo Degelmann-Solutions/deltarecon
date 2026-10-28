@@ -12,11 +12,17 @@ from __future__ import annotations
 import hashlib
 import json
 import re
+import subprocess
+import sys
+import zipfile
 from pathlib import Path
 
 import pytest
+from dulwich.repo import Repo
+from hatchling.builders.wheel import WheelBuilder
 from jsonschema import Draft202012Validator
 
+from degelmann.deltarecon import documents
 from degelmann.deltarecon.documents import load_schemas, strict_json_text, validator
 from degelmann.deltarecon.export import (INTEGER, READER_INTEGER, export_errors, export_rows,
                                is_profile_number, is_readable_number)
@@ -943,3 +949,36 @@ def test_contract_pack_names_no_engine_or_language():
         assert not ENGINE_NAMES.search(name), name
         match = ENGINE_NAMES.search(path.read_bytes().decode("utf-8"))
         assert not match, f"{name}: {match.group(0)}"
+
+# --- packaging ----------------------------------------------------------------------
+
+
+def test_the_checkout_reads_its_own_pack():
+    assert documents.CONTRACTS == ROOT / "contracts"
+
+
+def test_the_wheel_carries_the_pack_and_reads_its_schemas_outside_a_checkout(tmp_path):
+    """The wheel holds every tracked file of ``contracts/`` as ``degelmann/deltarecon/contracts``, byte
+    for byte, and nothing else there; unpacked outside the checkout, the module reads its schemas from that copy."""
+    wheel = Path(next(WheelBuilder(str(ROOT)).build(directory=str(tmp_path / "dist"), versions=["standard"])))
+    packaged = "degelmann/deltarecon/contracts/"
+    with zipfile.ZipFile(wheel) as archive:
+        carried = {name[len(packaged):]: archive.read(name) for name in archive.namelist()
+                   if name.startswith(packaged)}
+        archive.extractall(tmp_path / "unpacked")
+    # The published pack is the tracked files, so a stray file in the working tree is found, not shipped.
+    with Repo(str(ROOT)) as repo:
+        tracked = [path.decode("utf-8") for path in repo.open_index() if path.startswith(b"contracts/")]
+    published = {path.removeprefix("contracts/"): (ROOT / path).read_bytes() for path in tracked}
+    assert carried == published
+    probe = (
+        "import json, sys; sys.path.insert(0, sys.argv[1]);"
+        "from degelmann.deltarecon import documents as d;"
+        "print(d.CONTRACTS);"
+        "print(json.dumps(d.schema_errors(json.loads(open(sys.argv[2], encoding='utf-8').read()), d.RUN_REQUEST)))")
+    example = EXAMPLES / "reference" / "full-run.request.json"
+    result = subprocess.run([sys.executable, "-I", "-c", probe, str(tmp_path / "unpacked"), str(example)],
+                            cwd=tmp_path, capture_output=True, text=True, check=True)
+    folder, errors = result.stdout.splitlines()
+    assert Path(folder) == (tmp_path / "unpacked" / "degelmann" / "deltarecon" / "contracts").resolve()
+    assert json.loads(errors) == []
