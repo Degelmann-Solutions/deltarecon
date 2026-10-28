@@ -13,6 +13,7 @@ from __future__ import annotations
 import csv
 import difflib
 import hashlib
+import importlib.util
 import io
 import json
 import os
@@ -41,6 +42,7 @@ ROOT = Path(__file__).resolve().parent.parent
 REPOSITORIES = ROOT / "repositories"
 CLONE_NAME = "delib-history"
 CLONE = REPOSITORIES / CLONE_NAME
+MEASURE_TOOL = ROOT / "tools" / "measure_quick_start.py"
 REPOSITORY_URL = "https://github.com/Degelmann-Solutions/delib-history"
 RELEASE_N = "b64334e09613c45a7a12468dfddc0d9ec47819bb"  # the first commit of delib-history
 START = "fa368575a66d97c94e96dffc62b273ec95511b12"  # release N on the fixed model, the older end of the reference walk
@@ -83,6 +85,28 @@ def clone_state(clone: Path = CLONE) -> tuple[bytes, bytes, bytes]:
 def committed(path: str, revision: str = START, clone: Path = CLONE) -> bytes:
     """The bytes of a file of a commit, read from the object store."""
     return git(clone, "cat-file", "blob", f"{revision}:{path}")
+
+
+def load_measure_tool():
+    """The module ``tools/measure_quick_start.py``, loaded by its path: ``tools/`` is no package."""
+    spec = importlib.util.spec_from_file_location("measure_quick_start", MEASURE_TOOL)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+def artifacts(node, found=None) -> list[dict]:
+    """Every artifact reference in a document: an object with exactly path and sha256."""
+    found = [] if found is None else found
+    if isinstance(node, dict):
+        if set(node) == {"path", "sha256"}:
+            found.append(node)
+        for value in node.values():
+            artifacts(value, found)
+    elif isinstance(node, list):
+        for value in node:
+            artifacts(value, found)
+    return found
 
 
 def require_clone(clone: Path = CLONE, revision: str = START) -> None:
