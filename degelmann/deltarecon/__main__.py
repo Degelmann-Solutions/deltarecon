@@ -112,7 +112,7 @@ manifest that cannot be derived, a walk that is refused, stops, or leaves a revi
 unattributed because state 0 or the last state does not run or is not reproduced, a
 search that is refused or stops, and a request or regression whose revision, release, or
 clone the repositories do not hold; 2 when the command cannot start, for example because an
-output exists already, the history of the clone is cut off, or Git is not installed.
+output exists already or the history of the clone is cut off.
 """
 from __future__ import annotations
 

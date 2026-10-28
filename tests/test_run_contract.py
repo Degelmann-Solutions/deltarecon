@@ -1539,17 +1539,17 @@ def test_regression_command_starts_nothing_for_a_record_it_does_not_take(world, 
 # --- the core and the engine --------------------------------------------------------
 
 
-def test_core_modules_load_no_engine_and_cannot_start_git():
-    """Without ``subprocess`` a module starts no process, so none but the adapter starts Git."""
+def test_core_modules_load_no_engine_and_cannot_start_a_process():
+    """Without ``subprocess`` a module starts no process; the core loads no engine and no reader."""
     code = ("import sys\n"
             + "".join(f"import degelmann.deltarecon.{name}\n" for name in CORE_MODULES)
-            + "loaded = [m for m in ('modelx', 'pandas', 'numpy', 'subprocess') if m in sys.modules]\n"
+            + "loaded = [m for m in ('modelx', 'pandas', 'numpy', 'dulwich', 'subprocess') if m in sys.modules]\n"
             + "assert not loaded, loaded\n")
     done = subprocess.run([sys.executable, "-c", code], cwd=ROOT, capture_output=True, text=True)
     assert done.returncode == 0, done.stderr
 
 
-def test_only_the_adapter_imports_the_engine_and_calls_git():
+def test_only_the_adapter_imports_the_engine_and_the_reader_and_no_module_starts_a_process():
     sources = sorted((ROOT / "degelmann" / "deltarecon").rglob("*.py"))
 
     def importing(*modules: str) -> list[str]:
@@ -1558,12 +1558,13 @@ def test_only_the_adapter_imports_the_engine_and_calls_git():
                        for line in p.read_text("utf-8").splitlines() if len(line.split()) > 1)]
 
     assert importing("modelx") == ["degelmann/deltarecon/engines/reference_model.py"]
-    # Git is started as a process, and only the adapter can start one: no other module
-    # names ``subprocess`` or a process starter of ``os`` in any form.
+    # The clone is read with dulwich, and only by the adapter.
+    assert importing("dulwich") == ["degelmann/deltarecon/engines/reference_model.py"]
+    # No module starts a process, so none needs an installed Git: none names ``subprocess``
+    # or a process starter of ``os`` in any form.
     starters = (r"\bsubprocess\b|\bos\s*\.\s*(system|popen|exec\w*|spawn\w*|posix_spawn\w*|fork\w*|startfile)\b"
                 r"|\bfrom\s+os\s+import\b")
-    assert [p.relative_to(ROOT).as_posix() for p in sources if re.search(starters, p.read_text("utf-8"))] == [
-        "degelmann/deltarecon/engines/reference_model.py"]
+    assert [p.relative_to(ROOT).as_posix() for p in sources if re.search(starters, p.read_text("utf-8"))] == []
     for line in ("import os, subprocess", "os.system('git')", "os.popen('git')", "os.execvp('git', [])",
                  "os.spawnlp(0, 'git')", "from os import system", "from subprocess import run"):
         assert re.search(starters, line), line
@@ -1619,14 +1620,18 @@ def test_request_command_names_the_complete_release_identity(monkeypatch, tmp_pa
 def test_request_command_resolves_any_name_of_a_commit_to_the_full_hash(monkeypatch, tmp_path):
     repositories, clone = throwaway(tmp_path)
     git(clone, "branch", "start", START)
-    for number, name in enumerate(["HEAD", "work", "start", START[:10], START]):
+    git(clone, "tag", "light", START)
+    git(clone, "-c", "user.name=Test", "-c", "user.email=test@example.invalid", "tag", "-a", "-m", "N", "annotated",
+        START)
+    for number, name in enumerate(["HEAD", "work", "start", "light", "annotated", "refs/heads/work", START[:10],
+                                   START]):
         request = stored(model_request(monkeypatch, tmp_path / f"run-{number}", revision=name,
                                        repositories=repositories))
         assert named_revisions(request)["code_state"] == RELEASE_VALUE, name
 
 
 @pytest.mark.parametrize("name", ["no-such-branch", "0123456789abcdef0123456789abcdef01234567",
-                                  f"{START}^{{tree}}", "--all", ""])
+                                  f"{START}^{{tree}}", "--all", "", "HEAD~1", f"{START}~1"])
 def test_request_command_refuses_a_name_that_names_no_commit(monkeypatch, tmp_path, capsys, name):
     output = tmp_path / "run" / "request.json"
     assert cli(monkeypatch, "request", f"--revision={name}", "--repositories", REPOSITORIES, "--label", "N",
@@ -1814,28 +1819,48 @@ def test_run_without_a_clone_is_rejected_and_names_where_the_clone_is_expected(m
     assert not (folder / "results.csv").exists()
 
 
-def test_without_git_no_command_starts(monkeypatch, tmp_path, capsys):
-    folder = tmp_path / "run"
-    path = model_request(monkeypatch, folder, NEW_BUSINESS)
-    recorded = tmp_path / "recorded"
-    assert cli(monkeypatch, "run", model_request(monkeypatch, recorded, NEW_BUSINESS),
+def test_without_git_the_commands_and_the_history_read_the_clone(monkeypatch, tmp_path, capsys):
+    """With no Git on the PATH the clone is read as before: request, run, replay, and the history."""
+    from degelmann.deltarecon.engines.reference_model import ReferenceModel, path_class, release_references
+    from conftest import NEWER
+    require_clone(CLONE, NEWER)
+    older, newer = ({"label": label, "references": release_references(revision)}
+                    for label, revision in (("N", START), ("N+1", NEWER)))
+    # The main line, the messages, and the classes as Git reads them, where Git is on the PATH
+    # before it is taken away. A session without any Git checks the rest.
+    expected = None
+    if shutil.which("git"):
+        line = git(CLONE, "rev-list", "--first-parent", f"{START}..{NEWER}").decode("ascii").split()[::-1]
+        expected = [(revision,
+                     git(CLONE, "cat-file", "commit", revision).partition(b"\n\n")[2].decode("utf-8", "replace"),
+                     frozenset({path_class(path) for path in git(
+                         CLONE, "diff-tree", "-r", "-z", "--name-only", "--no-renames", parent, revision
+                     ).decode("utf-8").split("\0") if path} - {None}))
+                    for parent, revision in zip([START] + line, line)]
+    with_path = tmp_path / "with-path"
+    assert cli(monkeypatch, "run", model_request(monkeypatch, with_path, NEW_BUSINESS),
                "--repositories", REPOSITORIES) == 0
+    history_with_path = ReferenceModel().history(older, newer, REPOSITORIES)
     capsys.readouterr()
+
     (tmp_path / "bin").mkdir()
     monkeypatch.setenv("PATH", str(tmp_path / "bin"))
-    assert cli(monkeypatch, "run", path, "--repositories", REPOSITORIES) == 2
-    assert "git is not installed" in capsys.readouterr().err
-    assert cli(monkeypatch, "replay", recorded / "run-record.json", "--repositories", REPOSITORIES) == 2
-    assert "git is not installed" in capsys.readouterr().err
-    assert not (recorded / "replay").exists() and not (recorded / "replay-record.json").exists()
-    assert cli(monkeypatch, "request", "--revision", START, "--repositories", REPOSITORIES, "--label", "N",
-               "--run-id", "x", "--output", tmp_path / "other" / "request.json") == 2
-    assert "git is not installed" in capsys.readouterr().err
-    # Neither does a command start when the repositories folder is absent as well.
-    assert cli(monkeypatch, "run", path, "--repositories", tmp_path / "absent") == 2
-    assert "git is not installed" in capsys.readouterr().err
-    assert sorted(p.name for p in tmp_path.iterdir()) == ["bin", "recorded", "run"]
-    assert sorted(p.name for p in folder.iterdir()) == ["request.json"]
+    assert shutil.which("git") is None
+    folder = tmp_path / "run"
+    path = model_request(monkeypatch, folder, NEW_BUSINESS)
+    assert path.read_bytes() == (with_path / "request.json").read_bytes()
+    assert cli(monkeypatch, "run", path, "--repositories", REPOSITORIES) == 0
+    assert "outcome: succeeded" in capsys.readouterr().out
+    assert_documents_valid(folder)
+    assert (folder / "results.csv").read_bytes() == (with_path / "results.csv").read_bytes()
+    assert cli(monkeypatch, "replay", with_path / "run-record.json", "--repositories", REPOSITORIES) == 0
+    assert "replay: reproduced_exactly" in capsys.readouterr().out
+    history = ReferenceModel().history(older, newer, REPOSITORIES)
+    assert history == history_with_path
+    assert (history.older, history.newer) == (START, NEWER)
+    assert len(history.revisions) == 32
+    if expected is not None:
+        assert [(r.id, r.message, r.classes) for r in history.revisions] == expected
 
 
 def test_a_missing_clone_ends_the_test_session_with_the_clone_command(tmp_path):

@@ -29,6 +29,9 @@ from decimal import ROUND_HALF_UP, Decimal
 from pathlib import Path
 
 import pytest
+from dulwich.errors import NotGitRepository
+from dulwich.objectspec import parse_commit
+from dulwich.repo import Repo
 
 from degelmann.deltarecon import changes as changes_contract
 from degelmann.deltarecon.__main__ import main
@@ -122,10 +125,20 @@ def artifacts(node, found=None) -> list[dict]:
 
 def require_clone(clone: Path = CLONE, revision: str = START) -> None:
     """End the test session unless ``clone`` is a clone that holds the pinned commit."""
-    found = clone.is_dir() and subprocess.run(
-        ["git", "--no-optional-locks", "-C", str(clone), "cat-file", "-e", f"{revision}^{{commit}}"],
-        capture_output=True, env={"GIT_CEILING_DIRECTORIES": str(clone.parent), "PATH": os.environ.get("PATH", "")})
-    if not found or found.returncode != 0:
+    found = False
+    if clone.is_dir():  # read as the package reads it: no Git, no repository above the folder
+        try:
+            repository = Repo(str(clone))
+        except NotGitRepository:
+            pass
+        else:
+            try:
+                found = parse_commit(repository, revision.encode("ascii")) is not None
+            except (KeyError, ValueError):
+                pass
+            finally:
+                repository.close()
+    if not found:
         pytest.exit(f"The tests read the reference model from a clone at {clone} that holds the commit "
                     f"{revision}. Create it with: git clone {REPOSITORY_URL} {clone}", returncode=1)
 
