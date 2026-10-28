@@ -43,6 +43,7 @@ REPOSITORIES = ROOT / "repositories"
 CLONE_NAME = "delib-history"
 CLONE = REPOSITORIES / CLONE_NAME
 MEASURE_TOOL = ROOT / "tools" / "measure_quick_start.py"
+WINDOWS_HOST_TOOL = ROOT / "tools" / "windows_host.py"
 REPOSITORY_URL = "https://github.com/Degelmann-Solutions/delib-history"
 RELEASE_N = "b64334e09613c45a7a12468dfddc0d9ec47819bb"  # the first commit of delib-history
 START = "fa368575a66d97c94e96dffc62b273ec95511b12"  # release N on the fixed model, the older end of the reference walk
@@ -87,12 +88,22 @@ def committed(path: str, revision: str = START, clone: Path = CLONE) -> bytes:
     return git(clone, "cat-file", "blob", f"{revision}:{path}")
 
 
-def load_measure_tool():
-    """The module ``tools/measure_quick_start.py``, loaded by its path: ``tools/`` is no package."""
-    spec = importlib.util.spec_from_file_location("measure_quick_start", MEASURE_TOOL)
+def _load_tool(name: str, path: Path):
+    """A module of ``tools/``, loaded by its path: ``tools/`` is no package."""
+    spec = importlib.util.spec_from_file_location(name, path)
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
     return module
+
+
+def load_measure_tool():
+    """The module ``tools/measure_quick_start.py``."""
+    return _load_tool("measure_quick_start", MEASURE_TOOL)
+
+
+def load_windows_host_tool():
+    """The module ``tools/windows_host.py``."""
+    return _load_tool("windows_host", WINDOWS_HOST_TOOL)
 
 
 def artifacts(node, found=None) -> list[dict]:
