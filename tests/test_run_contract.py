@@ -38,7 +38,7 @@ from conftest import (CLONE, CLONE_NAME, EXACT, LAPSE_TABLE, MODEL_CODE, NEW_BUS
                       clone_state, commit, committed, deviation_rows, edit_file, expected_deviations,
                       folder_hashes, git, patch_text, rehash, require_clone, roles, run_stub, stored,
                       stub_regression, stub_release, stub_request, text, throwaway, with_columns, with_manifest,
-                      model_request, without_volatile)
+                      model_request, without_volatile, written_under)
 
 CORE_MODULES = ["documents", "export", "changes", "run", "compare", "signature", "replay", "regression",
                 "derive", "walk", "search", "workers", "__main__"]
@@ -61,7 +61,7 @@ def test_full_run_exports_every_model_point_and_writes_the_record(world):
         stored(folder / "request.json")
     for member in ("stage", "run_id", "release", "changes", "selection"):
         assert response[member] == request[member]
-    assert response["contract_version"] == record["contract_version"] == "3.0"
+    assert response["contract_version"] == record["contract_version"] == "3.1"
     assert response["time_basis"] == {"id": "policy_month"}
     assert response["model_points"] == [
         {"model_point_id": "MP-A", "first_period": 12, "last_period": 13},
@@ -141,7 +141,7 @@ def test_bad_request_is_rejected_with_the_response_alone(world, case, code):
         "duplicate-selection": request_bytes(
             world, selection={"mode": "subset", "model_point_ids": ["MP-A", "MP-A"]}),
         "unknown-member": request_bytes(world, priority="high"),
-        "a-response": document_bytes({"document": "run_response", "contract_version": "3.0",
+        "a-response": document_bytes({"document": "run_response", "contract_version": "3.1",
                                       "stage": "liability_cashflow", "run_id": "run-stub",
                                       "outcome": "rejected",
                                       "diagnostics": [{"code": "invalid_json", "message": "x"}]}),
@@ -155,7 +155,7 @@ def test_bad_request_is_rejected_with_the_response_alone(world, case, code):
     response = stored(folder / "response.json")
     assert not schema_errors(response, RUN_SCHEMA)
     assert [d["code"] for d in response["diagnostics"]] == [code]
-    assert response["contract_version"] == "3.0"
+    assert response["contract_version"] == "3.1"
     # Stage and run id are repeated where they can be read.
     readable = case not in {"not-json", "non-finite", "too-large", "not-an-object", "byte-order-mark",
                             "duplicate-member", "lone-surrogate"}
@@ -757,7 +757,8 @@ class AnyRelease(StubEngine):
 def test_the_error_examples_of_the_pack_are_written_by_the_core(world, case, engine):
     example = ROOT / "contracts" / "v3" / "examples" / "negative" / case
     shutil.copyfile(example / "request.json", world / "run" / "request.json")
-    result = run_request(world / "run" / "request.json", engine(), repositories=world)
+    with written_under("3.0"):  # the examples are 3.0 documents
+        result = run_request(world / "run" / "request.json", engine(), repositories=world)
     assert result.outcome == "error"
     assert (world / "run" / "response.json").read_bytes() == (example / "response.json").read_bytes()
 
@@ -968,7 +969,7 @@ def test_replay_of_an_unchanged_run_is_reproduced_exactly(world, with_changes):
     record = stored(folder / "replay-record.json")
     assert not schema_errors(record, RECORD_SCHEMA)
     assert record["procedure"] == {"type": "replay"} and record["outcome"] == "reproduced_exactly"
-    assert record["stage"] == "liability_cashflow" and record["contract_version"] == "3.0"
+    assert record["stage"] == "liability_cashflow" and record["contract_version"] == "3.1"
     # Every execution has its own record id: the replay, the repeated run, and the recorded run.
     repeated = stored(folder / "replay" / "run-record.json")
     assert RECORD_ID.fullmatch(record["record_id"]) and RECORD_ID.fullmatch(repeated["record_id"])
@@ -2172,7 +2173,7 @@ def test_unsupported_realisation_over_a_revision_is_rejected_and_names_the_chang
                folder, **{"class": "parameter"}),
         change("chg-switch", None, folder, realisation={"type": "engine_switch", "switch": "RC-1"}),
     ]
-    manifest = {"document": "change_manifest", "contract_version": "3.0", "stage": "liability_cashflow",
+    manifest = {"document": "change_manifest", "contract_version": "3.1", "stage": "liability_cashflow",
                 "manifest_id": "changes-synthetic", "base_release": "N", "changes": entries}
     (folder / "changes.json").write_bytes(document_bytes(manifest))
     assert cli(monkeypatch, "request", "--revision", START, "--repositories", REPOSITORIES, "--label", "N",
@@ -2194,7 +2195,7 @@ def test_an_enabled_revision_the_clone_does_not_hold_ends_with_the_outcome_error
     folder = tmp_path / "run"
     folder.mkdir()
     manifest = {
-        "document": "change_manifest", "contract_version": "3.0", "stage": "liability_cashflow",
+        "document": "change_manifest", "contract_version": "3.1", "stage": "liability_cashflow",
         "manifest_id": f"history-{START}-{'1' * 40}", "base_release": "N",
         "history": {"source": "git", "from": START, "to": "1" * 40,
                     "determines": ["code_state", "input_data", "parameter_set"], "remainder": []},
@@ -2241,7 +2242,7 @@ def test_changes_over_a_revision_and_replay_without_the_clone(monkeypatch, tmp_p
         change("chg-claim-expense", patch_text(MODEL_CODE, code, new_code), folder, **{"class": "code"}),
         change("chg-rename-point", patch_text(POINT_TABLE, points, new_points), folder),
     ]
-    manifest = {"document": "change_manifest", "contract_version": "3.0", "stage": "liability_cashflow",
+    manifest = {"document": "change_manifest", "contract_version": "3.1", "stage": "liability_cashflow",
                 "manifest_id": "changes-synthetic", "base_release": "N", "changes": entries}
     (folder / "changes.json").write_bytes(document_bytes(manifest))
     assert not schema_errors(manifest, CHANGES_SCHEMA)
@@ -2516,10 +2517,10 @@ def test_full_changed_case_on_all_model_points_of_release_n(monkeypatch, tmp_pat
     # table is the one that main wrote before the deviations left the result (story 9).
     assert compared["deviations"]["path"] == "compare.deviations.csv"
     assert (out / "compare.result.json").stat().st_size < 64 * 1024
-    # Contract version 3.0: the 2.0 table 7ba6c115... with "contract_version": "3.0", byte for byte; that
-    # table was the table of 1.0 (4fc28fbd...) with "contract_version": "2.0".
+    # Contract version 3.1: the 3.0 table 5ddfe219... with "contract_version": "3.1", byte for byte; that
+    # table was the 2.0 table 7ba6c115... with "3.0", and that the table of 1.0 (4fc28fbd...) with "2.0".
     assert sha256_file(out / "signature-table.json") == \
-        "5ddfe21969e468cbfe7e38bf25ce65e4086fa89cd0c7a980ad580b5047b73fc9"
+        "b39e4206d7991f2652ab1f458a913d149fbceef43600d08575d8e19c422cfa6d"
     assert len(stored(recorded / "response.json")["model_points"]) == 350
     # Exactly the new business deviates: no in-force point lies in policy year 1.
     lines = text(POINT_TABLE).splitlines()
@@ -3107,6 +3108,24 @@ def test_a_target_only_run_evaluates_no_model_check(world):
         "MP-B"] == (0, 2)
 
 
+def test_the_regression_refuses_the_record_of_a_target_only_run_and_nothing_runs(world, monkeypatch, capsys):
+    result, _ = run_stub(world, stub_request(world, selection=ALL_FOUR, target=CASH_TARGET))
+    assert result.outcome == "succeeded"
+    before = folder_hashes(world)
+    engine = StubEngine()
+    monkeypatch.setattr("degelmann.deltarecon.__main__.engine", lambda: engine)
+    assert main(["regression", str(result.record_path), "--revision", "HEAD", "--output", str(world / "out"),
+                 "--repositories", str(world)]) == 1
+    out = capsys.readouterr().out
+    assert out.splitlines()[0] == "regression: rejected" and "diagnostic: target_only_record: " in out
+    assert engine.opened == 0 and folder_hashes(world) == before and not (world / "out").exists()
+
+
+def test_the_replay_still_repeats_a_target_only_run(world):
+    result, _ = run_stub(world, stub_request(world, selection=ALL_FOUR, target=CASH_TARGET))
+    assert replay(result.record_path, StubEngine(), repositories=world).outcome == "reproduced_exactly"
+
+
 class _NoTargetEngine(StubEngine):
     @contextmanager
     def open(self, release, enabled, manifest_dir, repositories, hold=frozenset()):
@@ -3182,6 +3201,43 @@ def test_a_target_only_run_of_release_n_is_the_full_run_restricted_to_the_target
     start = next(p["first_period"] for p in full["model_points"] if p["model_point_id"] == in_force)
     assert start >= 144 and next(p for p in response["model_points"] if p["model_point_id"] == in_force)[
         "first_period"] == start + 12
+
+
+def test_a_target_only_subset_run_on_the_modelx_path_is_the_full_run_restricted_to_the_target(
+        monkeypatch, tmp_path):
+    """Bit for bit, on the computation path ``modelx`` with the real engine: the target-only run of the
+    quick start's target, Bruttobeitrag in projection periods 0 to 59, on a subset of a new and an in-force
+    point."""
+    from degelmann.deltarecon.engines.reference_model import engine_version, path_of
+    from degelmann.deltarecon.run import run_request_document
+    full_folder, target_folder = tmp_path / "full", tmp_path / "target"
+    request_path = model_request(monkeypatch, full_folder, NEW_BUSINESS, in_force_id(), path="modelx")
+    request = stored(request_path)
+    assert path_of(named_revisions(request)["engine_version"]) == "modelx" == path_of(engine_version("modelx"))
+    with counted_exports(monkeypatch) as calls:
+        full = run_model(request_path)
+        assert full.outcome == "succeeded", full.response
+        target = {"quantities": ["Bruttobeitrag"], "periods": {"first": 0, "last": 59}}
+        targeted = run_request_document(request["stage"], "run-n-subset-target", request["release"],
+                                        request["changes"], request["selection"], "the target-only request",
+                                        target=target)
+        target_folder.mkdir()
+        run = run_model(target_folder / "request.json", targeted)
+    assert run.outcome == "succeeded", run.response
+    assert calls == []  # the modelx path exports nothing
+    assert_documents_valid(target_folder)
+    assert run.response["target"] == target and [q["name"] for q in run.response["quantities"]] == ["Bruttobeitrag"]
+    whole = check_response(request, full.response, full_folder)
+    values = check_response(targeted, run.response, target_folder)
+    index = [q["name"] for q in full.response["quantities"]].index("Bruttobeitrag")
+    expected = {}
+    for point in full.response["model_points"]:
+        start = point["first_period"]
+        for period in range(start, min(start + 59, point["last_period"]) + 1):
+            expected[(point["model_point_id"], period)] = [whole[(point["model_point_id"], period)][index]]
+    assert len({point for point, _ in expected}) == 2
+    assert values == expected
+    assert [value.hex() for (value,) in values.values()] == [value.hex() for (value,) in expected.values()]
 
 
 def test_a_target_cell_that_returns_no_number_fails_its_point_alone():

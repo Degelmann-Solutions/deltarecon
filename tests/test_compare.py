@@ -29,7 +29,7 @@ from degelmann.deltarecon.signature import render_table, signature_table
 
 from conftest import (EXACT, EXAMPLES, POINTS, RECORD_ID, StubEngine, StubSession, compare_request, deviates,
                       deviation_rows, expected_deviations, folder_hashes, projection_periods, rehash, roles,
-                      rounded, run_side, stored, without_volatile)
+                      rounded, run_side, stored, without_volatile, written_under)
 
 COUNT, CASH = "Anzahl Verträge", "Netto-Cashflow"
 OUTPUTS = ["compare.deviations.csv", "compare.result.json", "compare.run-record.json", "signature-table.json"]
@@ -1079,7 +1079,8 @@ def test_the_reference_example_is_recomputed_by_the_core(tmp_path):
     for name in ("compare.result.json", "compare.deviations.csv", "compare.run-record.json",
                  "compare.signature-table.json"):
         (folder / name).unlink()
-    compared = compare(folder / "compare.request.json", signature_name="compare.signature-table.json")
+    with written_under("3.0"):  # the examples are 3.0 documents
+        compared = compare(folder / "compare.request.json", signature_name="compare.signature-table.json")
     assert compared.outcome == "compared" and not compared.no_deviation
     for name in ("compare.result.json", "compare.deviations.csv", "compare.signature-table.json"):
         assert (folder / name).read_bytes() == (EXAMPLES / "reference" / name).read_bytes(), name
@@ -1097,8 +1098,9 @@ def test_the_signature_table_examples_are_recomputed_by_the_core(tmp_path, name)
     outputs = ("compare.result.json", "compare.deviations.csv", "compare.signature-table.json")
     for output in outputs:
         (folder / output).unlink()
-    compared = compare(folder / "compare.request.json", record_name=None,
-                       signature_name="compare.signature-table.json")
+    with written_under("3.0"):  # the examples are 3.0 documents
+        compared = compare(folder / "compare.request.json", record_name=None,
+                           signature_name="compare.signature-table.json")
     assert compared.outcome == "compared" and compared.no_deviation == (name == "signature-empty")
     for output in outputs:
         assert (folder / output).read_bytes() == (EXAMPLES / name / output).read_bytes(), output
@@ -1302,7 +1304,8 @@ def test_the_other_negative_cases_of_story_9_carry_the_diagnostic_the_core_gives
     folder = tmp_path / "non-finite-difference"
     shutil.copytree(EXAMPLES / "negative" / "non-finite-difference", folder)
     (folder / "compare.result.json").unlink()
-    result = compare(folder / "compare.request.json", record_name=None).result
+    with written_under("3.0"):  # the examples are 3.0 documents
+        result = compare(folder / "compare.request.json", record_name=None).result
     assert (folder / "compare.result.json").read_bytes() == \
         (EXAMPLES / "negative" / "non-finite-difference" / "compare.result.json").read_bytes()
     assert result["diagnostics"][0]["model_point_ids"] == ["MP-0001"]

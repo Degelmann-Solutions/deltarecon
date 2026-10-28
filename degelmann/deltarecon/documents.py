@@ -4,9 +4,10 @@ Reading follows the order of ``contracts/v3/README.md``: the JSON profile, the c
 version, and then the schema. Every broken rule raises a :class:`Rejection` that carries
 the diagnostic of the contract.
 
-The tool writes contract version 3.0 and reads 1.0, 2.0, and 3.0. A document is checked
+The tool writes contract version 3.1 and reads 1.0, 2.0, 3.0, and 3.1. A document is checked
 against the schemas of its own version: a 1.0 document against ``contracts/v1/schemas``, a
-2.0 document against ``contracts/v2/schemas``, a 3.0 document against ``contracts/v3/schemas``.
+2.0 document against ``contracts/v2/schemas``, a 3.0 or 3.1 document against
+``contracts/v3/schemas``, which accept both minor versions of 3.
 """
 from __future__ import annotations
 
@@ -20,11 +21,11 @@ from pathlib import Path
 from jsonschema import Draft202012Validator
 from referencing import Registry, Resource
 
-CONTRACT_VERSION = "3.0"
+CONTRACT_VERSION = "3.1"
 CONTRACTS = Path(__file__).resolve().parents[2] / "contracts"
 # The versions a reader accepts, each with the schemas of its pack.
 SCHEMA_FOLDERS = {"1.0": CONTRACTS / "v1" / "schemas", "2.0": CONTRACTS / "v2" / "schemas",
-                  "3.0": CONTRACTS / "v3" / "schemas"}
+                  "3.0": CONTRACTS / "v3" / "schemas", "3.1": CONTRACTS / "v3" / "schemas"}
 SCHEMA_NAMES = ["common", "run", "changes", "compare", "localise", "run-record"]
 
 RUN_SCHEMA = "run.schema.json"

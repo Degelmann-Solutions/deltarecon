@@ -6,7 +6,7 @@
   "$defs": {
     "contract_version": {
       "description": "Version of the stage contracts the document follows.",
-      "const": "3.0"
+      "enum": ["3.0", "3.1"]
     },
     "stage": {
       "description": "Stage identifier, for example liability_cashflow.",

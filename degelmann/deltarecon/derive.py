@@ -25,7 +25,7 @@ from pathlib import Path
 
 from . import changes as changes_contract
 from .documents import CHANGES_SCHEMA, CONTRACT_VERSION, Rejection, write_document
-from .replay import RecordedRun, read_recorded_run
+from .replay import RecordedRun, read_recorded_run, refuse_target_only
 from .run import Engine, History, UsageError, repositories_folder
 
 REVISION = "revision"
@@ -39,11 +39,14 @@ class DeriveResult:
 
 
 def read_derive_input(record_path: Path | str, stages) -> RecordedRun:
-    """A recorded run a derivation starts from: succeeded, and without enabled changes.
+    """A recorded run a derivation, a walk, or a search starts from: succeeded, full, and without
+    enabled changes.
 
-    The state of a run with enabled changes is no revision of the history.
+    The state of a run with enabled changes is no revision of the history. The record of a
+    target-only run is refused with ``target_only_record``.
     """
     recorded = read_recorded_run(Path(record_path), stages)
+    refuse_target_only(recorded)
     if recorded.request["changes"]["enabled"]:
         raise UsageError(f"the run of {recorded.record_path} has enabled changes; a manifest is derived "
                          "from the records of two runs without enabled changes")

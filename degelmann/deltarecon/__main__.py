@@ -30,9 +30,9 @@ and the repeated run, and writes ``replay-compare.request.json``,
 ``replay-compare.result.json``, ``replay-compare.deviations.csv`` when the runs are
 compared, and ``replay-record.json``. A recorded run with the outcome ``error`` is
 repeated and its response compared byte for byte, apart from ``contract_version`` for a run
-recorded under 2.0; nothing else is compared. The record must name one of the present
+recorded under 2.0 or 3.0; nothing else is compared. The record must name one of the present
 engine versions, and the replay repeats the run on the computation path it names. A run record written under contract version
-2.0 or 3.0 is replayed; one written under 1.0 is rejected with ``unsupported_version``.
+2.0, 3.0, or 3.1 is replayed; one written under 1.0 is rejected with ``unsupported_version``.
 
 ``compare`` compares the two runs a compare request names and writes
 ``compare.result.json`` beside the request, ``compare.deviations.csv`` and
@@ -46,13 +46,14 @@ tolerance" or the deviating model points and the signature table. It writes ever
 into the new folder ``--output``. ``--path export|modelx`` chooses the computation path the
 engine version names, export by default. The recorded run may come from another engine
 version; the new run uses the present engine on that path, and the output names both versions.
+The record of a target-only run is rejected with ``target_only_record``, and nothing runs.
 
 ``derive`` reads the records of two succeeded runs without enabled changes, the older one
 first, and writes the change manifest of the history between the revisions they name: one
 change per revision on the main line, each with the change before it as its only
 prerequisite. The same two records give the same bytes. The folder of ``--output`` must
-exist. Revisions that are not on one main line, a revision the clone does not hold, and
-records of two stages are rejected with their diagnostic code, and nothing is written.
+exist. The record of a target-only run, revisions that are not on one main line, a revision
+the clone does not hold, and records of two stages are rejected with their diagnostic code, and nothing is written.
 
 ``walk`` reads the same two records, derives the manifest, runs every state from the
 older revision to the newer one on the selection of both records into the new folder
@@ -74,7 +75,8 @@ target, the intervals judged, its runs, and the runs saved against a walk.
 With ``--walk FOLDER``, a walk folder of the same two records, it copies the walk into
 ``walk/`` and names the contributions it missed. A search does not see contributions that
 cancel within one interval. A walk that does not attribute every revision or does not fit the
-search is refused with ``walk_not_attributed`` or ``walk_mismatch``, and nothing is written;
+search is refused with ``walk_not_attributed`` or ``walk_mismatch``, also a walk folder one of whose
+states names a target, and nothing is written;
 an unknown quantity or an empty period range is a usage error. ``--reuse-walk`` (with ``--walk``
 only) takes every state the search needs from the copied walk instead of running it, with the
 same findings; a reused state is no run, and the result and the run record name the switch.
@@ -472,7 +474,7 @@ def main(argv: list[str] | None = None) -> int:
     comparison.set_defaults(handler=command_compare)
 
     regress = commands.add_parser("regression", help="check a recorded run against a newer revision")
-    regress.add_argument("run_record", help="the record of a succeeded run without enabled changes")
+    regress.add_argument("run_record", help="the record of a succeeded full run without enabled changes")
     regress.add_argument("--revision", required=True, metavar="COMMIT",
                          help="the newer release: a name of a commit in the clone")
     regress.add_argument("--output", required=True, help="the folder to write; it must not exist")
@@ -482,7 +484,7 @@ def main(argv: list[str] | None = None) -> int:
 
     history = commands.add_parser("derive", help="derive the change manifest of the history between two "
                                                  "recorded runs")
-    history.add_argument("older_record", help="the record of a succeeded run without enabled changes")
+    history.add_argument("older_record", help="the record of a succeeded full run without enabled changes")
     history.add_argument("newer_record", help="the record of such a run of a newer revision")
     history.add_argument("--output", required=True,
                          help="path of the manifest to write; its folder must exist")
@@ -490,14 +492,14 @@ def main(argv: list[str] | None = None) -> int:
 
     stepper = commands.add_parser("walk", help="run every state between two recorded runs and attribute "
                                                "the deviation to revisions")
-    stepper.add_argument("older_record", help="the record of a succeeded run without enabled changes")
+    stepper.add_argument("older_record", help="the record of a succeeded full run without enabled changes")
     stepper.add_argument("newer_record", help="the record of such a run of a newer revision, on the same selection")
     stepper.add_argument("--output", required=True, help="the folder to write; it must not exist")
     stepper.set_defaults(handler=command_walk)
 
     halver = commands.add_parser("search", help="halve the history between two recorded runs for a target "
                                                "and check it against a walk")
-    halver.add_argument("older_record", help="the record of a succeeded run without enabled changes")
+    halver.add_argument("older_record", help="the record of a succeeded full run without enabled changes")
     halver.add_argument("newer_record", help="the record of such a run of a newer revision, on the same selection")
     halver.add_argument("--output", required=True, help="the folder to write; it must not exist")
     halver.add_argument("--quantity", action="append", default=[], metavar="NAME",

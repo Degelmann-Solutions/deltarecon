@@ -78,7 +78,7 @@ def test_linear_history_gives_one_chained_change_per_revision(world):
     assert list(manifest) == ["document", "contract_version", "stage", "manifest_id", "base_release",
                               "history", "changes"]
     assert (manifest["document"], manifest["contract_version"], manifest["stage"]) == (
-        "change_manifest", "3.0", "liability_cashflow")
+        "change_manifest", "3.1", "liability_cashflow")
     assert manifest["manifest_id"] == "history-r0-r3" and manifest["base_release"] == "N"
     assert manifest["history"] == {"source": "git", "from": "r0", "to": "r3",
                                    "determines": ["input_data", "release_folder"], "remainder": []}
@@ -226,6 +226,21 @@ def test_a_history_the_contract_does_not_allow_writes_no_manifest(history, messa
 def derive_command(monkeypatch, world: Path, older, newer, output, engine=HistoryStub) -> int:
     monkeypatch.setattr("degelmann.deltarecon.__main__.engine", engine)
     return main(["derive", str(older), str(newer), "--output", str(output), "--repositories", str(world)])
+
+
+TARGET = {"quantities": ["Anzahl Verträge"], "periods": {"first": 0, "last": 1}}
+
+
+@pytest.mark.parametrize("side", ["older", "newer"])
+def test_the_record_of_a_target_only_run_is_refused_and_nothing_is_written(world, monkeypatch, capsys, side):
+    older = record(world, "r0", label="N", **({"target": TARGET} if side == "older" else {}))
+    newer = record(world, "r3", **({"target": TARGET} if side == "newer" else {}))
+    before = folder_hashes(world)
+    engine = HistoryStub()
+    assert derive_command(monkeypatch, world, older, newer, world / "changes.json", lambda: engine) == 1
+    out = capsys.readouterr().out
+    assert out.splitlines()[0] == "derive: rejected" and "diagnostic: target_only_record: " in out
+    assert engine.opened == 0 and folder_hashes(world) == before and not (world / "changes.json").exists()
 
 
 def test_derive_command_prints_the_changes_and_the_remainder(world, monkeypatch, capsys):
