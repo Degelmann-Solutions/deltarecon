@@ -15,6 +15,6 @@ class UsageError(Exception):
     state request a walk or a search builds, would violate its schema; an output exists already;
     a number of workers is not a whole number of at least 1; a switch is given without the
     switch or the value it needs; an option has a value it does not take; or the history of a
-    clone is cut off or git is missing. It writes no document and is not a
+    clone is cut off. It writes no document and is not a
     :class:`~degelmann.deltarecon.documents.Rejection`.
     """

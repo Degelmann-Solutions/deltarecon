@@ -1,6 +1,7 @@
 """The reference model ``RLV_DE_S`` behind the run contract.
 
-This is the only module that imports modelx and the only one that starts Git. It checks
+This is the only module that imports modelx and the only one that reads the clone, with
+dulwich; no module of the package starts a process, so no installed Git is needed. It checks
 the release identity, restores the state of the named revisions to a scratch folder,
 applies the enabled text patches there, lists the model points, projects a selection,
 maps the model's variables to the quantity names of the domain reference, reports
@@ -130,18 +131,18 @@ merge is one revision. The class of a touched path:
 - every other path has no class.
 
 The paths a revision touches are those that differ from its first parent, without rename
-detection: a moved file counts with its old and its new path. Git is asked through
-plumbing commands with explicit options, and the log message is read from the commit
-object, so that no configuration of the user or the system changes the result.
+detection: a moved file counts with its old and its new path. References, commits, trees,
+and blobs are read from the object store of the clone with dulwich, without replace
+references, and the log message is read from the commit object, so that no configuration
+of the user or the system changes the result.
 """
 from __future__ import annotations
 
 import importlib.util
-import os
 import platform
 import re
 import shutil
-import subprocess
+import stat
 import sys
 import tempfile
 import traceback
@@ -153,6 +154,11 @@ import modelx as mx
 from modelx.core import errors as mx_errors
 import numpy as np
 import pandas as pd
+from dulwich.diff_tree import tree_changes
+from dulwich.object_store import iter_tree_contents
+from dulwich.objects import Commit, object_class
+from dulwich.objectspec import parse_commit
+from dulwich.repo import Repo
 
 from .. import changes as changes_contract
 from ..compare import target_window
@@ -318,43 +324,64 @@ def state_revision(release: dict) -> str:
 # --- the clone ------------------------------------------------------------------------
 
 
-def _git(clone: Path, *arguments: str, stdin: bytes | None = None) -> subprocess.CompletedProcess:
-    """Run a Git command that reads the clone. It takes no lock and fetches nothing.
+@contextmanager
+def _reading(clone: Path, refusal: str):
+    """The repository at ``clone``, opened for reading and closed after use.
 
-    Replace references are ignored: a hash names the object with that hash and no other.
+    Nothing is written to the clone: no lock, no fetch. The references are read without
+    ``refs/replace``, so a hash names the object with that hash and no other. A folder that
+    is no repository is not looked up above. Any error while the clone is opened or read
+    becomes the rejection ``unknown_reference`` with the message ``refusal``.
     """
-    environment = {name: value for name, value in os.environ.items()
-                   if name not in ("GIT_DIR", "GIT_WORK_TREE", "GIT_INDEX_FILE", "GIT_OBJECT_DIRECTORY")}
-    # A folder that is no repository must not resolve to a repository above it.
-    environment.update(GIT_OPTIONAL_LOCKS="0", GIT_NO_LAZY_FETCH="1", GIT_TERMINAL_PROMPT="0",
-                       GIT_NO_REPLACE_OBJECTS="1",
-                       GIT_CEILING_DIRECTORIES=str(clone.parent))
     try:
-        return subprocess.run(["git", "--no-optional-locks", "-C", str(clone), *arguments], input=stdin,
-                              capture_output=True, env=environment)
-    except FileNotFoundError:
-        raise UsageError("git is not installed or not on the PATH; the reference model is read "
-                         "from a Git clone") from None
+        repository = Repo(str(clone))
+    except Exception:
+        raise Rejection("unknown_reference", refusal) from None
+    try:
+        yield repository
+    except (Rejection, UsageError):
+        raise
+    except Exception:
+        raise Rejection("unknown_reference", refusal) from None
+    finally:
+        repository.close()  # Windows keeps an open pack file locked
+
+
+def _object(store, object_id: str) -> tuple[str, bytes] | None:
+    """The type name and the raw content of an object, or ``None`` when the store lacks it."""
+    try:
+        type_number, content = store.get_raw(object_id.encode("ascii"))
+    except KeyError:
+        return None
+    return object_class(type_number).type_name.decode("ascii"), content
 
 
 def find_clone(repositories: Path) -> Path:
     """The local clone of the reference model repository below ``repositories``."""
     clone = Path(repositories).resolve() / CLONE_NAME
-    # Git is started before the folder decides: without Git the command does not start.
-    is_repository = _git(clone, "rev-parse", "--git-dir").returncode == 0
-    if not clone.is_dir() or not is_repository:
-        raise Rejection("unknown_reference", f"There is no clone of {REPOSITORY_URL} at {clone}. "
-                        f"Create it with: git clone {REPOSITORY_URL} {clone}")
+    refusal = (f"There is no clone of {REPOSITORY_URL} at {clone}. "
+               f"Create it with: git clone {REPOSITORY_URL} {clone}")
+    if not clone.is_dir():
+        raise Rejection("unknown_reference", refusal)
+    with _reading(clone, refusal):
+        pass
     return clone
 
 
 def resolve_revision(name: str, repositories: Path) -> str:
-    """The full hash of the commit that ``name`` names in the clone: a hash, a branch, ``HEAD``."""
+    """The full hash of the commit that ``name`` names in the clone.
+
+    A name is a full or a short hash, a branch, a tag, or ``HEAD``; a tag names the commit
+    it points to. Ancestry suffixes such as ``HEAD~1`` name no commit here.
+    """
     clone = find_clone(repositories)
-    done = _git(clone, "rev-parse", "--verify", "--quiet", "--end-of-options", f"{name}^{{commit}}")
-    revision = done.stdout.decode("ascii", "replace").strip()
-    if done.returncode != 0 or not re.fullmatch(r"[0-9a-f]{40}", revision):
-        raise Rejection("unknown_reference", f"The clone at {clone} holds no commit named {name!r}.")
+    refusal = f"The clone at {clone} holds no commit named {name!r}."
+    if not name:  # an empty name is no reference; dulwich would look it up as ``refs/remotes//HEAD``
+        raise Rejection("unknown_reference", refusal)
+    with _reading(clone, refusal) as repository:
+        revision = parse_commit(repository, name.encode("utf-8")).id.decode("ascii")
+    if not re.fullmatch(r"[0-9a-f]{40}", revision):
+        raise Rejection("unknown_reference", refusal)
     return revision
 
 
@@ -372,36 +399,41 @@ def release_references(revision: str, input_revision: str | None = None,
             {"kind": "engine_version", "value": engine_version(path)}]
 
 
+def _commit_object(store, clone: Path, revision: str) -> bytes:
+    """The raw commit object ``revision``; ``unknown_reference`` when it is absent or no commit."""
+    found = _object(store, revision)
+    if found is None:
+        raise Rejection("unknown_reference", f"The clone at {clone} holds no object {revision}.")
+    kind, content = found
+    if kind != "commit":
+        raise Rejection("unknown_reference", f"The object {revision} is a {kind}, not a commit.")
+    return content
+
+
 def read_tree(clone: Path, revision: str) -> dict[str, str]:
     """Path and blob id of every file of the commit ``revision``.
 
     Raises ``unknown_reference`` when the clone holds no commit with this hash, or when
     the commit holds an entry that is not a regular file.
     """
-    kind = _git(clone, "cat-file", "-t", revision)
-    if kind.returncode != 0:
-        raise Rejection("unknown_reference", f"The clone at {clone} holds no object {revision}.")
-    if kind.stdout.strip() != b"commit":
-        raise Rejection("unknown_reference", f"The object {revision} is a {kind.stdout.decode().strip()}, "
-                        "not a commit.")
-    listing = _git(clone, "ls-tree", "-r", "-z", "--full-tree", revision)
-    if listing.returncode != 0:
-        raise Rejection("unknown_reference", f"The tree of the commit {revision} cannot be read from {clone}.")
+    refusal = f"The tree of the commit {revision} cannot be read from {clone}."
+    with _reading(clone, refusal) as repository:
+        store = repository.object_store
+        commit = Commit.from_raw_string(Commit.type_num, _commit_object(store, clone, revision))
+        entries = list(iter_tree_contents(store, commit.tree))
     files = {}
-    for entry in listing.stdout.split(b"\0")[:-1]:
-        meta, raw_path = entry.split(b"\t", 1)
-        mode, object_type, blob = meta.decode("ascii").split()
+    for entry in entries:
         try:
-            path = raw_path.decode("utf-8")
+            path = entry.path.decode("utf-8")
         except UnicodeDecodeError:
             raise Rejection("unknown_reference", f"The commit {revision} holds a path that is not "
                             "UTF-8.") from None
         parts = path.split("/")
-        if (object_type != "blob" or mode not in ("100644", "100755") or "\\" in path
+        if (not stat.S_ISREG(entry.mode) or "\\" in path
                 or any(part in ("", ".", "..", ".git") for part in parts)):
             raise Rejection("unknown_reference", f"The commit {revision} holds {path}, which is not a "
                             "regular file; the engine restores regular files only.")
-        files[path] = blob
+        files[path] = entry.sha.decode("ascii")
     return files
 
 
@@ -424,20 +456,15 @@ def path_class(path: str) -> str | None:
 
 
 def _require_commit(clone: Path, revision: str) -> None:
-    kind = _git(clone, "cat-file", "-t", revision)
-    if kind.returncode != 0:
-        raise Rejection("unknown_reference", f"The clone at {clone} holds no object {revision}.")
-    if kind.stdout.strip() != b"commit":
-        raise Rejection("unknown_reference", f"The object {revision} is a {kind.stdout.decode().strip()}, "
-                        "not a commit.")
+    with _reading(clone, f"The clone at {clone} holds no object {revision}.") as repository:
+        _commit_object(repository.object_store, clone, revision)
 
 
 def _refuse_cut_off_history(clone: Path) -> None:
     """A shallow clone lacks parents, so its main line would end early and look unrelated."""
-    shallow = _git(clone, "rev-parse", "--is-shallow-repository")
-    if shallow.returncode != 0:
-        raise Rejection("unknown_reference", f"The clone at {clone} cannot be read.")
-    if shallow.stdout.strip() != b"false":
+    with _reading(clone, f"The clone at {clone} cannot be read.") as repository:
+        shallow = (Path(repository.commondir()) / "shallow").exists()
+    if shallow:
         raise UsageError(f"the history of the clone at {clone} is cut off (a shallow clone); the history "
                          "between two revisions is read from a complete clone. Complete it with: "
                          f"git -C {clone} fetch --unshallow")
@@ -445,24 +472,30 @@ def _refuse_cut_off_history(clone: Path) -> None:
 
 def main_line(clone: Path, revision: str) -> list[str]:
     """The first-parent chain of a commit, the commit itself first."""
-    listing = _git(clone, "rev-list", "--first-parent", "--end-of-options", revision)
-    hashes = listing.stdout.decode("ascii", "replace").split()
-    if listing.returncode != 0 or hashes[:1] != [revision]:
-        raise Rejection("unknown_reference", f"The history of the commit {revision} cannot be read from {clone}.")
+    hashes = []
+    with _reading(clone, f"The history of the commit {revision} cannot be read from {clone}.") as repository:
+        store, current = repository.object_store, revision.encode("ascii")
+        while current is not None:
+            hashes.append(current.decode("ascii"))
+            parents = store[current].parents
+            current = parents[0] if parents else None
     return hashes
 
 
 def touched_paths(clone: Path, parent: str, revision: str) -> list[str]:
     """The paths that differ between a commit and its first parent, sorted.
 
-    Renames are not detected: a moved file is listed with its old and its new path.
+    Renames are not detected: a moved file is listed with its old and its new path. A
+    submodule entry counts like a file.
     """
-    listing = _git(clone, "diff-tree", "-r", "-z", "--name-only", "--no-renames", "--ignore-submodules=none",
-                   "--end-of-options", parent, revision)
-    if listing.returncode != 0:
-        raise Rejection("unknown_reference", f"The difference of the commit {revision} to its first parent "
-                        f"cannot be read from {clone}.")
-    return sorted(raw.decode("utf-8", "replace") for raw in listing.stdout.split(b"\0") if raw)
+    refusal = f"The difference of the commit {revision} to its first parent cannot be read from {clone}."
+    with _reading(clone, refusal) as repository:
+        store = repository.object_store
+        trees = [store[name.encode("ascii")].tree for name in (parent, revision)]
+        # A path whose type changes may come as a deletion and an addition: it is listed once.
+        paths = {entry.path for change in tree_changes(store, *trees)
+                 for entry in (change.old, change.new) if entry is not None and entry.path is not None}
+    return sorted(raw.decode("utf-8", "replace") for raw in paths)
 
 
 def log_messages(clone: Path, revisions: list[str]) -> list[str]:
@@ -473,20 +506,14 @@ def log_messages(clone: Path, revisions: list[str]) -> list[str]:
     """
     if not revisions:
         return []
-    done = _git(clone, "cat-file", "--batch", stdin="".join(f"{revision}\n" for revision in revisions).encode("ascii"))
-    if done.returncode != 0:
-        raise Rejection("unknown_reference", f"The commits of the history cannot be read from {clone}.")
-    data, position, messages = done.stdout, 0, []
-    for revision in revisions:
-        line_end = data.find(b"\n", position)
-        header = data[position:line_end].split() if line_end >= 0 else []
-        if len(header) != 3 or header[1] != b"commit":
-            raise Rejection("unknown_reference", f"The clone at {clone} does not hold the commit {revision}.")
-        size = int(header[2])
-        content = data[line_end + 1:line_end + 1 + size]
-        position = line_end + 1 + size + 1  # a line feed follows the content
-        _, separator, message = content.partition(b"\n\n")
-        messages.append(message.decode("utf-8", "replace") if separator else "")
+    messages = []
+    with _reading(clone, f"The commits of the history cannot be read from {clone}.") as repository:
+        for revision in revisions:
+            found = _object(repository.object_store, revision)
+            if found is None or found[0] != "commit":
+                raise Rejection("unknown_reference", f"The clone at {clone} does not hold the commit {revision}.")
+            _, separator, message = found[1].partition(b"\n\n")
+            messages.append(message.decode("utf-8", "replace") if separator else "")
     return messages
 
 
@@ -514,19 +541,15 @@ def export_tree(clone: Path, files: dict[str, str], target: Path) -> None:
         if target not in target.joinpath(*path.split("/")).resolve().parents:
             raise Rejection("unknown_reference", f"The revision holds {path}, which is not a path "
                             "inside the restored state.")
-    done = _git(clone, "cat-file", "--batch", stdin="".join(f"{files[path]}\n" for path in paths).encode("ascii"))
-    if done.returncode != 0:
-        raise Rejection("unknown_reference", f"The files of the revision cannot be read from {clone}.")
-    data, position = done.stdout, 0
-    for path in paths:
-        line_end = data.index(b"\n", position)
-        header = data[position:line_end].split()
-        if len(header) != 3 or header[1] != b"blob":
-            raise Rejection("unknown_reference", f"The clone at {clone} does not hold the file {path} "
-                            "of the revision.")
-        size = int(header[2])
-        content = data[line_end + 1:line_end + 1 + size]
-        position = line_end + 1 + size + 1  # a line feed follows the content
+    contents = []
+    with _reading(clone, f"The files of the revision cannot be read from {clone}.") as repository:
+        for path in paths:
+            found = _object(repository.object_store, files[path])
+            if found is None or found[0] != "blob":
+                raise Rejection("unknown_reference", f"The clone at {clone} does not hold the file {path} "
+                                "of the revision.")
+            contents.append(found[1])
+    for path, content in zip(paths, contents):
         file = target.joinpath(*path.split("/"))
         file.parent.mkdir(parents=True, exist_ok=True)
         file.write_bytes(content)
