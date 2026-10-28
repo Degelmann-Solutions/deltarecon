@@ -1,18 +1,21 @@
 """The reproduction oracle: the two published run requests of the reference walk and the SHA-256
-of its walk result and of every signature table it writes, under contract version 3.0, and the
-archive of the oracle of 2026-10-22, published under contract version 2.0.
+of its walk result and of every signature table it writes, under contract version 3.1, and the
+archives of the oracle of 2026-10-22, published under contract version 2.0, and of the oracle of
+2026-10-27, published under contract version 3.0.
 
 The reference walk runs from the start commit of the reference chain of ``delib-history``, which
 holds release N on the fixed model, to the newer revision: 32 commits on the main line. The archived
 oracle walked the earlier chain from release N to ``ab5dc79``, whose first 32 commits the new chain
 repeats one by one on the fixed model; its last three commits changed no result.
 
-The fast tests check the published files: the renewed requests are those of the archive with
-contract version 3.0, the engine version of the export path under Python 3.14.9, and the two ends of
-the new chain in place of release N and ``ab5dc79``, and the archived files stay well formed. The
-reproduction runs both requests and the walk on all 350 model points, and is skipped unless it is
-asked for: ``DELTARECON_ORACLE=1``. Besides the renewed hashes it checks every signature table against
-the archive. The archived tables were built under 2.0, which paired values by policy month; the present
+The fast tests check the published files: the renewed requests are those of the 3.0 archive with
+contract version 3.1, and those of the 2.0 archive with contract version 3.1, the engine version of the
+export path under Python 3.14.9, and the two ends of the new chain in place of release N and
+``ab5dc79``, and the archived files stay well formed. The reproduction runs both requests and the walk
+on all 350 model points, and is skipped unless it is asked for: ``DELTARECON_ORACLE=1``. Besides the
+renewed hashes it checks every signature table against both archives. Against the 3.0 archive each
+table, with its contract version set back to ``3.0``, hashes to the archived digest: 3.1 changes no
+value and no period. The 2.0 tables were built under 2.0, which paired values by policy month; the present
 tables carry projection periods. So each table is rebuilt in policy months from the deviation file of
 its step: every row's period gets back the first exported period of its model point in the step's left
 state export, the table is derived again from the rows, and its contract version is set back to the
@@ -44,8 +47,11 @@ from degelmann.deltarecon.signature import signature_table
 from conftest import CLONE, NEWER, RELEASE_N, REPOSITORIES, ROOT, START, export_coordinates, git, require_clone
 
 ORACLE = ROOT / "oracle"
+PUBLISHED_VERSION = "3.1"
 ARCHIVE = ORACLE / "archive" / "2026-10-22"
 ARCHIVED_VERSION = "2.0"
+# The oracle published under 3.0, with the same engine version and ends as the present one.
+ARCHIVE_3_0 = ORACLE / "archive" / "2026-10-27"
 ENGINE_VERSION = "modelx 0.33.0 export, pandas 3.0.6, numpy 2.5.3, Python 3.14.9"
 ARCHIVED_ENGINE_VERSION = "modelx 0.33.0, pandas 3.0.6, numpy 2.5.3, Python 3.12.13"
 PROFILE = ROOT / "profiles" / "tolerance-bruttobeitrag.json"
@@ -83,7 +89,7 @@ def in_policy_months(walk: Path, name: str) -> bytes:
     request = parse_document((walk / f"{prefix}.request.json").read_bytes())
     deviations = read_result_deviations(result, walk)
     table = parse_document((walk / name).read_bytes())
-    assert table["contract_version"] == "3.0" and table == signature_table(result, deviations), name
+    assert table["contract_version"] == PUBLISHED_VERSION and table == signature_table(result, deviations), name
     left = walk / request["left"]["response"]["path"]
     export = left.parent / parse_document(left.read_bytes())["export"]["artifact"]["path"]
     offsets = first_periods({(point, period) for point, period, _ in export_coordinates(export)})
@@ -91,11 +97,22 @@ def in_policy_months(walk: Path, name: str) -> bytes:
     return document_bytes({**signature_table(result, rows), "contract_version": ARCHIVED_VERSION})
 
 
+def under_3_0(walk: Path, name: str) -> bytes:
+    """The bytes of the signature table ``name`` of the walk folder ``walk`` with its contract version set
+    back to ``3.0``; the member order is kept."""
+    table = parse_document((walk / name).read_bytes())
+    assert table["contract_version"] == PUBLISHED_VERSION, name
+    return document_bytes({**table, "contract_version": "3.0"})
+
+
 def archive_mismatches(walk: Path) -> list[str]:
-    """The signature tables of ``walk`` whose rebuild in policy months does not hash to the archived digest."""
-    archived = tables(listed_hashes(ARCHIVE))
-    return [name for name, digest in archived.items()
-            if hashlib.sha256(in_policy_months(walk, name)).hexdigest() != digest]
+    """The signature tables of ``walk`` that do not hash to the digest of an archive: rebuilt in policy
+    months under 2.0 against the archive of 2026-10-22, and under 3.0 against that of 2026-10-27."""
+    mismatches = []
+    for folder, rebuild in ((ARCHIVE, in_policy_months), (ARCHIVE_3_0, under_3_0)):
+        mismatches += [f"{folder.name}/{name}" for name, digest in tables(listed_hashes(folder)).items()
+                       if hashlib.sha256(rebuild(walk, name)).hexdigest() != digest]
+    return mismatches
 
 
 def check_request(request: dict, name: str, engine_version: str, revision: str) -> None:
@@ -110,9 +127,9 @@ def check_request(request: dict, name: str, engine_version: str, revision: str) 
 
 
 @pytest.mark.parametrize("name", sorted(REQUESTS))
-def test_published_request_is_a_3_0_run_request_of_its_pinned_revision(name):
+def test_published_request_is_a_3_1_run_request_of_its_pinned_revision(name):
     request = read_document(ORACLE / name, RUN_SCHEMA, "run_request")
-    assert request["contract_version"] == "3.0"
+    assert request["contract_version"] == PUBLISHED_VERSION
     check_request(request, name, ENGINE_VERSION, REQUESTS[name][2])
 
 
@@ -126,7 +143,17 @@ def test_published_request_is_the_archived_one_but_for_the_contract_and_engine_v
                              .replace(ARCHIVED_ENDS[name].encode(), REQUESTS[name][2].encode()))
     assert renewed != archived
     assert {**published, "contract_version": ARCHIVED_VERSION} == renewed
-    assert (ORACLE / name).read_bytes() == document_bytes({**renewed, "contract_version": "3.0"})
+    assert (ORACLE / name).read_bytes() == document_bytes({**renewed, "contract_version": PUBLISHED_VERSION})
+
+
+@pytest.mark.parametrize("name", sorted(REQUESTS))
+def test_published_request_is_the_archived_3_0_one_but_for_the_contract_version(name):
+    archived = (ARCHIVE_3_0 / name).read_bytes()
+    assert parse_document(archived)["contract_version"] == "3.0"
+    assert (ORACLE / name).read_bytes() == document_bytes(
+        {**parse_document(archived), "contract_version": PUBLISHED_VERSION})
+    assert (ORACLE / name).read_bytes() == archived.replace(b'"contract_version": "3.0"',
+                                                           b'"contract_version": "3.1"')
 
 
 @pytest.mark.parametrize("name", sorted(REQUESTS))
@@ -136,13 +163,20 @@ def test_archived_request_is_a_2_0_run_request_of_its_pinned_revision(name):
     check_request(request, name, ARCHIVED_ENGINE_VERSION, ARCHIVED_ENDS[name])
 
 
+@pytest.mark.parametrize("name", sorted(REQUESTS))
+def test_archived_request_is_a_3_0_run_request_of_its_pinned_revision(name):
+    request = read_document(ARCHIVE_3_0 / name, RUN_SCHEMA, "run_request")
+    assert request["contract_version"] == "3.0"
+    check_request(request, name, ENGINE_VERSION, REQUESTS[name][2])
+
+
 def test_newer_revision_lies_on_the_main_line_32_commits_after_the_start():
     require_clone(CLONE, NEWER)
     assert START in git(CLONE, "rev-list", "--first-parent", NEWER).decode("ascii").split()
     assert len(git(CLONE, "rev-list", "--first-parent", f"{START}..{NEWER}").split()) == 32
 
 
-@pytest.mark.parametrize("folder", [ORACLE, ARCHIVE], ids=["published", "archived"])
+@pytest.mark.parametrize("folder", [ORACLE, ARCHIVE, ARCHIVE_3_0], ids=["published", "archived-2.0", "archived-3.0"])
 def test_sums_list_the_walk_result_and_signature_tables_only(folder):
     hashes = listed_hashes(folder)
     assert WALK_RESULT in hashes
@@ -151,12 +185,20 @@ def test_sums_list_the_walk_result_and_signature_tables_only(folder):
     assert PROFILE.is_file()
 
 
-def test_published_sums_list_the_archived_signature_tables():
-    assert set(tables(listed_hashes())) == set(tables(listed_hashes(ARCHIVE)))
+@pytest.mark.parametrize("archive", [ARCHIVE, ARCHIVE_3_0], ids=["2.0", "3.0"])
+def test_published_sums_list_the_archived_signature_tables(archive):
+    assert set(tables(listed_hashes())) == set(tables(listed_hashes(archive)))
 
 
-def test_archive_holds_the_four_files_of_the_oracle_only():
-    assert sorted(path.name for path in ARCHIVE.iterdir()) == \
+def test_the_published_hashes_differ_from_those_of_the_3_0_archive():
+    """3.1 stamps its version into every table and response, so no hash stays."""
+    published, archived = listed_hashes(), listed_hashes(ARCHIVE_3_0)
+    assert all(published[name] != archived[name] for name in published)
+
+
+@pytest.mark.parametrize("archive", [ARCHIVE, ARCHIVE_3_0], ids=["2.0", "3.0"])
+def test_archive_holds_the_four_files_of_the_oracle_only(archive):
+    assert sorted(path.name for path in archive.iterdir()) == \
         ["REPRODUCTIONS.md", "SHA256SUMS", "n.request.json", "n1.request.json"]
 
 
@@ -181,7 +223,8 @@ def test_reference_walk_reproduces_every_published_hash(monkeypatch, tmp_path):
     hashes = listed_hashes()
     assert set(hashes) == written
     assert {name: hashlib.sha256((walk / name).read_bytes()).hexdigest() for name in hashes} == hashes
-    # Each table, rebuilt in policy months with the archived contract version written back, is the
-    # archived table byte for byte; the member order is kept, so equal bytes mean equal fields.
-    assert set(tables(listed_hashes(ARCHIVE))) == set(tables(hashes))
+    # Each table, with the contract version of an archive written back, and rebuilt in policy months for
+    # the 2.0 archive, is the archived table byte for byte; the member order is kept, so equal bytes mean
+    # equal fields.
+    assert set(tables(listed_hashes(ARCHIVE))) == set(tables(listed_hashes(ARCHIVE_3_0))) == set(tables(hashes))
     assert archive_mismatches(walk) == []

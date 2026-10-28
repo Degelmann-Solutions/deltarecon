@@ -1,6 +1,6 @@
 """The regression case: a recorded result checked against another release state.
 
-A regression run takes the record of a succeeded run without enabled changes, runs the
+A regression run takes the record of a succeeded full run without enabled changes, runs the
 release identity the caller hands in on the selection of the recorded run, and compares
 the recorded run, as the left side, with the new run, as the right side, through the
 compare procedure of ``contracts/v3/compare.md``. The caller builds the identity: it names
@@ -31,7 +31,7 @@ from pathlib import Path
 
 from .compare import COMPARE_REQUEST, CompareResult, compare, compare_request_document, read_tolerance
 from .documents import artifact_reference, copy_files, document_bytes, write_document, write_new
-from .replay import RecordedRun, read_recorded_run
+from .replay import RecordedRun, read_recorded_run, refuse_target_only
 from .run import (RECORD_NAME, Engine, RunResult, UsageError, repositories_folder, run_request,
                   run_request_document)
 
@@ -52,8 +52,11 @@ class RegressionResult:
 
 
 def read_regression_input(record_path: Path | str, stages) -> RecordedRun:
-    """The recorded run a regression starts from: succeeded, and without enabled changes."""
+    """The recorded run a regression starts from: succeeded, full, and without enabled changes.
+
+    The record of a target-only run is refused with ``target_only_record``."""
     recorded = read_recorded_run(Path(record_path), stages)
+    refuse_target_only(recorded)
     if recorded.request["changes"]["enabled"]:
         raise UsageError("the recorded run has enabled changes; a regression run takes the record of "
                          "a run without enabled changes")

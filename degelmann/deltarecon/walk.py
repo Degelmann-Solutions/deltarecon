@@ -10,6 +10,7 @@ compares opaque references for equality and asks the engine everything else.
 
 Before anything runs:
 
+- neither record is that of a target-only run (``target_only_record``);
 - both records name one stage (``stage_mismatch``) and one selection
   (``selection_mismatch``);
 - the manifest is derived as by ``derive``;
@@ -727,6 +728,8 @@ def read_walk_folder(folder: Path | str, prepared: Prepared) -> WalkFolder:
             state_record = read_document(folder / names[1], RECORD_SCHEMA, "run_record")
         except (OSError, Rejection):
             raise _mismatch(f"The folder of state {k} holds no readable request or run record.") from None
+        if "target" in request:  # a walk runs every state in full
+            raise _mismatch(f"The request of state {k} of the walk names a target; a walk runs no target-only state.")
         release, enabled, hold, selection = state_request(prepared, k)
         changes = request.get("changes", {})
         if (request.get("release") != release or changes.get("enabled") != enabled

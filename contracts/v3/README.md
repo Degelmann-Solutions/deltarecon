@@ -93,41 +93,71 @@ Reader rules:
 
 ## Version compatibility
 
-The contract version is the string `3.0`: a major and a minor number.
+The contract version is the string `3.1`: a major and a minor number.
 
 - A minor version adds optional members, new diagnostic codes, or new registered
   names. It removes and redefines nothing.
 - A major version may change anything.
 - A reader accepts exactly the versions it implements. It rejects every other
   version with `unsupported_version` and does not guess. It checks the version
-  before it applies a schema. The schemas in this pack
-  accept `3.0` only, and they are closed: a member they do not name is an error.
+  before it applies a schema. The schemas in this pack accept `3.0` and `3.1`,
+  and they are closed: a member they do not name is an error.
 - The path of this pack, `contracts/v3/`, names the major version. Version 1.0
   stays published unchanged under [`contracts/v1/`](../v1/README.md), and
   version 2.0 under [`contracts/v2/`](../v2/README.md).
 
-Reader rule for documents of versions 1.0 and 2.0:
+Reader rule for documents of versions 1.0, 2.0, and 3.0:
 
-- A reader of version 3.0 also reads documents of versions 1.0 and 2.0. It
-  checks each document against the schemas of its own version: a 1.0 document
-  against the schemas under [`../v1/schemas/`](../v1/schemas/), a 2.0 document
-  against the schemas under [`../v2/schemas/`](../v2/schemas/), a 3.0 document
-  against the schemas of this pack. A schema fault in a 1.0 or 2.0 document is
-  a fault against the schema of its version.
-- A run request and a compare request of version 1.0 or 2.0 are accepted. Every
-  document a 3.0 writer produces in answer, and every other document it writes,
-  carries `3.0`.
-- A run record of version 1.0 or 2.0, with the documents it lists, serves as
-  input to every procedure that reads recorded runs, except the replay: a
-  replay repeats only runs recorded under 2.0 or 3.0 and rejects a 1.0 run
-  record with `unsupported_version`. For a run recorded under 2.0 with the
-  outcome `error`, the recorded and the repeated response may differ in
-  `contract_version` only, see [compare.md](compare.md#replay-criterion).
-- A walk folder written under 1.0 or 2.0 is a reference for a search when it
-  passes the reader rules of a walk folder, see
+- A reader of version 3.1 also reads documents of versions 1.0, 2.0, and 3.0.
+  It checks each document against the schemas of its own version: a 1.0
+  document against the schemas under [`../v1/schemas/`](../v1/schemas/), a 2.0
+  document against the schemas under [`../v2/schemas/`](../v2/schemas/), a 3.0
+  or 3.1 document against the schemas of this pack. A schema fault in a 1.0 or
+  2.0 document is a fault against the schema of its version.
+- A run request and a compare request of version 1.0, 2.0, or 3.0 are
+  accepted. Every document a 3.1 writer produces in answer, and every other
+  document it writes, carries `3.1`.
+- A run record of version 1.0, 2.0, or 3.0, with the documents it lists, serves
+  as input to every procedure that reads recorded runs, except the replay: a
+  replay repeats only runs recorded under 2.0, 3.0, or 3.1 and rejects a 1.0
+  run record with `unsupported_version`. For a run recorded under 2.0 or 3.0
+  with the outcome `error`, the recorded and the repeated response may differ
+  in `contract_version` only, see [compare.md](compare.md#replay-criterion).
+- A walk folder written under 1.0, 2.0, or 3.0 is a reference for a search when
+  it passes the reader rules of a walk folder, see
   [localise.md](localise.md#reader-rules-of-a-walk-folder); its change
   manifests may differ from the manifest derived again in `contract_version`
   only.
+
+### Changes from 3.0
+
+Version 3.1 is a minor version. It adds one diagnostic code and one reader rule
+of a walk folder, extends the replay criterion of a run that ended with an error
+to runs recorded under 3.0, and removes nothing:
+
+- The diagnostic `target_only_record`: a regression, a derivation, a walk, and
+  a search take the records of full runs, and refuse the record of a
+  target-only run, a run whose request names a target, before anything runs and
+  before anything is written. Such a record holds no full result: compared
+  with a full state it showed coordinates as added or removed, or an end as not
+  reproduced. See [localise.md](localise.md#before-the-first-run) and
+  [changes.md](changes.md#derived-manifest). The replay of a target-only run is
+  unchanged.
+- A reader rule of a walk folder: no state's request names a target. A walk
+  runs every state in full, so a folder with a target-only state fails the
+  reader rules, and a search checked against it refuses it with
+  `walk_mismatch`, see [localise.md](localise.md#reader-rules-of-a-walk-folder).
+- `common.schema.json`: `contract_version` is `3.0` or `3.1`. No other schema
+  changes.
+- The replay of a run recorded under 3.0 with the outcome `error`: its repeated
+  response is written under 3.1, so the byte comparison of the two responses
+  ignores `contract_version`, as for a run recorded under 2.0.
+
+A 3.1 reader reads every document written under 3.0 as before; a 3.0 record of
+a target-only run is refused as input of the four procedures above, like a 3.1
+one. The examples of this pack carry `3.0`: they are 3.0 documents and stay
+valid. A reader of 3.0 rejects a 3.1 document with `unsupported_version`, since
+a reader accepts exactly the versions it implements.
 
 ### Changes from 2.0
 
@@ -481,7 +511,8 @@ first broken rule in that order.
 | `selection_mismatch` | A walk is asked for two recorded results with different selections. Nothing runs. |
 | `reference_mismatch` | A walk is asked for two recorded results whose moving references do not fit the history: the base revision does not name what the older result names, or the last revision not what the newer one names. Nothing runs. |
 | `walk_not_attributed` | A search is checked against a walk that does not attribute every revision. Nothing runs. |
-| `walk_mismatch` | A search is checked against a walk folder that fails the reader rules of a walk folder, or whose walk names other records, another tolerance profile, other held kinds, another manifest, or ran its states on another request or engine than the search would use. Nothing runs. |
+| `target_only_record` | A regression, a derivation, a walk, or a search is asked for the record of a target-only run, a run whose request names a target. Nothing runs. |
+| `walk_mismatch` | A search is checked against a walk folder that fails the reader rules of a walk folder, among them a state whose request names a target, or whose walk names other records, another tolerance profile, other held kinds, another manifest, or ran its states on another request or engine than the search would use. Nothing runs. |
 
 A walk and a search report what they find in their result, not as a diagnostic:
 the findings `state_zero_not_reproduced`, `state_n_not_reproduced`,
@@ -512,9 +543,9 @@ in [examples/index.json](examples/index.json) as `matrix_rows`.
 | `parameter-diff` | Parameter added, removed, or changed | One typed entry per parameter with the old and the new value. | [compare.md](compare.md#parameter-diff) |
 | `signature-table` | A compare result with the outcome `compared` | One row per stage and quantity that deviates, in quantity order, derived from the result and its deviation file alone. The same result and file give the same table; without deviation the table has no row. | [compare.md](compare.md#signature-table) |
 | `change-combination` | Enabled changes with an unmet prerequisite or a conflict; a set of revisions that is no prefix; a change of the type `revision` in a manifest without `history`; a held kind the engine cannot hold | Reject the combination, or the manifest with `schema_violation`. | [changes.md](changes.md#combination-rules), [changes.md](changes.md#revision-profile) |
-| `walk` | Two recorded results of one selection whose revisions lie on one main line | Every state from the older to the newer revision runs; state 0 and state n are checked against the two results; per revision and quantity the walk result states whether it contributes, the signed and the absolute sum of the differences, and the signature row. A state that does not run is a finding and its revisions are carried by the next state that runs. The signed sums add up to the difference of state n and state 0. Different selections give `selection_mismatch`, references that do not fit the history `reference_mismatch`, and nothing runs. | [localise.md](localise.md#walk) |
-| `search` | Two recorded results as for a walk, a target of quantities and periods, and optionally a walk folder of the same two records | State 0 and state n run and are checked as the ends of a walk; the history is halved for the target, and only the states needed run. An interval whose ends agree on the target is not divided; an interval of one revision that differs is a contribution in the shape of a walk step; an interval that differs while neither half does gives `interval_not_resolved`. The result states the intervals judged, the contributions, and the runs of both arms with the runs saved; checked against a walk, it names the contributions it missed. A walk that does not attribute every revision gives `walk_not_attributed`, one that does not fit `walk_mismatch`, and nothing runs. Contributions that cancel within one interval are not seen. | [localise.md](localise.md#search) |
-| `derived-manifest` | Two results whose release identities name two revisions of one history | One change per revision on the main line after the older revision, in history order, each with the change before it as its only prerequisite; the references no revision fixes and that differ are named as the remainder. The same two results give the same manifest. Revisions that are not on one main line give `unrelated_revisions` and no manifest. | [changes.md](changes.md#derived-manifest) |
+| `walk` | Two recorded results of one selection whose revisions lie on one main line | Every state from the older to the newer revision runs; state 0 and state n are checked against the two results; per revision and quantity the walk result states whether it contributes, the signed and the absolute sum of the differences, and the signature row. A state that does not run is a finding and its revisions are carried by the next state that runs. The signed sums add up to the difference of state n and state 0. Different selections give `selection_mismatch`, references that do not fit the history `reference_mismatch`, the record of a target-only run `target_only_record`, and nothing runs. | [localise.md](localise.md#walk) |
+| `search` | Two recorded results as for a walk, a target of quantities and periods, and optionally a walk folder of the same two records | State 0 and state n run and are checked as the ends of a walk; the history is halved for the target, and only the states needed run. An interval whose ends agree on the target is not divided; an interval of one revision that differs is a contribution in the shape of a walk step; an interval that differs while neither half does gives `interval_not_resolved`. The result states the intervals judged, the contributions, and the runs of both arms with the runs saved; checked against a walk, it names the contributions it missed. A walk that does not attribute every revision gives `walk_not_attributed`, one that does not fit `walk_mismatch`, also one with a state whose request names a target, the record of a target-only run `target_only_record`, and nothing runs. Contributions that cancel within one interval are not seen. | [localise.md](localise.md#search) |
+| `derived-manifest` | Two results whose release identities name two revisions of one history | One change per revision on the main line after the older revision, in history order, each with the change before it as its only prerequisite; the references no revision fixes and that differ are named as the remainder. The same two results give the same manifest. Revisions that are not on one main line give `unrelated_revisions`, the record of a target-only run `target_only_record`, and no manifest. | [changes.md](changes.md#derived-manifest) |
 
 ## Capability map
 

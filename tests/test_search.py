@@ -308,7 +308,7 @@ def test_only_a_proper_subset_of_the_quantities_or_a_period_range_narrows_the_ta
     assert all(c["quantity"] == CASH for c in every_contribution(result))
 
 
-@pytest.mark.parametrize("version", ["1.0", "2.0"])
+@pytest.mark.parametrize("version", ["1.0", "2.0", "3.0"])
 def test_a_walk_folder_written_under_an_earlier_version_is_a_reference(cancel, version):
     world, older, newer = cancel
     with written_under(version):
@@ -320,14 +320,14 @@ def test_a_walk_folder_written_under_an_earlier_version_is_a_reference(cancel, v
     run_walk(world, older, newer, WalkStub(CANCEL), output="walk-2")
     result = run_search(world, older, newer, WalkStub(CANCEL), walk=walked).result
     again = run_search(world, older, newer, WalkStub(CANCEL), output="search-2", walk=world / "walk-2").result
-    assert result["contract_version"] == "3.0"
+    assert result["contract_version"] == "3.1"
     assert result["missed"] == again["missed"] == [{"revision": "c1", "quantity": CASH},
                                                    {"revision": "c2", "quantity": CASH}]
     # The copy of the walk keeps its bytes and its version.
     assert (world / "search" / "walk" / "walk.result.json").read_bytes() == (walked / "walk.result.json").read_bytes()
 
 
-@pytest.mark.parametrize("version", ["1.0", "2.0"])
+@pytest.mark.parametrize("version", ["1.0", "2.0", "3.0"])
 def test_an_earlier_walk_folder_whose_manifest_differs_otherwise_is_refused(cancel, version):
     world, older, newer = cancel
     with written_under(version):
@@ -495,6 +495,47 @@ def test_a_state_of_the_walk_on_another_manifest_or_a_malformed_request_is_refus
         run_search(world, older, newer, WalkStub(CANCEL), walk=world / "walk")
     assert caught.value.code == "walk_mismatch", caught.value.message
     assert not (world / "search").exists()
+
+
+def name_a_target(request):
+    request["target"] = {"quantities": [CASH]}
+
+
+def test_a_walk_folder_with_a_state_whose_request_names_a_target_is_refused(cancel, monkeypatch, capsys):
+    """A walk runs every state in full: a state request with a target fails the reader rules of a walk
+    folder. State 4 lies in no comparison the walk keeps, so the rehashed folder passes every other rule."""
+    world, older, newer = cancel
+    run_walk(world, older, newer, WalkStub(CANCEL))
+    shutil.copytree(world / "walk", world / "walk-same")
+    rewrite_state(world / "walk-same", 4, edit_request=lambda request: None)
+    assert run_search(world, older, newer, WalkStub(CANCEL), output="control", walk=world / "walk-same",
+                      reuse=True).searched
+    rewrite_state(world / "walk", 4, edit_request=name_a_target)
+    before = folder_hashes(world)
+    engine = WalkStub(CANCEL)
+    monkeypatch.setattr("degelmann.deltarecon.__main__.engine", lambda: engine)
+    assert main(["search", str(older), str(newer), "--output", str(world / "search"), "--repositories", str(world),
+                 "--walk", str(world / "walk"), "--reuse-walk"]) == 1
+    out = capsys.readouterr().out
+    assert out.splitlines()[0] == "search: rejected" and "diagnostic: walk_mismatch: " in out
+    assert "names a target" in out
+    assert engine.opened == 0 and folder_hashes(world) == before and not (world / "search").exists()
+
+
+@pytest.mark.parametrize("side", ["older", "newer"])
+def test_the_record_of_a_target_only_run_is_refused_and_nothing_runs(world, monkeypatch, capsys, side):
+    build(world, CANCEL)
+    target = {"target": {"quantities": [CASH], "periods": {"first": 0, "last": 1}}}
+    older = record(world, "c0", WalkStub(CANCEL), label="N", **(target if side == "older" else {}))
+    newer = record(world, "c4", WalkStub(CANCEL), label="N+1", **(target if side == "newer" else {}))
+    before = folder_hashes(world)
+    engine = WalkStub(CANCEL)
+    monkeypatch.setattr("degelmann.deltarecon.__main__.engine", lambda: engine)
+    assert main(["search", str(older), str(newer), "--output", str(world / "search"), "--repositories", str(world),
+                 "--quantity", CASH, "--periods", "0-1"]) == 1
+    out = capsys.readouterr().out
+    assert out.splitlines()[0] == "search: rejected" and "diagnostic: target_only_record: " in out
+    assert engine.opened == 0 and folder_hashes(world) == before and not (world / "search").exists()
 
 
 # --- reuse of the walk's states -------------------------------------------------------
@@ -1228,11 +1269,16 @@ def kept_request(folder: Path, entry: dict) -> dict:
 
 @pytest.mark.parametrize("options", [{"quantities": [COUNT], "periods": "0-2"}, {}],
                          ids=["target", "every-coordinate"])
-def test_a_search_without_the_switch_writes_the_bytes_it_wrote_before(history, options):
-    world, older, newer = history
-    run_walk(world, older, newer, WalkStub(HISTORY), tolerance=world / "tolerance.json")
-    done = run_search(world, older, newer, WalkStub(HISTORY), tolerance=world / "tolerance.json", walk=world / "walk",
-                      **options)
+def test_a_search_without_the_switch_writes_the_bytes_it_wrote_before(world, options):
+    # The pins were taken under contract version 3.0; written under 3.0, every byte is the same.
+    with written_under("3.0"):
+        build(world, HISTORY)
+        (world / "tolerance.json").write_text(json.dumps(PROFILE), "utf-8")
+        older = record(world, "h0", WalkStub(HISTORY), label="N", contract_version="3.0")
+        newer = record(world, "h8", WalkStub(HISTORY), label="N+1", contract_version="3.0")
+        run_walk(world, older, newer, WalkStub(HISTORY), tolerance=world / "tolerance.json")
+        done = run_search(world, older, newer, WalkStub(HISTORY), tolerance=world / "tolerance.json",
+                          walk=world / "walk", **options)
     name = "target" if options else "every-coordinate"
     assert sha256_file(done.result_path) == SWITCH_OFF_RESULTS[name]
     assert not list((world / "search").glob("*.target"))

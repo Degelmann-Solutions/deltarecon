@@ -331,6 +331,40 @@ def test_records_whose_moving_kind_does_not_match_are_refused_and_nothing_is_wri
     assert folder_hashes(world) == before and not (world / "walk").exists()
 
 
+TARGET = {"quantities": ["Anzahl Verträge"], "periods": {"first": 0, "last": 1}}
+
+
+def target_only(side: str, which: str) -> dict:
+    """The request members of the record ``which`` when the record of ``side`` is that of a target-only run."""
+    return {"target": TARGET} if side == which else {}
+
+
+@pytest.mark.parametrize("side", ["older", "newer"])
+def test_the_record_of_a_target_only_run_is_refused_and_nothing_runs(world, monkeypatch, capsys, side):
+    build(world)
+    older = record(world, "w0", label="N", **target_only(side, "older"))
+    newer = record(world, "w4", label="N+1", **target_only(side, "newer"))
+    before = folder_hashes(world)
+    engine = WalkStub()
+    monkeypatch.setattr("degelmann.deltarecon.__main__.engine", lambda: engine)
+    assert main(["walk", str(older), str(newer), "--output", str(world / "walk"), "--repositories", str(world)]) == 1
+    out = capsys.readouterr().out
+    assert out.splitlines()[0] == "walk: rejected" and "diagnostic: target_only_record: " in out
+    assert engine.opened == 0 and folder_hashes(world) == before and not (world / "walk").exists()
+
+
+@pytest.mark.parametrize("side", ["older", "newer"])
+def test_a_target_only_record_is_refused_before_a_stage_mismatch(world, monkeypatch, side):
+    """Rule 1 of the checks before the first run comes before rule 2."""
+    build(world)
+    monkeypatch.setitem(STAGE_QUANTITIES, "other_stage", STAGE_QUANTITIES["liability_cashflow"])
+    older = record(world, "w0", TwoStages(), **target_only(side, "older"))
+    newer = record(world, "w4", TwoStages(), stage="other_stage", **target_only(side, "newer"))
+    with pytest.raises(Rejection) as caught:
+        run_walk(world, older, newer, TwoStages())
+    assert caught.value.code == "target_only_record" and not (world / "walk").exists()
+
+
 def test_records_of_different_selections_are_refused(world):
     build(world)
     older = record(world, "w0", selection={"mode": "subset", "model_point_ids": ["MP-A"]})

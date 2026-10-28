@@ -6,7 +6,7 @@ record, and compares the recorded run, as the left side, with the repeated run, 
 right side, through the compare procedure of ``contracts/v3/compare.md``. Without a
 tolerance profile the comparison is exact.
 
-- The replay repeats runs recorded under contract version 2.0 or 3.0. A run record written
+- The replay repeats runs recorded under contract version 2.0, 3.0, or 3.1. A run record written
   under 1.0 is read by ``regression``, ``derive``, ``walk``, and ``search``, but it is not
   replayed: the replay rejects it with ``unsupported_version`` (``contracts/v3/README.md``,
   "Version compatibility").
@@ -44,7 +44,7 @@ from .run import (RECORD_NAME, STAGE_QUANTITIES, Engine, UsageError, quantity_er
                   repositories_folder, run_record, run_request)
 
 # The contract versions of the run records a replay repeats; a 1.0 record is not replayed.
-REPLAY_VERSIONS = ("2.0", "3.0")
+REPLAY_VERSIONS = ("2.0", "3.0", "3.1")
 REPLAY_FOLDER = "replay"
 REPLAY_RECORD_NAME = "replay-record.json"
 REPLAY_COMPARE_REQUEST_NAME = "replay-compare.request.json"
@@ -198,6 +198,15 @@ def read_recorded_run(record_path: Path, stages, allow_error: bool = False) -> R
     values = check_response(request, response, folder)
     return RecordedRun(record_path, record, request, response, manifest, request_ref, response_ref,
                        export_ref, manifest_ref, values)
+
+
+def refuse_target_only(recorded: RecordedRun) -> None:
+    """Refuse the record of a target-only run as the input of a regression, a derivation, a walk, or
+    a search: those compare whole recorded results. Rule 1 of ``contracts/v3/localise.md``, "Before
+    the first run"; the replay does not apply it."""
+    if "target" in recorded.request:
+        raise Rejection("target_only_record", f"The record {recorded.record_path} is that of a target-only "
+                        "run; a regression, a derivation, a walk, and a search take the records of full runs.")
 
 
 def reproduction(result: dict, folder: Path) -> str:

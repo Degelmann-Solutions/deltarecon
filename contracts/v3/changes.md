@@ -13,7 +13,7 @@ A change manifest lists the changes that can be applied on top of one base relea
 ```json
 {
   "document": "change_manifest",
-  "contract_version": "3.0",
+  "contract_version": "3.1",
   "stage": "liability_cashflow",
   "manifest_id": "changes-n-to-n1",
   "base_release": "N",
@@ -232,12 +232,14 @@ no other member; a manifest without `history` holds no change of this type.
 
 A manifest can be derived from the history between two revisions instead of
 being written by an author. The two revisions are those of two results: the
-release identities of two run records name them.
+release identities of two run records name them. Neither result may be that of
+a [target-only run](run.md#target-only-run), whose request names a target: such
+a record is refused with `target_only_record`, and no manifest is derived.
 
 ```json
 {
   "document": "change_manifest",
-  "contract_version": "3.0",
+  "contract_version": "3.1",
   "stage": "liability_cashflow",
   "manifest_id": "history-41ab…-9f2c…",
   "base_release": "N",

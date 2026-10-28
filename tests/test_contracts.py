@@ -528,11 +528,12 @@ def test_localise_contract_is_no_stage_contract_and_names_its_findings():
     assert "It is no stage contract. No engine implements it" in text
     for code in ("state_zero_not_reproduced", "state_n_not_reproduced", "state_did_not_run", "step_not_compared",
                  "non_finite_difference", "selection_mismatch", "reference_mismatch", "interval_not_resolved",
-                 "walk_not_attributed", "walk_mismatch"):
+                 "walk_not_attributed", "walk_mismatch", "target_only_record"):
         assert f"`{code}`" in text, code
     assert "does not see contributions that cancel within one\ninterval" in text  # known limit 6
     readme = (PACK / "README.md").read_text("utf-8")
-    for code in ("invalid_hold", "selection_mismatch", "reference_mismatch", "walk_not_attributed", "walk_mismatch"):
+    for code in ("invalid_hold", "selection_mismatch", "reference_mismatch", "walk_not_attributed", "walk_mismatch",
+                 "target_only_record"):
         assert f"| `{code}` |" in readme, code
     assert "sums of\ndifferences" not in (PACK / "compare.md").read_text("utf-8")
     assert "localise.md#contribution" in (PACK / "compare.md").read_text("utf-8")
@@ -668,7 +669,7 @@ def test_the_earlier_examples_still_match_their_outcome_under_their_own_schemas(
 
 def test_each_version_has_its_own_schemas():
     """A document of 1.0, 2.0, or 3.0 passes the schemas of its own version and fails those of
-    the two others."""
+    the two others; a document of 3.1 passes the schemas of 3.0, which are its own."""
     versions = ("1.0", "2.0", "3.0")
     for version in versions:
         pack = ROOT / "contracts" / f"v{version[0]}"
@@ -678,6 +679,13 @@ def test_each_version_has_its_own_schemas():
         for other in versions:
             if other != version:
                 assert list(validator("run.schema.json", other).iter_errors(request)), (version, other)
+    # Version 3.1 is a minor version of the pack of 3.0: its schemas read both, the earlier packs neither.
+    request = {**strict_json(ROOT / "contracts" / "v3" / "examples" / "reference" / "full-run.request.json"),
+               "contract_version": "3.1"}
+    assert not list(validator("run.schema.json", "3.1").iter_errors(request))
+    assert not list(validator("run.schema.json", "3.0").iter_errors(request))
+    for other in ("1.0", "2.0"):
+        assert list(validator("run.schema.json", other).iter_errors(request)), other
 
 
 def test_schema_level_cases_exist():
