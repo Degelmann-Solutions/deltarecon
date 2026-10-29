@@ -3,7 +3,9 @@
     uv run python tools/release.py [--output DIR] [--source URL|PATH]
 
 The release folder is ``dist/release-v<version>/`` (the version of ``pyproject.toml``) unless
-``--output`` names another; it must not exist. The steps, in this order:
+``--output`` names another; it must not exist. It must lie outside the working tree or in a folder
+git ignores, such as ``dist/``: an archive in a folder git does not ignore is untracked, and the
+release then fails after both builds. The steps, in this order:
 
 1. The working tree must be clean: ``git status --porcelain`` prints nothing. A modified, staged,
    deleted or untracked file refuses the release and is named; an ignored file (``build/``,
@@ -107,7 +109,8 @@ A package is one folder that runs DeltaRecon without Python, uv or Git on the ma
 - `python/`: a standalone CPython {python}, the version that `requires-python` in `pyproject.toml` pins;
 - the runtime libraries locked in `uv.lock` and DeltaRecon itself with its contract pack, installed in that Python;
 - `delib-history/`: a full clone of the reference model repository, with its history;
-- `profiles/`: the tolerance profiles the quick start uses, and `LICENSE`;
+- `profiles/`: the tolerance profiles the quick start uses;
+- `LICENSE`, the licence of DeltaRecon, in the package folder itself;
 - the launcher, `deltarecon` on Linux and `deltarecon.cmd` on Windows, which runs DeltaRecon on the clone in the package (`DELTARECON_REPOSITORIES`).
 
 The quick start of the package is in the README at this tag: {REPOSITORY_URL}/blob/{tag}/README.md#quick-start
@@ -160,7 +163,8 @@ def parse(argv: list[str] | None) -> argparse.Namespace:
         description="Build the Linux and the Windows package from one clean commit into a release folder and "
                     f"write {SUMS} and {NOTES} there. Publishes nothing and checks no archive.")
     parser.add_argument("--output", type=Path,
-                        help="the release folder, which must not exist (default dist/release-v<version>/)")
+                        help="the release folder, which must not exist and must lie outside the working tree or in an "
+                             "ignored folder (default dist/release-v<version>/)")
     parser.add_argument("--source", default=BUILD.DEFAULT_SOURCE,
                         help=f"what delib-history is cloned from, a URL or a local path (default {BUILD.DEFAULT_SOURCE})")
     return parser.parse_args(argv)
