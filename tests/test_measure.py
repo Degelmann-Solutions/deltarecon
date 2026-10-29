@@ -410,7 +410,14 @@ def test_windows_refusals_exit_2_and_copy_nothing(tmp_path, monkeypatch, capsys,
     elif case == "existing work":
         fake.folder(work).mkdir(parents=True)
     assert tool.main(["--windows-package", str(archive), "--work", work, "--output", str(tmp_path / "m.json")]) == 2
-    assert capsys.readouterr().err
+    error = capsys.readouterr().err
+    assert error.startswith("measure: ")
+    if case in ("wsl work", "unc work", "other drive"):
+        assert error.startswith("measure: the work folder: ")
+    elif case == "existing work":
+        assert error == f"measure: the work folder {work} exists already\n"
+    elif case == "no host":
+        assert error == "measure: powershell.exe is not on PATH; --windows-package runs in WSL on a Windows host\n"
     assert fake.calls == [] and not (tmp_path / "m.json").exists()
     copied = list(fake.drive.rglob("*.zip")) if fake.drive.exists() else []
     assert copied == []

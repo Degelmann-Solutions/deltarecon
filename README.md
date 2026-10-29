@@ -87,7 +87,7 @@ The earlier bare runner, which projects every model point and prints one SHA-256
 | `tests/` | The checks of the contract pack, and the tests of run, run record, replay, compare, signature table, regression, the derived manifest, the walk, the search, the reproduction oracle and the pin of the quick-start search. The provenance, portfolio and runner tests of release N are in `delib-history`. |
 | `oracle/` | The reproduction oracle: the two run requests of the reference attribution and `SHA256SUMS`, the SHA-256 of its walk result and signature tables, and `REPRODUCTIONS.md`, the record of every reproduction, under contract version 3.1; `archive/2026-10-27/`, the oracle published under 3.0, and `archive/2026-10-22/`, the oracle published under 2.0, both unchanged. See "Reproduce the reference attribution" above. |
 | `profiles/` | Tolerance profiles: `tolerance-bruttobeitrag.json`, used by the quick start and the reference attribution. |
-| `tools/` | `measure_quick_start.py`, the measurement of the quick start, step by step. |
+| `tools/` | `measure_quick_start.py`, the measurement of the quick start, step by step; `windows_host.py`, which runs checks natively on the Windows host from WSL; and `build_package.py`, which builds and checks the Linux and Windows packages. |
 | `measurements/` | The recorded measurements of the quick start: `baseline.json` and one file per later measurement; and `quick-start-search.SHA256SUMS`, the pin of `search.result.json` of the quick-start search and of the files it hashes. |
 | `PROVENANCE.md` | Statement on the origin of the open-source core. |
 

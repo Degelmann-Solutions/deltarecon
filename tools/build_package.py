@@ -109,6 +109,8 @@ LAUNCHER = "deltarecon"
 WINDOWS_LAUNCHER = "deltarecon.cmd"
 REPOSITORIES_VARIABLE = "DELTARECON_REPOSITORIES"
 PROBE_MODULE = "deltarecon_probe_engine"
+# The text of the probe module that the import check writes to ``<work>/engines/``.
+PROBE_SOURCE = '"""A module that stands for an engine the user names."""\n'
 # The script that prints the distributions a Python finds, as JSON pairs of name and version.
 LIST_DISTRIBUTIONS = ("import importlib.metadata, json; print(json.dumps([[d.metadata['Name'], d.version] "
                       "for d in importlib.metadata.distributions()]))")
@@ -200,7 +202,6 @@ TARGETS: dict[str, dict] = {
         },
     },
 }
-
 
 
 class Failed(Exception):
@@ -451,7 +452,7 @@ def build(output: Path, source: str, target_name: str = TARGET) -> Path:
              "--no-deps", "--no-build", "-r", str(requirements)], "uv pip install of the locked libraries", cwd=ROOT)
         wheels = staging / "wheel"
         run(["uv", "build", "--wheel", "--quiet", "--out-dir", str(wheels)], "uv build --wheel", cwd=ROOT)
-        wheel = [path for path in wheels.glob("*.whl")]
+        wheel = list(wheels.glob("*.whl"))
         if len(wheel) != 1:
             raise Failed(f"uv build --wheel left {len(wheel)} wheels, expected one")
         run(["uv", "pip", "install", "--quiet", "--target", str(site), *platform_options, "--no-deps",
@@ -528,7 +529,7 @@ def chain_commands(package: Path | PureWindowsPath, runs: Path | PureWindowsPath
     return commands
 
 
-def check_chain(package: Path, work: Path, empty: Path, measure, compare) -> bool:
+def check_chain(package: Path, work: Path, empty: Path) -> bool:
     runs, logs = work / "runs", work / "logs"
     logs.mkdir()
     environment = clean_environment(empty)
@@ -536,7 +537,7 @@ def check_chain(package: Path, work: Path, empty: Path, measure, compare) -> boo
         if shutil.which(tool, path=environment["PATH"]) is not None:
             raise Failed(f"{tool} is reachable on the PATH of the chain")
     print(f"build_package: chain: PATH={empty}, no uv, no git, cwd={work}", flush=True)
-    for name, command, expect in chain_commands(package, runs, measure.STEPS, measure.rewrite):
+    for name, command, expect in chain_commands(package, runs, MEASURE.STEPS, MEASURE.rewrite):
         log = logs / f"{name}.log"
         start = time.perf_counter()
         with log.open("wb") as output:
@@ -546,10 +547,10 @@ def check_chain(package: Path, work: Path, empty: Path, measure, compare) -> boo
         if code != expect:
             print(f"build_package: chain: the step {name} failed; log: {log}", file=sys.stderr)
             return False
-    code, lines = compare(runs / "search")
+    code, lines = HOST.compare(runs / "search")
     for line in lines:
         print(f"build_package: pin: {line}")
-    print(f"build_package: engine_version: {measure.engine_version(runs)}")
+    print(f"build_package: engine_version: {MEASURE.engine_version(runs)}")
     return code == 0
 
 
@@ -582,7 +583,7 @@ def compare_lock(installed: list[tuple[str, str]], expected: list[tuple[str, str
 def check_import(package: Path, work: Path, empty: Path, target: dict) -> bool:
     engines = work / "engines"
     engines.mkdir()
-    (engines / f"{PROBE_MODULE}.py").write_text('"""A module that stands for an engine the user names."""\n', "utf-8")
+    (engines / f"{PROBE_MODULE}.py").write_text(PROBE_SOURCE, "utf-8")
     done = subprocess.run([str(package / target["python"]), "-c", PROBE_IMPORT], capture_output=True, text=True, cwd=work,
                           env=clean_environment(empty, PYTHONPATH=str(engines)))
     if done.returncode != 0:
@@ -623,7 +624,7 @@ def check_linux(archive: Path, work: Path | None, target: dict, version: str) ->
     empty = work / "empty-path"
     empty.mkdir()
     results = {
-        "chain and pin": check_chain(package, work, empty, MEASURE, HOST.compare),
+        "chain and pin": check_chain(package, work, empty),
         "installed packages equal uv.lock": check_lock(package, target, version),
         "import from a user-named folder": check_import(package, work, empty, target),
     }
@@ -639,6 +640,9 @@ def report(results: dict[str, bool]) -> bool:
 DEFAULT_WINDOWS_PARENT = "C:\\tmp\\deltarecon-package-check"
 LISTER_SCRIPT = "list_distributions.py"
 PROBE_SCRIPT = "probe_import.py"
+# The PowerShell expression of the seconds a ``$watch`` stopwatch has run, as ``0.0`` with a decimal
+# point; ``STEP_LINE`` and ``UNPACK_LINE`` of ``tools/measure_quick_start.py`` read it.
+WATCH_SECONDS = "$watch.Elapsed.TotalSeconds.ToString('0.0', [Globalization.CultureInfo]::InvariantCulture)"
 
 
 def _say(text: str, stream: str = "Out") -> str:
@@ -672,8 +676,7 @@ def windows_chain_script(work: str, archive: str, name: str, commands: list[tupl
         f"if ($tops.Count -ne 1 -or $tops[0] -ne {literal(name)}) {{ [Console]::Error.WriteLine("
         f"'build_package: the archive holds the top folders ' + ($tops -join ', ') + ', expected one: ' + "
         f"{literal(name)}); exit 1 }}\n",
-        "[Console]::Out.WriteLine('build_package: host: unpacked in ' + "
-        "$watch.Elapsed.TotalSeconds.ToString('0.0', [Globalization.CultureInfo]::InvariantCulture) + ' s')\n",
+        f"[Console]::Out.WriteLine('build_package: host: unpacked in ' + {WATCH_SECONDS} + ' s')\n",
         host_environment(work),
         "foreach ($name in 'uv', 'git') {\n"
         "  if (Get-Command $name -CommandType Application -ErrorAction SilentlyContinue) {\n"
@@ -690,8 +693,7 @@ def windows_chain_script(work: str, archive: str, name: str, commands: list[tupl
             f"{call}\n",
             "$code = $LASTEXITCODE\n",
             f"[Console]::Out.WriteLine({literal('build_package: chain: ' + step + ' exit ')} + $code + "
-            f"{literal(f' (expected {expect}) in ')} + "
-            "$watch.Elapsed.TotalSeconds.ToString('0.0', [Globalization.CultureInfo]::InvariantCulture) + ' s')\n",
+            f"{literal(f' (expected {expect}) in ')} + {WATCH_SECONDS} + ' s')\n",
             f"if ($code -ne {expect}) {{ [Console]::Error.WriteLine("
             f"{literal('build_package: step ' + step + ' exit ')} + $code + {literal(f', expected {expect}')}); "
             f"exit 1 }}\n",
@@ -706,27 +708,23 @@ def windows_python_script(work: str, python: str, arguments: list[str], name: st
     script = host_environment(work)
     if pythonpath is not None:
         script += f"$env:PYTHONPATH = {HOST.literal(pythonpath)}\n"
-    return script + HOST._step(name, "& " + " ".join(HOST.literal(a) for a in [python, *arguments]))
+    return script + HOST.step(name, "& " + " ".join(HOST.literal(a) for a in [python, *arguments]))
 
 
 def _last_line(text: str | None) -> str:
-    lines = [line.strip() for line in (text or "").splitlines() if line.strip()]
+    lines = HOST.lines_of(text)
     return lines[-1] if lines else ""
 
 
-def check_windows(archive: Path, work: str | None, version: str, now: datetime.datetime | None = None) -> bool:
+def check_windows(archive: Path, work: str | None, version: str) -> bool:
     """Check a Windows archive natively on the Windows host of this WSL session."""
-    now = now or datetime.datetime.now(datetime.timezone.utc)
+    now = datetime.datetime.now(datetime.timezone.utc)
     work = work or f"{DEFAULT_WINDOWS_PARENT}\\{now:%Y%m%dT%H%M%SZ}"
     try:
-        HOST.require_host_folder(work)
+        executable = HOST.open_work(work, "powershell.exe is not on PATH; a Windows archive is checked in WSL on "
+                                          "a Windows host")
     except HOST.Refused as refusal:
-        raise Refused(f"the work folder: {refusal}") from None
-    executable = HOST.powershell_path()
-    if executable is None:
-        raise Refused("powershell.exe is not on PATH; a Windows archive is checked in WSL on a Windows host")
-    if HOST.host_exists(work):
-        raise Refused(f"the work folder {work} exists already")
+        raise Refused(str(refusal)) from None
     target = TARGETS[WINDOWS_TARGET]
     name = package_name(version, WINDOWS_TARGET)
     folder = Path(HOST.wsl_path(work))
@@ -735,8 +733,7 @@ def check_windows(archive: Path, work: str | None, version: str, now: datetime.d
         (folder / sub).mkdir()
     print(f"build_package: copying {archive} to {work}", flush=True)
     shutil.copyfile(archive, folder / archive.name)
-    (folder / "engines" / f"{PROBE_MODULE}.py").write_text('"""A module that stands for an engine the user names."""\n',
-                                                         "utf-8")
+    (folder / "engines" / f"{PROBE_MODULE}.py").write_text(PROBE_SOURCE, "utf-8")
     (folder / "scripts" / LISTER_SCRIPT).write_text(LIST_DISTRIBUTIONS + "\n", "utf-8")
     (folder / "scripts" / PROBE_SCRIPT).write_text(PROBE_IMPORT + "\n", "utf-8")
     host_work = PureWindowsPath(work)

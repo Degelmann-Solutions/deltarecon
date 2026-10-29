@@ -370,7 +370,12 @@ def test_a_windows_check_that_cannot_start_copies_nothing(tmp_path, monkeypatch,
     error = capsys.readouterr().err
     assert ("powershell.exe is not on PATH" if case == "no powershell" else "the work folder") in error
     if case == "existing work":
-        assert "exists already" in error
+        assert error == "build_package: the work folder C:\\tmp\\deltarecon-package-check\\exists exists already\n"
+    elif case == "no powershell":
+        assert error == ("build_package: powershell.exe is not on PATH; a Windows archive is checked in WSL on a "
+                         "Windows host\n")
+    else:
+        assert error.startswith("build_package: the work folder: ")
     assert sorted(p.name for p in tmp_path.iterdir()) == [archive.name]
 
 

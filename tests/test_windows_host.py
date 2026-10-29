@@ -125,7 +125,8 @@ def test_the_script_refuses_a_work_folder_outside_c():
 def test_main_refuses_a_work_folder_without_running_anything(host, work, capsys):
     runner = Runner()
     assert tool.main(["quick-start", "--work", work], runner) == 2
-    assert runner.scripts == [] and "C:\\" in capsys.readouterr().err
+    error = capsys.readouterr().err
+    assert runner.scripts == [] and error.startswith("windows_host: the work folder: ") and "C:\\" in error
 
 
 def test_main_refuses_an_existing_work_folder(host, capsys):
@@ -140,6 +141,53 @@ def test_main_needs_powershell(host, capsys):
     runner = Runner()
     assert tool.main(["quick-start", "--work", WORK], runner) == 2
     assert runner.scripts == [] and "powershell.exe" in capsys.readouterr().err
+
+
+NO_POWERSHELL = "powershell.exe is not on PATH; the caller's sentence"
+
+
+@pytest.mark.parametrize("case, work, powershell, exists, refusal", [
+    ("good folder", WORK, "/fake/powershell.exe", False, None),
+    ("refused folder", "\\\\wsl.localhost\\Ubuntu\\x", "/fake/powershell.exe", False, "the work folder: a UNC path"),
+    ("no powershell", WORK, None, False, NO_POWERSHELL),
+    ("folder exists", WORK, "/fake/powershell.exe", True, f"the work folder {WORK} exists already"),
+])
+def test_open_work_checks_the_folder_then_powershell_then_that_the_folder_is_new(monkeypatch, case, work, powershell,
+                                                                                exists, refusal):
+    asked = []
+    monkeypatch.setattr(tool, "powershell_path", lambda: asked.append("powershell") or powershell)
+    monkeypatch.setattr(tool, "host_exists", lambda windows: asked.append(("exists", windows)) or exists)
+    if refusal is None:
+        assert tool.open_work(work, NO_POWERSHELL) == powershell
+    else:
+        with pytest.raises(tool.Refused) as raised:
+            tool.open_work(work, NO_POWERSHELL)
+        assert str(raised.value).startswith(refusal)
+    expected = {"refused folder": [], "no powershell": ["powershell"]}.get(case, ["powershell", ("exists", WORK)])
+    assert asked == expected
+
+
+@pytest.mark.parametrize("work", ["/home/x", "D:\\x", "C:relative"])
+def test_open_work_refuses_each_other_folder_form_with_the_prefix(work):
+    with pytest.raises(tool.Refused, match="^the work folder: "):
+        tool.open_work(work, NO_POWERSHELL)
+
+
+def test_lines_of_keeps_the_non_empty_lines_stripped():
+    assert tool.lines_of(" one \r\n\r\n  \ntwo\n") == ["one", "two"]
+    assert tool.lines_of("") == [] and tool.lines_of(None) == []
+
+
+def test_count_ok_counts_the_pinned_files_reported_ok():
+    assert tool.count_ok(["a.json: OK", "b.json: FAILED", "c.json: FAILED open or read", "d.csv: OK"]) == 2
+    assert tool.count_ok([]) == 0
+
+
+def test_a_step_announces_itself_and_stops_on_a_failing_exit_status():
+    assert tool.step("sync", "uv sync") == (
+        "[Console]::Out.WriteLine('windows_host: step sync')\nuv sync\n"
+        "if ($LASTEXITCODE -ne 0) { [Console]::Error.WriteLine('windows_host: the host step sync failed with exit "
+        "status ' + $LASTEXITCODE); exit 1 }\n")
 
 
 def test_main_names_missing_host_tools(host, capsys):

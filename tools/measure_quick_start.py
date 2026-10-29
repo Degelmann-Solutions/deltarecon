@@ -291,17 +291,10 @@ def measure_windows(arguments: argparse.Namespace, names: list[str], steps: dict
         return 2
     work = arguments.work or f"{WINDOWS_PARENT}\\{now:%Y%m%dT%H%M%SZ}"
     try:
-        host.require_host_folder(work)
+        executable = host.open_work(work, "powershell.exe is not on PATH; --windows-package runs in WSL on a "
+                                          "Windows host")
     except host.Refused as refusal:
-        print(f"measure: the work folder: {refusal}", file=sys.stderr)
-        return 2
-    executable = host.powershell_path()
-    if executable is None:
-        print("measure: powershell.exe is not on PATH; --windows-package runs in WSL on a Windows host",
-              file=sys.stderr)
-        return 2
-    if host.host_exists(work):
-        print(f"measure: the work folder {work} exists already", file=sys.stderr)
+        print(f"measure: {refusal}", file=sys.stderr)
         return 2
 
     package_sha256 = build.sha256_file(archive)
@@ -332,7 +325,7 @@ def measure_windows(arguments: argparse.Namespace, names: list[str], steps: dict
     python = str(package / PureWindowsPath(target["python"]))
     probed = host.powershell(build.windows_python_script(work, python, ["-I", "-c", PLATFORM_PROBE], "probe the platform"),
                              capture=True, executable=executable)
-    lines = [line.strip() for line in (probed.stdout or "").splitlines() if line.strip()]
+    lines = host.lines_of(probed.stdout)
     if probed.returncode != 0 or len(lines) < 2 or not lines[-1].isdigit():
         print(f"measure: the packaged Python could not report its platform (exit status {probed.returncode}): "
               f"{(probed.stdout or '').strip()} {(probed.stderr or '').strip()}; nothing written", file=sys.stderr)
@@ -344,8 +337,7 @@ def measure_windows(arguments: argparse.Namespace, names: list[str], steps: dict
         code, compared = host.compare(Path(host.wsl_path(work + "\\runs\\search")))
         for line in compared:
             print(f"measure: pin: {line}")
-        good = sum(1 for line in compared if line.endswith(": OK"))
-        print(f"measure: {good} pinned files OK; compare exit status {code}")
+        print(f"measure: {host.count_ok(compared)} pinned files OK; compare exit status {code}")
         if code != 0:
             print("measure: the search differs from the pin; nothing written", file=sys.stderr)
             return 1
