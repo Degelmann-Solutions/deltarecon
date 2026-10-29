@@ -17,8 +17,10 @@ drives and relative paths are refused before anything runs. The folder is left o
 
 Every script runs as ``powershell.exe -NoProfile -NonInteractive -EncodedCommand`` (UTF-16LE base64)
 with UTF-8 output, so no quoting passes through two shells; values enter a script only as PowerShell
-single-quoted literals (``literal``). ``windows_path``, ``wsl_path``, ``require_host_folder``,
-``literal``, ``encoded``, ``powershell`` and ``compare`` are the reusable parts for other host checks.
+single-quoted literals (``literal``). ``Refused``, ``windows_path``, ``wsl_path``,
+``require_host_folder``, ``powershell_path``, ``host_exists``, ``open_work``, ``literal``, ``encoded``,
+``powershell``, ``step``, ``compare``, ``lines_of`` and ``count_ok`` are the reusable parts for other
+host checks.
 
 Exit status: 0 when every pinned file reports ``OK``; 1 when a host step fails (nothing is compared
 then) or a pinned file differs or is missing; 2 when the tool cannot start (a refused or existing
@@ -127,7 +129,7 @@ def powershell(script: str, runner=subprocess.run, capture: bool = False, execut
     return runner(argv, **options)
 
 
-def _step(name: str, command: str) -> str:
+def step(name: str, command: str) -> str:
     """One host step: announce it, run it, stop the script with a step-named message when it fails."""
     return (f"[Console]::Out.WriteLine({literal('windows_host: step ' + name)})\n"
             f"{command}\n"
@@ -146,24 +148,24 @@ def quick_start_script(work: str, bundle_paths: dict[str, str], commit: str) -> 
     python, runs = work + "\\python", work + "\\runs"
     lines = [
         f"Set-Location -LiteralPath {literal(work)}\n",  # not the UNC folder of WSL the host starts in
-        _step("clone deltarecon", f"git -c core.autocrlf=false clone --config core.autocrlf=false --no-checkout "
-                                  f"{literal(deltarecon)} {literal(checkout)}"),
-        _step(f"checkout {commit}", f"git -C {literal(checkout)} -c core.autocrlf=false checkout --detach "
-                                    f"{literal(commit)}"),
+        step("clone deltarecon", f"git -c core.autocrlf=false clone --config core.autocrlf=false --no-checkout "
+                                 f"{literal(deltarecon)} {literal(checkout)}"),
+        step(f"checkout {commit}", f"git -C {literal(checkout)} -c core.autocrlf=false checkout --detach "
+                                   f"{literal(commit)}"),
         f"$head = git -C {literal(checkout)} rev-parse HEAD\n"
         f"if ($head -ne {literal(commit)}) {{ [Console]::Error.WriteLine("
         f"'windows_host: the host step verify commit found ' + $head); exit 1 }}\n",
-        _step("clone delib-history", f"git -c core.autocrlf=false clone --config core.autocrlf=false "
-                                     f"{literal(history)} {literal(clone)}"),
-        _step("fetch delib-history remote branches",
-              f"git -C {literal(clone)} fetch --quiet {literal(history)} "
-              f"{literal('+refs/remotes/origin/*:refs/remotes/wsl-origin/*')}"),
+        step("clone delib-history", f"git -c core.autocrlf=false clone --config core.autocrlf=false "
+                                    f"{literal(history)} {literal(clone)}"),
+        step("fetch delib-history remote branches",
+             f"git -C {literal(clone)} fetch --quiet {literal(history)} "
+             f"{literal('+refs/remotes/origin/*:refs/remotes/wsl-origin/*')}"),
         f"Set-Location -LiteralPath {literal(checkout)}\n",
         f"$env:UV_PYTHON_INSTALL_DIR = {literal(python)}\n",
-        _step(f"install Python {PYTHON}", f"uv python install --no-bin --no-registry {literal(PYTHON)}"),
-        _step("uv sync --locked", "uv sync --locked"),
-        _step("run the quick start chain", f"uv run python tools/measure_quick_start.py --work "
-                                            f"{literal(runs)}"),
+        step(f"install Python {PYTHON}", f"uv python install --no-bin --no-registry {literal(PYTHON)}"),
+        step("uv sync --locked", "uv sync --locked"),
+        step("run the quick start chain", f"uv run python tools/measure_quick_start.py --work "
+                                           f"{literal(runs)}"),
     ]
     return "".join(lines)
 
@@ -178,11 +180,16 @@ PROBE = ("foreach ($name in 'git', 'uv') {\n"
 def probe(runner=subprocess.run, executable: str = "powershell.exe") -> tuple[list[str], list[str]]:
     """The host tools ``quick-start`` needs: the lines found and the names missing."""
     done = powershell(PROBE, runner, capture=True, executable=executable)
-    lines = [line.strip() for line in (done.stdout or "").splitlines() if line.strip()]
+    lines = lines_of(done.stdout)
     missing = [line.split(" ", 1)[1] for line in lines if line.startswith("missing ")]
     if done.returncode != 0 and not missing:
         missing = [f"a working powershell.exe (probe exit status {done.returncode}: {(done.stderr or '').strip()})"]
     return [line for line in lines if line.startswith("found ")], missing
+
+
+def lines_of(text: str | None) -> list[str]:
+    """The non-empty lines of a host output ``text`` (``None`` counts as empty), stripped."""
+    return [line.strip() for line in (text or "").splitlines() if line.strip()]
 
 
 def compare(search_folder: Path, pin: Path = PIN) -> tuple[int, list[str]]:
@@ -191,6 +198,11 @@ def compare(search_folder: Path, pin: Path = PIN) -> tuple[int, list[str]]:
         return 1, [f"{search_folder}: no search folder"]
     done = subprocess.run(["sha256sum", "-c", str(pin)], cwd=search_folder, capture_output=True, text=True)
     return done.returncode, (done.stdout + done.stderr).splitlines()
+
+
+def count_ok(lines: list[str]) -> int:
+    """The number of output lines of ``compare`` that report a pinned file as ``OK``."""
+    return sum(1 for line in lines if line.endswith(": OK"))
 
 
 def _git(*arguments: str, folder: Path = ROOT) -> str:
@@ -211,6 +223,26 @@ def prepare(work: str) -> tuple[str, dict[str, str]]:
 
 def host_exists(windows: str) -> bool:
     return Path(wsl_path(windows)).exists()
+
+
+def open_work(work: str, no_powershell: str) -> str:
+    """The ``powershell.exe`` to run host scripts with, once the start-up checks of the new host work
+    folder ``work`` hold, in this order: ``work`` is a host folder (``require_host_folder``),
+    ``powershell.exe`` is on ``PATH``, and ``work`` does not exist yet.
+
+    Each failing check raises ``Refused``: ``the work folder: <reason>``, then ``no_powershell``, the
+    caller's own sentence, then ``the work folder <work> exists already``.
+    """
+    try:
+        require_host_folder(work)
+    except Refused as refusal:
+        raise Refused(f"the work folder: {refusal}") from None
+    executable = powershell_path()
+    if executable is None:
+        raise Refused(no_powershell)
+    if host_exists(work):
+        raise Refused(f"the work folder {work} exists already")
+    return executable
 
 
 def engine_version(work: str) -> str | None:
@@ -235,16 +267,9 @@ def main(argv: list[str] | None = None, runner=subprocess.run) -> int:
     now = datetime.datetime.now(datetime.timezone.utc)
     work = arguments.work or f"{DEFAULT_PARENT}\\{now:%Y%m%dT%H%M%SZ}"
     try:
-        require_host_folder(work)
+        executable = open_work(work, "powershell.exe is not on PATH; the tool runs in WSL on a Windows host")
     except Refused as refusal:
         print(f"windows_host: {refusal}", file=sys.stderr)
-        return 2
-    executable = powershell_path()
-    if executable is None:
-        print("windows_host: powershell.exe is not on PATH; the tool runs in WSL on a Windows host", file=sys.stderr)
-        return 2
-    if host_exists(work):
-        print(f"windows_host: the work folder {work} exists already", file=sys.stderr)
         return 2
     found, missing = probe(runner, executable)
     if missing:
@@ -265,8 +290,7 @@ def main(argv: list[str] | None = None, runner=subprocess.run) -> int:
     status, lines = compare(Path(wsl_path(work + "\\runs\\search")))
     for line in lines:
         print(line)
-    good = sum(1 for line in lines if line.endswith(": OK"))
-    print(f"windows_host: {good} pinned files OK; compare exit status {status}")
+    print(f"windows_host: {count_ok(lines)} pinned files OK; compare exit status {status}")
     return 0 if status == 0 else 1
 
 
