@@ -20,7 +20,7 @@ with UTF-8 output, so no quoting passes through two shells; values enter a scrip
 single-quoted literals (``literal``). ``Refused``, ``windows_path``, ``wsl_path``,
 ``require_host_folder``, ``powershell_path``, ``host_exists``, ``open_work``, ``literal``, ``encoded``,
 ``powershell``, ``step``, ``compare``, ``lines_of`` and ``count_ok`` are the reusable parts for other
-host checks; ``tools/build_package.py`` and ``tools/measure_quick_start.py`` use them.
+host checks.
 
 Exit status: 0 when every pinned file reports ``OK``; 1 when a host step fails (nothing is compared
 then) or a pinned file differs or is missing; 2 when the tool cannot start (a refused or existing
@@ -149,23 +149,23 @@ def quick_start_script(work: str, bundle_paths: dict[str, str], commit: str) -> 
     lines = [
         f"Set-Location -LiteralPath {literal(work)}\n",  # not the UNC folder of WSL the host starts in
         step("clone deltarecon", f"git -c core.autocrlf=false clone --config core.autocrlf=false --no-checkout "
-                                  f"{literal(deltarecon)} {literal(checkout)}"),
+                                 f"{literal(deltarecon)} {literal(checkout)}"),
         step(f"checkout {commit}", f"git -C {literal(checkout)} -c core.autocrlf=false checkout --detach "
-                                    f"{literal(commit)}"),
+                                   f"{literal(commit)}"),
         f"$head = git -C {literal(checkout)} rev-parse HEAD\n"
         f"if ($head -ne {literal(commit)}) {{ [Console]::Error.WriteLine("
         f"'windows_host: the host step verify commit found ' + $head); exit 1 }}\n",
         step("clone delib-history", f"git -c core.autocrlf=false clone --config core.autocrlf=false "
-                                     f"{literal(history)} {literal(clone)}"),
+                                    f"{literal(history)} {literal(clone)}"),
         step("fetch delib-history remote branches",
-              f"git -C {literal(clone)} fetch --quiet {literal(history)} "
-              f"{literal('+refs/remotes/origin/*:refs/remotes/wsl-origin/*')}"),
+             f"git -C {literal(clone)} fetch --quiet {literal(history)} "
+             f"{literal('+refs/remotes/origin/*:refs/remotes/wsl-origin/*')}"),
         f"Set-Location -LiteralPath {literal(checkout)}\n",
         f"$env:UV_PYTHON_INSTALL_DIR = {literal(python)}\n",
         step(f"install Python {PYTHON}", f"uv python install --no-bin --no-registry {literal(PYTHON)}"),
         step("uv sync --locked", "uv sync --locked"),
         step("run the quick start chain", f"uv run python tools/measure_quick_start.py --work "
-                                            f"{literal(runs)}"),
+                                           f"{literal(runs)}"),
     ]
     return "".join(lines)
 

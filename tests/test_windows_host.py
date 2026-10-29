@@ -162,7 +162,10 @@ def test_open_work_checks_the_folder_then_powershell_then_that_the_folder_is_new
     else:
         with pytest.raises(tool.Refused) as raised:
             tool.open_work(work, NO_POWERSHELL)
-        assert str(raised.value).startswith(refusal)
+        if case == "refused folder":
+            assert str(raised.value).startswith(refusal)
+        else:
+            assert str(raised.value) == refusal
     expected = {"refused folder": [], "no powershell": ["powershell"]}.get(case, ["powershell", ("exists", WORK)])
     assert asked == expected
 
