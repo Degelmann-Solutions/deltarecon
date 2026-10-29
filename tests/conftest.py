@@ -48,6 +48,7 @@ CLONE = REPOSITORIES / CLONE_NAME
 MEASURE_TOOL = ROOT / "tools" / "measure_quick_start.py"
 WINDOWS_HOST_TOOL = ROOT / "tools" / "windows_host.py"
 BUILD_PACKAGE_TOOL = ROOT / "tools" / "build_package.py"
+RELEASE_TOOL = ROOT / "tools" / "release.py"
 REPOSITORY_URL = "https://github.com/Degelmann-Solutions/delib-history"
 RELEASE_N = "b64334e09613c45a7a12468dfddc0d9ec47819bb"  # the first commit of delib-history
 START = "fa368575a66d97c94e96dffc62b273ec95511b12"  # release N on the fixed model, the older end of the reference walk
@@ -117,6 +118,11 @@ def load_windows_host_tool():
 def load_build_package_tool():
     """The module ``tools/build_package.py``."""
     return _load_tool("build_package", BUILD_PACKAGE_TOOL)
+
+
+def load_release_tool():
+    """The module ``tools/release.py``."""
+    return _load_tool("release", RELEASE_TOOL)
 
 
 def artifacts(node, found=None) -> list[dict]:

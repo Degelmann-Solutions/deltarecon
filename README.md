@@ -8,6 +8,42 @@ The repo currently holds two building blocks: version 3 of the engine-neutral st
 
 ## Quick start
 
+There are two ways to run the quick start: from a package, which needs nothing installed, or from a checkout of this repository, which needs uv and Git. Both run the same six commands on the same two revisions of `delib-history` and give the same search result.
+
+### From a package
+
+The release [`v0.1.0`](https://github.com/Degelmann-Solutions/deltarecon/releases/tag/v0.1.0) offers one package per platform: `deltarecon-0.1.0-x86_64-unknown-linux-gnu.tar.gz` for Linux on x86-64 and `deltarecon-0.1.0-x86_64-pc-windows-msvc.zip` for Windows on x86-64. Download the archive of your platform and `SHA256SUMS` from the release page and check the archive against `SHA256SUMS`: on Linux `sha256sum -c SHA256SUMS --ignore-missing` in the download folder must report `OK`; on Windows `Get-FileHash -Algorithm SHA256 deltarecon-0.1.0-x86_64-pc-windows-msvc.zip` in PowerShell prints the SHA-256, which must equal its line in `SHA256SUMS`. A package needs no Python, no uv and no Git: it holds its own Python 3.14.9, the libraries locked in `uv.lock`, DeltaRecon with its contract pack, a full clone of `delib-history` with its history in `delib-history/`, the tolerance profiles in `profiles/`, and a launcher. The launcher sets `DELTARECON_REPOSITORIES` to the package folder, so every command reads the clone in the package. There is no macOS package; on macOS use the checkout below.
+
+On Linux, unpack the archive with `tar` and run the commands from the package folder:
+
+```sh
+tar -xzf deltarecon-0.1.0-x86_64-unknown-linux-gnu.tar.gz
+cd deltarecon-0.1.0-x86_64-unknown-linux-gnu
+./deltarecon request --revision fa368575a66d97c94e96dffc62b273ec95511b12 --label N --run-id run-n-full --output runs/n-full/request.json
+./deltarecon run runs/n-full/request.json
+./deltarecon replay runs/n-full/run-record.json
+./deltarecon regression runs/n-full/run-record.json --revision 887b7181d22550eda2fb52fa1a6bd77376d4eb2e --output runs/regression-n
+./deltarecon derive runs/n-full/run-record.json runs/regression-n/run/run-record.json --output runs/changes.json
+./deltarecon search runs/n-full/run-record.json runs/regression-n/run/run-record.json --quantity Bruttobeitrag --periods 0-59 --tolerance profiles/tolerance-bruttobeitrag.json --target-only --output runs/search
+```
+
+On Windows, unpack the zip with Explorer's "Extract All" or with `Expand-Archive deltarecon-0.1.0-x86_64-pc-windows-msvc.zip -DestinationPath .` in PowerShell. The package folder is `deltarecon-0.1.0-x86_64-pc-windows-msvc`, the folder that holds `deltarecon.cmd`; "Extract All" proposes a folder named after the zip, which then holds the package folder. Run the commands from the package folder with Windows paths. In cmd:
+
+```bat
+deltarecon.cmd request --revision fa368575a66d97c94e96dffc62b273ec95511b12 --label N --run-id run-n-full --output runs\n-full\request.json
+deltarecon.cmd run runs\n-full\request.json
+deltarecon.cmd replay runs\n-full\run-record.json
+deltarecon.cmd regression runs\n-full\run-record.json --revision 887b7181d22550eda2fb52fa1a6bd77376d4eb2e --output runs\regression-n
+deltarecon.cmd derive runs\n-full\run-record.json runs\regression-n\run\run-record.json --output runs\changes.json
+deltarecon.cmd search runs\n-full\run-record.json runs\regression-n\run\run-record.json --quantity Bruttobeitrag --periods 0-59 --tolerance profiles\tolerance-bruttobeitrag.json --target-only --output runs\search
+```
+
+In PowerShell each line starts with `.\deltarecon.cmd` instead of `deltarecon.cmd`. The Windows package is not signed, so SmartScreen or the browser may warn when it is downloaded or run. The commands, their output and their exit statuses are those of the checkout below, where they are described; the regression exits with status 1.
+
+`uv run python tools/release.py` builds both packages of a release in a checkout. It refuses a working tree that is not clean (an ignored file does not count), records the commit of `HEAD`, builds the Linux and then the Windows package with `tools/build_package.py build` into `dist/release-v<version>/` (`--output DIR` names another folder, which must not exist; `--source` is passed to the build), fails when `HEAD` or the working tree changed during the builds, and writes `SHA256SUMS` and `release-notes.md`, the notes of the GitHub release: the commit, the platform and SHA-256 of each archive, what a package holds, how to verify a download, and the link to this quick start at the tag. It publishes nothing and checks no archive; `uv run python tools/build_package.py check <archive>` checks each archive of the release folder.
+
+### From a checkout
+
 You need [uv](https://docs.astral.sh/uv/) 0.13.5 or newer, and Git to make and update the clone of `delib-history`; the commands read the clone with the Python library dulwich, a locked dependency, and need no Git. `uv sync` installs the uv-managed Python 3.14.9 that `.python-version` and `pyproject.toml` pin, if it is absent, and the locked dependencies. The project uses only uv-managed interpreters (`python-preference = "only-managed"` in `pyproject.toml`), never a Python found on `PATH`. An older uv does not know Python 3.14.9, and `uv sync` then fails: uv 0.12.15 does not know it, uv 0.13.5 does; `uv self update` updates it.
 
 ```sh
@@ -87,7 +123,7 @@ The earlier bare runner, which projects every model point and prints one SHA-256
 | `tests/` | The checks of the contract pack, and the tests of run, run record, replay, compare, signature table, regression, the derived manifest, the walk, the search, the reproduction oracle and the pin of the quick-start search. The provenance, portfolio and runner tests of release N are in `delib-history`. |
 | `oracle/` | The reproduction oracle: the two run requests of the reference attribution and `SHA256SUMS`, the SHA-256 of its walk result and signature tables, and `REPRODUCTIONS.md`, the record of every reproduction, under contract version 3.1; `archive/2026-10-27/`, the oracle published under 3.0, and `archive/2026-10-22/`, the oracle published under 2.0, both unchanged. See "Reproduce the reference attribution" above. |
 | `profiles/` | Tolerance profiles: `tolerance-bruttobeitrag.json`, used by the quick start and the reference attribution. |
-| `tools/` | `measure_quick_start.py`, the measurement of the quick start, step by step; `windows_host.py`, which runs checks natively on the Windows host from WSL; and `build_package.py`, which builds and checks the Linux and Windows packages. |
+| `tools/` | `measure_quick_start.py`, the measurement of the quick start, step by step; `windows_host.py`, which runs checks natively on the Windows host from WSL; `build_package.py`, which builds and checks the Linux and Windows packages; and `release.py`, which builds both packages of a release from one clean commit and writes their `SHA256SUMS` and release notes. |
 | `measurements/` | The recorded measurements of the quick start: `baseline.json` and one file per later measurement; and `quick-start-search.SHA256SUMS`, the pin of `search.result.json` of the quick-start search and of the files it hashes. |
 | `PROVENANCE.md` | Statement on the origin of the open-source core. |
 
