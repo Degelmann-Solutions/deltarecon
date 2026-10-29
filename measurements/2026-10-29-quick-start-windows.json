@@ -1,0 +1,67 @@
+{
+  "date": "2026-10-29T09:44:40Z",
+  "commit": "0a91ad4ba27d5ff113d70dee40fffd234457de9e",
+  "dirty": false,
+  "platform": "Windows-11-10.0.26300-SP0",
+  "cpu_count": 24,
+  "engine_version": "modelx 0.33.0 export, pandas 3.0.6, numpy 2.5.3, Python 3.14.9",
+  "note": "Windows package dist/deltarecon-0.1.0-x86_64-pc-windows-msvc.zip built with tools/build_package.py build --target x86_64-pc-windows-msvc from the clean commit 0a91ad4 right before this measurement, delib-history cloned from GitHub; measured from WSL with --windows-package, each step run natively on the Windows host through deltarecon.cmd with an empty PATH and timed by the host's stopwatch; Intel Core i7-12800HX; commit 0a91ad4 is an earlier form of the story commit, amended afterwards with files no run reads (this record and the Windows durations in the README)",
+  "beside": [
+    {
+      "name": "unpack",
+      "seconds": 5.9
+    }
+  ],
+  "peak_mib_covers": "nothing: memory is not measured on the Windows host",
+  "measured_steps": [
+    "request",
+    "run",
+    "replay",
+    "regression",
+    "derive",
+    "search"
+  ],
+  "steps": [
+    {
+      "name": "request",
+      "seconds": 9.4,
+      "peak_mib": null
+    },
+    {
+      "name": "run",
+      "seconds": 8.2,
+      "peak_mib": null
+    },
+    {
+      "name": "replay",
+      "seconds": 12.3,
+      "peak_mib": null
+    },
+    {
+      "name": "regression",
+      "seconds": 21.7,
+      "peak_mib": null
+    },
+    {
+      "name": "derive",
+      "seconds": 3.5,
+      "peak_mib": null
+    },
+    {
+      "name": "search",
+      "seconds": 105.3,
+      "peak_mib": null,
+      "states": 17,
+      "seconds_per_state": 6.194117647058824
+    }
+  ],
+  "total": {
+    "seconds": 160.4,
+    "peak_mib": null
+  },
+  "windows": {
+    "work": "C:\\tmp\\deltarecon-measure\\20261029T094440Z",
+    "package": "deltarecon-0.1.0-x86_64-pc-windows-msvc.zip",
+    "package_sha256": "efc91b103a71bb757977194a12608708b10012ee008c2a8913c760942f95bbfa"
+  }
+}
