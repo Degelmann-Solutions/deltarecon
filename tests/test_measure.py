@@ -1,6 +1,6 @@
 """The measurement tool ``tools/measure_quick_start.py``: fast tests only, no measurement runs.
 
-The tool's step list must equal the ``uv run`` lines of the README quick-start block, so a change
+The tool's step list must equal the ``uv run`` lines of the checkout block of the README quick start, so a change
 of the quick start changes the measurement with it.
 """
 from __future__ import annotations
@@ -21,9 +21,10 @@ tool = load_measure_tool()
 
 
 def quick_start_commands() -> list[list[str]]:
-    """The ``uv run`` lines of the first ``sh`` block under the heading "Quick start" of the README."""
+    """The ``uv run`` lines of the first ``sh`` block under "From a checkout" of the README quick start."""
     text = (ROOT / "README.md").read_text("utf-8")
     section = text[text.index("## Quick start"):]
+    section = section[section.index("### From a checkout"):]
     block = re.search(r"```sh\n(.*?)```", section, re.S).group(1)
     return [shlex.split(line) for line in block.splitlines() if line.startswith("uv run ")]
 
