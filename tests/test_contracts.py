@@ -982,3 +982,19 @@ def test_the_wheel_carries_the_pack_and_reads_its_schemas_outside_a_checkout(tmp
     folder, errors = result.stdout.splitlines()
     assert Path(folder) == (tmp_path / "unpacked" / "degelmann" / "deltarecon" / "contracts").resolve()
     assert json.loads(errors) == []
+
+
+def test_the_wheel_carries_the_tolerance_profile_and_the_demo_reads_it_outside_a_checkout(tmp_path):
+    """The wheel holds ``profiles/tolerance-bruttobeitrag.json`` as ``degelmann/deltarecon/profiles``, byte for
+    byte; unpacked outside the checkout, the guided quick start reads that copy."""
+    wheel = Path(next(WheelBuilder(str(ROOT)).build(directory=str(tmp_path / "dist"), versions=["standard"])))
+    name = "tolerance-bruttobeitrag.json"
+    with zipfile.ZipFile(wheel) as archive:
+        carried = archive.read(f"degelmann/deltarecon/profiles/{name}")
+        archive.extractall(tmp_path / "unpacked")
+    assert carried == (ROOT / "profiles" / name).read_bytes()
+    probe = ("import sys; sys.path.insert(0, sys.argv[1]);"
+             "from degelmann.deltarecon import quickstart as q; print(q.profile_path())")
+    result = subprocess.run([sys.executable, "-I", "-c", probe, str(tmp_path / "unpacked")],
+                            cwd=tmp_path, capture_output=True, text=True, check=True)
+    assert Path(result.stdout.strip()) == (tmp_path / "unpacked" / "degelmann" / "deltarecon" / "profiles" / name).resolve()

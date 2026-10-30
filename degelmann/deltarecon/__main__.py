@@ -14,6 +14,7 @@
     uv run python -m degelmann.deltarecon search runs/n-full/run-record.json \\
         runs/new-full/run-record.json --quantity Bruttobeitrag --periods 0-59 \\
         --walk runs/walk --output runs/search
+    uv run python -m degelmann.deltarecon quickstart
 
 ``request`` writes a run request with the complete release identity of a commit of the
 reference model repository. ``--revision`` takes any name of a commit in the local clone,
@@ -92,6 +93,19 @@ state in ``--workers N`` worker processes, else as many as ``DELTARECON_WORKERS`
 one per processor; ``N`` and the variable must be whole numbers of at least 1. The count changes
 no byte of any document and is not recorded. ``request`` and ``derive`` project no point and do not
 read the variable.
+
+``quickstart`` is the guided quick start: it runs ``request``, ``run``, ``regression``, ``derive``
+and ``search`` of the quick start, without ``replay``, on the same two revisions into the new folder
+``runs/quickstart-<UTC timestamp>/`` below the working directory, and explains each of the last four
+before it runs: it shows the step as a single command, waits for Enter (not with ``--no-pause``),
+and summarises the outcome from the files the step wrote. The search uses the tolerance profile
+``tolerance-bruttobeitrag.json``: the wheel's copy when installed, else ``profiles/`` of the
+checkout; the regression compares exactly.
+``--lang de|en`` chooses the language; without it the first non-empty one of ``LC_ALL``,
+``LC_MESSAGES`` and ``LANG`` decides, else the locale of the system: German for a value that starts
+with ``de`` or ``German``, else English. It exits with 0 when every step has its expected status,
+1 when one has another (the demo prints the output of that step and stops), 2 when the folder
+exists already, and 130 when it is interrupted.
 
 ``compare`` takes its tolerance profile from the request. ``replay``, ``regression``,
 ``walk``, and ``search`` compare exactly unless ``--tolerance FILE`` names a tolerance profile: a JSON file in the
@@ -463,6 +477,12 @@ def command_search(args) -> int:
     return 0 if done.searched else 1
 
 
+def command_quickstart(args) -> int:
+    from . import quickstart  # loaded on use, as the engine is
+
+    return quickstart.quickstart(args.lang or quickstart.system_language(), not args.no_pause, args.repositories)
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="deltarecon", description="Run and compare releases through the stage contracts.")
     commands = parser.add_subparsers(dest="command", required=True)
@@ -536,6 +556,13 @@ def main(argv: list[str] | None = None) -> int:
                              "needs a narrowed target: --quantity for a proper subset of the quantities, or --periods")
     halver.set_defaults(handler=command_search)
 
+    guided = commands.add_parser("quickstart", help="the guided quick start: run and explain the quick start "
+                                                    "step by step")
+    guided.add_argument("--no-pause", action="store_true", help="do not wait for Enter before each step")
+    guided.add_argument("--lang", choices=("de", "en"),
+                        help="the language of the texts (default: the language of the system)")
+    guided.set_defaults(handler=command_quickstart)
+
     for command in (again, regress, stepper, halver):
         command.add_argument("--tolerance", metavar="FILE",
                              help="tolerance profile, JSON in the form of the tolerance member of a "
@@ -553,7 +580,7 @@ def main(argv: list[str] | None = None) -> int:
                                   "export, through the modelx export of the model (default), or "
                                   "modelx, through modelx itself; a run never falls back to the other")
 
-    for command in (request, run, again, regress, history, stepper, halver):
+    for command in (request, run, again, regress, history, stepper, halver, guided):
         command.add_argument("--repositories", metavar="DIR",
                              help="folder that holds the clone of the reference model repository "
                                   f"(default: the folder {REPOSITORIES_VARIABLE} names, else "
