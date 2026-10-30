@@ -118,7 +118,7 @@ TEXTS = {
             "and is classified: data (the portfolio), parameter (tables such as lapse or cost rates), code (the "
             "calculation rules), or none of these (for example documentation only)."),
         "after_derive": "{count} changes: {data} data, {parameter} parameter, {code} code, {none} without a class.",
-        "derive_row": "  {short} [{classes}] {description}",
+        "derive_header": ("No.", "Revision", "Class", "Description"),
         "classes": {"data": "data", "parameter": "parameter", "code": "code"},
         "no_class": "no class",
         "after_derive_end": "File: changes.json (the change manifest).",
@@ -136,7 +136,7 @@ TEXTS = {
         "after_search": (
             "Found with {run} of {walk} intermediate states computed ({saved} saved). These changes cause the "
             "deviation in the Bruttobeitrag:"),
-        "search_row": "  {short} {description}: sum of the deviation {sum}",
+        "search_header": ("Revision", "Description", "Sum of the deviation"),
         "not_resolved": (
             "Not resolved: the changes {shorts} exceed the tolerance only together; each one alone stays below "
             "it. DeltaRecon therefore attributes this part of the deviation to none of them."),
@@ -201,7 +201,7 @@ TEXTS = {
             "nichts davon (zum Beispiel nur Dokumentation)."),
         "after_derive": (
             "{count} Änderungen: {data} Daten, {parameter} Parameter, {code} Code, {none} ohne Einordnung."),
-        "derive_row": "  {short} [{classes}] {description}",
+        "derive_header": ("Nr.", "Revision", "Einordnung", "Beschreibung"),
         "classes": {"data": "Daten", "parameter": "Parameter", "code": "Code"},
         "no_class": "ohne Einordnung",
         "after_derive_end": "Datei: changes.json (das Änderungsverzeichnis).",
@@ -219,7 +219,7 @@ TEXTS = {
         "after_search": (
             "Gefunden mit {run} von {walk} Zwischenständen ({saved} gespart). Diese Änderungen verursachen die "
             "Abweichung im Bruttobeitrag:"),
-        "search_row": "  {short} {description}: Summe der Abweichung {sum}",
+        "search_header": ("Revision", "Beschreibung", "Summe der Abweichung"),
         "not_resolved": (
             "Nicht aufgelöst: Die Änderungen {shorts} überschreiten die Toleranz nur zusammen; jede einzelne "
             "bleibt darunter. DeltaRecon ordnet diesen Teil der Abweichung daher keiner von ihnen zu."),
@@ -318,11 +318,13 @@ def command_lines(argv: list[str], width: int) -> list[str]:
     return lines
 
 
-def table(header: tuple[str, ...], rows: list[tuple[str, ...]]) -> list[str]:
-    """``header`` and ``rows`` as lines indented by two spaces, two spaces between columns: the first column
-    left-aligned, the others right-aligned, each as wide as its widest entry, the header included."""
+def table(header: tuple[str, ...], rows: list[tuple[str, ...]], right: set[int] | None = None) -> list[str]:
+    """``header`` and ``rows`` as lines indented by two spaces, two spaces between columns, each column as
+    wide as its widest entry, the header included: the columns ``right`` names right-aligned (by default
+    every column but the first), the others left-aligned."""
+    right = set(range(1, len(header))) if right is None else right
     widths = [max(len(entry[column]) for entry in [header, *rows]) for column in range(len(header))]
-    return ["  " + "  ".join(cell.ljust(width) if column == 0 else cell.rjust(width)
+    return ["  " + "  ".join(cell.rjust(width) if column in right else cell.ljust(width)
                              for column, (cell, width) in enumerate(zip(entry, widths))).rstrip()
             for entry in [header, *rows]]
 
@@ -455,10 +457,13 @@ def quickstart(lang: str, pause: bool = True, repositories: str | None = None,
         say()
         paragraph("after_derive", count=integer(len(changes), lang),
                   none=integer(sum(not change["class"] for change in changes), lang), **counts)
-        for change in changes:
-            classes = ", ".join(texts["classes"][kind] for kind in change["class"]) or texts["no_class"]
-            say(texts["derive_row"].format(short=short(change["id"]), classes=classes,
-                                           description=descriptions[change["id"]]))
+        say()
+        for line in table(texts["derive_header"], [
+                (str(number), short(change["id"]),
+                 ", ".join(texts["classes"][kind] for kind in change["class"]) or texts["no_class"],
+                 descriptions[change["id"]]) for number, change in enumerate(changes, 1)], right={0}):
+            say(line)
+        say()
         paragraph("after_derive_end")
 
         if not explain("search", count=integer(len(changes), lang)):
@@ -468,14 +473,18 @@ def quickstart(lang: str, pause: bool = True, repositories: str | None = None,
         say()
         paragraph("after_search", run=integer(runs["search"], lang), walk=integer(runs["walk"], lang),
                   saved=integer(runs["saved"], lang))
+        contributing = []
         for entry in result["contributions"]:
             for contribution in entry["contributions"]:
                 if contribution["contributes"]:
                     revisions = entry["revisions"]
                     description = descriptions.get(revisions[0], "") if len(revisions) == 1 else ""
-                    say(texts["search_row"].format(short=", ".join(short(r) for r in revisions),
-                                                   description=description,
-                                                   sum=signed(contribution.get("sum"), lang)))
+                    contributing.append((", ".join(short(r) for r in revisions), description,
+                                         signed(contribution.get("sum"), lang)))
+        say()
+        for line in table(texts["search_header"], contributing, right={2}):
+            say(line)
+        say()
         for finding in result["findings"]:
             if finding["code"] == "interval_not_resolved":
                 paragraph("not_resolved", shorts=", ".join(short(r) for r in finding.get("revisions", [])))

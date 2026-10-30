@@ -53,8 +53,13 @@ def fake_files(name: str) -> None:
     elif name == "search":
         write(Path("search") / "search.result.json", {
             "runs": {"search": 3, "walk": 5, "saved": 2},
-            "contributions": [{"revisions": [REVISIONS[1]], "contributions": [
-                {"quantity": "Bruttobeitrag", "contributes": True, "sum": 24109.994, "absolute_sum": 1.0}]}],
+            "contributions": [
+                {"revisions": [REVISIONS[1]], "contributions": [
+                    {"quantity": "Bruttobeitrag", "contributes": True, "sum": 24109.994, "absolute_sum": 1.0}]},
+                {"revisions": [REVISIONS[3]], "contributions": [
+                    {"quantity": "Bruttobeitrag", "contributes": True, "sum": -4429.49, "absolute_sum": 1.0}]},
+                {"revisions": [REVISIONS[0]], "contributions": [
+                    {"quantity": "Bruttobeitrag", "contributes": False}]}],
             "findings": [{"code": "interval_not_resolved", "message": "m", "revisions": REVISIONS[2:]}],
             "held": [{"kind": "input_data", "not_shown": [REVISIONS[0]]}]})
 
@@ -181,13 +186,22 @@ def test_the_happy_path_runs_in_the_demo_folder_and_summarises_the_files(cwd, ca
     assert "Total" not in out
     assert "the run of N+1 in regression/run." in text
     assert "4 changes: 1 data, 1 parameter, 2 code, 1 without a class." in text
-    assert "  aaaaaaa [data] Change the portfolio\n" in out
-    assert "  bbbbbbb [parameter, code] Lower the lapse rate\n" in out
-    assert "  ccccccc [no class] Say more in the README\n" in out
+    assert ("without a class.\n\n"
+            "  No.  Revision  Class            Description\n"
+            "    1  aaaaaaa   data             Change the portfolio\n"
+            "    2  bbbbbbb   parameter, code  Lower the lapse rate\n"
+            "    3  ccccccc   no class         Say more in the README\n"
+            "    4  ddddddd   code             Raise the charge\n"
+            "\nFile: changes.json") in out
     assert "File: changes.json (the change manifest)." in text
     assert "Which of the 4 changes cause" in text
     assert "Found with 3 of 5 intermediate states computed (2 saved)." in text
-    assert "  bbbbbbb Lower the lapse rate: sum of the deviation +24,109.99\n" in out
+    assert ("Bruttobeitrag:\n\n"
+            "  Revision  Description           Sum of the deviation\n"
+            "  bbbbbbb   Lower the lapse rate            +24,109.99\n"
+            "  ddddddd   Raise the charge                 -4,429.49\n"
+            "\nNot resolved:") in out
+    assert "aaaaaaa   Change" not in out  # a change that does not contribute has no row
     assert "Not resolved: the changes ccccccc, ddddddd exceed the tolerance only together;" in text
     assert "Not shown: the effect of 1 change(s) of the portfolio data" in text
     assert "Result: search/search.result.json." in text
@@ -232,6 +246,8 @@ def test_the_table_aligns_to_the_widest_entry_or_header():
         "  Quantity                            Model points  Values   Periods",
         "  Kosten 2. Ordnung ohne Provisionen           350  80,580  0 to 479",
         "  Anzahl                                         1       5    1 to 2"]
+    assert demo.table(("No.", "Revision"), [("1", "abc"), ("10", "abcdefghij")], right={0}) == [
+        "  No.  Revision", "    1  abc", "   10  abcdefghij"]
 
 
 def test_the_german_texts_and_numbers(cwd, capsys):
@@ -250,9 +266,19 @@ def test_the_german_texts_and_numbers(cwd, capsys):
             "  Provisionen               2     34   1 bis 12\n"
             "\nDie Abweichung ist das erwartete Ergebnis") in out
     assert "4 Änderungen: 1 Daten, 1 Parameter, 2 Code, 1 ohne Einordnung." in text
-    assert "  bbbbbbb [Parameter, Code] Lower the lapse rate\n" in out
+    assert ("ohne Einordnung.\n\n"
+            "  Nr.  Revision  Einordnung       Beschreibung\n"
+            "    1  aaaaaaa   Daten            Change the portfolio\n"
+            "    2  bbbbbbb   Parameter, Code  Lower the lapse rate\n"
+            "    3  ccccccc   ohne Einordnung  Say more in the README\n"
+            "    4  ddddddd   Code             Raise the charge\n"
+            "\nDatei: changes.json") in out
     assert "Gefunden mit 3 von 5 Zwischenständen (2 gespart)." in text
-    assert "  bbbbbbb Lower the lapse rate: Summe der Abweichung +24.109,99\n" in out
+    assert ("Bruttobeitrag:\n\n"
+            "  Revision  Beschreibung          Summe der Abweichung\n"
+            "  bbbbbbb   Lower the lapse rate            +24.109,99\n"
+            "  ddddddd   Raise the charge                 -4.429,49\n"
+            "\nNicht aufgelöst:") in out
     assert "Nicht aufgelöst: Die Änderungen ccccccc, ddddddd" in text
     assert "Nicht gezeigt: die Wirkung von 1 Änderung(en) der Bestandsdaten" in text
     assert "Ergebnis: search/search.result.json." in text
