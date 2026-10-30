@@ -172,8 +172,13 @@ def test_the_happy_path_runs_in_the_demo_folder_and_summarises_the_files(cwd, ca
     assert "(--revision, the revision fa36857)" in text and "the revision 887b718." in text
     assert "Release N is computed: 350 model points, 80,580 result rows. Files in release-n:" in text
     assert "1,234 values in 3 model points differ" in text
-    assert "  Bruttobeitrag: 3 model points, 1,200 values, periods 0 to 479\n" in out
-    assert "  Provisionen: 2 model points, 34 values, periods 1 to 12\n" in out
+    assert "A value is one quantity of one model point in one period." in text
+    assert ("one period.\n\n"
+            "  Quantity       Model points  Values   Periods\n"
+            "  Bruttobeitrag             3   1,200  0 to 479\n"
+            "  Provisionen               2      34   1 to 12\n"
+            "\nThe deviation is the expected outcome") in out
+    assert "Total" not in out
     assert "the run of N+1 in regression/run." in text
     assert "4 changes: 1 data, 1 parameter, 2 code, 1 without a class." in text
     assert "  aaaaaaa [data] Change the portfolio\n" in out
@@ -221,6 +226,14 @@ def test_an_option_stays_with_its_value_when_a_command_wraps():
     assert demo.command_lines(["x", "with space"], 80) == ['  deltarecon x "with space"']
 
 
+def test_the_table_aligns_to_the_widest_entry_or_header():
+    rows = [("Kosten 2. Ordnung ohne Provisionen", "350", "80,580", "0 to 479"), ("Anzahl", "1", "5", "1 to 2")]
+    assert demo.table(("Quantity", "Model points", "Values", "Periods"), rows) == [
+        "  Quantity                            Model points  Values   Periods",
+        "  Kosten 2. Ordnung ohne Provisionen           350  80,580  0 to 479",
+        "  Anzahl                                         1       5    1 to 2"]
+
+
 def test_the_german_texts_and_numbers(cwd, capsys):
     assert run_demo("de")[0] == 0
     out = capsys.readouterr().out
@@ -230,7 +243,12 @@ def test_the_german_texts_and_numbers(cwd, capsys):
     assert "\nBefehle:\n  deltarecon request " in out and "\nBefehl:\n  deltarecon regression " in out
     assert "Release N ist gerechnet: 350 Modellpunkte, 80.580 Ergebniszeilen." in text
     assert "Die Regression zeigt eine Abweichung: 1.234 Werte in 3 Modellpunkten weichen ab." in text
-    assert "  Bruttobeitrag: 3 Modellpunkte, 1.200 Werte, Perioden 0 bis 479\n" in out
+    assert "Ein Wert ist eine Größe eines Modellpunkts in einer Periode." in text
+    assert ("Periode.\n\n"
+            "  Größe          Modellpunkte  Werte   Perioden\n"
+            "  Bruttobeitrag             3  1.200  0 bis 479\n"
+            "  Provisionen               2     34   1 bis 12\n"
+            "\nDie Abweichung ist das erwartete Ergebnis") in out
     assert "4 Änderungen: 1 Daten, 1 Parameter, 2 Code, 1 ohne Einordnung." in text
     assert "  bbbbbbb [Parameter, Code] Lower the lapse rate\n" in out
     assert "Gefunden mit 3 von 5 Zwischenständen (2 gespart)." in text

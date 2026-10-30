@@ -101,9 +101,10 @@ TEXTS = {
             "where the results of the two releases differ. A deviation is expected here; the command reports it "
             "with exit status 1."),
         "after_regression": (
-            "The regression shows a deviation: {coordinates} values in {points} model points differ. "
-            "Per quantity:"),
-        "regression_row": "  {quantity}: {points} model points, {coordinates} values, periods {first} to {last}",
+            "The regression shows a deviation: {coordinates} values in {points} model points differ. A value is "
+            "one quantity of one model point in one period."),
+        "regression_header": ("Quantity", "Model points", "Values", "Periods"),
+        "periods": "{first} to {last}",
         "after_regression_end": (
             "The deviation is the expected outcome; the demo goes on. Files in regression: compare.result.json, "
             "compare.deviations.csv (every differing value), signature-table.json (the table above); the run of "
@@ -181,9 +182,10 @@ TEXTS = {
             "die Ergebnisse der beiden Releases unterscheiden. Eine Abweichung ist hier erwartet; der Befehl "
             "meldet sie mit dem Exit-Status 1."),
         "after_regression": (
-            "Die Regression zeigt eine Abweichung: {coordinates} Werte in {points} Modellpunkten weichen ab. "
-            "Je Größe:"),
-        "regression_row": "  {quantity}: {points} Modellpunkte, {coordinates} Werte, Perioden {first} bis {last}",
+            "Die Regression zeigt eine Abweichung: {coordinates} Werte in {points} Modellpunkten weichen ab. Ein "
+            "Wert ist eine Größe eines Modellpunkts in einer Periode."),
+        "regression_header": ("Größe", "Modellpunkte", "Werte", "Perioden"),
+        "periods": "{first} bis {last}",
         "after_regression_end": (
             "Die Abweichung ist das erwartete Ergebnis; die Vorführung geht weiter. Dateien in regression: "
             "compare.result.json, compare.deviations.csv (jeder abweichende Wert), signature-table.json (die "
@@ -316,6 +318,15 @@ def command_lines(argv: list[str], width: int) -> list[str]:
     return lines
 
 
+def table(header: tuple[str, ...], rows: list[tuple[str, ...]]) -> list[str]:
+    """``header`` and ``rows`` as lines indented by two spaces, two spaces between columns: the first column
+    left-aligned, the others right-aligned, each as wide as its widest entry, the header included."""
+    widths = [max(len(entry[column]) for entry in [header, *rows]) for column in range(len(header))]
+    return ["  " + "  ".join(cell.ljust(width) if column == 0 else cell.rjust(width)
+                             for column, (cell, width) in enumerate(zip(entry, widths))).rstrip()
+            for entry in [header, *rows]]
+
+
 def main_step(argv: list[str]) -> tuple[int, str]:
     """Run one command through ``__main__.main`` in this process: its exit status and its output."""
     from .__main__ import main
@@ -425,11 +436,13 @@ def quickstart(lang: str, pause: bool = True, repositories: str | None = None,
         say()
         paragraph("after_regression", coordinates=integer(sum(r["deviating_coordinates"] for r in rows), lang),
                   points=integer(len(compared["deviating_model_points"]), lang))
-        for row in rows:
-            say(texts["regression_row"].format(
-                quantity=row["quantity"], points=integer(row["deviating_model_points"], lang),
-                coordinates=integer(row["deviating_coordinates"], lang), first=row["first_period"],
-                last=row["last_period"]))
+        say()
+        for line in table(texts["regression_header"], [
+                (row["quantity"], integer(row["deviating_model_points"], lang),
+                 integer(row["deviating_coordinates"], lang),
+                 texts["periods"].format(first=row["first_period"], last=row["last_period"])) for row in rows]):
+            say(line)
+        say()
         paragraph("after_regression_end")
 
         if not explain("derive"):
