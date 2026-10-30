@@ -12,10 +12,10 @@ runs in this process through ``__main__.main`` with its output captured, so it m
 the single command; the argv run is the argv shown, with every path relative to the demo folder, so
 each shown command runs on its own from there.
 
-Every command gets ``--repositories`` with the clone folder relative to the demo folder when
-``--repositories`` is given or ``DELTARECON_REPOSITORIES`` is unset or names a relative folder; when
-the variable names an absolute folder and no ``--repositories`` is given (the launcher of a package),
-no command gets it. The search gets ``--tolerance`` with the profile relative to the demo folder, or
+A command gets ``--repositories``, with the clone folder relative to the demo folder, only when the
+demo is given ``--repositories`` or ``DELTARECON_REPOSITORIES`` names a relative folder. Otherwise no
+command gets it: from the demo folder a command finds ``repositories/`` of a checkout in a parent
+folder, and in a package the launcher's absolute variable applies. The search gets ``--tolerance`` with the profile relative to the demo folder, or
 absolute when no relative path exists (another drive on Windows).
 
 The texts are in English and German. Without ``--lang`` the first non-empty one of ``LC_ALL``,
@@ -43,7 +43,7 @@ import textwrap
 from pathlib import Path
 from typing import Callable
 
-from .run import REPOSITORIES_FOLDER, REPOSITORIES_VARIABLE
+from .run import REPOSITORIES_VARIABLE
 
 OLDER = "fa368575a66d97c94e96dffc62b273ec95511b12"  # release N on the fixed model
 NEWER = "887b7181d22550eda2fb52fa1a6bd77376d4eb2e"  # the state N+1, 32 revisions later
@@ -280,15 +280,15 @@ def relative_to(path: Path | str, start: Path | str) -> str:
 
 def clone_option(folder: Path, repositories: str | None, env=None) -> str | None:
     """The ``--repositories`` value of every command, relative to the demo folder ``folder``: from
-    ``repositories`` when given, else from ``DELTARECON_REPOSITORIES`` when it names a relative folder,
-    else ``repositories/`` of the working directory; ``None`` when the variable names an absolute folder
-    and ``repositories`` is not given (the launcher of a package)."""
+    ``repositories`` when given, else from ``DELTARECON_REPOSITORIES`` when it names a relative folder;
+    otherwise ``None``, and each command finds the clone itself (upward from the demo folder, or the
+    absolute folder the variable names)."""
     env = os.environ if env is None else env
     if repositories is None:
         named = env.get(REPOSITORIES_VARIABLE)
-        if named and Path(named).is_absolute():
+        if not named or Path(named).is_absolute():
             return None
-        repositories = named or REPOSITORIES_FOLDER
+        repositories = named
     return relative_to(repositories, folder)
 
 

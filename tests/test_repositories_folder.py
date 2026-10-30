@@ -1,5 +1,6 @@
 """Where the commands read the clone: ``--repositories DIR``, else the folder the environment
-variable ``DELTARECON_REPOSITORIES`` names, else ``repositories/`` in the working directory.
+variable ``DELTARECON_REPOSITORIES`` names, else the nearest folder ``repositories/`` in the working
+directory or one of its parents, else ``repositories/`` in the working directory.
 """
 from __future__ import annotations
 
@@ -27,6 +28,72 @@ def test_the_option_ranks_before_the_variable_before_the_working_directory(monke
     assert repositories_folder(None) == tmp_path / "repositories"
     monkeypatch.delenv(REPOSITORIES_VARIABLE)
     assert repositories_folder(None) == tmp_path / "repositories"
+
+
+@pytest.fixture
+def tree(monkeypatch, tmp_path):
+    """``tmp_path/a/b/c`` as the working directory, without the variable."""
+    monkeypatch.delenv(REPOSITORIES_VARIABLE, raising=False)
+    deep = tmp_path / "a" / "b" / "c"
+    deep.mkdir(parents=True)
+    monkeypatch.chdir(deep)
+    return tmp_path
+
+
+def test_the_option_wins_over_a_folder_found_upward(tree):
+    (tree / "repositories").mkdir()
+    assert repositories_folder("given") == Path("given")
+
+
+@pytest.mark.parametrize("named, expected", [("/elsewhere/named", Path("/elsewhere/named")),
+                                             ("relative", Path("relative"))])
+def test_the_variable_wins_over_a_folder_found_upward(tree, monkeypatch, named, expected):
+    (tree / "repositories").mkdir()
+    monkeypatch.setenv(REPOSITORIES_VARIABLE, named)
+    assert repositories_folder(None) == expected
+
+
+def test_the_folder_in_the_working_directory_is_found(tree):
+    (tree / "a" / "b" / "c" / "repositories").mkdir()
+    (tree / "repositories").mkdir()
+    assert repositories_folder(None) == tree / "a" / "b" / "c" / "repositories"
+
+
+def test_the_folder_in_a_parent_is_found(tree):
+    (tree / "a" / "repositories").mkdir()
+    assert repositories_folder(None) == tree / "a" / "repositories"
+
+
+def test_the_nearer_of_two_folders_is_found(tree):
+    (tree / "repositories").mkdir()
+    (tree / "a" / "b" / "repositories").mkdir()
+    assert repositories_folder(None) == tree / "a" / "b" / "repositories"
+
+
+def test_a_file_named_repositories_is_not_a_folder(tree):
+    (tree / "a" / "b" / "repositories").write_text("")
+    (tree / "repositories").mkdir()
+    assert repositories_folder(None) == tree / "repositories"
+
+
+def test_without_a_folder_upward_the_working_directory_is_named(tree):
+    assert repositories_folder(None) == tree / "a" / "b" / "c" / "repositories"
+
+
+def test_an_empty_variable_searches_upward(tree, monkeypatch):
+    (tree / "repositories").mkdir()
+    monkeypatch.setenv(REPOSITORIES_VARIABLE, "")
+    assert repositories_folder(None) == tree / "repositories"
+
+
+def test_a_request_in_a_subfolder_of_the_checkout_finds_the_clone(monkeypatch, tmp_path):
+    """A command started below the folder that holds ``repositories/`` reads the clone there."""
+    monkeypatch.delenv(REPOSITORIES_VARIABLE, raising=False)
+    root = tmp_path / "checkout"
+    (root / "runs" / "demo").mkdir(parents=True)
+    (root / "repositories").symlink_to(REPOSITORIES, target_is_directory=True)
+    monkeypatch.chdir(root / "runs" / "demo")
+    assert main(["request", "--revision", START, "--label", "N", "--run-id", "x", "--output", "request.json"]) == 0
 
 
 @pytest.mark.parametrize("command", READERS)

@@ -100,9 +100,10 @@ and ``search`` of the quick start, without ``replay``, on the same two revisions
 back when it ends, and writes ``release-n/``, ``regression/`` (the run of N+1 in ``regression/run/``),
 ``changes.json`` and ``search/`` there. In four steps, the first ``request`` and ``run``, it explains
 each step, shows its commands as they run from that folder, with every path relative to it, waits for
-Enter (not with ``--no-pause``), and summarises the outcome from the files the step wrote. Every
-command gets ``--repositories`` with the clone folder relative to the demo folder, unless no
-``--repositories`` is given and ``DELTARECON_REPOSITORIES`` names an absolute folder. The search uses the tolerance profile
+Enter (not with ``--no-pause``), and summarises the outcome from the files the step wrote. A
+command gets ``--repositories``, with the clone folder relative to the demo folder, only when the
+demo is given ``--repositories`` or ``DELTARECON_REPOSITORIES`` names a relative folder; otherwise
+each command finds the clone itself. The search uses the tolerance profile
 ``tolerance-bruttobeitrag.json``: the wheel's copy when installed, else ``profiles/`` of the
 checkout; the regression compares exactly.
 ``--lang de|en`` chooses the language; without it the first non-empty one of ``LC_ALL``,
@@ -117,8 +118,10 @@ form of the ``tolerance`` member of a compare request. There is no default profi
 
 No command overwrites an existing file, and none writes into the clone or uses the network.
 The clone is read from ``delib-history`` in the folder ``--repositories DIR`` names, else in the
-folder the environment variable ``DELTARECON_REPOSITORIES`` names, else in ``repositories/`` in
-the working directory. A relative folder is taken from the working directory. The run folders are
+folder the environment variable ``DELTARECON_REPOSITORIES`` names, else in the nearest folder
+``repositories/`` in the working directory or one of its parents, else in ``repositories/`` in the
+working directory, where a missing clone is reported. A relative folder is taken from the working
+directory. The run folders are
 where ``--output`` or the path of a request or record names them, relative to the working
 directory; neither the option nor the variable moves them.
 
@@ -588,7 +591,7 @@ def main(argv: list[str] | None = None) -> int:
         command.add_argument("--repositories", metavar="DIR",
                              help="folder that holds the clone of the reference model repository "
                                   f"(default: the folder {REPOSITORIES_VARIABLE} names, else "
-                                  f"{REPOSITORIES_FOLDER}/ in the working directory)")
+                                  f"the nearest {REPOSITORIES_FOLDER}/ in the working directory or one of its parents)")
 
     args = parser.parse_args(argv)
     try:

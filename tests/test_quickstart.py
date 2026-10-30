@@ -128,7 +128,7 @@ def shown_commands(out: str) -> list[list[str]]:
 def checkout_argvs(tmp_path: Path) -> dict[str, list[str]]:
     """The argvs of a demo started in ``tmp_path`` without the variable and without ``--repositories``."""
     folder = tmp_path / FOLDER
-    return demo.steps(os.path.relpath(demo.profile_path(), folder), os.path.relpath(tmp_path / "repositories", folder))
+    return demo.steps(os.path.relpath(demo.profile_path(), folder))
 
 
 def test_the_steps_equal_the_readme_quick_start_without_replay():
@@ -160,12 +160,13 @@ def test_the_happy_path_runs_in_the_demo_folder_and_summarises_the_files(cwd, ca
     assert [argv[0] for argv in steps.argvs] == NAMES
     assert steps.cwds == [cwd / FOLDER] * 5
     assert steps.argvs == list(checkout_argvs(cwd).values())
-    assert steps.argvs[1][-2:] == ["--repositories", os.path.join("..", "..", "repositories")]
+    assert not any("--repositories" in argv for argv in steps.argvs)
     assert (cwd / FOLDER / "release-n" / "response.json").is_file()
     assert ask.prompts == []
     out = capsys.readouterr().out
     text = flat(out)
     assert "output of" not in out  # the commands' own output is captured, not printed
+    assert "--repositories" not in out
     assert out.startswith("DeltaRecon guided quick start\n\nThe demo compares two states")
     assert f"\n  cd {FOLDER}\n" in out
     assert "(--revision, the revision fa36857)" in text and "the revision 887b718." in text
@@ -318,15 +319,16 @@ def test_an_existing_folder_exits_with_2(cwd, capsys):
 
 
 @pytest.mark.parametrize("variable, option, expected", [
-    (None, None, os.path.join("..", "..", "repositories")),
-    ("", None, os.path.join("..", "..", "repositories")),
+    (None, None, None),
+    ("", None, None),
     ("clones", None, os.path.join("..", "..", "clones")),
     ("ABSOLUTE", None, None),
     ("ABSOLUTE", "mine", os.path.join("..", "..", "mine")),
     (None, "ABSOLUTE", "ABSOLUTE-RELATIVE"),
 ])
 def test_the_clone_folder_of_the_commands(cwd, capsys, monkeypatch, variable, option, expected):
-    """``--repositories`` relative to the demo folder, unless only an absolute variable names the clone."""
+    """``--repositories`` relative to the demo folder only when the demo is given it or the variable names a
+    relative folder; otherwise each command finds the clone itself."""
     absolute = str(cwd.parent / "elsewhere")
     if variable is not None:
         monkeypatch.setenv(REPOSITORIES_VARIABLE, absolute if variable == "ABSOLUTE" else variable)

@@ -581,12 +581,19 @@ def check_target(session: Session, target: dict) -> None:
 
 def repositories_folder(repositories: Path | str | None) -> Path:
     """The repositories folder: the given one, else the one ``DELTARECON_REPOSITORIES`` names, else
-    ``repositories/`` in the working directory. An empty variable counts as unset; a relative
-    folder is taken from the working directory."""
+    the nearest folder ``repositories/`` in the working directory or one of its parents, else
+    ``repositories/`` in the working directory (so a missing clone is reported there). An empty
+    variable counts as unset; a relative folder is taken from the working directory."""
     if repositories is not None:
         return Path(repositories)
     named = os.environ.get(REPOSITORIES_VARIABLE)
-    return Path(named) if named else Path.cwd() / REPOSITORIES_FOLDER
+    if named:
+        return Path(named)
+    here = Path.cwd()
+    for folder in (here, *here.parents):
+        if (folder / REPOSITORIES_FOLDER).is_dir():
+            return folder / REPOSITORIES_FOLDER
+    return here / REPOSITORIES_FOLDER
 
 
 def run_request(request_path: Path, engine: Engine, repositories: Path | None = None) -> RunResult:
