@@ -95,10 +95,14 @@ no byte of any document and is not recorded. ``request`` and ``derive`` project 
 read the variable.
 
 ``quickstart`` is the guided quick start: it runs ``request``, ``run``, ``regression``, ``derive``
-and ``search`` of the quick start, without ``replay``, on the same two revisions into the new folder
-``runs/quickstart-<UTC timestamp>/`` below the working directory, and explains each of the last four
-before it runs: it shows the step as a single command, waits for Enter (not with ``--no-pause``),
-and summarises the outcome from the files the step wrote. The search uses the tolerance profile
+and ``search`` of the quick start, without ``replay``, on the same two revisions in the new folder
+``runs/quickstart-<UTC timestamp>/`` below the working directory: it changes into that folder and
+back when it ends, and writes ``release-n/``, ``regression/`` (the run of N+1 in ``regression/run/``),
+``changes.json`` and ``search/`` there. In four steps, the first ``request`` and ``run``, it explains
+each step, shows its commands as they run from that folder, with every path relative to it, waits for
+Enter (not with ``--no-pause``), and summarises the outcome from the files the step wrote. Every
+command gets ``--repositories`` with the clone folder relative to the demo folder, unless no
+``--repositories`` is given and ``DELTARECON_REPOSITORIES`` names an absolute folder. The search uses the tolerance profile
 ``tolerance-bruttobeitrag.json``: the wheel's copy when installed, else ``profiles/`` of the
 checkout; the regression compares exactly.
 ``--lang de|en`` chooses the language; without it the first non-empty one of ``LC_ALL``,

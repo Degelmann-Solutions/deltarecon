@@ -1,11 +1,22 @@
 """The guided quick start: ``deltarecon quickstart``.
 
-The demo runs the steps of the README quick start without ``replay`` into the new folder
-``runs/quickstart-<UTC timestamp>/`` below the working directory: ``request`` silently, then
-``run``, ``regression``, ``derive`` and ``search`` as four explained steps. Before each of the four
-it explains the step, shows it as a single command and waits for Enter (not with ``--no-pause``);
-after it, it summarises the outcome from the files the step wrote. Each step runs in this process
-through ``__main__.main`` with its output captured, so it makes every check of the single command.
+The demo runs the steps of the README quick start without ``replay`` in the new folder
+``runs/quickstart-<UTC timestamp>/`` below the working directory. It changes into that folder
+before the first step and back to the former working directory when it ends, however it ends.
+Inside it, ``release-n/`` holds the run of release N, ``regression/`` the regression against N+1
+(the run of N+1 in ``regression/run/``), ``changes.json`` the change manifest and ``search/`` the
+search. Step 1 is ``request`` and ``run``; steps 2 to 4 are ``regression``, ``derive`` and
+``search``. Before each step the demo explains it, shows its commands and waits for Enter (not with
+``--no-pause``); after it, it summarises the outcome from the files the step wrote. Each command
+runs in this process through ``__main__.main`` with its output captured, so it makes every check of
+the single command; the argv run is the argv shown, with every path relative to the demo folder, so
+each shown command runs on its own from there.
+
+Every command gets ``--repositories`` with the clone folder relative to the demo folder when
+``--repositories`` is given or ``DELTARECON_REPOSITORIES`` is unset or names a relative folder; when
+the variable names an absolute folder and no ``--repositories`` is given (the launcher of a package),
+no command gets it. The search gets ``--tolerance`` with the profile relative to the demo folder, or
+absolute when no relative path exists (another drive on Windows).
 
 The texts are in English and German. Without ``--lang`` the first non-empty one of ``LC_ALL``,
 ``LC_MESSAGES`` and ``LANG`` decides, else ``locale.getlocale()``: a value that starts with ``de``
@@ -32,6 +43,8 @@ import textwrap
 from pathlib import Path
 from typing import Callable
 
+from .run import REPOSITORIES_FOLDER, REPOSITORIES_VARIABLE
+
 OLDER = "fa368575a66d97c94e96dffc62b273ec95511b12"  # release N on the fixed model
 NEWER = "887b7181d22550eda2fb52fa1a6bd77376d4eb2e"  # the state N+1, 32 revisions later
 LABEL = "N"
@@ -40,56 +53,85 @@ QUANTITY = "Bruttobeitrag"
 PERIODS = "0-59"
 PROFILE_NAME = "tolerance-bruttobeitrag.json"
 RUNS = Path("runs")
+# The folders and files inside the demo folder.
+RELEASE = Path("release-n")
+REGRESSION = Path("regression")
+CHANGES = Path("changes.json")
+SEARCH = Path("search")
 PACKAGED_PROFILES = Path(__file__).resolve().parent / "profiles"
 PROFILES = PACKAGED_PROFILES if PACKAGED_PROFILES.is_dir() else Path(__file__).resolve().parents[2] / "profiles"
 LANGUAGE_VARIABLES = ("LC_ALL", "LC_MESSAGES", "LANG")
-# The expected exit status of each step: the regression shows the deviation between N and N+1.
+# The expected exit status of each command: the regression shows the deviation between N and N+1.
 EXPECT = {"request": 0, "run": 0, "regression": 1, "derive": 0, "search": 0}
+# The commands of each of the four steps.
+STEP_COMMANDS = {"run": ("request", "run"), "regression": ("regression",), "derive": ("derive",),
+                 "search": ("search",)}
+CONTINUATION = " " * 6
 
 TEXTS = {
     "en": {
+        "opening_heading": "DeltaRecon guided quick start",
         "opening": (
-            "DeltaRecon guided quick start. The demo compares two states of the reference model delib-history, "
-            "a term life insurance with 350 model points: release N and the state N+1, 32 revisions later. "
-            "In four steps it shows how DeltaRecon finds a deviation between two releases and traces it back "
-            "to the changes that cause it. Every file goes into {folder}."),
+            "The demo compares two states of the reference model delib-history, a term life insurance with 350 "
+            "model points: release N and the state N+1, 32 revisions later. In four steps it shows how DeltaRecon "
+            "finds a deviation between two releases and traces it back to the changes that cause it. The demo "
+            "puts its files into a folder of its own, and every command runs there:"),
         "prompt": "Press Enter to continue ...",
+        "command": "Command:",
+        "commands": "Commands:",
+        "heading_run": "Step 1 of 4: compute release N",
         "before_run": (
-            "Step 1 of 4: compute release N. DeltaRecon runs the model at release N (revision {short}) for all "
-            "350 model points and records the result together with its full origin: code, parameters and "
-            "portfolio data. This result is the reference that every later step checks against."),
+            "First, request writes a run request to --output. It records which state is computed (--revision, the "
+            "revision {short}), which name this state carries (--label N) and under which identifier the request "
+            "runs (--run-id run-n-full). Name and identifier are chosen freely and reappear in the later "
+            "comparisons. Without --subset the request covers every model point of the portfolio, with --subset "
+            "only the ones named. Then run computes this request and records the result together with its full "
+            "origin: code, parameters and portfolio data. This result is the reference that every later step "
+            "checks against."),
         "after_run": (
-            "Release N is computed: {points} model points, {rows} result rows. Files in {folder}: results.csv "
+            "Release N is computed: {points} model points, {rows} result rows. Files in release-n: results.csv "
             "(the results), response.json and run-record.json (the record of what was computed with what)."),
+        "heading_regression": "Step 2 of 4: regression against N+1",
         "before_regression": (
-            "Step 2 of 4: regression against N+1. DeltaRecon runs the newer state N+1 (revision {short}) on the "
-            "same portfolio data as release N and compares the two results value by value. This shows whether "
-            "and where the results of the two releases differ. A deviation is expected here; the command "
-            "reports it with exit status 1."),
+            "regression takes the record of the run of release N from step 1 (release-n/run-record.json) and, "
+            "with --revision, computes the newer state N+1, the revision {short}. It computes on the same "
+            "portfolio data and for the same model points as release N and compares the two results value by "
+            "value. Without --tolerance it compares exactly: every deviation counts. It writes the run of N+1 "
+            "and the comparison into the folder --output, the run into its subfolder run. This shows whether and "
+            "where the results of the two releases differ. A deviation is expected here; the command reports it "
+            "with exit status 1."),
         "after_regression": (
             "The regression shows a deviation: {coordinates} values in {points} model points differ. "
             "Per quantity:"),
         "regression_row": "  {quantity}: {points} model points, {coordinates} values, periods {first} to {last}",
         "after_regression_end": (
-            "The deviation is the expected outcome; the demo goes on. Files in {folder}: compare.result.json, "
-            "compare.deviations.csv (every differing value), signature-table.json (the table above)."),
+            "The deviation is the expected outcome; the demo goes on. Files in regression: compare.result.json, "
+            "compare.deviations.csv (every differing value), signature-table.json (the table above); the run of "
+            "N+1 in regression/run."),
+        "heading_derive": "Step 3 of 4: the changes between N and N+1",
         "before_derive": (
-            "Step 3 of 4: the changes between N and N+1. DeltaRecon reads the revision history between the two "
-            "states and lists every change on its own, in the order in which it was made. Each change is one "
-            "revision and is classified: data (the portfolio), parameter (tables such as lapse or cost rates), "
-            "code (the calculation rules), or none of these (for example documentation only)."),
+            "derive takes the record of release N from step 1 (release-n/run-record.json) and the record of N+1 "
+            "from step 2 (regression/run/run-record.json) and reads from them which two revisions were computed. "
+            "Then it reads the revision history between these two states, lists every change on its own, in the "
+            "order in which it was made, and writes this change manifest to --output. Each change is one revision "
+            "and is classified: data (the portfolio), parameter (tables such as lapse or cost rates), code (the "
+            "calculation rules), or none of these (for example documentation only)."),
         "after_derive": "{count} changes: {data} data, {parameter} parameter, {code} code, {none} without a class.",
         "derive_row": "  {short} [{classes}] {description}",
         "classes": {"data": "data", "parameter": "parameter", "code": "code"},
         "no_class": "no class",
-        "after_derive_end": "File: {path} (the change manifest).",
+        "after_derive_end": "File: changes.json (the change manifest).",
+        "heading_search": "Step 4 of 4: find the cause in the Bruttobeitrag",
         "before_search": (
-            "Step 4 of 4: find the cause in the Bruttobeitrag. Which of the {count} changes cause the deviation "
-            "in the Bruttobeitrag, the gross premium, in the first five projection years (periods 0 to 59, one "
-            "period per month)? DeltaRecon does not compute every intermediate state; it halves the history "
-            "until each deviation belongs to a single change. A deviation is a change of the Bruttobeitrag by "
-            "more than one cent per model point and month (the tolerance profile). The portfolio data stay at "
-            "release N."),
+            "Which of the {count} changes cause the deviation in the Bruttobeitrag, the gross premium (--quantity "
+            "Bruttobeitrag), in the first five projection years (--periods 0-59, one period per month)? search "
+            "takes the same two records as step 3: release-n/run-record.json and regression/run/run-record.json. "
+            "It does not compute every intermediate state; it halves the history until each deviation belongs to "
+            "a single change. A deviation is a change of the Bruttobeitrag by more than one cent per model point "
+            "and month; the tolerance profile sets this (--tolerance). With --target-only it computes the "
+            "intermediate states only for the Bruttobeitrag in these periods and without the model checks; it "
+            "computes the two end states in full. It writes the result into the folder --output. The portfolio "
+            "data stay at release N."),
         "after_search": (
             "Found with {run} of {walk} intermediate states computed ({saved} saved). These changes cause the "
             "deviation in the Bruttobeitrag:"),
@@ -100,60 +142,78 @@ TEXTS = {
         "not_shown": (
             "Not shown: the effect of {count} change(s) of the portfolio data, since the portfolio data stay at "
             "release N."),
-        "after_search_end": "Result: {path}.",
+        "after_search_end": "Result: search/search.result.json.",
         "closing": (
             "Done. Every file is in {folder}. Each step also runs on its own as the command shown before it."),
         "stopped": "stopped",
     },
     "de": {
+        "opening_heading": "DeltaRecon – geführter Quick Start",
         "opening": (
-            "DeltaRecon – geführter Quick Start. Die Vorführung vergleicht zwei Stände des Referenzmodells "
-            "delib-history, einer Risikolebensversicherung mit 350 Modellpunkten: Release N und den Stand N+1, "
-            "32 Revisionen später. In vier Schritten zeigt sie, wie DeltaRecon eine Abweichung zwischen zwei "
-            "Releases findet und auf die Änderungen zurückführt, die sie verursachen. Alle Dateien landen in "
-            "{folder}."),
+            "Die Vorführung vergleicht zwei Stände des Referenzmodells delib-history, einer "
+            "Risikolebensversicherung mit 350 Modellpunkten: Release N und den Stand N+1, 32 Revisionen später. "
+            "In vier Schritten zeigt sie, wie DeltaRecon eine Abweichung zwischen zwei Releases findet und auf die "
+            "Änderungen zurückführt, die sie verursachen. Die Vorführung legt ihre Dateien in einem eigenen Ordner "
+            "an, und alle Befehle laufen dort:"),
         "prompt": "Weiter mit der Eingabetaste ...",
+        "command": "Befehl:",
+        "commands": "Befehle:",
+        "heading_run": "Schritt 1 von 4: Release N rechnen",
         "before_run": (
-            "Schritt 1 von 4: Release N rechnen. DeltaRecon rechnet das Modell im Stand von Release N (Revision "
-            "{short}) für alle 350 Modellpunkte und hält das Ergebnis mit seiner vollständigen Herkunft fest: "
-            "Code, Parameter und Bestandsdaten. Dieses Ergebnis ist die Referenz, gegen die jeder weitere Schritt "
-            "prüft."),
+            "Zuerst schreibt request einen Rechenauftrag nach --output. Er hält fest, welcher Stand gerechnet wird "
+            "(--revision, die Revision {short}), welchen Namen dieser Stand trägt (--label N) und unter welcher "
+            "Kennung der Auftrag läuft (--run-id run-n-full). Name und Kennung sind frei gewählt und erscheinen in "
+            "den späteren Vergleichen wieder. Ohne --subset gilt der Auftrag für alle Modellpunkte des Bestands, "
+            "mit --subset nur für die genannten. Dann rechnet run diesen Auftrag und hält das Ergebnis mit seiner "
+            "vollständigen Herkunft fest: Code, Parameter und Bestandsdaten. Dieses Ergebnis ist die Referenz, "
+            "gegen die jeder weitere Schritt prüft."),
         "after_run": (
-            "Release N ist gerechnet: {points} Modellpunkte, {rows} Ergebniszeilen. Dateien in {folder}: "
+            "Release N ist gerechnet: {points} Modellpunkte, {rows} Ergebniszeilen. Dateien in release-n: "
             "results.csv (die Ergebnisse), response.json und run-record.json (der Nachweis, womit was gerechnet "
             "wurde)."),
+        "heading_regression": "Schritt 2 von 4: Regression gegen N+1",
         "before_regression": (
-            "Schritt 2 von 4: Regression gegen N+1. DeltaRecon rechnet den neueren Stand N+1 (Revision {short}) "
-            "auf denselben Bestandsdaten wie Release N und vergleicht beide Ergebnisse Wert für Wert. So zeigt "
-            "sich, ob und wo sich die Ergebnisse der beiden Releases unterscheiden. Eine Abweichung ist hier "
-            "erwartet; der Befehl meldet sie mit dem Exit-Status 1."),
+            "regression nimmt den Nachweis des Laufs von Release N aus Schritt 1 (release-n/run-record.json) und "
+            "rechnet mit --revision den neueren Stand N+1, die Revision {short}. Er rechnet auf denselben "
+            "Bestandsdaten und für dieselben Modellpunkte wie Release N und vergleicht beide Ergebnisse Wert für "
+            "Wert. Ohne --tolerance vergleicht er exakt: Jede Abweichung zählt. Den Lauf von N+1 und den Vergleich "
+            "schreibt er in den Ordner --output, den Lauf in dessen Unterordner run. So zeigt sich, ob und wo sich "
+            "die Ergebnisse der beiden Releases unterscheiden. Eine Abweichung ist hier erwartet; der Befehl "
+            "meldet sie mit dem Exit-Status 1."),
         "after_regression": (
             "Die Regression zeigt eine Abweichung: {coordinates} Werte in {points} Modellpunkten weichen ab. "
             "Je Größe:"),
         "regression_row": "  {quantity}: {points} Modellpunkte, {coordinates} Werte, Perioden {first} bis {last}",
         "after_regression_end": (
-            "Die Abweichung ist das erwartete Ergebnis; die Vorführung geht weiter. Dateien in {folder}: "
+            "Die Abweichung ist das erwartete Ergebnis; die Vorführung geht weiter. Dateien in regression: "
             "compare.result.json, compare.deviations.csv (jeder abweichende Wert), signature-table.json (die "
-            "Tabelle oben)."),
+            "Tabelle oben); der Lauf von N+1 in regression/run."),
+        "heading_derive": "Schritt 3 von 4: die Änderungen zwischen N und N+1",
         "before_derive": (
-            "Schritt 3 von 4: die Änderungen zwischen N und N+1. DeltaRecon liest die Versionsgeschichte zwischen "
-            "den beiden Ständen und listet jede Änderung einzeln auf, in der Reihenfolge, in der sie gemacht "
-            "wurde. Jede Änderung ist eine Revision und wird eingeordnet: Daten (der Bestand), Parameter "
-            "(Tabellen wie Storno- oder Kostensätze), Code (die Rechenvorschriften) oder nichts davon (zum "
-            "Beispiel nur Dokumentation)."),
+            "derive nimmt den Nachweis von Release N aus Schritt 1 (release-n/run-record.json) und den Nachweis "
+            "von N+1 aus Schritt 2 (regression/run/run-record.json) und liest daraus, welche zwei Revisionen "
+            "gerechnet wurden. Dann liest es die Versionsgeschichte zwischen diesen beiden Ständen, listet jede "
+            "Änderung einzeln auf, in der Reihenfolge, in der sie gemacht wurde, und schreibt dieses "
+            "Änderungsverzeichnis nach --output. Jede Änderung ist eine Revision und wird eingeordnet: Daten (der "
+            "Bestand), Parameter (Tabellen wie Storno- oder Kostensätze), Code (die Rechenvorschriften) oder "
+            "nichts davon (zum Beispiel nur Dokumentation)."),
         "after_derive": (
             "{count} Änderungen: {data} Daten, {parameter} Parameter, {code} Code, {none} ohne Einordnung."),
         "derive_row": "  {short} [{classes}] {description}",
         "classes": {"data": "Daten", "parameter": "Parameter", "code": "Code"},
         "no_class": "ohne Einordnung",
-        "after_derive_end": "Datei: {path} (das Änderungsverzeichnis).",
+        "after_derive_end": "Datei: changes.json (das Änderungsverzeichnis).",
+        "heading_search": "Schritt 4 von 4: die Ursache im Bruttobeitrag suchen",
         "before_search": (
-            "Schritt 4 von 4: die Ursache im Bruttobeitrag suchen. Welche der {count} Änderungen verursachen die "
-            "Abweichung im Bruttobeitrag in den ersten fünf Projektionsjahren (Perioden 0 bis 59, eine Periode je "
-            "Monat)? DeltaRecon rechnet nicht jeden Zwischenstand, sondern halbiert die Versionsgeschichte, bis "
-            "jede Abweichung einer einzelnen Änderung zugeordnet ist. Als Abweichung zählt eine Änderung des "
-            "Bruttobeitrags um mehr als einen Cent je Modellpunkt und Monat (das Toleranzprofil). Die "
-            "Bestandsdaten bleiben auf dem Stand von Release N."),
+            "Welche der {count} Änderungen verursachen die Abweichung im Bruttobeitrag (--quantity Bruttobeitrag) "
+            "in den ersten fünf Projektionsjahren (--periods 0-59, eine Periode je Monat)? search nimmt dieselben "
+            "beiden Nachweise wie Schritt 3: release-n/run-record.json und regression/run/run-record.json. Es "
+            "rechnet nicht jeden Zwischenstand, sondern halbiert die Versionsgeschichte, bis jede Abweichung einer "
+            "einzelnen Änderung zugeordnet ist. Als Abweichung zählt eine Änderung des Bruttobeitrags um mehr als "
+            "einen Cent je Modellpunkt und Monat; das legt das Toleranzprofil fest (--tolerance). Mit "
+            "--target-only rechnet es die Zwischenstände nur für den Bruttobeitrag in diesen Perioden und ohne die "
+            "Modellprüfungen; die beiden Endstände rechnet es vollständig. Das Ergebnis schreibt es in den Ordner "
+            "--output. Die Bestandsdaten bleiben auf dem Stand von Release N."),
         "after_search": (
             "Gefunden mit {run} von {walk} Zwischenständen ({saved} gespart). Diese Änderungen verursachen die "
             "Abweichung im Bruttobeitrag:"),
@@ -164,7 +224,7 @@ TEXTS = {
         "not_shown": (
             "Nicht gezeigt: die Wirkung von {count} Änderung(en) der Bestandsdaten, da die Bestandsdaten auf dem "
             "Stand von Release N bleiben."),
-        "after_search_end": "Ergebnis: {path}.",
+        "after_search_end": "Ergebnis: search/search.result.json.",
         "closing": (
             "Fertig. Alle Dateien liegen in {folder}. Jeder Schritt läuft auch einzeln, als der Befehl, der vor "
             "ihm gezeigt wurde."),
@@ -209,18 +269,51 @@ def short(revision: str) -> str:
     return revision[:7]
 
 
-def shown(path: Path | str) -> str:
-    """``path`` relative to the working directory when it lies below it, else absolute."""
-    path = Path(path)
+def relative_to(path: Path | str, start: Path | str) -> str:
+    """``path`` relative to the folder ``start``, both taken from the working directory; absolute when no
+    relative path exists (another drive on Windows)."""
     try:
-        relative = os.path.relpath(path)
-    except ValueError:  # another drive on Windows
-        return str(path)
-    return str(path) if relative.startswith("..") else relative
+        return os.path.relpath(Path(path).absolute(), Path(start).absolute())
+    except ValueError:
+        return str(Path(path).absolute())
 
 
-def command_line(argv: list[str]) -> str:
-    return " ".join(["deltarecon", *(f'"{a}"' if " " in a or not a else a for a in argv)])
+def clone_option(folder: Path, repositories: str | None, env=None) -> str | None:
+    """The ``--repositories`` value of every command, relative to the demo folder ``folder``: from
+    ``repositories`` when given, else from ``DELTARECON_REPOSITORIES`` when it names a relative folder,
+    else ``repositories/`` of the working directory; ``None`` when the variable names an absolute folder
+    and ``repositories`` is not given (the launcher of a package)."""
+    env = os.environ if env is None else env
+    if repositories is None:
+        named = env.get(REPOSITORIES_VARIABLE)
+        if named and Path(named).is_absolute():
+            return None
+        repositories = named or REPOSITORIES_FOLDER
+    return relative_to(repositories, folder)
+
+
+def quoted(argument: str) -> str:
+    return f'"{argument}"' if " " in argument or not argument else argument
+
+
+def command_lines(argv: list[str], width: int) -> list[str]:
+    """``deltarecon <argv>`` indented by two spaces, wrapped between arguments to ``width``; continuation
+    lines are indented by six spaces. An option stays on the line of its value."""
+    words, index = ["deltarecon"], 0
+    while index < len(argv):
+        word = quoted(argv[index])
+        if word.startswith("--") and index + 1 < len(argv) and not argv[index + 1].startswith("--"):
+            word += " " + quoted(argv[index + 1])
+            index += 1
+        words.append(word)
+        index += 1
+    lines = ["  " + words[0]]
+    for word in words[1:]:
+        if len(lines[-1]) + 1 + len(word) > width and lines[-1].strip():
+            lines.append(CONTINUATION + word)
+        else:
+            lines[-1] += " " + word
+    return lines
 
 
 def main_step(argv: list[str]) -> tuple[int, str]:
@@ -236,22 +329,22 @@ def main_step(argv: list[str]) -> tuple[int, str]:
     return status, output.getvalue()
 
 
-def steps(folder: Path, profile: str, repositories: str | None = None) -> dict[str, list[str]]:
-    """The argv of each step, ``folder`` in place of ``runs/``."""
-    record = str(folder / "n-full" / "run-record.json")
-    newer = str(folder / "regression-n" / "run" / "run-record.json")
+def steps(profile: str, clone: str | None = None) -> dict[str, list[str]]:
+    """The argv of each command, run from the demo folder: every path relative to it."""
+    record = str(RELEASE / "run-record.json")
+    newer = str(REGRESSION / "run" / "run-record.json")
     argvs = {
         "request": ["request", "--revision", OLDER, "--label", LABEL, "--run-id", RUN_ID,
-                    "--output", str(folder / "n-full" / "request.json")],
-        "run": ["run", str(folder / "n-full" / "request.json")],
-        "regression": ["regression", record, "--revision", NEWER, "--output", str(folder / "regression-n")],
-        "derive": ["derive", record, newer, "--output", str(folder / "changes.json")],
+                    "--output", str(RELEASE / "request.json")],
+        "run": ["run", str(RELEASE / "request.json")],
+        "regression": ["regression", record, "--revision", NEWER, "--output", str(REGRESSION)],
+        "derive": ["derive", record, newer, "--output", str(CHANGES)],
         "search": ["search", record, newer, "--quantity", QUANTITY, "--periods", PERIODS, "--tolerance", profile,
-                   "--target-only", "--output", str(folder / "search")],
+                   "--target-only", "--output", str(SEARCH)],
     }
-    if repositories is not None:
+    if clone is not None:
         for argv in argvs.values():
-            argv += ["--repositories", repositories]
+            argv += ["--repositories", clone]
     return argvs
 
 
@@ -281,7 +374,8 @@ def quickstart(lang: str, pause: bool = True, repositories: str | None = None,
     except FileExistsError:
         print(f"error: {folder} exists already", file=sys.stderr)
         return 2
-    argvs = steps(folder, shown(profile_path()), repositories)
+    argvs = steps(relative_to(profile_path(), folder), clone_option(folder, repositories))
+    former = Path.cwd()
 
     def execute(name: str) -> bool:
         status, output = step(argvs[name])
@@ -291,36 +385,43 @@ def quickstart(lang: str, pause: bool = True, repositories: str | None = None,
             return False
         return True
 
-    def explain(key: str, name: str, **values) -> None:
+    def explain(name: str, **values) -> bool:
+        """The heading, the explanation, the commands and the prompt of a step; then run its commands."""
+        commands = STEP_COMMANDS[name]
         say()
-        paragraph(key, **values)
+        say(texts[f"heading_{name}"])
         say()
-        say(command_line(argvs[name]))
+        paragraph(f"before_{name}", **values)
+        say()
+        say(texts["commands" if len(commands) > 1 else "command"])
+        for command in commands:
+            for line in command_lines(argvs[command], width):
+                say(line)
         if pause:
             try:
                 ask(texts["prompt"] + " ")
             except EOFError:  # no more input counts as Enter
                 say()
+        return all(execute(command) for command in commands)
 
     try:
-        paragraph("opening", folder=shown(folder))
-        if not execute("request"):
-            return 1
+        say(texts["opening_heading"])
+        say()
+        paragraph("opening")
+        say(f"  cd {folder}")
+        os.chdir(folder)
 
-        explain("before_run", "run", short=short(OLDER))
-        if not execute("run"):
+        if not explain("run", short=short(OLDER)):
             return 1
-        response = read(folder / "n-full" / "response.json")
+        response = read(RELEASE / "response.json")
         say()
         paragraph("after_run", points=integer(len(response["model_points"]), lang),
-                  rows=integer(response["export"]["data_rows"], lang), folder=shown(folder / "n-full"))
+                  rows=integer(response["export"]["data_rows"], lang))
 
-        explain("before_regression", "regression", short=short(NEWER))
-        if not execute("regression"):
+        if not explain("regression", short=short(NEWER)):
             return 1
-        regression = folder / "regression-n"
-        compared = read(regression / "compare.result.json")
-        rows = read(regression / "signature-table.json")["rows"]
+        compared = read(REGRESSION / "compare.result.json")
+        rows = read(REGRESSION / "signature-table.json")["rows"]
         say()
         paragraph("after_regression", coordinates=integer(sum(r["deviating_coordinates"] for r in rows), lang),
                   points=integer(len(compared["deviating_model_points"]), lang))
@@ -329,12 +430,11 @@ def quickstart(lang: str, pause: bool = True, repositories: str | None = None,
                 quantity=row["quantity"], points=integer(row["deviating_model_points"], lang),
                 coordinates=integer(row["deviating_coordinates"], lang), first=row["first_period"],
                 last=row["last_period"]))
-        paragraph("after_regression_end", folder=shown(regression))
+        paragraph("after_regression_end")
 
-        explain("before_derive", "derive")
-        if not execute("derive"):
+        if not explain("derive"):
             return 1
-        changes = read(folder / "changes.json")["changes"]
+        changes = read(CHANGES)["changes"]
         descriptions = {change["id"]: change["description"].splitlines()[0] if change["description"] else ""
                         for change in changes}
         counts = {kind: integer(sum(kind in change["class"] for change in changes), lang)
@@ -346,12 +446,11 @@ def quickstart(lang: str, pause: bool = True, repositories: str | None = None,
             classes = ", ".join(texts["classes"][kind] for kind in change["class"]) or texts["no_class"]
             say(texts["derive_row"].format(short=short(change["id"]), classes=classes,
                                            description=descriptions[change["id"]]))
-        paragraph("after_derive_end", path=shown(folder / "changes.json"))
+        paragraph("after_derive_end")
 
-        explain("before_search", "search", count=integer(len(changes), lang))
-        if not execute("search"):
+        if not explain("search", count=integer(len(changes), lang)):
             return 1
-        result = read(folder / "search" / "search.result.json")
+        result = read(SEARCH / "search.result.json")
         runs = result["runs"]
         say()
         paragraph("after_search", run=integer(runs["search"], lang), walk=integer(runs["walk"], lang),
@@ -372,12 +471,14 @@ def quickstart(lang: str, pause: bool = True, repositories: str | None = None,
         for held in result["held"]:
             if held["kind"] == "input_data" and held["not_shown"]:
                 paragraph("not_shown", count=integer(len(held["not_shown"]), lang))
-        paragraph("after_search_end", path=shown(folder / "search" / "search.result.json"))
+        paragraph("after_search_end")
 
         say()
-        paragraph("closing", folder=shown(folder))
+        paragraph("closing", folder=folder)
         return 0
     except KeyboardInterrupt:
         say()
         say(texts["stopped"])
         return 130
+    finally:
+        os.chdir(former)

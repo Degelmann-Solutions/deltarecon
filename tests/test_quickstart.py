@@ -1,13 +1,15 @@
 """The guided quick start ``deltarecon quickstart`` with a fake step and a fake prompt.
 
-The fake step writes small result files in the shapes the real steps write and returns given
-statuses, so these tests run no model. The run of the real demo against the pin of the quick-start
-search is in ``tests/test_quick_start.py`` and runs on request.
+The fake step writes small result files in the shapes the real steps write, relative to the working
+directory it is called in, and returns given statuses, so these tests run no model. The run of the
+real demo against the pin of the quick-start search is in ``tests/test_quick_start.py`` and runs on
+request.
 """
 from __future__ import annotations
 
 import datetime
 import json
+import os
 import re
 from pathlib import Path
 
@@ -15,6 +17,7 @@ import pytest
 
 from degelmann.deltarecon import quickstart as demo
 from degelmann.deltarecon.__main__ import main
+from degelmann.deltarecon.run import REPOSITORIES_VARIABLE
 
 from conftest import ROOT, load_measure_tool
 
@@ -22,6 +25,7 @@ NOW = datetime.datetime(2026, 10, 29, 12, 0, 0, tzinfo=datetime.timezone.utc)
 FOLDER = Path("runs") / "quickstart-20261029T120000Z"
 REVISIONS = ["a" * 40, "b" * 40, "c" * 40, "d" * 40]
 NAMES = ["request", "run", "regression", "derive", "search"]
+WIDTH = 99  # COLUMNS=100 below
 
 
 def write(path: Path, document: dict) -> None:
@@ -29,26 +33,25 @@ def write(path: Path, document: dict) -> None:
     path.write_text(json.dumps(document), "utf-8")
 
 
-def fake_files(name: str, folder: Path) -> None:
-    """The files the step ``name`` writes, reduced to what the demo reads."""
+def fake_files(name: str) -> None:
+    """The files the command ``name`` writes, reduced to what the demo reads, below the working directory."""
     if name == "run":
-        write(folder / "n-full" / "response.json",
-              {"model_points": [{}] * 350, "export": {"data_rows": 80580}})
+        write(Path("release-n") / "response.json", {"model_points": [{}] * 350, "export": {"data_rows": 80580}})
     elif name == "regression":
-        write(folder / "regression-n" / "compare.result.json", {"deviating_model_points": ["1", "2", "3"]})
-        write(folder / "regression-n" / "signature-table.json", {"rows": [
+        write(Path("regression") / "compare.result.json", {"deviating_model_points": ["1", "2", "3"]})
+        write(Path("regression") / "signature-table.json", {"rows": [
             {"quantity": "Bruttobeitrag", "deviating_model_points": 3, "deviating_coordinates": 1200,
              "first_period": 0, "last_period": 479},
             {"quantity": "Provisionen", "deviating_model_points": 2, "deviating_coordinates": 34,
              "first_period": 1, "last_period": 12}]})
     elif name == "derive":
-        write(folder / "changes.json", {"changes": [
+        write(Path("changes.json"), {"changes": [
             {"id": REVISIONS[0], "class": ["data"], "description": "Change the portfolio\n\nbody"},
             {"id": REVISIONS[1], "class": ["parameter", "code"], "description": "Lower the lapse rate"},
             {"id": REVISIONS[2], "class": [], "description": "Say more in the README"},
             {"id": REVISIONS[3], "class": ["code"], "description": "Raise the charge"}]})
     elif name == "search":
-        write(folder / "search" / "search.result.json", {
+        write(Path("search") / "search.result.json", {
             "runs": {"search": 3, "walk": 5, "saved": 2},
             "contributions": [{"revisions": [REVISIONS[1]], "contributions": [
                 {"quantity": "Bruttobeitrag", "contributes": True, "sum": 24109.994, "absolute_sum": 1.0}]}],
@@ -57,17 +60,18 @@ def fake_files(name: str, folder: Path) -> None:
 
 
 class Steps:
-    """A fake ``step``: records each argv, writes the files of the step, returns its status."""
+    """A fake ``step``: records each argv and the working directory, writes the files, returns the status."""
 
-    def __init__(self, folder: Path, statuses: dict[str, int] | None = None):
-        self.folder = folder
+    def __init__(self, statuses: dict[str, int] | None = None):
         self.statuses = {**demo.EXPECT, **(statuses or {})}
         self.argvs: list[list[str]] = []
+        self.cwds: list[Path] = []
 
     def __call__(self, argv: list[str]) -> tuple[int, str]:
         name = argv[0]
         self.argvs.append(argv)
-        fake_files(name, self.folder)
+        self.cwds.append(Path.cwd())
+        fake_files(name)
         return self.statuses[name], f"output of {name}\n"
 
 
@@ -86,6 +90,8 @@ class Prompt:
 @pytest.fixture
 def cwd(tmp_path, monkeypatch):
     monkeypatch.chdir(tmp_path)
+    monkeypatch.setenv("COLUMNS", "100")
+    monkeypatch.delenv(REPOSITORIES_VARIABLE, raising=False)
     return tmp_path
 
 
@@ -94,64 +100,133 @@ def flat(text: str) -> str:
     return re.sub(r"\s+", " ", text)
 
 
-def run_demo(lang="en", pause=False, statuses=None, ask=None, repositories=None):
-    steps = Steps(FOLDER, statuses)
+def run_demo(lang="en", pause=False, statuses=None, ask=None, repositories=None, step=None):
+    steps = step or Steps(statuses)
     ask = ask or Prompt()
     status = demo.quickstart(lang, pause, repositories, step=steps, ask=ask, now=NOW)
     return status, steps, ask
 
 
+def shown_commands(out: str) -> list[list[str]]:
+    """The commands below each label line, joined from their wrapped lines and split into words."""
+    lines, commands, index = out.splitlines(), [], 0
+    while index < len(lines):
+        if lines[index] in ("Command:", "Commands:", "Befehl:", "Befehle:"):
+            index += 1
+            while index < len(lines) and lines[index].startswith("  deltarecon "):
+                words = lines[index].split()
+                index += 1
+                while index < len(lines) and re.match(r" {6}\S", lines[index]):
+                    words += lines[index].split()
+                    index += 1
+                commands.append(words)
+        else:
+            index += 1
+    return commands
+
+
+def checkout_argvs(tmp_path: Path) -> dict[str, list[str]]:
+    """The argvs of a demo started in ``tmp_path`` without the variable and without ``--repositories``."""
+    folder = tmp_path / FOLDER
+    return demo.steps(os.path.relpath(demo.profile_path(), folder), os.path.relpath(tmp_path / "repositories", folder))
+
+
 def test_the_steps_equal_the_readme_quick_start_without_replay():
+    """The tool's steps without ``replay``, with the README's folders mapped to those of the demo folder."""
     tool = load_measure_tool()
-    work = Path("runs") / "quickstart-x"
-    profile = "profiles/tolerance-bruttobeitrag.json"
-    ours = demo.steps(work, "PROFILE")
+    readme_profile = "profiles/tolerance-bruttobeitrag.json"
+    folders = {"runs/n-full/request.json": str(Path("release-n") / "request.json"),
+               "runs/n-full/run-record.json": str(Path("release-n") / "run-record.json"),
+               "runs/regression-n": "regression",
+               "runs/regression-n/run/run-record.json": str(Path("regression") / "run" / "run-record.json"),
+               "runs/changes.json": "changes.json",
+               "runs/search": "search",
+               readme_profile: "PROFILE"}
+    ours = demo.steps("PROFILE")
     assert list(ours) == [name for name in tool.STEPS if name != "replay"]
     for name, argv in ours.items():
-        expected = tool.rewrite(tool.STEPS[name]["argv"], work)
-        assert expected[:3] == ["uv", "run", "deltarecon"]
-        assert [profile if a == "PROFILE" else a for a in argv] == expected[3:], name
+        readme = tool.STEPS[name]["argv"]
+        assert readme[:3] == ["uv", "run", "deltarecon"]
+        assert all(not a.startswith("runs/") or a in folders for a in readme[3:]), name
+        assert argv == [folders.get(a, a) for a in readme[3:]], name
         assert demo.EXPECT[name] == tool.STEPS[name]["expect"], name
-    assert demo.steps(work, "P", "/clone")["run"][-2:] == ["--repositories", "/clone"]
+    assert demo.steps("P", "../../x")["run"][-2:] == ["--repositories", "../../x"]
 
 
-def test_the_happy_path_runs_the_steps_in_order_and_summarises_the_files(cwd, capsys):
+def test_the_happy_path_runs_in_the_demo_folder_and_summarises_the_files(cwd, capsys):
     status, steps, ask = run_demo("en")
     assert status == 0
+    assert Path.cwd() == cwd  # back in the former working directory
     assert [argv[0] for argv in steps.argvs] == NAMES
-    assert steps.argvs == list(demo.steps(FOLDER, demo.shown(demo.profile_path())).values())
+    assert steps.cwds == [cwd / FOLDER] * 5
+    assert steps.argvs == list(checkout_argvs(cwd).values())
+    assert steps.argvs[1][-2:] == ["--repositories", os.path.join("..", "..", "repositories")]
+    assert (cwd / FOLDER / "release-n" / "response.json").is_file()
     assert ask.prompts == []
     out = capsys.readouterr().out
     text = flat(out)
-    assert "output of" not in out  # the steps' own output is captured, not printed
-    assert text.startswith("DeltaRecon guided quick start.")
-    assert f"Every file goes into {FOLDER}." in text
-    assert "(revision fa36857)" in text and "(revision 887b718)" in text
-    assert "Release N is computed: 350 model points, 80,580 result rows." in text
+    assert "output of" not in out  # the commands' own output is captured, not printed
+    assert out.startswith("DeltaRecon guided quick start\n\nThe demo compares two states")
+    assert f"\n  cd {FOLDER}\n" in out
+    assert "(--revision, the revision fa36857)" in text and "the revision 887b718." in text
+    assert "Release N is computed: 350 model points, 80,580 result rows. Files in release-n:" in text
     assert "1,234 values in 3 model points differ" in text
     assert "  Bruttobeitrag: 3 model points, 1,200 values, periods 0 to 479\n" in out
     assert "  Provisionen: 2 model points, 34 values, periods 1 to 12\n" in out
+    assert "the run of N+1 in regression/run." in text
     assert "4 changes: 1 data, 1 parameter, 2 code, 1 without a class." in text
     assert "  aaaaaaa [data] Change the portfolio\n" in out
     assert "  bbbbbbb [parameter, code] Lower the lapse rate\n" in out
     assert "  ccccccc [no class] Say more in the README\n" in out
+    assert "File: changes.json (the change manifest)." in text
     assert "Which of the 4 changes cause" in text
     assert "Found with 3 of 5 intermediate states computed (2 saved)." in text
     assert "  bbbbbbb Lower the lapse rate: sum of the deviation +24,109.99\n" in out
     assert "Not resolved: the changes ccccccc, ddddddd exceed the tolerance only together;" in text
     assert "Not shown: the effect of 1 change(s) of the portfolio data" in text
-    assert f"Result: {FOLDER / 'search' / 'search.result.json'}." in text
+    assert "Result: search/search.result.json." in text
     assert text.rstrip().endswith(f"Done. Every file is in {FOLDER}. Each step also runs on its own as the "
                                   "command shown before it.")
-    for argv in steps.argvs[1:]:  # each of the four steps is shown as a single command
-        assert "deltarecon " + " ".join(argv) + "\n" in out
+    assert "`" not in out
+
+
+def test_the_layout_of_a_step(cwd, capsys):
+    """Heading on its own line, a blank line, the wrapped explanation, a blank line, the label, the
+    indented commands wrapped between arguments, continuation lines indented by six spaces."""
+    _, steps, _ = run_demo("en")
+    out = capsys.readouterr().out
+    lines = out.splitlines()
+    for heading, label in (("Step 1 of 4: compute release N", "Commands:"),
+                           ("Step 2 of 4: regression against N+1", "Command:"),
+                           ("Step 3 of 4: the changes between N and N+1", "Command:"),
+                           ("Step 4 of 4: find the cause in the Bruttobeitrag", "Command:")):
+        at = lines.index(heading)
+        assert lines[at - 1] == "" and lines[at + 1] == ""
+        end = lines.index("", at + 2)
+        assert lines[at + 2].strip() and all(len(line) <= WIDTH for line in lines[at + 2:end])
+        assert lines[end + 1] == label
+        assert lines[end + 2].startswith("  deltarecon ")
+    for line in lines:
+        if line.startswith("  deltarecon ") or re.match(r" {6}\S", line):
+            assert len(line) <= WIDTH or " " not in line.strip(), line
+    assert [w[1:] for w in shown_commands(out)] == steps.argvs  # the argv shown is the argv run
+    assert any(line.startswith(demo.CONTINUATION + "--") for line in lines)  # the search wraps at 99
+
+
+def test_an_option_stays_with_its_value_when_a_command_wraps():
+    lines = demo.command_lines(["search", "a" * 30, "b" * 30, "--quantity", "Bruttobeitrag", "--target-only"], 61)
+    assert lines == ["  deltarecon search " + "a" * 30, "      " + "b" * 30 + " --quantity Bruttobeitrag",
+                     "      --target-only"]
+    assert demo.command_lines(["x", "with space"], 80) == ['  deltarecon x "with space"']
 
 
 def test_the_german_texts_and_numbers(cwd, capsys):
     assert run_demo("de")[0] == 0
     out = capsys.readouterr().out
     text = flat(out)
-    assert text.startswith("DeltaRecon – geführter Quick Start.")
+    assert out.startswith("DeltaRecon – geführter Quick Start\n\nDie Vorführung vergleicht")
+    assert "\nSchritt 1 von 4: Release N rechnen\n\nZuerst schreibt request einen Rechenauftrag nach --output." in out
+    assert "\nBefehle:\n  deltarecon request " in out and "\nBefehl:\n  deltarecon regression " in out
     assert "Release N ist gerechnet: 350 Modellpunkte, 80.580 Ergebniszeilen." in text
     assert "Die Regression zeigt eine Abweichung: 1.234 Werte in 3 Modellpunkten weichen ab." in text
     assert "  Bruttobeitrag: 3 Modellpunkte, 1.200 Werte, Perioden 0 bis 479\n" in out
@@ -161,7 +236,9 @@ def test_the_german_texts_and_numbers(cwd, capsys):
     assert "  bbbbbbb Lower the lapse rate: Summe der Abweichung +24.109,99\n" in out
     assert "Nicht aufgelöst: Die Änderungen ccccccc, ddddddd" in text
     assert "Nicht gezeigt: die Wirkung von 1 Änderung(en) der Bestandsdaten" in text
-    assert text.rstrip().endswith("als der Befehl, der vor ihm gezeigt wurde.")
+    assert "Ergebnis: search/search.result.json." in text
+    assert text.rstrip().endswith(f"Fertig. Alle Dateien liegen in {FOLDER}. Jeder Schritt läuft auch einzeln, "
+                                  "als der Befehl, der vor ihm gezeigt wurde.")
 
 
 def test_both_languages_have_the_same_texts():
@@ -172,16 +249,16 @@ def test_both_languages_have_the_same_texts():
 
 
 def test_held_input_data_with_no_change_not_shown_prints_no_line(cwd, capsys):
-    steps = Steps(FOLDER)
+    steps = Steps()
 
     def step(argv):
         status, output = steps(argv)
         if argv[0] == "search":
-            path = FOLDER / "search" / "search.result.json"
+            path = Path("search") / "search.result.json"
             write(path, {**json.loads(path.read_text("utf-8")), "held": [{"kind": "input_data", "not_shown": []}]})
         return status, output
 
-    assert demo.quickstart("en", False, None, step=step, ask=Prompt(), now=NOW) == 0
+    assert run_demo("en", step=step)[0] == 0
     assert "Not shown" not in capsys.readouterr().out
 
 
@@ -214,8 +291,9 @@ def test_end_of_input_counts_as_enter(cwd, capsys):
 def test_an_interrupt_at_a_prompt_stops_with_130(cwd, capsys, lang, line):
     status, steps, _ = run_demo(lang, pause=True, ask=Prompt(KeyboardInterrupt))
     assert status == 130
-    assert [argv[0] for argv in steps.argvs] == ["request"]
+    assert steps.argvs == []  # step 1 shows request and run under its one prompt
     assert capsys.readouterr().out.splitlines()[-1] == line
+    assert Path.cwd() == cwd
 
 
 @pytest.mark.parametrize("failing", NAMES)
@@ -223,6 +301,7 @@ def test_a_step_with_another_status_prints_its_output_and_stops(cwd, capsys, fai
     other = 1 - demo.EXPECT[failing]
     status, steps, _ = run_demo("en", statuses={failing: other})
     assert status == 1
+    assert Path.cwd() == cwd
     assert [argv[0] for argv in steps.argvs] == NAMES[:NAMES.index(failing) + 1]
     out = capsys.readouterr().out
     assert out.rstrip().endswith(f"output of {failing}")
@@ -234,7 +313,49 @@ def test_an_existing_folder_exits_with_2(cwd, capsys):
     status, steps, _ = run_demo("en")
     assert status == 2
     assert steps.argvs == []
+    assert Path.cwd() == cwd
     assert capsys.readouterr().err == f"error: {FOLDER} exists already\n"
+
+
+@pytest.mark.parametrize("variable, option, expected", [
+    (None, None, os.path.join("..", "..", "repositories")),
+    ("", None, os.path.join("..", "..", "repositories")),
+    ("clones", None, os.path.join("..", "..", "clones")),
+    ("ABSOLUTE", None, None),
+    ("ABSOLUTE", "mine", os.path.join("..", "..", "mine")),
+    (None, "ABSOLUTE", "ABSOLUTE-RELATIVE"),
+])
+def test_the_clone_folder_of_the_commands(cwd, capsys, monkeypatch, variable, option, expected):
+    """``--repositories`` relative to the demo folder, unless only an absolute variable names the clone."""
+    absolute = str(cwd.parent / "elsewhere")
+    if variable is not None:
+        monkeypatch.setenv(REPOSITORIES_VARIABLE, absolute if variable == "ABSOLUTE" else variable)
+    if option == "ABSOLUTE":
+        option, expected = absolute, os.path.relpath(absolute, cwd / FOLDER)
+    status, steps, _ = run_demo("en", repositories=option)
+    assert status == 0
+    for argv in steps.argvs:
+        if expected is None:
+            assert "--repositories" not in argv
+        else:
+            assert argv[-2:] == ["--repositories", expected]
+    assert [w[1:] for w in shown_commands(capsys.readouterr().out)] == steps.argvs
+
+
+def test_the_profile_of_the_search_is_relative_to_the_demo_folder(cwd):
+    _, steps, _ = run_demo("en")
+    search = steps.argvs[-1]
+    profile = search[search.index("--tolerance") + 1]
+    assert not Path(profile).is_absolute()
+    assert (cwd / FOLDER / profile).resolve() == demo.profile_path().resolve()
+
+
+def test_a_path_without_a_relative_form_stays_absolute(monkeypatch):
+    def refuse(path, start):
+        raise ValueError("path is on mount 'D:', start on mount 'C:'")
+
+    monkeypatch.setattr(demo.os.path, "relpath", refuse)
+    assert demo.relative_to("/x/profiles/p.json", "runs/q") == str(Path("/x/profiles/p.json").absolute())
 
 
 @pytest.mark.parametrize("env, system, expected", [
