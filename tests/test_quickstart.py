@@ -11,6 +11,7 @@ import datetime
 import json
 import os
 import re
+import shutil
 from pathlib import Path
 
 import pytest
@@ -195,18 +196,17 @@ def test_the_happy_path_runs_in_the_demo_folder_and_summarises_the_files(cwd, ca
             "\nFile: changes.json") in out
     assert "File: changes.json (the change manifest)." in text
     assert "Which of the 4 changes cause" in text
-    assert "Found with 3 of 5 intermediate states computed (2 saved)." in text
-    assert ("Bruttobeitrag:\n\n"
+    assert ("\n2 revisions deviate in the Bruttobeitrag. 3 of 5 were computed (2 computations saved).\n\n"
             "  Revision  Description           Sum of the deviation\n"
             "  bbbbbbb   Lower the lapse rate            +24,109.99\n"
             "  ddddddd   Raise the charge                 -4,429.49\n"
             "\nNot resolved:") in out
     assert "aaaaaaa   Change" not in out  # a change that does not contribute has no row
     assert "Not resolved: the changes ccccccc, ddddddd exceed the tolerance only together;" in text
-    assert "Not shown: the effect of 1 change(s) of the portfolio data" in text
+    assert "Not shown" not in out
     assert "Result: search/search.result.json." in text
-    assert text.rstrip().endswith(f"Done. Every file is in {FOLDER}. Each step also runs on its own as the "
-                                  "command shown before it.")
+    assert text.rstrip().endswith(f"Done. Every file is in {FOLDER}. The commands shown can also be run there on "
+                                  "their own.")
     assert "`" not in out
 
 
@@ -273,17 +273,16 @@ def test_the_german_texts_and_numbers(cwd, capsys):
             "    3  ccccccc   ohne Einordnung  Say more in the README\n"
             "    4  ddddddd   Code             Raise the charge\n"
             "\nDatei: changes.json") in out
-    assert "Gefunden mit 3 von 5 Zwischenständen (2 gespart)." in text
-    assert ("Bruttobeitrag:\n\n"
+    assert ("\n2 Revisionen weichen im Bruttobeitrag ab. Gerechnet wurden 3 von 5 (2 Berechnungen gespart).\n\n"
             "  Revision  Beschreibung          Summe der Abweichung\n"
             "  bbbbbbb   Lower the lapse rate            +24.109,99\n"
             "  ddddddd   Raise the charge                 -4.429,49\n"
             "\nNicht aufgelöst:") in out
     assert "Nicht aufgelöst: Die Änderungen ccccccc, ddddddd" in text
-    assert "Nicht gezeigt: die Wirkung von 1 Änderung(en) der Bestandsdaten" in text
+    assert "Nicht gezeigt" not in out
     assert "Ergebnis: search/search.result.json." in text
-    assert text.rstrip().endswith(f"Fertig. Alle Dateien liegen in {FOLDER}. Jeder Schritt läuft auch einzeln, "
-                                  "als der Befehl, der vor ihm gezeigt wurde.")
+    assert text.rstrip().endswith(f"Fertig. Alle Dateien liegen in {FOLDER}. Die gezeigten Befehle lassen sich dort "
+                                  "auch einzeln ausführen.")
 
 
 def test_both_languages_have_the_same_texts():
@@ -293,18 +292,41 @@ def test_both_languages_have_the_same_texts():
             assert re.findall(r"\{(\w+)\}", value) == re.findall(r"\{(\w+)\}", demo.TEXTS["de"][key]), key
 
 
-def test_held_input_data_with_no_change_not_shown_prints_no_line(cwd, capsys):
+def search_result_step(**changes):
+    """A fake step whose search result has the members ``changes`` replaced."""
     steps = Steps()
 
     def step(argv):
         status, output = steps(argv)
         if argv[0] == "search":
             path = Path("search") / "search.result.json"
-            write(path, {**json.loads(path.read_text("utf-8")), "held": [{"kind": "input_data", "not_shown": []}]})
+            write(path, {**json.loads(path.read_text("utf-8")), **changes})
         return status, output
 
-    assert run_demo("en", step=step)[0] == 0
-    assert "Not shown" not in capsys.readouterr().out
+    return step
+
+
+@pytest.mark.parametrize("held", [[], [{"kind": "input_data", "not_shown": []}],
+                                  [{"kind": "input_data", "not_shown": REVISIONS[:2]}]])
+def test_no_held_entry_prints_anything(cwd, capsys, held):
+    def summary(changes: dict) -> str:
+        assert run_demo("en", step=search_result_step(**changes))[0] == 0
+        out = capsys.readouterr().out
+        shutil.rmtree(cwd / FOLDER)
+        return out.split("Step 4 of 4")[1]
+
+    assert summary({"held": held}) == summary({"held": []})
+
+
+@pytest.mark.parametrize("lang, sentence", [
+    ("en", "1 revision deviates in the Bruttobeitrag. 3 of 5 were computed (2 computations saved)."),
+    ("de", "1 Revision weicht im Bruttobeitrag ab. Gerechnet wurden 3 von 5 (2 Berechnungen gespart).")])
+def test_one_deviating_revision_takes_the_singular(cwd, capsys, lang, sentence):
+    one = [{"revisions": [REVISIONS[1]], "contributions": [
+        {"quantity": "Bruttobeitrag", "contributes": True, "sum": 1.0, "absolute_sum": 1.0}]}]
+    assert run_demo(lang, step=search_result_step(contributions=one))[0] == 0
+    out = capsys.readouterr().out
+    assert "\n" + sentence + "\n\n" in out
 
 
 @pytest.mark.parametrize("value, lang, expected", [

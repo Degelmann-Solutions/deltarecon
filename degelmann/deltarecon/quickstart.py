@@ -134,18 +134,18 @@ TEXTS = {
             "computes the two end states in full. It writes the result into the folder --output. The portfolio "
             "data stay at release N."),
         "after_search": (
-            "Found with {run} of {walk} intermediate states computed ({saved} saved). These changes cause the "
-            "deviation in the Bruttobeitrag:"),
+            "{n} revisions deviate in the Bruttobeitrag. {run} of {walk} were computed ({saved} computations "
+            "saved)."),
+        "after_search_one": (
+            "1 revision deviates in the Bruttobeitrag. {run} of {walk} were computed ({saved} computations "
+            "saved)."),
         "search_header": ("Revision", "Description", "Sum of the deviation"),
         "not_resolved": (
             "Not resolved: the changes {shorts} exceed the tolerance only together; each one alone stays below "
             "it. DeltaRecon therefore attributes this part of the deviation to none of them."),
-        "not_shown": (
-            "Not shown: the effect of {count} change(s) of the portfolio data, since the portfolio data stay at "
-            "release N."),
         "after_search_end": "Result: search/search.result.json.",
         "closing": (
-            "Done. Every file is in {folder}. Each step also runs on its own as the command shown before it."),
+            "Done. Every file is in {folder}. The commands shown can also be run there on their own."),
         "stopped": "stopped",
     },
     "de": {
@@ -217,19 +217,19 @@ TEXTS = {
             "Modellprüfungen; die beiden Endstände rechnet es vollständig. Das Ergebnis schreibt es in den Ordner "
             "--output. Die Bestandsdaten bleiben auf dem Stand von Release N."),
         "after_search": (
-            "Gefunden mit {run} von {walk} Zwischenständen ({saved} gespart). Diese Änderungen verursachen die "
-            "Abweichung im Bruttobeitrag:"),
+            "{n} Revisionen weichen im Bruttobeitrag ab. Gerechnet wurden {run} von {walk} ({saved} Berechnungen "
+            "gespart)."),
+        "after_search_one": (
+            "1 Revision weicht im Bruttobeitrag ab. Gerechnet wurden {run} von {walk} ({saved} Berechnungen "
+            "gespart)."),
         "search_header": ("Revision", "Beschreibung", "Summe der Abweichung"),
         "not_resolved": (
             "Nicht aufgelöst: Die Änderungen {shorts} überschreiten die Toleranz nur zusammen; jede einzelne "
             "bleibt darunter. DeltaRecon ordnet diesen Teil der Abweichung daher keiner von ihnen zu."),
-        "not_shown": (
-            "Nicht gezeigt: die Wirkung von {count} Änderung(en) der Bestandsdaten, da die Bestandsdaten auf dem "
-            "Stand von Release N bleiben."),
         "after_search_end": "Ergebnis: search/search.result.json.",
         "closing": (
-            "Fertig. Alle Dateien liegen in {folder}. Jeder Schritt läuft auch einzeln, als der Befehl, der vor "
-            "ihm gezeigt wurde."),
+            "Fertig. Alle Dateien liegen in {folder}. Die gezeigten Befehle lassen sich dort auch einzeln "
+            "ausführen."),
         "stopped": "abgebrochen",
     },
 }
@@ -470,17 +470,19 @@ def quickstart(lang: str, pause: bool = True, repositories: str | None = None,
             return 1
         result = read(SEARCH / "search.result.json")
         runs = result["runs"]
-        say()
-        paragraph("after_search", run=integer(runs["search"], lang), walk=integer(runs["walk"], lang),
-                  saved=integer(runs["saved"], lang))
-        contributing = []
+        contributing, deviating = [], []
         for entry in result["contributions"]:
             for contribution in entry["contributions"]:
                 if contribution["contributes"]:
                     revisions = entry["revisions"]
+                    deviating += [r for r in revisions if r not in deviating]
                     description = descriptions.get(revisions[0], "") if len(revisions) == 1 else ""
                     contributing.append((", ".join(short(r) for r in revisions), description,
                                          signed(contribution.get("sum"), lang)))
+        say()
+        paragraph("after_search_one" if len(deviating) == 1 else "after_search", n=integer(len(deviating), lang),
+                  run=integer(runs["search"], lang), walk=integer(runs["walk"], lang),
+                  saved=integer(runs["saved"], lang))
         say()
         for line in table(texts["search_header"], contributing, right={2}):
             say(line)
@@ -490,9 +492,6 @@ def quickstart(lang: str, pause: bool = True, repositories: str | None = None,
                 paragraph("not_resolved", shorts=", ".join(short(r) for r in finding.get("revisions", [])))
             else:  # a finding the texts do not name is shown as the search prints it
                 say(f"finding: {finding['code']}: {finding['message']}")
-        for held in result["held"]:
-            if held["kind"] == "input_data" and held["not_shown"]:
-                paragraph("not_shown", count=integer(len(held["not_shown"]), lang))
         paragraph("after_search_end")
 
         say()
