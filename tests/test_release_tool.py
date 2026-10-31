@@ -95,6 +95,23 @@ def test_the_notes_name_the_commit_the_tag_and_both_hashes(tmp_path):
     assert str(tmp_path) not in notes and "\r" not in notes
 
 
+def test_the_notes_start_with_the_demo(tmp_path):
+    output = tmp_path / "release"
+    tool.release(output, "SOURCE", builder=FakeBuilder(), git=FakeGit())
+    notes = (output / "release-notes.md").read_text("utf-8")
+    demo, holds = notes.index("\n## Start with the demo\n"), notes.index("\n## What a package holds\n")
+    assert notes.index("| Platform | Archive | SHA-256 |") < demo < holds
+    section = notes[demo:holds]
+    assert "double-click `quickstart.cmd`" in section
+    assert "```bat\nquickstart.cmd\n```" in section and "```powershell\n.\\quickstart.cmd\n```" in section
+    assert "\n./quickstart\n```" in section
+    assert f"cd deltarecon-{VERSION}-x86_64-unknown-linux-gnu\n" in section
+    assert "`LIESMICH.txt`" in section and "`README.txt`" in section
+    listed = notes[holds:]
+    for name in ("`quickstart`", "`quickstart.cmd`", "`LIESMICH.txt`", "`README.txt`"):
+        assert name in listed, name
+
+
 def test_the_same_inputs_give_the_same_notes(tmp_path):
     texts = []
     for name in ("one", "two"):
@@ -185,11 +202,15 @@ def test_the_package_quick_start_runs_the_checkout_steps():
     measure = tool.BUILD.MEASURE
     text = (tool.ROOT / "README.md").read_text("utf-8")
     section = text[text.index("### From a package"):text.index("### From a checkout")]
-    linux = re.search(r"```sh\n(.*?)```", section, re.S).group(1)
-    windows = re.search(r"```bat\n(.*?)```", section, re.S).group(1)
+    blocks = re.findall(r"```(sh|bat|powershell)\n(.*?)```", section, re.S)
+    # The guided demo comes first: Linux, cmd, PowerShell; then the single commands in the same order.
+    assert [language for language, _ in blocks] == ["sh", "bat", "powershell", "sh", "bat", "powershell"]
+    assert blocks[0][1].splitlines()[-1] == "./quickstart"
+    assert blocks[1][1] == "quickstart.cmd\n" and blocks[2][1] == ".\\quickstart.cmd\n"
+    linux, windows, powershell = (body for _, body in blocks[3:])
     steps = [step["argv"][3:] for step in measure.STEPS.values()]
-    assert [line.split() for line in linux.splitlines() if line.startswith("./deltarecon ")] == [
-        ["./deltarecon", *argv] for argv in steps]
-    assert [line.split() for line in windows.splitlines()] == [
-        ["deltarecon.cmd", *(argument.replace("/", "\\") if argument.startswith(("runs/", "profiles/")) else argument
-                             for argument in argv)] for argv in steps]
+    assert [line.split() for line in linux.splitlines()] == [["./deltarecon", *argv] for argv in steps]
+    expected = [["deltarecon.cmd", *(argument.replace("/", "\\") if argument.startswith(("runs/", "profiles/"))
+                                     else argument for argument in argv)] for argv in steps]
+    assert [line.split() for line in windows.splitlines()] == expected
+    assert [line.split() for line in powershell.splitlines()] == [[".\\" + line[0], *line[1:]] for line in expected]

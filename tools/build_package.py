@@ -28,6 +28,16 @@ Windows package is cross-built without Windows. The layout:
   uses only shell builtins and resolves its folder from ``$0`` (a symbolic link to it from another
   folder is not supported); on Windows it is ``deltarecon.cmd`` (CRLF, cmd builtins only), which
   resolves its folder from ``%~dp0``.
+- the starter of the guided demo, which changes to its own folder, runs the launcher with
+  ``quickstart`` and the arguments unchanged, keeps the window open and exits with the launcher's
+  status. On Linux it is ``quickstart`` (POSIX sh, builtins only, mode 0755), which resolves its
+  folder from ``$0`` like the launcher and waits for Enter only when its input is a terminal; on
+  Windows it is ``quickstart.cmd`` (CRLF, cmd builtins only), which changes there with ``pushd``,
+  ends with ``pause`` and returns with ``popd``.
+- the guides ``LIESMICH.txt`` (German) and ``README.txt`` (English), UTF-8 without BOM, LF on Linux
+  and CRLF on Windows (``guide_text``): the version and platform, how to start the guided demo, the
+  six commands of the README quick start (from ``STEPS`` of ``tools/measure_quick_start.py``; on
+  Windows a cmd and a PowerShell block), and the README at the tag ``v<version>``.
 
 The folder and the archive are assembled in a temporary folder inside the output folder and moved
 to their final names only when both are complete, so a failed build leaves nothing behind; nothing
@@ -35,7 +45,7 @@ is written when the folder or the archive exists already. A symbolic link in the
 fails the build.
 
 ``check`` takes the target from the archive's name, which must be ``deltarecon-<version>-<target>``
-with the target's suffix. It unpacks the archive into a new folder and proves three claims,
+with the target's suffix. It unpacks the archive into a new folder and proves four claims,
 printing each result:
 
 1. The README quick start (``STEPS`` of ``tools/measure_quick_start.py``) runs through the
@@ -48,6 +58,11 @@ printing each result:
    ``degelmann-deltarecon`` itself.
 3. A module written to ``<work>/engines/`` imports in the packaged Python with ``PYTHONPATH`` set
    to that folder and an empty ``PATH``, and is read from that folder.
+4. The guided demo: the starter runs with ``--no-pause`` from the work folder, its input empty,
+   with the environment of the chain (an empty ``PATH``, ``PYTHONPATH``, ``PYTHONHOME``,
+   ``VIRTUAL_ENV`` and ``DELTARECON_REPOSITORIES`` removed); it exits with 0, and exactly one new
+   folder ``runs/quickstart-*/`` in the package folder holds a ``search/`` that matches the pin.
+   On Linux its output goes to ``<work>/logs/quickstart.log``.
 
 It also prints the ``engine_version`` the request step recorded.
 
@@ -57,8 +72,10 @@ WSL session through ``powershell.exe`` (the helpers of ``tools/windows_host.py``
 (default ``C:\\tmp\\deltarecon-package-check\\<UTC timestamp>``) must be a new local folder under
 ``C:\\``; WSL and UNC paths and other drives are refused. The archive is copied there and unpacked
 with .NET ``ZipFile``, the code behind ``Expand-Archive``; the host prints each step with its exit
-status and seconds. The lister and the probe run as script files under ``<work>\\scripts\\``. The
-pin and the lock are compared from WSL. The folder is left on the host.
+status and seconds. The lister and the probe run as script files under ``<work>\\scripts\\``, and
+the demo through ``<work>\\scripts\\demo.cmd``, which calls the starter with its input from ``NUL``;
+its output passes through like the chain's. The pin and the lock are compared from WSL. The folder is
+left on the host.
 
 Exit status: 0 when the build completes or every check holds; 1 when a build step fails (a
 failing command, a shallow clone, a symbolic link in a Windows folder) or a check does not hold; 2
@@ -101,6 +118,7 @@ PYPROJECT = ROOT / "pyproject.toml"
 DOWNLOADS = ROOT / "build" / "python-downloads"
 DEFAULT_OUTPUT = ROOT / "dist"
 DEFAULT_SOURCE = "https://github.com/Degelmann-Solutions/delib-history"
+REPOSITORY_URL = "https://github.com/Degelmann-Solutions/deltarecon"
 PROJECT = "degelmann-deltarecon"
 CLONE_NAME = "delib-history"
 PROFILES = "profiles"
@@ -146,12 +164,52 @@ WINDOWS_LAUNCHER_TEXT = "\r\n".join([
     "",
 ])
 
+# The starter of the guided demo: changes to its own folder, so the demo writes ``runs/`` there,
+# runs ``deltarecon quickstart`` through the launcher with the arguments unchanged, keeps the window
+# open, and exits with the launcher's status. Shell builtins only, so it runs with an empty PATH; it
+# waits for Enter only when its input is a terminal.
+STARTER = "quickstart"
+WINDOWS_STARTER = "quickstart.cmd"
+STARTER_TEXT = f"""#!/bin/sh
+# DeltaRecon guided demo: runs "deltarecon quickstart" in this folder. Shell builtins only.
+case $0 in
+    */*) here=${{0%/*}} ;;
+    *) here=. ;;
+esac
+CDPATH= cd -- "$here" || exit 2
+./{LAUNCHER} quickstart "$@"
+status=$?
+if [ -t 0 ]; then
+    printf '%s\n' 'Press Enter to close. / Enter schließt das Fenster.'
+    read -r line
+fi
+exit $status
+"""
+
+# The Windows starter: cmd builtins only. pushd changes to the starter's folder and popd returns,
+# so a double click and a call from another folder both write runs\ in the package folder.
+WINDOWS_STARTER_TEXT = "\r\n".join([
+    "@echo off",
+    "rem DeltaRecon guided demo: runs \"deltarecon quickstart\" in this folder. cmd builtins only.",
+    "setlocal",
+    'pushd "%~dp0"',
+    f'call "%~dp0{WINDOWS_LAUNCHER}" quickstart %*',
+    'set "status=%ERRORLEVEL%"',
+    "pause",
+    "popd",
+    "exit /b %status%",
+    "",
+])
+# The guides in the package folder: German and English.
+GUIDES = {"de": "LIESMICH.txt", "en": "README.txt"}
+
 TARGET = "x86_64-unknown-linux-gnu"
 WINDOWS_TARGET = "x86_64-pc-windows-msvc"
 # One row per target platform: the python-build-standalone archive (URL and SHA-256 of the
 # release's SHA256SUMS), where the interpreter, site-packages, pip and the header that names the
 # Python version lie in the unpacked ``python/``, the marker environment the lock's markers are
-# evaluated in, the launcher (name and text), and the suffix of the package archive.
+# evaluated in, the launcher and the starter of the guided demo (name and text), the platform the
+# guides and the release notes name, and the suffix of the package archive.
 TARGETS: dict[str, dict] = {
     "x86_64-unknown-linux-gnu": {
         "url": "https://releases.astral.sh/github/python-build-standalone/releases/download/20261021/"
@@ -162,6 +220,8 @@ TARGETS: dict[str, dict] = {
         "pip": ("python/bin/pip*",),
         "patchlevel": "python/include/python3.14/patchlevel.h",
         "launcher": (LAUNCHER, LAUNCHER_TEXT),
+        "starter": (STARTER, STARTER_TEXT),
+        "platform": "Linux x86-64",
         "archive": "tar.gz",
         "markers": {
             "implementation_name": "cpython",
@@ -186,6 +246,8 @@ TARGETS: dict[str, dict] = {
         "pip": ("python/Scripts/pip*",),
         "patchlevel": "python/include/patchlevel.h",
         "launcher": (WINDOWS_LAUNCHER, WINDOWS_LAUNCHER_TEXT),
+        "starter": (WINDOWS_STARTER, WINDOWS_STARTER_TEXT),
+        "platform": "Windows x86-64",
         "archive": "zip",
         "markers": {
             "implementation_name": "cpython",
@@ -302,13 +364,157 @@ def remove_pip(folder: Path, target: dict) -> list[str]:
     return removed
 
 
-def write_launcher(folder: Path, target: dict = TARGETS[TARGET]) -> Path:
-    """The target's launcher in ``folder``, its text written byte for byte (LF or CRLF as it stands)."""
-    name, text = target["launcher"]
+def write_launcher(folder: Path, target: dict = TARGETS[TARGET], role: str = "launcher") -> Path:
+    """The target's launcher (or, with ``role="starter"``, the starter of the guided demo) in ``folder``,
+    its text written byte for byte (LF or CRLF as it stands), mode 0755."""
+    name, text = target[role]
     path = folder / name
     path.write_bytes(text.encode("utf-8"))
     path.chmod(0o755)
     return path
+
+
+def guide_commands(target_name: str, prefix: str) -> list[str]:
+    """The six commands of the README quick start (``STEPS`` of ``tools/measure_quick_start.py``), with
+    ``uv run deltarecon`` replaced by ``prefix`` and, for Windows, every ``/`` by ``\\``."""
+    lines = []
+    for step in MEASURE.STEPS.values():
+        assert step["argv"][:3] == ["uv", "run", "deltarecon"], step["argv"]
+        arguments = step["argv"][3:]
+        if target_name == WINDOWS_TARGET:
+            arguments = [argument.replace("/", "\\") for argument in arguments]
+        lines.append(" ".join([prefix, *arguments]))
+    return lines
+
+
+def _block(lines: list[str]) -> str:
+    return "".join(f"    {line}\n" for line in lines)
+
+
+def guide_text(lang: str, target_name: str, version: str) -> str:
+    """The guide of the package folder, German (``de``) or English (``en``), for the target: the guided
+    demo first, then the six commands of the README, then where to read on. LF on Linux, CRLF on Windows."""
+    windows = target_name == WINDOWS_TARGET
+    platform = TARGETS[target_name]["platform"]
+    readme = f"{REPOSITORY_URL}/blob/v{version}/README.md"
+    stamp = "<UTC-Zeit>" if lang == "de" else "<UTC time>"
+    demo_folder = f"runs\\quickstart-{stamp}\\" if windows else f"runs/quickstart-{stamp}/"
+    runs = "runs\\" if windows else "runs/"
+    if windows:
+        cmd = _block(guide_commands(target_name, WINDOWS_LAUNCHER))
+        powershell = _block(guide_commands(target_name, ".\\" + WINDOWS_LAUNCHER))
+    else:
+        sh = _block(guide_commands(target_name, "./" + LAUNCHER))
+    if lang == "de":
+        title = f"DeltaRecon {version} für {platform}"
+        intro = ("Dieser Ordner ist das DeltaRecon-Paket. Es braucht kein Python, kein uv und kein Git.\n")
+        if windows:
+            intro += ("Das Paket ist nicht signiert; SmartScreen kann deshalb beim Start warnen.\n")
+            start = ("Starten Sie die Demo mit einem Doppelklick auf quickstart.cmd. Oder öffnen Sie\n"
+                     "cmd in diesem Ordner und geben Sie ein:\n\n"
+                     "    quickstart.cmd\n\n"
+                     "Oder öffnen Sie PowerShell in diesem Ordner und geben Sie ein:\n\n"
+                     "    .\\quickstart.cmd\n\n")
+            end = "Am Ende bleibt das Fenster offen, bis Sie eine Taste drücken.\n"
+            example = ".\\quickstart.cmd --lang en --no-pause"
+            single = ("In cmd:\n\n" + cmd + "\nIn PowerShell:\n\n" + powershell)
+        else:
+            start = ("Starten Sie die Demo im Terminal in diesem Ordner:\n\n"
+                     "    ./quickstart\n\n")
+            end = "Am Ende wartet sie im Terminal auf Enter, bevor sie sich beendet.\n"
+            example = "./quickstart --lang en --no-pause"
+            single = sh
+        body = f"""{title}
+
+{intro}
+1. Die geführte Demo
+
+{start}Die Demo erklärt vier Schritte und wartet vor jedem auf Enter. Sie spricht
+die Sprache des Systems; --lang de oder --lang en wählt Deutsch oder Englisch,
+--no-pause lässt sie ohne Warten durchlaufen, zum Beispiel:
+
+    {example}
+
+Sie schreibt ihre Dateien in den neuen Ordner {demo_folder} in diesem
+Ordner und nennt ihn am Anfang und am Ende.
+{end}
+2. Die einzelnen Befehle
+
+Die Demo führt die Befehle des Schnellstarts für Sie aus, ohne replay. Einzeln
+starten Sie sie aus diesem Ordner. Sie schreiben nach {runs} in diesem Ordner.
+
+{single}
+Der Befehl regression endet absichtlich mit dem Status 1: Er meldet die
+Abweichung zwischen den beiden Revisionen. Die folgenden Befehle laufen
+trotzdem.
+
+3. Weiterlesen
+
+Das README dieser Version beschreibt jeden Befehl:
+{readme}
+LICENSE in diesem Ordner ist die Lizenz von DeltaRecon.
+"""
+    elif lang == "en":
+        title = f"DeltaRecon {version} for {platform}"
+        intro = "This folder is the DeltaRecon package. It needs no Python, no uv and no Git.\n"
+        if windows:
+            intro += "The package is not signed, so SmartScreen may warn when you start it.\n"
+            start = ("Start the demo with a double click on quickstart.cmd. Or open cmd in this\n"
+                     "folder and type:\n\n"
+                     "    quickstart.cmd\n\n"
+                     "Or open PowerShell in this folder and type:\n\n"
+                     "    .\\quickstart.cmd\n\n")
+            end = "At the end the window stays open until you press a key.\n"
+            example = ".\\quickstart.cmd --lang de --no-pause"
+            single = ("In cmd:\n\n" + cmd + "\nIn PowerShell:\n\n" + powershell)
+        else:
+            start = ("Start the demo in a terminal in this folder:\n\n"
+                     "    ./quickstart\n\n")
+            end = "At the end it waits in the terminal for Enter before it closes.\n"
+            example = "./quickstart --lang de --no-pause"
+            single = sh
+        body = f"""{title}
+
+{intro}
+1. The guided demo
+
+{start}The demo explains four steps and waits for Enter before each. It speaks the
+language of the system; --lang de or --lang en chooses German or English,
+--no-pause runs it through without waiting, for example:
+
+    {example}
+
+It writes its files to the new folder {demo_folder} in this folder
+and names it at the start and at the end.
+{end}
+2. The single commands
+
+The demo runs the commands of the quick start for you, apart from replay. To run
+them one by one, start them from this folder. They write to {runs} in this folder.
+
+{single}
+The regression exits with status 1 by design: it reports the deviation between
+the two revisions. The next commands run all the same.
+
+3. Read on
+
+The README of this version describes every command:
+{readme}
+LICENSE in this folder is the licence of DeltaRecon.
+"""
+    else:
+        raise ValueError(f"no guide in the language {lang!r}")
+    return body.replace("\n", "\r\n") if windows else body
+
+
+def write_guides(folder: Path, target_name: str, version: str) -> list[Path]:
+    """Both guides of the target in ``folder``, UTF-8 without BOM."""
+    paths = []
+    for lang, name in GUIDES.items():
+        path = folder / name
+        path.write_bytes(guide_text(lang, target_name, version).encode("utf-8"))
+        paths.append(path)
+    return paths
 
 
 def is_shallow(clone: Path) -> bool:
@@ -464,6 +670,8 @@ def build(output: Path, source: str, target_name: str = TARGET) -> Path:
         shutil.copytree(ROOT / PROFILES, package / PROFILES)
         shutil.copy2(ROOT / LICENSE, package / LICENSE)
         write_launcher(package, target)
+        write_launcher(package, target, "starter")
+        write_guides(package, target_name, version)
         make_archive(package, staging / archive.name)
         package.replace(folder)
         (staging / archive.name).replace(archive)
@@ -554,6 +762,40 @@ def check_chain(package: Path, work: Path, empty: Path) -> bool:
     return code == 0
 
 
+def demo_folders(package: Path) -> set[Path]:
+    """The folders ``runs/quickstart-*`` in ``package``."""
+    return set((package / "runs").glob("quickstart-*"))
+
+
+def compare_demo(code: int, before: set[Path], after: set[Path]) -> bool:
+    """Whether the starter exited 0 and wrote exactly one new demo folder whose ``search/`` matches the pin."""
+    new = sorted(after - before)
+    print(f"build_package: demo: starter exit {code}; new demo folders: "
+          f"{', '.join(path.name for path in new) or 'none'}", flush=True)
+    if code != 0 or len(new) != 1:
+        return False
+    status, lines = HOST.compare(new[0] / "search")
+    for line in lines:
+        print(f"build_package: demo pin: {line}")
+    return status == 0
+
+
+def check_demo(package: Path, work: Path, empty: Path, target: dict) -> bool:
+    """The starter with ``--no-pause`` from the work folder, its input empty, with the environment of
+    the chain; its output goes to ``<work>/logs/quickstart.log``."""
+    logs = work / "logs"
+    logs.mkdir(exist_ok=True)
+    log = logs / "quickstart.log"
+    before = demo_folders(package)
+    start = time.perf_counter()
+    with log.open("wb") as output:
+        code = subprocess.run([str(package / target["starter"][0]), "--no-pause"], cwd=work, env=clean_environment(empty),
+                              stdin=subprocess.DEVNULL, stdout=output, stderr=subprocess.STDOUT).returncode
+    print(f"build_package: demo: {target['starter'][0]} --no-pause in {time.perf_counter() - start:.1f} s; log: {log}",
+          flush=True)
+    return compare_demo(code, before, demo_folders(package))
+
+
 def locked_packages(target: dict, version: str) -> list[tuple[str, str]]:
     """The distributions ``uv.lock`` names for ``target``, with the project."""
     exported = run(["uv", "export", "--locked", "--no-dev", "--no-hashes", "--format", "requirements-txt", "--quiet"],
@@ -627,6 +869,7 @@ def check_linux(archive: Path, work: Path | None, target: dict, version: str) ->
         "chain and pin": check_chain(package, work, empty),
         "installed packages equal uv.lock": check_lock(package, target, version),
         "import from a user-named folder": check_import(package, work, empty, target),
+        "guided demo and pin": check_demo(package, work, empty, target),
     }
     return report(results)
 
@@ -640,6 +883,7 @@ def report(results: dict[str, bool]) -> bool:
 DEFAULT_WINDOWS_PARENT = "C:\\tmp\\deltarecon-package-check"
 LISTER_SCRIPT = "list_distributions.py"
 PROBE_SCRIPT = "probe_import.py"
+DEMO_SCRIPT = "demo.cmd"
 # The PowerShell expression of the seconds a ``$watch`` stopwatch has run, as ``0.0`` with a decimal
 # point; ``STEP_LINE`` and ``UNPACK_LINE`` of ``tools/measure_quick_start.py`` read it.
 WATCH_SECONDS = "$watch.Elapsed.TotalSeconds.ToString('0.0', [Globalization.CultureInfo]::InvariantCulture)"
@@ -711,6 +955,24 @@ def windows_python_script(work: str, python: str, arguments: list[str], name: st
     return script + HOST.step(name, "& " + " ".join(HOST.literal(a) for a in [python, *arguments]))
 
 
+def windows_demo_script(package: str) -> str:
+    """The cmd script ``<work>\\scripts\\demo.cmd``: the starter of the package with ``--no-pause`` and
+    its input from ``NUL``, so neither the demo nor ``pause`` waits; it exits with the starter's status."""
+    return "\r\n".join([
+        "@echo off",
+        f'call "{package}\\{WINDOWS_STARTER}" --no-pause < NUL',
+        "exit /b %ERRORLEVEL%",
+        "",
+    ])
+
+
+def windows_demo_host_script(work: str, demo: str) -> str:
+    """The host script that runs ``demo`` (the script of ``windows_demo_script``) with the cleared
+    environment and the empty ``PATH`` of the chain, as the host step ``guided demo``."""
+    work = HOST.require_host_folder(work)
+    return host_environment(work) + HOST.step("guided demo", "& " + HOST.literal(demo))
+
+
 def _last_line(text: str | None) -> str:
     lines = HOST.lines_of(text)
     return lines[-1] if lines else ""
@@ -772,11 +1034,19 @@ def check_windows(archive: Path, work: str | None, version: str) -> bool:
     else:
         print(f"build_package: import: failed: {(probed.stdout or '').strip()} {(probed.stderr or '').strip()}")
         inside = False
+    demo = f"{scripts}\\{DEMO_SCRIPT}"
+    (folder / "scripts" / DEMO_SCRIPT).write_bytes(windows_demo_script(str(package)).encode("utf-8"))
+    package_wsl = Path(HOST.wsl_path(str(package)))
+    before = demo_folders(package_wsl)
+    ran = HOST.powershell(windows_demo_host_script(work, demo), executable=executable)
+    guided = compare_demo(ran.returncode, before, demo_folders(package_wsl))
+
     print(f"build_package: the work folder {work} is left on the host")
     return report({
         "chain and pin": chain and code == 0,
         "installed packages equal uv.lock": lock,
         "import from a user-named folder": inside,
+        "guided demo and pin": guided,
     })
 
 
