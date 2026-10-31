@@ -163,14 +163,13 @@ from dulwich.repo import Repo
 from .. import changes as changes_contract
 from ..compare import target_window
 from ..documents import Rejection
-from ..run import (SCRATCH_PREFIX, History, ModelPointFailure, Revision, UsageError, from_worker_outcome,
-                   worker_outcome)
+from ..run import (CLONE_NAME, SCRATCH_PREFIX, History, ModelPointFailure, Revision, UsageError,
+                   from_worker_outcome, worker_outcome)
 from ..workers import ordered_map, worker_count
 
 STAGE = "liability_cashflow"
 SOURCE = "git"
 REPOSITORY_URL = "https://github.com/Degelmann-Solutions/delib-history"
-CLONE_NAME = "delib-history"          # the folder of the clone below the repositories folder
 PRODUCT_FOLDER = "risikolebensversicherung"
 MODEL_NAME = "RLV_DE_S"
 # The kinds of release reference a revision fixes. ``engine_version`` stays its own reference.

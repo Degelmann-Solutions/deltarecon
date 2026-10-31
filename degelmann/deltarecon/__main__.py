@@ -119,8 +119,8 @@ form of the ``tolerance`` member of a compare request. There is no default profi
 No command overwrites an existing file, and none writes into the clone or uses the network.
 The clone is read from ``delib-history`` in the folder ``--repositories DIR`` names, else in the
 folder the environment variable ``DELTARECON_REPOSITORIES`` names, else in the nearest folder
-``repositories/`` in the working directory or one of its parents, else in ``repositories/`` in the
-working directory, where a missing clone is reported. A relative folder is taken from the working
+``repositories/`` that holds ``delib-history``, in the working directory or one of its parents, else
+in ``repositories/`` in the working directory, where a missing clone is reported. A relative folder is taken from the working
 directory. The run folders are
 where ``--output`` or the path of a request or record names them, relative to the working
 directory; neither the option nor the variable moves them.
@@ -591,7 +591,8 @@ def main(argv: list[str] | None = None) -> int:
         command.add_argument("--repositories", metavar="DIR",
                              help="folder that holds the clone of the reference model repository "
                                   f"(default: the folder {REPOSITORIES_VARIABLE} names, else "
-                                  f"the nearest {REPOSITORIES_FOLDER}/ in the working directory or one of its parents)")
+                                  f"the nearest {REPOSITORIES_FOLDER}/ that holds the clone, in the working directory or "
+                                  "one of its parents)")
 
     args = parser.parse_args(argv)
     try:

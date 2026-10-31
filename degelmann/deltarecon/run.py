@@ -54,6 +54,8 @@ RECORD_NAME = "run-record.json"
 REPOSITORIES_FOLDER = "repositories"
 # The environment variable that names that folder when no option does.
 REPOSITORIES_VARIABLE = "DELTARECON_REPOSITORIES"
+# The folder of the clone of the reference model repository below the repositories folder.
+CLONE_NAME = "delib-history"
 # An engine restores a release into a folder of the system's temporary folder whose name
 # starts with this prefix. A message of the outcome ``error`` names it ``<scratch>``.
 SCRATCH_PREFIX = "deltarecon-"
@@ -581,9 +583,10 @@ def check_target(session: Session, target: dict) -> None:
 
 def repositories_folder(repositories: Path | str | None) -> Path:
     """The repositories folder: the given one, else the one ``DELTARECON_REPOSITORIES`` names, else
-    the nearest folder ``repositories/`` in the working directory or one of its parents, else
-    ``repositories/`` in the working directory (so a missing clone is reported there). An empty
-    variable counts as unset; a relative folder is taken from the working directory."""
+    the nearest folder ``repositories/`` that holds the clone folder ``delib-history``, in the working
+    directory or one of its parents, else ``repositories/`` in the working directory (so a missing
+    clone is reported there). An empty variable counts as unset; a relative folder is taken from the
+    working directory."""
     if repositories is not None:
         return Path(repositories)
     named = os.environ.get(REPOSITORIES_VARIABLE)
@@ -591,7 +594,7 @@ def repositories_folder(repositories: Path | str | None) -> Path:
         return Path(named)
     here = Path.cwd()
     for folder in (here, *here.parents):
-        if (folder / REPOSITORIES_FOLDER).is_dir():
+        if (folder / REPOSITORIES_FOLDER / CLONE_NAME).is_dir():
             return folder / REPOSITORIES_FOLDER
     return here / REPOSITORIES_FOLDER
 

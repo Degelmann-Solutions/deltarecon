@@ -39,7 +39,7 @@ def fake_files(name: str) -> None:
     if name == "run":
         write(Path("release-n") / "response.json", {"model_points": [{}] * 350, "export": {"data_rows": 80580}})
     elif name == "regression":
-        write(Path("regression") / "compare.result.json", {"deviating_model_points": ["1", "2", "3"]})
+        write(Path("regression") / "compare.result.json", {"outcome": "compared", "deviating_model_points": ["1", "2", "3"]})
         write(Path("regression") / "signature-table.json", {"rows": [
             {"quantity": "Bruttobeitrag", "deviating_model_points": 3, "deviating_coordinates": 1200,
              "first_period": 0, "last_period": 479},
@@ -373,6 +373,30 @@ def test_a_step_with_another_status_prints_its_output_and_stops(cwd, capsys, fai
     out = capsys.readouterr().out
     assert out.rstrip().endswith(f"output of {failing}")
     assert "Done." not in out
+
+
+@pytest.mark.parametrize("compare_result", [None, {"outcome": "incompatible", "diagnostics": []}, "not json"])
+def test_a_regression_that_compares_nothing_prints_its_output_and_stops(cwd, capsys, compare_result):
+    """Status 1 of a rejected regression or of a failed run of N+1 is not the expected deviation."""
+    steps = Steps()
+
+    def step(argv):
+        if argv[0] != "regression":
+            return steps(argv)
+        steps.argvs.append(argv)
+        if compare_result is not None:
+            path = Path("regression") / "compare.result.json"
+            path.parent.mkdir(parents=True)
+            path.write_text(compare_result if isinstance(compare_result, str) else json.dumps(compare_result))
+        return 1, "regression: rejected\n"
+
+    status, _, _ = run_demo("en", step=step)
+    assert status == 1
+    assert Path.cwd() == cwd
+    assert [argv[0] for argv in steps.argvs] == ["request", "run", "regression"]
+    out = capsys.readouterr().out
+    assert out.rstrip().endswith("regression: rejected")
+    assert "The regression shows a deviation" not in out
 
 
 def test_an_existing_folder_exits_with_2(cwd, capsys):

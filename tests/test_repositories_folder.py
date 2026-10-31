@@ -1,6 +1,7 @@
 """Where the commands read the clone: ``--repositories DIR``, else the folder the environment
-variable ``DELTARECON_REPOSITORIES`` names, else the nearest folder ``repositories/`` in the working
-directory or one of its parents, else ``repositories/`` in the working directory.
+variable ``DELTARECON_REPOSITORIES`` names, else the nearest folder ``repositories/`` that holds the
+clone folder ``delib-history``, in the working directory or one of its parents, else ``repositories/``
+in the working directory.
 """
 from __future__ import annotations
 
@@ -9,7 +10,7 @@ from pathlib import Path
 import pytest
 
 from degelmann.deltarecon.__main__ import main
-from degelmann.deltarecon.run import REPOSITORIES_VARIABLE, repositories_folder
+from degelmann.deltarecon.run import CLONE_NAME, REPOSITORIES_VARIABLE, repositories_folder
 
 from conftest import REPOSITORIES, START
 
@@ -30,6 +31,11 @@ def test_the_option_ranks_before_the_variable_before_the_working_directory(monke
     assert repositories_folder(None) == tmp_path / "repositories"
 
 
+def holder(folder: Path) -> None:
+    """``folder/repositories`` with an (empty) clone folder in it."""
+    (folder / "repositories" / CLONE_NAME).mkdir(parents=True)
+
+
 @pytest.fixture
 def tree(monkeypatch, tmp_path):
     """``tmp_path/a/b/c`` as the working directory, without the variable."""
@@ -41,38 +47,38 @@ def tree(monkeypatch, tmp_path):
 
 
 def test_the_option_wins_over_a_folder_found_upward(tree):
-    (tree / "repositories").mkdir()
+    holder(tree)
     assert repositories_folder("given") == Path("given")
 
 
 @pytest.mark.parametrize("named, expected", [("/elsewhere/named", Path("/elsewhere/named")),
                                              ("relative", Path("relative"))])
 def test_the_variable_wins_over_a_folder_found_upward(tree, monkeypatch, named, expected):
-    (tree / "repositories").mkdir()
+    holder(tree)
     monkeypatch.setenv(REPOSITORIES_VARIABLE, named)
     assert repositories_folder(None) == expected
 
 
 def test_the_folder_in_the_working_directory_is_found(tree):
-    (tree / "a" / "b" / "c" / "repositories").mkdir()
-    (tree / "repositories").mkdir()
+    holder(tree / "a" / "b" / "c")
+    holder(tree)
     assert repositories_folder(None) == tree / "a" / "b" / "c" / "repositories"
 
 
 def test_the_folder_in_a_parent_is_found(tree):
-    (tree / "a" / "repositories").mkdir()
+    holder(tree / "a")
     assert repositories_folder(None) == tree / "a" / "repositories"
 
 
 def test_the_nearer_of_two_folders_is_found(tree):
-    (tree / "repositories").mkdir()
-    (tree / "a" / "b" / "repositories").mkdir()
+    holder(tree)
+    holder(tree / "a" / "b")
     assert repositories_folder(None) == tree / "a" / "b" / "repositories"
 
 
 def test_a_file_named_repositories_is_not_a_folder(tree):
     (tree / "a" / "b" / "repositories").write_text("")
-    (tree / "repositories").mkdir()
+    holder(tree)
     assert repositories_folder(None) == tree / "repositories"
 
 
@@ -80,8 +86,22 @@ def test_without_a_folder_upward_the_working_directory_is_named(tree):
     assert repositories_folder(None) == tree / "a" / "b" / "c" / "repositories"
 
 
-def test_an_empty_variable_searches_upward(tree, monkeypatch):
+def test_a_nearer_folder_without_the_clone_is_passed_over(tree):
+    (tree / "a" / "b" / "repositories").mkdir()
+    (tree / "a" / "b" / "repositories" / "other").mkdir()
+    holder(tree)
+    assert repositories_folder(None) == tree / "repositories"
+
+
+def test_folders_without_the_clone_give_the_working_directory(tree):
+    (tree / "a" / "b" / "c" / "repositories").mkdir()
     (tree / "repositories").mkdir()
+    (tree / "repositories" / CLONE_NAME).write_text("")  # a file, not a clone folder
+    assert repositories_folder(None) == tree / "a" / "b" / "c" / "repositories"
+
+
+def test_an_empty_variable_searches_upward(tree, monkeypatch):
+    holder(tree)
     monkeypatch.setenv(REPOSITORIES_VARIABLE, "")
     assert repositories_folder(None) == tree / "repositories"
 

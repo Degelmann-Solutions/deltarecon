@@ -365,6 +365,15 @@ def read(path: Path) -> dict:
     return json.loads(path.read_text("utf-8"))
 
 
+def compared_runs() -> bool:
+    """Whether the regression compared the two runs: its exit status 1 also stands for a rejected
+    regression or a failed run of N+1, which write no compare result with the outcome ``compared``."""
+    try:
+        return read(REGRESSION / "compare.result.json").get("outcome") == "compared"
+    except (OSError, ValueError, AttributeError):
+        return False
+
+
 def quickstart(lang: str, pause: bool = True, repositories: str | None = None,
                step: Callable[[list[str]], tuple[int, str]] | None = None, ask: Callable = input,
                now: datetime.datetime | None = None) -> int:
@@ -392,7 +401,7 @@ def quickstart(lang: str, pause: bool = True, repositories: str | None = None,
 
     def execute(name: str) -> bool:
         status, output = step(argvs[name])
-        if status != EXPECT[name]:
+        if status != EXPECT[name] or (name == "regression" and not compared_runs()):
             for line in output.splitlines():
                 say(line)
             return False
