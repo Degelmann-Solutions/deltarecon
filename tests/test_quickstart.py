@@ -205,8 +205,7 @@ def test_the_happy_path_runs_in_the_demo_folder_and_summarises_the_files(cwd, ca
     assert "Not resolved: the changes ccccccc, ddddddd exceed the tolerance only together;" in text
     assert "Not shown" not in out
     assert "Result: search/search.result.json." in text
-    assert text.rstrip().endswith(f"Done. Every file is in {FOLDER}. The commands shown can also be run there on "
-                                  "their own.")
+    assert text.rstrip().endswith(f"Done. Every file is in {FOLDER}.")
     assert "`" not in out
 
 
@@ -281,8 +280,7 @@ def test_the_german_texts_and_numbers(cwd, capsys):
     assert "Nicht aufgelöst: Die Änderungen ccccccc, ddddddd" in text
     assert "Nicht gezeigt" not in out
     assert "Ergebnis: search/search.result.json." in text
-    assert text.rstrip().endswith(f"Fertig. Alle Dateien liegen in {FOLDER}. Die gezeigten Befehle lassen sich dort "
-                                  "auch einzeln ausführen.")
+    assert text.rstrip().endswith(f"Fertig. Alle Dateien liegen in {FOLDER}.")
 
 
 def test_both_languages_have_the_same_texts():

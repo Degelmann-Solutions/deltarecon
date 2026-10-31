@@ -198,4 +198,4 @@ def test_the_guided_quick_start_writes_the_pinned_search(monkeypatch, tmp_path, 
     pinned = read_pin()
     assert pin_problems(search, pinned) == []
     assert list(pinned) == hashed_paths(search)
-    assert " ".join(capsys.readouterr().out.split()).endswith("The commands shown can also be run there on their own.")
+    assert " ".join(capsys.readouterr().out.split()).endswith(f"Done. Every file is in {Path('runs') / folders[0].name}.")

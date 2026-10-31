@@ -144,8 +144,7 @@ TEXTS = {
             "Not resolved: the changes {shorts} exceed the tolerance only together; each one alone stays below "
             "it. DeltaRecon therefore attributes this part of the deviation to none of them."),
         "after_search_end": "Result: search/search.result.json.",
-        "closing": (
-            "Done. Every file is in {folder}. The commands shown can also be run there on their own."),
+        "closing": "Done. Every file is in {folder}.",
         "stopped": "stopped",
     },
     "de": {
@@ -227,9 +226,7 @@ TEXTS = {
             "Nicht aufgelöst: Die Änderungen {shorts} überschreiten die Toleranz nur zusammen; jede einzelne "
             "bleibt darunter. DeltaRecon ordnet diesen Teil der Abweichung daher keiner von ihnen zu."),
         "after_search_end": "Ergebnis: search/search.result.json.",
-        "closing": (
-            "Fertig. Alle Dateien liegen in {folder}. Die gezeigten Befehle lassen sich dort auch einzeln "
-            "ausführen."),
+        "closing": "Fertig. Alle Dateien liegen in {folder}.",
         "stopped": "abgebrochen",
     },
 }
