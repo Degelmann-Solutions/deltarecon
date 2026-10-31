@@ -104,8 +104,9 @@ Enter (not with ``--no-pause``), and summarises the outcome from the files the s
 command gets ``--repositories``, with the clone folder relative to the demo folder, only when the
 demo is given ``--repositories`` or ``DELTARECON_REPOSITORIES`` names a relative folder; otherwise
 each command finds the clone itself. The search uses the tolerance profile
-``tolerance-bruttobeitrag.json``: the wheel's copy when installed, else ``profiles/`` of the
-checkout; the regression compares exactly.
+``tolerance-bruttobeitrag.json``: the nearest ``profiles/tolerance-bruttobeitrag.json`` in the
+working directory or one of its parents, else the wheel's copy when installed, else ``profiles/`` of
+the checkout; the regression compares exactly.
 ``--lang de|en`` chooses the language; without it the first non-empty one of ``LC_ALL``,
 ``LC_MESSAGES`` and ``LANG`` decides, else the locale of the system: German for a value that starts
 with ``de`` or ``German``, else English. It exits with 0 when every step has its expected status,

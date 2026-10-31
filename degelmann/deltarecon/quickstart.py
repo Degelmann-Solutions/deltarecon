@@ -22,8 +22,10 @@ The texts are in English and German. Without ``--lang`` the first non-empty one 
 ``LC_MESSAGES`` and ``LANG`` decides, else ``locale.getlocale()``: a value that starts with ``de``
 or ``German`` gives German, anything else English.
 
-The tolerance profile of the search is read from the copy a wheel carries as
-``degelmann/deltarecon/profiles`` beside this module, else from ``profiles/`` at the root of a checkout.
+The tolerance profile of the search is the nearest file ``profiles/tolerance-bruttobeitrag.json`` in
+the working directory or one of its parents (in a checkout or a package, the folder that holds
+``profiles/``), else the copy a wheel carries as ``degelmann/deltarecon/profiles`` beside this module,
+else ``profiles/`` at the root of a checkout. It is looked up before the demo changes into its folder.
 
 Exit status: 0 when every step had its expected status, 1 when one had another (its captured output
 is printed and no later step runs), 2 when the folder exists already, 130 when the demo is
@@ -246,7 +248,12 @@ def system_language(env=None, getlocale: Callable = locale.getlocale) -> str:
 
 
 def profile_path() -> Path:
-    """The tolerance profile of the search: the wheel's copy beside this module, else the checkout's."""
+    """The tolerance profile of the search: the nearest file ``profiles/<name>`` in the working directory or
+    one of its parents, else the wheel's copy beside this module, else the checkout's."""
+    here = Path.cwd()
+    for folder in (here, *here.parents):
+        if (folder / "profiles" / PROFILE_NAME).is_file():
+            return folder / "profiles" / PROFILE_NAME
     return PROFILES / PROFILE_NAME
 
 

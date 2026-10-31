@@ -463,8 +463,63 @@ def test_the_language_of_the_system(env, system, expected):
     assert demo.system_language(env, lambda: (system, None)) == expected
 
 
-def test_the_profile_of_a_checkout_is_the_tracked_one():
+def test_the_profile_of_a_checkout_is_the_tracked_one(monkeypatch):
+    monkeypatch.chdir(ROOT)
     assert demo.profile_path() == ROOT / "profiles" / "tolerance-bruttobeitrag.json"
+
+
+def profile_in(folder: Path) -> Path:
+    path = folder / "profiles" / demo.PROFILE_NAME
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text("{}")
+    return path
+
+
+@pytest.fixture
+def deep(tmp_path, monkeypatch):
+    """``tmp_path/a/b`` as the working directory."""
+    folder = tmp_path / "a" / "b"
+    folder.mkdir(parents=True)
+    monkeypatch.chdir(folder)
+    return folder
+
+
+def test_the_profile_in_the_working_directory_is_taken(deep):
+    profile_in(deep.parent)
+    nearest = profile_in(deep)
+    assert demo.profile_path() == nearest
+
+
+def test_the_profile_in_a_parent_is_taken(deep):
+    found = profile_in(deep.parent.parent)
+    assert demo.profile_path() == found
+
+
+def test_a_folder_named_like_the_profile_is_passed_over(deep):
+    (deep / "profiles" / demo.PROFILE_NAME).mkdir(parents=True)
+    found = profile_in(deep.parent)
+    assert demo.profile_path() == found
+
+
+@pytest.mark.parametrize("packaged", [True, False])
+def test_without_a_profile_upward_the_wheel_copy_else_the_checkout_is_taken(deep, monkeypatch, tmp_path, packaged):
+    wheel = tmp_path / "site-packages" / "degelmann" / "deltarecon" / "profiles"
+    checkout = tmp_path / "checkout" / "profiles"
+    if packaged:
+        wheel.mkdir(parents=True)
+    # As the module sets it: the wheel's copy when it is present, else the checkout's.
+    monkeypatch.setattr(demo, "PACKAGED_PROFILES", wheel)
+    monkeypatch.setattr(demo, "PROFILES", wheel if packaged else checkout)
+    assert demo.profile_path() == (wheel if packaged else checkout) / demo.PROFILE_NAME
+
+
+def test_the_happy_path_shows_the_profile_of_the_working_directory(cwd, capsys):
+    profile_in(cwd)
+    _, steps, _ = run_demo("en")
+    search = steps.argvs[-1]
+    expected = os.path.join("..", "..", "profiles", demo.PROFILE_NAME)
+    assert search[search.index("--tolerance") + 1] == expected
+    assert f"--tolerance {expected}" in capsys.readouterr().out
 
 
 def test_the_command_line_passes_its_options(monkeypatch):
