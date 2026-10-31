@@ -117,7 +117,7 @@ TEXTS = {
             "order in which it was made, and writes this change manifest to --output. Each change is one revision "
             "and is classified: data (the portfolio), parameter (tables such as lapse or cost rates), code (the "
             "calculation rules), or none of these (for example documentation only)."),
-        "after_derive": "{count} changes: {data} data, {parameter} parameter, {code} code, {none} without a class.",
+        "after_derive": "{count} changes: {data} data, {parameter} parameter, {code} code, {none} without a class (a change can have several classes).",
         "derive_header": ("No.", "Revision", "Class", "Description"),
         "classes": {"data": "data", "parameter": "parameter", "code": "code"},
         "no_class": "no class",
@@ -199,7 +199,7 @@ TEXTS = {
             "Bestand), Parameter (Tabellen wie Storno- oder Kostensätze), Code (die Rechenvorschriften) oder "
             "nichts davon (zum Beispiel nur Dokumentation)."),
         "after_derive": (
-            "{count} Änderungen: {data} Daten, {parameter} Parameter, {code} Code, {none} ohne Einordnung."),
+            "{count} Änderungen: {data} Daten, {parameter} Parameter, {code} Code, {none} ohne Einordnung (eine Änderung kann mehrere Einordnungen haben)."),
         "derive_header": ("Nr.", "Revision", "Einordnung", "Beschreibung"),
         "classes": {"data": "Daten", "parameter": "Parameter", "code": "Code"},
         "no_class": "ohne Einordnung",

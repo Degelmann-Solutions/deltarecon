@@ -186,8 +186,8 @@ def test_the_happy_path_runs_in_the_demo_folder_and_summarises_the_files(cwd, ca
             "\nThe deviation is the expected outcome") in out
     assert "Total" not in out
     assert "the run of N+1 in regression/run." in text
-    assert "4 changes: 1 data, 1 parameter, 2 code, 1 without a class." in text
-    assert ("without a class.\n\n"
+    assert "4 changes: 1 data, 1 parameter, 2 code, 1 without a class (a change can have several classes)." in text
+    assert ("without a class (a change can have several classes).\n\n"
             "  No.  Revision  Class            Description\n"
             "    1  aaaaaaa   data             Change the portfolio\n"
             "    2  bbbbbbb   parameter, code  Lower the lapse rate\n"
@@ -264,8 +264,8 @@ def test_the_german_texts_and_numbers(cwd, capsys):
             "  Bruttobeitrag             3  1.200  0 bis 479\n"
             "  Provisionen               2     34   1 bis 12\n"
             "\nDie Abweichung ist das erwartete Ergebnis") in out
-    assert "4 Änderungen: 1 Daten, 1 Parameter, 2 Code, 1 ohne Einordnung." in text
-    assert ("ohne Einordnung.\n\n"
+    assert "4 Änderungen: 1 Daten, 1 Parameter, 2 Code, 1 ohne Einordnung (eine Änderung kann mehrere Einordnungen haben)." in text
+    assert ("Einordnungen haben).\n\n"
             "  Nr.  Revision  Einordnung       Beschreibung\n"
             "    1  aaaaaaa   Daten            Change the portfolio\n"
             "    2  bbbbbbb   Parameter, Code  Lower the lapse rate\n"
