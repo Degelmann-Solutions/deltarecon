@@ -450,7 +450,7 @@ trotzdem.
 
 3. Weiterlesen
 
-Das README dieser Version beschreibt jeden Befehl:
+Jeder Befehl ist in der README.md des Projekts auf GitHub beschrieben, im Stand dieser Version:
 {readme}
 LICENSE in diesem Ordner ist die Lizenz von DeltaRecon.
 """
@@ -498,7 +498,7 @@ the two revisions. The next commands run all the same.
 
 3. Read on
 
-The README of this version describes every command:
+Every command is described in the project's README.md on GitHub, as of this version:
 {readme}
 LICENSE in this folder is the licence of DeltaRecon.
 """
