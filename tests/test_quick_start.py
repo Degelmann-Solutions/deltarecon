@@ -8,7 +8,8 @@ records are not pinned: they hold the time of the run and a random record id.
 
 The fast tests check the format of the pin and the check of a search folder against it on a
 synthetic folder. The chain test runs the quick start, the steps of ``tools/measure_quick_start.py``,
-which equal the README lines, in process, and is skipped unless it is asked for:
+which equal the README lines, in process; its twin runs the guided quick start ``deltarecon quickstart``.
+Both are skipped unless they are asked for:
 ``DELTARECON_QUICK_START=1``. The pinned hashes are never rewritten to make a test pass.
 """
 from __future__ import annotations
@@ -179,3 +180,22 @@ def test_quick_start_chain_writes_the_pinned_search(monkeypatch, tmp_path):
     pinned = read_pin()
     assert pin_problems(search, pinned) == []
     assert list(pinned) == hashed_paths(search)
+
+
+@pytest.mark.skipif(os.environ.get("DELTARECON_QUICK_START") != "1",
+                    reason="the quick-start chain runs on request: DELTARECON_QUICK_START=1")
+def test_the_guided_quick_start_writes_the_pinned_search(monkeypatch, tmp_path, capsys):
+    """Run ``deltarecon quickstart`` in process in a new working directory and check its search folder against
+    the pin; the demo works in its folder, names the clone relative to it, and changes back at the end."""
+    require_clone(CLONE, NEWER)
+    monkeypatch.chdir(tmp_path)
+    assert main(["quickstart", "--no-pause", "--lang", "en", "--repositories", str(REPOSITORIES)]) == 0
+    assert Path.cwd() == tmp_path
+    folders = list((tmp_path / "runs").glob("quickstart-*"))
+    assert len(folders) == 1
+    assert {path.name for path in folders[0].iterdir()} == {"release-n", "regression", "changes.json", "search"}
+    search = folders[0] / "search"
+    pinned = read_pin()
+    assert pin_problems(search, pinned) == []
+    assert list(pinned) == hashed_paths(search)
+    assert " ".join(capsys.readouterr().out.split()).endswith(f"Done. Every file is in {Path('runs') / folders[0].name}.")
