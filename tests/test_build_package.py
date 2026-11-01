@@ -25,6 +25,8 @@ tool = load_build_package_tool()
 measure = load_measure_tool()
 LINUX = tool.TARGETS["x86_64-unknown-linux-gnu"]
 WINDOWS = tool.TARGETS["x86_64-pc-windows-msvc"]
+# The version of pyproject.toml: the archive names that check and build accept carry it.
+VERSION = tool.project()[0]
 
 # A Python that prints what the launcher hands it, one item per line; printf is a shell builtin.
 FAKE_PYTHON = '#!/bin/sh\nprintf "%s\\n" "$DELTARECON_REPOSITORIES" "$@"\n'
@@ -351,7 +353,7 @@ def test_the_windows_python_scripts():
 
 @pytest.mark.parametrize("case", ["no powershell", "wsl work", "unc work", "other drive", "existing work"])
 def test_a_windows_check_that_cannot_start_copies_nothing(tmp_path, monkeypatch, capsys, case):
-    archive = tmp_path / "deltarecon-0.1.0-x86_64-pc-windows-msvc.zip"
+    archive = tmp_path / f"deltarecon-{VERSION}-x86_64-pc-windows-msvc.zip"
     archive.write_bytes(b"")
 
     def refuse(*arguments, **options):
@@ -378,8 +380,8 @@ def test_a_windows_check_that_cannot_start_copies_nothing(tmp_path, monkeypatch,
     assert sorted(p.name for p in tmp_path.iterdir()) == [archive.name]
 
 
-@pytest.mark.parametrize("existing", ["deltarecon-0.1.0-x86_64-unknown-linux-gnu",
-                                      "deltarecon-0.1.0-x86_64-unknown-linux-gnu.tar.gz"])
+@pytest.mark.parametrize("existing", [f"deltarecon-{VERSION}-x86_64-unknown-linux-gnu",
+                                      f"deltarecon-{VERSION}-x86_64-unknown-linux-gnu.tar.gz"])
 def test_build_with_an_existing_output_writes_nothing(tmp_path, monkeypatch, capsys, existing):
     def refuse(*arguments, **options):
         raise AssertionError("nothing runs when the output exists")
@@ -409,8 +411,164 @@ def test_a_shallow_clone_is_refused(tmp_path):
 
 
 def test_check_refuses_a_work_folder_inside_the_checkout(tmp_path, capsys):
-    archive = tmp_path / "deltarecon-0.1.0-x86_64-unknown-linux-gnu.tar.gz"
+    archive = tmp_path / f"deltarecon-{VERSION}-x86_64-unknown-linux-gnu.tar.gz"
     archive.write_bytes(b"")
     assert tool.main(["check", str(archive), "--work", str(ROOT / "runs" / "package-check-refused")]) == 2
     assert "inside this checkout" in capsys.readouterr().err
     assert not (ROOT / "runs" / "package-check-refused").exists()
+
+
+# A launcher that prints its folder and arguments and exits with $FAKE_STATUS; builtins only.
+FAKE_LAUNCHER = '#!/bin/sh\nprintf "%s\\n" "$(pwd -P)" "$@"\nexit ${FAKE_STATUS:-0}\n'
+
+
+def fake_starter_package(folder):
+    folder.mkdir(parents=True)
+    launcher = folder / "deltarecon"
+    launcher.write_text(FAKE_LAUNCHER, "utf-8")
+    launcher.chmod(0o755)
+    return tool.write_launcher(folder, LINUX, "starter")
+
+
+@pytest.mark.parametrize("relative", [False, True])
+@pytest.mark.parametrize("status", [0, 1, 130])
+def test_the_starter_runs_the_demo_in_its_folder_with_an_empty_path(tmp_path, relative, status):
+    package = tmp_path / "pack age"
+    starter = fake_starter_package(package)
+    assert starter.name == "quickstart" and stat.S_IMODE(starter.stat().st_mode) == 0o755
+    elsewhere, empty = tmp_path / "elsewhere", tmp_path / "empty"
+    elsewhere.mkdir()
+    empty.mkdir()
+    called = os.path.join("..", "pack age", "quickstart") if relative else str(starter)
+    arguments = ["--no-pause", "--lang", "de", "a b", ""]
+    done = subprocess.run([called, *arguments], cwd=elsewhere, capture_output=True, text=True,
+                          stdin=subprocess.DEVNULL, env={"PATH": str(empty), "FAKE_STATUS": str(status)})
+    assert done.returncode == status, done.stderr
+    # No prompt: the input is not a terminal.
+    assert done.stdout.split("\n")[:-1] == [str(package.resolve()), "quickstart", *arguments]
+
+
+def test_the_starter_waits_for_enter_on_a_terminal(tmp_path):
+    starter = fake_starter_package(tmp_path / "package")
+    controller, terminal = os.openpty()
+    try:
+        os.write(controller, b"\n")
+        done = subprocess.run([str(starter)], stdin=terminal, capture_output=True, timeout=30,
+                              env={"PATH": str(tmp_path), "FAKE_STATUS": "1"})
+    finally:
+        os.close(controller)
+        os.close(terminal)
+    assert done.returncode == 1
+    assert done.stdout.decode("utf-8").splitlines()[-1] == "Press Enter to close. / Enter schließt das Fenster."
+
+
+def test_the_linux_starter_text():
+    text = tool.STARTER_TEXT
+    assert text.startswith("#!/bin/sh\n") and "\r" not in text
+    assert '*/*) here=${0%/*} ;;' in text and 'CDPATH= cd -- "$here" || exit 2' in text
+    assert text.index('./deltarecon quickstart "$@"') < text.index("status=$?") < text.index("[ -t 0 ]")
+    assert text.rstrip().endswith("exit $status")
+
+
+def test_the_windows_starter_text(tmp_path):
+    starter = tool.write_launcher(tmp_path, WINDOWS, "starter")
+    assert starter.name == "quickstart.cmd"
+    raw = starter.read_bytes()
+    assert raw.count(b"\r\n") == raw.count(b"\n") and raw.endswith(b"\r\n")
+    lines = [line for line in raw.decode("utf-8").split("\r\n") if not line.startswith("rem ")]
+    assert lines == ["@echo off", "setlocal", 'pushd "%~dp0"', 'call "%~dp0deltarecon.cmd" quickstart %*',
+                     'set "status=%ERRORLEVEL%"', "pause", "popd", "exit /b %status%", ""]
+
+
+README = (ROOT / "README.md").read_text("utf-8")
+
+
+@pytest.mark.parametrize("lang", ["de", "en"])
+@pytest.mark.parametrize("target_name", sorted(tool.TARGETS))
+def test_the_guides(lang, target_name):
+    text = tool.guide_text(lang, target_name, "9.8.7")
+    windows = target_name == tool.WINDOWS_TARGET
+    if windows:
+        assert text.count("\r\n") == text.count("\n") and text.endswith("\r\n")
+    else:
+        assert "\r" not in text and text.endswith("\n")
+    lines = text.replace("\r\n", "\n").split("\n")
+    assert lines[0] == ("DeltaRecon 9.8.7 " + ("für " if lang == "de" else "for ")
+                        + ("Windows x86-64" if windows else "Linux x86-64"))
+    assert "https://github.com/Degelmann-Solutions/deltarecon/blob/v9.8.7/README.md" in lines
+    assert "LICENSE" in text and "--lang de" in text and "--lang en" in text and "--no-pause" in text
+    single = [line.strip() for line in lines if line.strip().startswith(("deltarecon.cmd ", ".\\deltarecon.cmd ",
+                                                                         "./deltarecon "))]
+    first_command = lines.index("    " + single[0])
+    if windows:
+        assert "SmartScreen" in text and "runs\\quickstart-" in text
+        demo = [lines.index("    quickstart.cmd"), lines.index("    .\\quickstart.cmd")]
+        cmd = [line for line in single if line.startswith("deltarecon.cmd ")]
+        powershell = [line for line in single if line.startswith(".\\deltarecon.cmd ")]
+        assert len(cmd) == len(powershell) == 6 and single == cmd + powershell
+        assert powershell == [".\\" + line for line in cmd]
+        assert lines.index("In cmd:") < lines.index("    " + cmd[0]) < lines.index("In PowerShell:") \
+            < lines.index("    " + powershell[0])
+        in_readme = cmd + powershell
+    else:
+        assert "SmartScreen" not in text and "runs/quickstart-" in text and "quickstart.cmd" not in text
+        demo = [lines.index("    ./quickstart")]
+        assert len(single) == 6
+        in_readme = single
+    assert max(demo) < first_command
+    for line in in_readme:
+        assert f"\n{line}\n" in README, line
+    assert [line.split()[1] for line in single[:6]] == list(measure.STEPS)
+
+
+def test_the_guides_are_written_without_bom(tmp_path):
+    paths = tool.write_guides(tmp_path, tool.WINDOWS_TARGET, "9.8.7")
+    assert [path.name for path in paths] == ["LIESMICH.txt", "README.txt"]
+    for path, lang in zip(paths, ("de", "en")):
+        raw = path.read_bytes()
+        assert not raw.startswith(b"\xef\xbb\xbf")
+        assert raw.decode("utf-8") == tool.guide_text(lang, tool.WINDOWS_TARGET, "9.8.7")
+    assert "Die geführte Demo" in paths[0].read_text("utf-8")
+
+
+def test_the_windows_demo_scripts():
+    package = "C:\\tmp\\w\\package\\deltarecon-9.8.7-x86_64-pc-windows-msvc"
+    demo = tool.windows_demo_script(package)
+    assert demo == ("@echo off\r\n"
+                    f'call "{package}\\quickstart.cmd" --no-pause < NUL\r\n'
+                    "exit /b %ERRORLEVEL%\r\n")
+    script = tool.windows_demo_host_script("C:\\tmp\\w", "C:\\tmp\\w\\scripts\\demo.cmd")
+    assert "$env:PATH = 'C:\\tmp\\w\\empty-path'" in script
+    for variable in tool.CLEARED:
+        assert f"'{variable}'" in script
+    assert script.index("Remove-Item") < script.index("& 'C:\\tmp\\w\\scripts\\demo.cmd'")
+    assert "if ($LASTEXITCODE -ne 0)" in script and "guided demo" in script
+    with pytest.raises(tool.HOST.Refused):
+        tool.windows_demo_host_script("/mnt/c/tmp/w", "C:\\tmp\\w\\scripts\\demo.cmd")
+
+
+@pytest.mark.parametrize("code, new, compared, holds", [
+    (0, ["quickstart-1"], 0, True),
+    (1, ["quickstart-1"], 0, False),
+    (0, [], 0, False),
+    (0, ["quickstart-1", "quickstart-2"], 0, False),
+    (0, ["quickstart-1"], 1, False),
+])
+def test_the_demo_claim(tmp_path, monkeypatch, capsys, code, new, compared, holds):
+    calls = []
+
+    def compare(folder):
+        calls.append(folder)
+        return compared, [f"{folder}: {'OK' if compared == 0 else 'FAILED'}"]
+
+    monkeypatch.setattr(tool.HOST, "compare", compare)
+    old = {tmp_path / "runs" / "quickstart-0"}
+    after = old | {tmp_path / "runs" / name for name in new}
+    assert tool.compare_demo(code, old, after) is holds
+    assert calls == ([tmp_path / "runs" / new[0] / "search"] if code == 0 and len(new) == 1 else [])
+    assert f"starter exit {code}" in capsys.readouterr().out
+
+
+def test_the_report_names_the_demo_claim(capsys):
+    assert tool.report({"chain and pin": True, "guided demo and pin": False}) is False
+    assert "build_package: guided demo and pin: FAILED" in capsys.readouterr().out

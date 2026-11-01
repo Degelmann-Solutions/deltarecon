@@ -22,8 +22,10 @@ release then fails after both builds. The steps, in this order:
    clean, the release fails and writes neither ``SHA256SUMS`` nor the notes.
 5. ``SHA256SUMS`` gets one line per archive, ``<SHA-256>  <archive name>``, sorted by name, so
    ``sha256sum -c SHA256SUMS`` passes in the release folder. ``release-notes.md`` gets the notes
-   of the release ``v<version>``: the commit, the platform and SHA-256 of each archive, what a
-   package holds, how to verify a download, that the Windows package is not signed, and a link
+   of the release ``v<version>``: the commit, the platform and SHA-256 of each archive, how to
+   start the guided demo (``quickstart.cmd`` on Windows, by double click, in cmd or as
+   ``.\\quickstart.cmd`` in PowerShell; ``./quickstart`` on Linux) and the guides ``LIESMICH.txt``
+   and ``README.txt`` of each package, what a package holds, how to verify a download, that the Windows package is not signed, and a link
    to the quick start of the README at the tag. The notes hold no time and no path of this
    machine, so the same commit and archives give the same bytes. Both files are UTF-8 with LF.
 
@@ -46,7 +48,6 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 BUILD_PACKAGE_TOOL = ROOT / "tools" / "build_package.py"
-REPOSITORY_URL = "https://github.com/Degelmann-Solutions/deltarecon"
 SUMS = "SHA256SUMS"
 NOTES = "release-notes.md"
 
@@ -59,10 +60,11 @@ def _load_tool(name: str, path: Path):
 
 
 BUILD = _load_tool("build_package", BUILD_PACKAGE_TOOL)
+REPOSITORY_URL = BUILD.REPOSITORY_URL
 Failed, Refused = BUILD.Failed, BUILD.Refused
 # The targets in the order they are built, and the platform each names in the notes.
 TARGETS = (BUILD.TARGET, BUILD.WINDOWS_TARGET)
-PLATFORMS = {BUILD.TARGET: "Linux x86-64", BUILD.WINDOWS_TARGET: "Windows x86-64"}
+PLATFORMS = {name: BUILD.TARGETS[name]["platform"] for name in TARGETS}
 
 
 def default_output(version: str) -> Path:
@@ -102,6 +104,30 @@ Release `{tag}`, built from commit `{commit}`.
 | Platform | Archive | SHA-256 |
 |---|---|---|
 {rows}
+## Start with the demo
+
+On Windows, unpack the zip (Explorer's "Extract All" or `Expand-Archive` in PowerShell) and double-click `quickstart.cmd` in the package folder. Or start it from the package folder in cmd:
+
+```bat
+quickstart.cmd
+```
+
+or in PowerShell:
+
+```powershell
+.\\quickstart.cmd
+```
+
+On Linux, unpack the archive and start the demo from the package folder:
+
+```sh
+tar -xzf deltarecon-{version}-x86_64-unknown-linux-gnu.tar.gz
+cd deltarecon-{version}-x86_64-unknown-linux-gnu
+./quickstart
+```
+
+The demo explains four steps of the quick start and waits for Enter before each. Each package folder holds a guide, `LIESMICH.txt` in German and `README.txt` in English, which says how to start the demo and where it writes its files. The single commands of the quick start are in the guide and in the README.
+
 ## What a package holds
 
 A package is one folder that runs DeltaRecon without Python, uv or Git on the machine. It holds:
@@ -111,7 +137,9 @@ A package is one folder that runs DeltaRecon without Python, uv or Git on the ma
 - `delib-history/`: a full clone of the reference model repository, with its history;
 - `profiles/`: the tolerance profiles the quick start uses;
 - `LICENSE`, the licence of DeltaRecon, in the package folder itself;
-- the launcher, `deltarecon` on Linux and `deltarecon.cmd` on Windows, which runs DeltaRecon on the clone in the package (`DELTARECON_REPOSITORIES`).
+- the launcher, `deltarecon` on Linux and `deltarecon.cmd` on Windows, which runs DeltaRecon on the clone in the package (`DELTARECON_REPOSITORIES`);
+- the starter of the guided demo, `quickstart` on Linux and `quickstart.cmd` on Windows, which runs `deltarecon quickstart` in the package folder;
+- the guides `LIESMICH.txt` (German) and `README.txt` (English).
 
 The quick start of the package is in the README at this tag: {REPOSITORY_URL}/blob/{tag}/README.md#quick-start
 
