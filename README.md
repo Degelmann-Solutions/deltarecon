@@ -205,4 +205,4 @@ modelx is licensed under LGPL-3.0. It is not part of this repo. It is installed 
 
 ## Licence
 
-DeltaRecon is licensed under the Apache License 2.0, see `LICENSE`. `delib-history` is licensed under the MIT licence: the files copied from lifelib are "Copyright (c) 2022 lifelib Developers", its other files "Copyright (c) 2026 Degelmann Solutions".
+DeltaRecon is licensed under the Apache License 2.0, see `LICENSE`. `delib-history` is licensed under the MIT licence: the files copied from lifelib are "Copyright (c) 2022 lifelib Developers", its other files "Copyright (c) 2026 Degelmann GmbH".
