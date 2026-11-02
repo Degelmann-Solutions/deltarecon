@@ -528,10 +528,14 @@ def test_an_os_error_of_a_step_or_its_files_exits_with_2_and_a_message(cwd, caps
 
 
 @pytest.mark.skipif(os.name == "nt", reason="a symbolic link needs a privilege on Windows")
-def test_the_paths_of_the_commands_hold_when_runs_is_a_symbolic_link(cwd):
-    shutil.rmtree(cwd / "repositories")  # so the commands get --repositories as well
+@pytest.mark.parametrize("clone, outside, option", [(False, False, True), (True, True, True), (True, False, False)])
+def test_the_paths_of_the_commands_hold_when_runs_is_a_symbolic_link(cwd, clone, outside, option):
+    """``runs`` links to a folder inside or outside the checkout; a command searches upward from the resolved
+    demo folder, so it gets ``--repositories`` unless that search finds the checkout's clone."""
+    if not clone:
+        shutil.rmtree(cwd / "repositories")
     profile = profile_in(cwd)
-    elsewhere = cwd / "store" / "deeper"
+    elsewhere = (cwd.parent / f"{cwd.name}-store" if outside else cwd / "store") / "deeper"
     elsewhere.mkdir(parents=True)
     (cwd / "runs").symlink_to(elsewhere, target_is_directory=True)
     status, steps, _ = run_demo("en")
@@ -540,7 +544,22 @@ def test_the_paths_of_the_commands_hold_when_runs_is_a_symbolic_link(cwd):
     assert steps.cwds[0].resolve() == (elsewhere / FOLDER.name).resolve()
     search = steps.argvs[-1]
     assert (folder / search[search.index("--tolerance") + 1]).resolve() == profile.resolve()
-    assert (folder / search[search.index("--repositories") + 1]).resolve() == (cwd / "repositories").resolve()
+    if option:
+        assert (folder / search[search.index("--repositories") + 1]).resolve() == (cwd / "repositories").resolve()
+    else:
+        assert not any("--repositories" in argv for argv in steps.argvs)
+
+
+def test_a_file_in_the_way_of_the_folder_is_not_called_an_existing_folder(cwd, capsys, monkeypatch):
+    """On Windows a file named ``runs`` makes ``mkdir`` raise ``FileExistsError`` for the absent folder."""
+    def refuse(self, *args, **kwargs):
+        raise FileExistsError(183, "Cannot create a file when that file already exists", str(self))
+
+    monkeypatch.setattr(Path, "mkdir", refuse)
+    status, steps, _ = run_demo("en")
+    assert status == 2 and steps.argvs == []
+    assert capsys.readouterr().err == (f"error: cannot create {FOLDER}: "
+                                       "Cannot create a file when that file already exists\n")
 
 
 def demo_url() -> str:
