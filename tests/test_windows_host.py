@@ -264,4 +264,5 @@ def test_a_failing_git_command_while_preparing_exits_1(host, capsys):
     runner = Runner()
     assert tool.main(["quick-start", "--work", WORK], runner) == 1
     assert len(runner.scripts) == 1  # the probe only
-    assert capsys.readouterr().err == "windows_host: git bundle create failed in /somewhere\n"
+    assert capsys.readouterr().err == (f"windows_host: git bundle create failed in /somewhere; the work folder {WORK} "
+                                       "is left on the host\n")

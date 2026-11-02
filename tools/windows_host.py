@@ -17,8 +17,8 @@ drives and relative paths are refused before anything runs. The folder is left o
 
 The scripts run through the helpers of ``tools/host.py``, which other host checks reuse.
 
-Exit status: 0 when every pinned file reports ``OK``; 1 when a Git command that writes a bundle here
-fails, a host step fails (nothing is compared then) or a pinned file differs or is missing; 2 when the
+Exit status: 0 when every pinned file reports ``OK``; 1 when a Git command of the preparation here
+fails (the work folder is then left on the host), a host step fails (nothing is compared then) or a pinned file differs or is missing; 2 when the
 tool cannot start (a refused or existing work folder, no ``powershell.exe``, a host without ``git`` or
 ``uv``). Standard library and the DeltaRecon package of this checkout only.
 """
@@ -145,7 +145,7 @@ def main(argv: list[str] | None = None, runner=subprocess.run) -> int:
     try:
         commit, bundles = prepare(work)
     except Failed as failure:
-        print(f"windows_host: {failure}", file=sys.stderr)
+        print(f"windows_host: {failure}; the work folder {work} is left on the host", file=sys.stderr)
         return 1
     print(f"windows_host: carrying commit {commit} to {work}", flush=True)
     done = host.powershell(quick_start_script(work, bundles, commit), runner, executable=executable)

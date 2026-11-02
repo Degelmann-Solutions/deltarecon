@@ -172,7 +172,7 @@ def beside(value: str) -> dict:
 
 
 def stream(argv: list[str], **options) -> subprocess.CompletedProcess:
-    """A runner for ``windows_host.powershell``: every output line (stdout and stderr merged) is
+    """A runner for ``host.powershell``: every output line (stdout and stderr merged) is
     echoed to this process as it comes and collected into ``stdout`` of the result."""
     process = subprocess.Popen(argv, stdin=options.get("stdin"), stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
                                text=True, encoding="utf-8", errors="replace")

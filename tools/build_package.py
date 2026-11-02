@@ -83,8 +83,8 @@ when the tool cannot start (an existing output or work folder, a work folder ins
 or, for Windows, not a new local folder under ``C:\\``, an archive whose name names no target, a
 missing archive, no ``powershell.exe`` for a Windows check, ``uv`` or ``git`` missing from
 ``PATH``, a target URL that does not name the pinned Python, a failed download, a download whose
-SHA-256 differs from the pin, a Python version other than the pin). Standard library and
-``packaging`` (in the development environment) only.
+SHA-256 differs from the pin, a Python version other than the pin). Standard library, the
+DeltaRecon package of this checkout, and ``packaging`` (in the development environment) only.
 
 This module is the command line; the work lies in the library modules of ``tools/``:
 ``python_runtime`` (the pinned Python), ``assembly`` (``build``), ``guides``, ``package_check`` (what
