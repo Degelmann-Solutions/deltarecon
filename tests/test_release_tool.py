@@ -12,10 +12,10 @@ import subprocess
 
 import pytest
 
-from conftest import load_release_tool
+from tools import assembly, common, python_runtime, quick_start_steps, targets
+from tools import release as tool
 
-tool = load_release_tool()
-VERSION, PYTHON = tool.BUILD.project()
+VERSION, PYTHON = python_runtime.project()
 COMMIT = "0123456789abcdef0123456789abcdef01234567"
 LINUX_ARCHIVE = f"deltarecon-{VERSION}-x86_64-unknown-linux-gnu.tar.gz"
 WINDOWS_ARCHIVE = f"deltarecon-{VERSION}-x86_64-pc-windows-msvc.zip"
@@ -45,7 +45,7 @@ class FakeBuilder:
     def __call__(self, output, source, target):
         self.calls.append((output, source, target))
         output.mkdir(parents=True, exist_ok=True)
-        archive = output / tool.BUILD.archive_name(VERSION, target)
+        archive = output / targets.archive_name(VERSION, target)
         archive.write_bytes(f"archive of {target}\n".encode())
         if self.after:
             self.after(target)
@@ -124,8 +124,8 @@ def test_the_same_inputs_give_the_same_notes(tmp_path):
 @pytest.mark.parametrize("status", [" M README.md\n", "?? new-file.txt\n", "M  tools/release.py\n?? notes\n"])
 def test_a_dirty_tree_is_refused_and_nothing_is_built(tmp_path, monkeypatch, capsys, status):
     builder = FakeBuilder()
-    monkeypatch.setattr(tool.BUILD, "build", builder)
-    monkeypatch.setattr(tool.BUILD.MEASURE, "git_text", FakeGit(status=status))
+    monkeypatch.setattr(assembly, "build", builder)
+    monkeypatch.setattr(common, "git_text", FakeGit(status=status))
     assert tool.main(["--output", str(tmp_path / "release")]) == 2
     error = capsys.readouterr().err
     assert error.startswith("release: the working tree is not clean: ")
@@ -136,8 +136,8 @@ def test_a_dirty_tree_is_refused_and_nothing_is_built(tmp_path, monkeypatch, cap
 
 def test_an_existing_output_is_refused(tmp_path, monkeypatch, capsys):
     builder = FakeBuilder()
-    monkeypatch.setattr(tool.BUILD, "build", builder)
-    monkeypatch.setattr(tool.BUILD.MEASURE, "git_text", FakeGit())
+    monkeypatch.setattr(assembly, "build", builder)
+    monkeypatch.setattr(common, "git_text", FakeGit())
     output = tmp_path / "release"
     output.mkdir()
     assert tool.main(["--output", str(output)]) == 2
@@ -146,8 +146,8 @@ def test_an_existing_output_is_refused(tmp_path, monkeypatch, capsys):
 
 
 def test_a_failing_git_is_refused(tmp_path, monkeypatch, capsys):
-    monkeypatch.setattr(tool.BUILD, "build", FakeBuilder())
-    monkeypatch.setattr(tool.BUILD.MEASURE, "git_text", lambda *arguments: None)
+    monkeypatch.setattr(assembly, "build", FakeBuilder())
+    monkeypatch.setattr(common, "git_text", lambda *arguments: None)
     assert tool.main(["--output", str(tmp_path / "release")]) == 2
     assert "release: git status failed" in capsys.readouterr().err
 
@@ -163,8 +163,8 @@ def test_a_change_during_the_build_fails_without_sums_or_notes(tmp_path, monkeyp
             else:
                 git.status = "?? stray.txt"
 
-    monkeypatch.setattr(tool.BUILD, "build", FakeBuilder(after=move))
-    monkeypatch.setattr(tool.BUILD.MEASURE, "git_text", git)
+    monkeypatch.setattr(assembly, "build", FakeBuilder(after=move))
+    monkeypatch.setattr(common, "git_text", git)
     output = tmp_path / "release"
     assert tool.main(["--output", str(output)]) == 1
     error = capsys.readouterr().err
@@ -175,21 +175,21 @@ def test_a_change_during_the_build_fails_without_sums_or_notes(tmp_path, monkeyp
 @pytest.mark.parametrize("kind, status", [("Refused", 2), ("Failed", 1)])
 def test_a_build_that_refuses_or_fails_passes_its_message(tmp_path, monkeypatch, capsys, kind, status):
     def builder(output, source, target):
-        raise getattr(tool.BUILD, kind)("uv is not on PATH")
+        raise getattr(common, kind)("uv is not on PATH")
 
-    monkeypatch.setattr(tool.BUILD, "build", builder)
-    monkeypatch.setattr(tool.BUILD.MEASURE, "git_text", FakeGit())
+    monkeypatch.setattr(assembly, "build", builder)
+    monkeypatch.setattr(common, "git_text", FakeGit())
     assert tool.main(["--output", str(tmp_path / "release")]) == status
     assert capsys.readouterr().err == "release: uv is not on PATH\n"
 
 
 def test_main_passes_the_source_and_defaults_to_the_build_source(tmp_path, monkeypatch, capsys):
     builder = FakeBuilder()
-    monkeypatch.setattr(tool.BUILD, "build", builder)
-    monkeypatch.setattr(tool.BUILD.MEASURE, "git_text", FakeGit())
+    monkeypatch.setattr(assembly, "build", builder)
+    monkeypatch.setattr(common, "git_text", FakeGit())
     assert tool.main(["--output", str(tmp_path / "one")]) == 0
     assert tool.main(["--output", str(tmp_path / "two"), "--source", "/some/clone"]) == 0
-    assert [call[1] for call in builder.calls] == [tool.BUILD.DEFAULT_SOURCE] * 2 + ["/some/clone"] * 2
+    assert [call[1] for call in builder.calls] == [assembly.DEFAULT_SOURCE] * 2 + ["/some/clone"] * 2
     assert f"of commit {COMMIT}" in capsys.readouterr().out
 
 
@@ -199,7 +199,7 @@ def test_the_default_output_is_the_release_folder_of_the_version():
 
 
 def test_the_package_quick_start_runs_the_checkout_steps():
-    measure = tool.BUILD.MEASURE
+    measure = quick_start_steps
     text = (tool.ROOT / "README.md").read_text("utf-8")
     section = text[text.index("### From a package"):text.index("### From a checkout")]
     blocks = re.findall(r"```(sh|bat|powershell)\n(.*?)```", section, re.S)

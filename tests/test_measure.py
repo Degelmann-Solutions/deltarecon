@@ -13,11 +13,11 @@ import sys
 
 import pytest
 
-from conftest import ROOT, load_measure_tool
+from conftest import ROOT
+from tools import check_windows, common, host, python_runtime, targets
+from tools import measure_quick_start as tool
 
 MEASUREMENTS = sorted((ROOT / "measurements").glob("*.json"))
-
-tool = load_measure_tool()
 
 
 def quick_start_commands() -> list[list[str]]:
@@ -279,13 +279,13 @@ class FakeHost:
     """The host: a folder ``C`` below ``tmp_path`` for ``C:\\``, a recorded ``powershell``, a ``compare``."""
 
     def __init__(self, tmp_path, monkeypatch, failing=None, compared=(0, ["a.json: OK", "b.csv: OK"])):
-        self.build, self.host = tool.windows_tools()
+        self.host = host
         self.drive = tmp_path / "C"
         self.calls, self.commands, self.failing, self.compared = [], [], failing, compared
-        self.version = self.build.project()[0]
-        self.archive = tmp_path / self.build.archive_name(self.version, self.build.WINDOWS_TARGET)
+        self.version = python_runtime.project()[0]
+        self.archive = tmp_path / targets.archive_name(self.version, targets.WINDOWS_TARGET)
         self.archive.write_bytes(b"zip")
-        original_wsl_path, chain_script = self.host.wsl_path, self.build.windows_chain_script
+        original_wsl_path, chain_script = self.host.wsl_path, check_windows.windows_chain_script
 
         def wsl_path(windows):
             return str(self.drive) + original_wsl_path(windows)[len(self.host.MOUNT):]
@@ -298,7 +298,7 @@ class FakeHost:
         monkeypatch.setattr(self.host, "powershell_path", lambda: "/host/powershell.exe")
         monkeypatch.setattr(self.host, "powershell", self.powershell)
         monkeypatch.setattr(self.host, "compare", self.compare)
-        monkeypatch.setattr(self.build, "windows_chain_script", windows_chain_script)
+        monkeypatch.setattr(check_windows, "windows_chain_script", windows_chain_script)
 
     def folder(self, windows: str):
         return self.drive / windows[3:].replace("\\", "/")
@@ -354,14 +354,14 @@ def test_a_windows_measurement_writes_a_record_with_the_host_seconds(tmp_path, m
     assert record["beside"] == [{"name": "build", "seconds": 60.0}, {"name": "unpack", "seconds": 3.4}]
     assert record["peak_mib_covers"] == tool.WINDOWS_PEAK_COVERS
     assert record["windows"] == {"work": "C:\\tmp\\m\\one", "package": fake.archive.name,
-                                 "package_sha256": fake.build.sha256_file(fake.archive)}
+                                 "package_sha256": common.sha256_file(fake.archive)}
     work = fake.folder("C:\\tmp\\m\\one")
     assert (work / fake.archive.name).read_bytes() == b"zip" and (work / "empty-path").is_dir()
     assert fake.compared_folder == work / "runs" / "search"
     chain, probe = fake.calls
     assert chain["runner"] is tool.stream and not chain["capture"] and chain["executable"] == "/host/powershell.exe"
     assert probe["capture"] and tool.PLATFORM_PROBE in probe["script"] and '"' not in tool.PLATFORM_PROBE
-    launcher = "C:\\tmp\\m\\one\\package\\" + fake.build.package_name(fake.version, fake.build.WINDOWS_TARGET) + \
+    launcher = "C:\\tmp\\m\\one\\package\\" + targets.package_name(fake.version, targets.WINDOWS_TARGET) + \
         "\\deltarecon.cmd"
     assert [command[1][0] for command in fake.commands] == [launcher] * len(tool.STEPS)
     out = capsys.readouterr().out
@@ -393,7 +393,7 @@ def test_windows_refusals_exit_2_and_copy_nothing(tmp_path, monkeypatch, capsys,
     fake = FakeHost(tmp_path, monkeypatch)
     archive, work = fake.archive, "C:\\tmp\\m\\one"
     if case == "linux archive":
-        archive = tmp_path / fake.build.archive_name(fake.version, fake.build.TARGET)
+        archive = tmp_path / targets.archive_name(fake.version, targets.TARGET)
         archive.write_bytes(b"tar")
     elif case == "no target":
         archive = tmp_path / "deltarecon.zip"
