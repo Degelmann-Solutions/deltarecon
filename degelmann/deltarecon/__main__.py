@@ -17,8 +17,9 @@
     uv run python -m degelmann.deltarecon quickstart
 
 ``request`` writes a run request with the complete release identity of a commit of the
-reference model repository. ``--revision`` takes any name of a commit in the local clone,
-``HEAD``, a branch, or a short hash; the request holds the full hash. ``--path
+reference model repository. ``--revision`` names a commit of the local clone by a full or
+abbreviated hash, a branch, a tag, or ``HEAD``; an ancestry suffix such as ``HEAD~1`` is
+refused. The request holds the full hash. ``--path
 export|modelx`` chooses the computation path the engine version names, export by default.
 ``run`` writes
 ``response.json``, ``results.csv``, and ``run-record.json`` beside the request.
@@ -497,8 +498,8 @@ def main(argv: list[str] | None = None) -> int:
 
     request = commands.add_parser("request", help="write a run request with the complete release identity")
     request.add_argument("--revision", required=True, metavar="COMMIT",
-                         help="the release: a name of a commit in the clone of the reference model "
-                              "repository, for example HEAD, a branch, or a hash")
+                         help="the release: a commit of the clone of the reference model repository, named "
+                              "by a full or abbreviated hash, a branch, a tag, or HEAD (no suffix such as HEAD~1)")
     request.add_argument("--label", required=True, help="label of the release, for example N")
     request.add_argument("--run-id", required=True)
     request.add_argument("--output", required=True, help="path of the request to write")
@@ -524,7 +525,8 @@ def main(argv: list[str] | None = None) -> int:
     regress = commands.add_parser("regression", help="check a recorded run against a newer revision")
     regress.add_argument("run_record", help="the record of a succeeded full run without enabled changes")
     regress.add_argument("--revision", required=True, metavar="COMMIT",
-                         help="the newer release: a name of a commit in the clone")
+                         help="the newer release: a commit of the clone, named by a full or abbreviated hash, "
+                              "a branch, a tag, or HEAD (no suffix such as HEAD~1)")
     regress.add_argument("--output", required=True, help="the folder to write; it must not exist")
     regress.add_argument("--label", default="regression",
                          help="label of the release that is run (default: regression)")

@@ -3,9 +3,9 @@ sequence it shares with the Windows mode of ``tools/measure_quick_start.py``.
 
 ``start_host_chain`` opens a new host work folder under ``C:\\`` (``tools/host.py``), creates it with
 ``empty-path``, copies the archive there, and runs the host chain script: it unpacks the zip with
-.NET ``ZipFile`` into ``<work>\\package``, clears the environment, and runs the chosen quick-start
-steps through ``deltarecon.cmd``, printing each step with its exit status and the seconds of the
-host's stopwatch. ``check_windows`` then lists the installed distributions, imports a probe module
+.NET ``ZipFile`` into ``<work>\\package``, sets ``PATH`` to the empty folder (the rest of the host
+user's environment stays), and runs the chosen quick-start steps through ``deltarecon.cmd``,
+printing each step with its exit status and the seconds of the host's stopwatch. ``check_windows`` then lists the installed distributions, imports a probe module
 from a user-named folder and runs the guided demo, each as a host script; the pin and the lock are
 compared from WSL. Needs ``packaging`` of the development environment.
 """
@@ -20,11 +20,10 @@ from pathlib import Path, PureWindowsPath
 
 from tools import host
 from tools.common import engine_version
-from tools.package_check import (CLEARED, LIST_DISTRIBUTIONS, PROBE_IMPORT, PROBE_MODULE, PROBE_SOURCE,
-                                 chain_commands, compare_demo, compare_lock, demo_folders, distributions,
-                                 locked_packages, report)
+from tools.package_check import (LIST_DISTRIBUTIONS, PROBE_IMPORT, PROBE_MODULE, PROBE_SOURCE, chain_commands,
+                                 compare_demo, compare_lock, demo_folders, distributions, locked_packages)
 from tools.quick_start_steps import STEPS, rewrite
-from tools.targets import TARGETS, WINDOWS_STARTER, WINDOWS_TARGET, package_name
+from tools.targets import PYTHON_FLAGS, TARGETS, WINDOWS_STARTER, WINDOWS_TARGET, package_name
 
 DEFAULT_WINDOWS_PARENT = "C:\\tmp\\deltarecon-package-check"
 LISTER_SCRIPT = "list_distributions.py"
@@ -40,17 +39,16 @@ def _say(text: str, stream: str = "Out") -> str:
 
 
 def host_environment(work: str) -> str:
-    """The host lines that set ``PATH`` to ``<work>\\empty-path`` and remove ``CLEARED``."""
-    names = ", ".join(host.literal(name) for name in CLEARED)
+    """The host lines that change to ``work`` and set ``PATH`` to ``<work>\\empty-path``; the rest of
+    the host user's environment stays as it is (``PYTHONPATH``, ``PYTHONHOME`` and the like included),
+    as for the Linux check."""
     return (f"Set-Location -LiteralPath {host.literal(work)}\n"
-            f"$env:PATH = {host.literal(work + '\\empty-path')}\n"
-            f"foreach ($name in {names}) {{ Remove-Item -LiteralPath ('Env:' + $name) "
-            f"-ErrorAction SilentlyContinue }}\n")
+            f"$env:PATH = {host.literal(work + '\\empty-path')}\n")
 
 
 def windows_chain_script(work: str, archive: str, name: str, commands: list[tuple[str, list[str], int]]) -> str:
     """The first host script of a Windows check: unpack ``<work>\\<archive>`` into ``<work>\\package``
-    with .NET ``ZipFile``, verify its one top folder ``name``, clear the environment, verify that
+    with .NET ``ZipFile``, verify its one top folder ``name``, set ``PATH`` to the empty folder, verify that
     ``uv`` and ``git`` are not found, and run each chain command, stopping at the first exit status
     other than the expected one."""
     work = host.require_host_folder(work)
@@ -92,7 +90,7 @@ def windows_chain_script(work: str, archive: str, name: str, commands: list[tupl
 
 
 def windows_python_script(work: str, python: str, arguments: list[str], name: str, pythonpath: str | None = None) -> str:
-    """A captured host script: the cleared environment (and ``PYTHONPATH`` when given), then the
+    """A captured host script: the environment of the check (and ``PYTHONPATH`` when given), then the
     packaged Python with ``arguments`` as the host step ``name``."""
     work = host.require_host_folder(work)
     script = host_environment(work)
@@ -113,7 +111,7 @@ def windows_demo_script(package: str) -> str:
 
 
 def windows_demo_host_script(work: str, demo: str) -> str:
-    """The host script that runs ``demo`` (the script of ``windows_demo_script``) with the cleared
+    """The host script that runs ``demo`` (the script of ``windows_demo_script``) with the
     environment and the empty ``PATH`` of the chain, as the host step ``guided demo``."""
     work = host.require_host_folder(work)
     return host_environment(work) + host.step("guided demo", "& " + host.literal(demo))
@@ -159,8 +157,9 @@ def start_host_chain(archive: Path, work: str, version: str, steps: dict[str, di
     return HostChain(executable, folder, host_work, package, python, done)
 
 
-def check_windows(archive: Path, work: str | None, version: str) -> bool:
-    """Check a Windows archive natively on the Windows host of this WSL session."""
+def check_windows(archive: Path, work: str | None, version: str) -> dict[str, bool]:
+    """Check a Windows archive natively on the Windows host of this WSL session; each claim and
+    whether it holds (the traces claim is read from the archive by ``build_package.check``)."""
     now = datetime.datetime.now(datetime.timezone.utc)
     work = work or f"{DEFAULT_WINDOWS_PARENT}\\{now:%Y%m%dT%H%M%SZ}"
     started = start_host_chain(archive, work, version, STEPS, "build_package",
@@ -194,7 +193,9 @@ def check_windows(archive: Path, work: str | None, version: str) -> bool:
         lock = False
 
     engines = str(host_work / "engines")
-    probed = host.powershell(windows_python_script(work, python, ["-X", "utf8", f"{scripts}\\{PROBE_SCRIPT}"],
+    # With the launcher's flags: they must leave PYTHONPATH in force.
+    probed = host.powershell(windows_python_script(work, python, ["-X", "utf8", *PYTHON_FLAGS,
+                                                                  f"{scripts}\\{PROBE_SCRIPT}"],
                                                    "import the probe", pythonpath=engines),
                              capture=True, executable=executable)
     where = _last_line(probed.stdout)
@@ -212,9 +213,9 @@ def check_windows(archive: Path, work: str | None, version: str) -> bool:
     guided = compare_demo(ran.returncode, before, demo_folders(package_wsl))
 
     print(f"build_package: the work folder {work} is left on the host")
-    return report({
+    return {
         "chain and pin": chain and code == 0,
         "installed packages equal uv.lock": lock,
         "import from a user-named folder": inside,
         "guided demo and pin": guided,
-    })
+    }

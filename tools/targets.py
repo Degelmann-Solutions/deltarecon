@@ -10,29 +10,37 @@ from tools.common import REPOSITORIES_VARIABLE, Refused
 LAUNCHER = "deltarecon"
 WINDOWS_LAUNCHER = "deltarecon.cmd"
 
-LAUNCHER_TEXT = """#!/bin/sh
+# The flags the launchers start the packaged Python with: ``-P`` keeps the current folder off
+# ``sys.path`` and ``-s`` the user's site-packages, so neither replaces the packaged code. Neither
+# drops ``PYTHONPATH`` (``-I`` and ``-E`` would), so a module the user names there still imports.
+# ``PYTHONHOME`` is read before any flag applies, so each launcher removes it from its environment.
+PYTHON_FLAGS = ("-P", "-s")
+
+LAUNCHER_TEXT = f"""#!/bin/sh
 # DeltaRecon launcher: runs the packaged Python on the DeltaRecon command line, with the clone
 # of delib-history in this folder. Shell builtins only, so it runs with an empty PATH.
 case $0 in
-    */*) here=${0%/*} ;;
+    */*) here=${{0%/*}} ;;
     *) here=. ;;
 esac
 here=$(CDPATH= cd -- "$here" && pwd -P) || exit 2
 DELTARECON_REPOSITORIES=$here
 export DELTARECON_REPOSITORIES
-exec "$here/python/bin/python3" -m degelmann.deltarecon "$@"
+unset PYTHONHOME
+exec "$here/python/bin/python3" {' '.join(PYTHON_FLAGS)} -m degelmann.deltarecon "$@"
 """
 
 # The Windows launcher: cmd builtins only, so it runs with an empty PATH. %~dp0 is the launcher's
-# folder with a trailing backslash, which the second set removes.
+# folder with a trailing backslash, which the second set of the variable removes.
 WINDOWS_LAUNCHER_TEXT = "\r\n".join([
     "@echo off",
     "rem DeltaRecon launcher: runs the packaged Python on the DeltaRecon command line, with the clone",
     "rem of delib-history in this folder. cmd builtins only, so it runs with an empty PATH.",
     "setlocal",
+    'set "PYTHONHOME="',
     f'set "{REPOSITORIES_VARIABLE}=%~dp0"',
     f'set "{REPOSITORIES_VARIABLE}=%{REPOSITORIES_VARIABLE}:~0,-1%"',
-    '"%~dp0python\\python.exe" -m degelmann.deltarecon %*',
+    f'"%~dp0python\\python.exe" {" ".join(PYTHON_FLAGS)} -m degelmann.deltarecon %*',
     "exit /b %ERRORLEVEL%",
     "",
 ])
@@ -53,7 +61,7 @@ CDPATH= cd -- "$here" || exit 2
 ./{LAUNCHER} quickstart "$@"
 status=$?
 if [ -t 0 ]; then
-    printf '%s\n' 'Press Enter to close. / Enter schließt das Fenster.'
+    printf '%s\\n' 'Press Enter to close. / Enter schließt das Fenster.'
     read -r line
 fi
 exit $status

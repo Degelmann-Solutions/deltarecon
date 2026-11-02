@@ -18,13 +18,22 @@ Windows package is cross-built without Windows. The layout:
   ``--require-hashes --no-deps --no-build`` for the target platform) and the DeltaRecon wheel of
   ``uv build --wheel`` (with the contract pack) in the ``site-packages`` of that Python; the
   ``pip`` the build brings and the ``bin`` and ``Scripts`` folders of the installed scripts are
-  removed, so the installed distributions are exactly the locked ones.
+  removed, so the installed distributions are exactly the locked ones. Every member of the wheel
+  outside its ``.dist-info`` must map to a file Git tracks (the folders of the wheel's
+  ``force-include`` to the checkout folders they come from), or the build fails naming it; the
+  ``direct_url.json`` the install writes, which names the folder the wheel was built in, is
+  removed with its row in ``RECORD``.
 - ``delib-history/``: a full ``git clone`` of ``--source`` (default the GitHub repository; a local
-  path is allowed). A shallow clone is refused.
-- ``profiles/`` and ``LICENSE`` of this checkout.
-- a launcher that sets ``DELTARECON_REPOSITORIES`` to its own folder and runs the packaged Python
-  with ``-m degelmann.deltarecon`` and the arguments unchanged. It passes no ``-I`` or ``-E``, so
-  ``PYTHONPATH`` reaches the packaged Python. On Linux it is ``deltarecon``, a POSIX script that
+  path is allowed). A shallow clone is refused. Whatever ``--source`` is, the remote ``origin`` of
+  the clone is set to the GitHub repository and ``.git/logs`` (the reflogs, which name the builder
+  and the source) is removed; branches and history stay.
+- the files of ``profiles/`` that Git tracks (``git ls-files``; ignored and untracked files stay
+  behind) and ``LICENSE`` of this checkout.
+- a launcher that sets ``DELTARECON_REPOSITORIES`` to its own folder, removes ``PYTHONHOME`` and
+  runs the packaged Python with ``-P -s -m degelmann.deltarecon`` and the arguments unchanged:
+  ``-P`` keeps the current folder and ``-s`` the user's site-packages off ``sys.path``, so neither
+  replaces the packaged code. It passes no ``-I`` or ``-E``, so ``PYTHONPATH`` reaches the packaged
+  Python. On Linux it is ``deltarecon``, a POSIX script that
   uses only shell builtins and resolves its folder from ``$0`` (a symbolic link to it from another
   folder is not supported); on Windows it is ``deltarecon.cmd`` (CRLF, cmd builtins only), which
   resolves its folder from ``%~dp0``.
@@ -45,24 +54,29 @@ is written when the folder or the archive exists already. A symbolic link in the
 fails the build.
 
 ``check`` takes the target from the archive's name, which must be ``deltarecon-<version>-<target>``
-with the target's suffix. It unpacks the archive into a new folder and proves four claims,
-printing each result:
+with the target's suffix. It unpacks the archive into a new folder and proves five claims,
+printing each result. The chain, the import and the demo run with the caller's environment as it
+is (on Windows the host user's), ``PYTHONPATH``, ``PYTHONHOME``, ``VIRTUAL_ENV`` and
+``DELTARECON_REPOSITORIES`` included, with only ``PATH`` replaced by an empty folder:
 
 1. The README quick start (``STEPS`` of ``tools/quick_start_steps.py``) runs through the
    launcher from the work folder, which holds no ``repositories/``, with ``PATH`` an empty folder
-   (no ``uv``, no ``git``) and without ``PYTHONPATH``, ``PYTHONHOME``, ``VIRTUAL_ENV`` and
-   ``DELTARECON_REPOSITORIES``; every step exits with its expected status, and the search folder
+   (no ``uv``, no ``git``); every step exits with its expected status, and the search folder
    matches the pin ``measurements/quick-start-search.SHA256SUMS``.
 2. The distributions installed in the packaged Python (name normalised, version) equal the
    runtime lines of ``uv export --locked --no-dev`` whose markers hold for the target, plus
    ``degelmann-deltarecon`` itself.
-3. A module written to ``<work>/engines/`` imports in the packaged Python with ``PYTHONPATH`` set
-   to that folder and an empty ``PATH``, and is read from that folder.
+3. A module written to ``<work>/engines/`` imports in the packaged Python, started with the
+   launcher's flags ``-P -s``, with ``PYTHONPATH`` set to that folder and an empty ``PATH``, and is
+   read from that folder.
 4. The guided demo: the starter runs with ``--no-pause`` from the work folder, its input empty,
-   with the environment of the chain (an empty ``PATH``, ``PYTHONPATH``, ``PYTHONHOME``,
-   ``VIRTUAL_ENV`` and ``DELTARECON_REPOSITORIES`` removed); it exits with 0, and exactly one new
-   folder ``runs/quickstart-*/`` in the package folder holds a ``search/`` that matches the pin.
-   On Linux its output goes to ``<work>/logs/quickstart.log``.
+   with the environment of the chain; it exits with 0, and exactly one new folder
+   ``runs/quickstart-*/`` in the package folder holds a ``search/`` that matches the pin. On Linux
+   its output goes to ``<work>/logs/quickstart.log``.
+5. No build-machine traces, read from the archive itself in WSL for both targets after the other
+   four: no member lies below ``delib-history/.git/logs/``, and no member's name, bytes or link
+   target contains the home folder of this machine, the checkout root or the archive's own folder.
+   Each offending member is printed.
 
 It also prints the ``engine_version`` the request step recorded.
 
@@ -78,9 +92,9 @@ its output passes through like the chain's. The pin and the lock are compared fr
 left on the host.
 
 Exit status: 0 when the build completes or every check holds; 1 when a build step fails (a
-failing command, a shallow clone, a symbolic link in a Windows folder) or a check does not hold; 2
-when the tool cannot start (an existing output or work folder, a work folder inside this checkout
-or, for Windows, not a new local folder under ``C:\\``, an archive whose name names no target, a
+failing command, a shallow clone, a wheel member Git does not track, a symbolic link in a Windows
+folder) or a check does not hold; 2 when the tool cannot start (an existing output or work folder,
+a work folder inside this checkout or, for Windows, not a new local folder under ``C:\\``, an archive whose name names no target, a
 missing archive, no ``powershell.exe`` for a Windows check, ``uv`` or ``git`` missing from
 ``PATH``, a target URL that does not name the pinned Python, a failed download, a download whose
 SHA-256 differs from the pin, a Python version other than the pin). Standard library, the
@@ -104,20 +118,25 @@ from tools.assembly import DEFAULT_OUTPUT, DEFAULT_SOURCE, build  # noqa: E402
 from tools.check_linux import check_linux  # noqa: E402
 from tools.check_windows import DEFAULT_WINDOWS_PARENT, check_windows  # noqa: E402
 from tools.common import Failed, Refused  # noqa: E402
+from tools.package_check import TRACES_CLAIM, check_traces, report  # noqa: E402
 from tools.python_runtime import project  # noqa: E402
 from tools.targets import TARGET, TARGETS, WINDOWS_TARGET, package_name, target_of  # noqa: E402
 
 
 def check(archive: Path, work: str | None) -> bool:
-    """Check ``archive`` for the target its name bears: here for Linux, on the Windows host for Windows."""
+    """Check ``archive`` for the target its name bears: here for Linux, on the Windows host for Windows;
+    then, for both, the archive itself for traces of this machine. Whether all five claims hold."""
     version, _ = project()
     target_name = target_of(archive, version)
     archive = archive.resolve()
     if not archive.is_file():
         raise Refused(f"no archive at {archive}")
     if target_name == WINDOWS_TARGET:
-        return check_windows(archive, work, version)
-    return check_linux(archive, None if work is None else Path(work), TARGETS[target_name], version)
+        results = check_windows(archive, work, version)
+    else:
+        results = check_linux(archive, None if work is None else Path(work), TARGETS[target_name], version)
+    results[TRACES_CLAIM] = check_traces(archive)
+    return report(results)
 
 
 def parse(argv: list[str] | None) -> argparse.Namespace:

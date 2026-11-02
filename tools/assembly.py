@@ -1,23 +1,28 @@
 """The build of a package: the folder ``deltarecon-<version>-<target>/`` and its archive.
 
 ``build`` unpacks the target's pinned Python (``tools/python_runtime.py``), installs the locked
-runtime libraries and the DeltaRecon wheel into it, removes ``pip`` and the script folders, clones
-``delib-history`` in full, copies ``profiles/`` and ``LICENSE``, writes the launcher, the starter of
-the guided demo (``tools/targets.py``) and the guides (``tools/guides.py``), and packs the folder.
+runtime libraries and the DeltaRecon wheel into it (a wheel member that maps to no file Git tracks
+fails the build), removes ``pip``, the script folders and the ``direct_url.json`` that names the
+wheel's build folder, clones ``delib-history`` in full without the traces of this machine (its
+remote is ``DEFAULT_SOURCE``, its reflogs are removed), copies the files of ``profiles/`` that Git
+tracks and ``LICENSE``, writes the launcher, the starter of the guided demo (``tools/targets.py``)
+and the guides (``tools/guides.py``), and packs the folder.
 """
 from __future__ import annotations
 
+import csv
 import os
 import shutil
 import subprocess
 import tarfile
 import tempfile
+import tomllib
 import zipfile
 from pathlib import Path, PurePosixPath
 
 from tools.common import CLONE_NAME, ROOT, Failed, Refused
 from tools.guides import write_guides
-from tools.python_runtime import fetch_python, project, require_python
+from tools.python_runtime import PYPROJECT, fetch_python, project, require_python
 from tools.targets import TARGET, TARGETS, archive_name, package_name
 
 DEFAULT_OUTPUT = ROOT / "dist"
@@ -54,6 +59,65 @@ def remove_pip(folder: Path, target: dict) -> list[str]:
     return removed
 
 
+def drop_direct_url(site: Path) -> list[str]:
+    """Remove each ``direct_url.json`` from the distributions in ``site`` and its row from the
+    ``RECORD`` beside it; the paths removed, relative to ``site``. An installed wheel's
+    ``direct_url.json`` names the folder the wheel was built in."""
+    removed = []
+    for path in sorted(site.glob("*.dist-info/direct_url.json")):
+        name = path.relative_to(site).as_posix()
+        path.unlink()
+        record = path.parent / "RECORD"
+        if record.is_file():
+            lines = record.read_bytes().decode("utf-8").splitlines(keepends=True)
+            kept = [line for line in lines if not line.strip() or next(csv.reader([line]))[0] != name]
+            record.write_bytes("".join(kept).encode("utf-8"))
+        removed.append(name)
+    return removed
+
+
+def tracked_files(*paths: str, root: Path = ROOT) -> list[str]:
+    """The files below ``paths`` (all, without ``paths``) that Git tracks in ``root``, relative to it, sorted."""
+    done = run(["git", "-C", str(root), "ls-files", "-z", "--", *paths], f"git ls-files in {root}")
+    return sorted(name for name in done.stdout.split("\0") if name)
+
+
+def copy_tracked(folder: str, destination: Path, root: Path = ROOT) -> list[str]:
+    """Copy the files below ``folder`` that Git tracks in ``root`` to the same paths below
+    ``destination``; ignored and untracked files stay behind. The paths copied."""
+    names = tracked_files(folder, root=root)
+    for name in names:
+        source = root / name
+        if not source.is_file():
+            raise Failed(f"the tracked file {name} is missing from {root}")
+        target = destination / name
+        target.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(source, target)
+    return names
+
+
+def wheel_strays(wheel: Path, tracked: set[str], pyproject: Path = PYPROJECT) -> list[str]:
+    """The members of ``wheel`` that map to no file of ``tracked``, sorted. A member below a folder
+    of ``[tool.hatch.build.targets.wheel.force-include]`` maps to the checkout folder it was copied
+    from, any other to its own path; the ``.dist-info`` folder is written by the build and is skipped."""
+    included = tomllib.loads(pyproject.read_text("utf-8"))["tool"]["hatch"]["build"]["targets"]["wheel"]
+    sources = {inside.rstrip("/"): outside.rstrip("/") for outside, inside in included.get("force-include", {}).items()}
+    strays = []
+    with zipfile.ZipFile(wheel) as zip_file:
+        names = [name for name in zip_file.namelist() if not name.endswith("/")]
+    for name in names:
+        if name.split("/", 1)[0].endswith(".dist-info"):
+            continue
+        source = name
+        for inside in sorted(sources, key=len, reverse=True):
+            if name.startswith(inside + "/"):
+                source = sources[inside] + name[len(inside):]
+                break
+        if source not in tracked:
+            strays.append(name)
+    return sorted(strays)
+
+
 def write_launcher(folder: Path, target: dict = TARGETS[TARGET], role: str = "launcher") -> Path:
     """The target's launcher (or, with ``role="starter"``, the starter of the guided demo) in ``folder``,
     its text written byte for byte (LF or CRLF as it stands), mode 0755."""
@@ -70,10 +134,16 @@ def is_shallow(clone: Path) -> bool:
 
 
 def clone_history(source: str, destination: Path) -> None:
-    """A full clone of ``source`` at ``destination``; a shallow result is refused."""
+    """A full clone of ``source`` at ``destination``; a shallow result is refused.
+
+    The clone keeps no trace of this machine: its remote ``origin`` is ``DEFAULT_SOURCE`` whatever
+    ``source`` was, and ``.git/logs`` (the reflogs, which name the builder and ``source``) is removed.
+    Its branches, remote-tracking branches and history stay as ``git clone`` made them."""
     run(["git", "clone", "--quiet", source, str(destination)], f"git clone of {source}")
     if is_shallow(destination):
         raise Failed(f"the clone of {source} is shallow; the package needs the full history of {CLONE_NAME}")
+    run(["git", "-C", str(destination), "remote", "set-url", "origin", DEFAULT_SOURCE], "git remote set-url")
+    shutil.rmtree(destination / ".git" / "logs", ignore_errors=True)
 
 
 def _anonymous(member: tarfile.TarInfo) -> tarfile.TarInfo:
@@ -173,13 +243,17 @@ def build(output: Path, source: str, target_name: str = TARGET) -> Path:
         wheel = list(wheels.glob("*.whl"))
         if len(wheel) != 1:
             raise Failed(f"uv build --wheel left {len(wheel)} wheels, expected one")
+        strays = wheel_strays(wheel[0], set(tracked_files()))
+        if strays:
+            raise Failed(f"the wheel holds files Git does not track: {', '.join(strays)}")
         run(["uv", "pip", "install", "--quiet", "--target", str(site), *platform_options, "--no-deps",
              str(wheel[0])], "uv pip install of the DeltaRecon wheel", cwd=ROOT)
         removed = remove_pip(package, target)
+        removed += [f"{target['site_packages']}/{name}" for name in drop_direct_url(site)]
         print(f"build_package: libraries installed; removed {', '.join(removed) or 'nothing'}", flush=True)
         clone_history(source, package / CLONE_NAME)
-        print(f"build_package: cloned {source}", flush=True)
-        shutil.copytree(ROOT / PROFILES, package / PROFILES)
+        print(f"build_package: cloned {source}; remote set to {DEFAULT_SOURCE}, reflogs removed", flush=True)
+        copy_tracked(PROFILES, package)
         shutil.copy2(ROOT / LICENSE, package / LICENSE)
         write_launcher(package, target)
         write_launcher(package, target, "starter")

@@ -9,8 +9,7 @@ search. Step 1 is ``request`` and ``run``; steps 2 to 4 are ``regression``, ``de
 ``search``. Before each step the demo explains it, shows its commands and waits for Enter (not with
 ``--no-pause``); after it, it summarises the outcome from the files the step wrote. Each command
 runs in this process through ``__main__.main`` with its output captured, so it makes every check of
-the single command; the argv run is the argv shown, with every path relative to the demo folder, so
-each shown command runs on its own from there.
+the single command; the argv run is the argv shown, with every path relative to the demo folder.
 
 A command gets ``--repositories``, with the clone folder relative to the demo folder, only when the
 demo is given ``--repositories`` or ``DELTARECON_REPOSITORIES`` names a relative folder. Otherwise no
