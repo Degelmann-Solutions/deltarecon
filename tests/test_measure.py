@@ -46,6 +46,15 @@ def test_rewrite_replaces_the_leading_runs_folder_only(tmp_path):
                                         "--tolerance", "profiles/tolerance-bruttobeitrag.json", "other/runs/y", "runs"]
 
 
+def test_a_step_runs_without_the_repositories_variable_of_the_caller(tmp_path, monkeypatch):
+    monkeypatch.setenv(common.REPOSITORIES_VARIABLE, str(tmp_path / "elsewhere"))
+    log = tmp_path / "step.log"
+    probe = f"import os; print(repr(os.environ.get({common.REPOSITORIES_VARIABLE!r})))"
+    status, seconds, _ = tool.execute([sys.executable, "-c", probe], log)
+    assert status == 0 and seconds >= 0
+    assert log.read_text("utf-8").strip() == "None"
+
+
 def test_needed_steps_are_added_and_only_the_named_ones_reported(tmp_path, monkeypatch, capsys):
     assert tool.expand(["search"]) == ["request", "run", "regression", "search"]
     assert tool.expand(["derive", "request"]) == ["request", "run", "regression", "derive"]
