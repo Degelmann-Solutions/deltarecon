@@ -25,7 +25,7 @@ from packaging.markers import default_environment
 import pytest
 
 from conftest import ROOT, git
-from tools import assembly, check_windows, common, guides, host, package_check, python_runtime, targets
+from tools import assembly, check_linux, check_windows, common, guides, host, package_check, python_runtime, targets
 from tools import build_package as tool
 from tools import quick_start_steps as measure
 LINUX = targets.TARGETS["x86_64-unknown-linux-gnu"]
@@ -416,7 +416,9 @@ def test_the_windows_python_scripts():
     probe = check_windows.windows_python_script(work, python, ["-X", "utf8", "C:\\tmp\\w\\scripts\\p.py"], "probe",
                                        pythonpath="C:\\tmp\\w\\engines")
     assert probe.index("$env:PATH") < probe.index("$env:PYTHONPATH = 'C:\\tmp\\w\\engines'") < probe.index("& ")
-    assert "Remove-Item" not in lister + probe
+    # The probe starts the packaged Python directly, so it removes PYTHONHOME as the launcher does.
+    assert "Remove-Item" not in lister
+    assert probe.index("Remove-Item -LiteralPath 'Env:PYTHONHOME'") < probe.index("& ")
     assert f"& '{python}' '-X' 'utf8' 'C:\\tmp\\w\\scripts\\p.py'" in probe and "'-I'" not in probe
 
 
@@ -780,6 +782,21 @@ def test_the_traces_claim(tmp_path, suffix):
         "deltarecon-0.1.2-x/python/site/direct_url.json: names /home/builder/deltarecon",
         f"deltarecon-0.1.2-x/notes.txt: names {tmp_path}",
     ]
+
+
+def test_an_archive_folder_one_below_the_root_is_no_needle():
+    needles = package_check.trace_needles(Path("/tmp/a.tar.gz"))
+    assert "/tmp" not in needles and str(Path.home()) in needles and str(ROOT) in needles
+    assert str(Path("/tmp/dr-1-19-rel")) in package_check.trace_needles(Path("/tmp/dr-1-19-rel/a.tar.gz"))
+
+
+def test_the_linux_probe_runs_without_the_callers_pythonhome(monkeypatch, tmp_path):
+    monkeypatch.setenv("PYTHONHOME", "/caller/home")
+    monkeypatch.setenv("VIRTUAL_ENV", "/caller/venv")
+    environment = check_linux.probe_environment(tmp_path / "empty", tmp_path / "engines")
+    assert "PYTHONHOME" not in environment
+    assert environment["PYTHONPATH"] == str(tmp_path / "engines") and environment["PATH"] == str(tmp_path / "empty")
+    assert environment["VIRTUAL_ENV"] == "/caller/venv"
 
 
 def test_the_trace_needles_name_home_checkout_and_archive_folder(tmp_path):

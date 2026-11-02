@@ -66,13 +66,21 @@ def check_lock(package: Path, target: dict, version: str) -> bool:
     return compare_lock(installed_packages(package / target["python"]), locked_packages(target, version))
 
 
+def probe_environment(empty: Path, engines: Path) -> dict[str, str]:
+    """The environment of the import probe: that of the check with ``PYTHONPATH`` set to ``engines`` and,
+    as the launcher does, without ``PYTHONHOME``, since the probe starts the packaged Python directly."""
+    environment = check_environment(empty, PYTHONPATH=str(engines))
+    environment.pop("PYTHONHOME", None)
+    return environment
+
+
 def check_import(package: Path, work: Path, empty: Path, target: dict) -> bool:
     engines = work / "engines"
     engines.mkdir()
     (engines / f"{PROBE_MODULE}.py").write_text(PROBE_SOURCE, "utf-8")
     # With the launcher's flags: they must leave PYTHONPATH in force.
     done = subprocess.run([str(package / target["python"]), *PYTHON_FLAGS, "-c", PROBE_IMPORT], capture_output=True,
-                          text=True, cwd=work, env=check_environment(empty, PYTHONPATH=str(engines)))
+                          text=True, cwd=work, env=probe_environment(empty, engines))
     if done.returncode != 0:
         print(f"build_package: import: failed: {done.stderr.strip()}")
         return False

@@ -90,12 +90,14 @@ def windows_chain_script(work: str, archive: str, name: str, commands: list[tupl
 
 
 def windows_python_script(work: str, python: str, arguments: list[str], name: str, pythonpath: str | None = None) -> str:
-    """A captured host script: the environment of the check (and ``PYTHONPATH`` when given), then the
-    packaged Python with ``arguments`` as the host step ``name``."""
+    """A captured host script: the environment of the check (and, when given, ``PYTHONPATH``, with
+    ``PYTHONHOME`` removed as the launcher does, since the probe starts the packaged Python directly),
+    then the packaged Python with ``arguments`` as the host step ``name``."""
     work = host.require_host_folder(work)
     script = host_environment(work)
     if pythonpath is not None:
-        script += f"$env:PYTHONPATH = {host.literal(pythonpath)}\n"
+        script += ("Remove-Item -LiteralPath 'Env:PYTHONHOME' -ErrorAction SilentlyContinue\n"
+                   f"$env:PYTHONPATH = {host.literal(pythonpath)}\n")
     return script + host.step(name, "& " + " ".join(host.literal(a) for a in [python, *arguments]))
 
 

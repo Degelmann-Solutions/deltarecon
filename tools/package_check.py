@@ -79,11 +79,13 @@ def check_environment(path: Path, **extra: str) -> dict[str, str]:
 
 def trace_needles(archive: Path) -> list[str]:
     """What a package must not name: the home folder of this machine, the checkout root and the
-    folder of ``archive``, each absolute; the root folder itself is left out."""
+    folder of ``archive``, each absolute; the root folder itself is left out, and the folder of
+    ``archive`` counts only with at least two components below the root (``/tmp`` would match the
+    ``'/tmp'`` the standard library holds)."""
     needles = []
-    for folder in (Path.home(), ROOT, archive.resolve().parent):
-        text = str(folder)
-        if len(Path(text).parts) > 1 and text not in needles:
+    folder = archive.resolve().parent
+    for text, least in ((str(Path.home()), 2), (str(ROOT), 2), (str(folder), 3)):
+        if len(Path(text).parts) >= least and text not in needles:
             needles.append(text)
     return needles
 
