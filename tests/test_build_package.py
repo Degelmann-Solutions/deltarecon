@@ -501,6 +501,20 @@ def test_the_packaged_clone_keeps_no_trace_of_its_source(tmp_path):
             assert str(tmp_path).encode() not in path.read_bytes() and b"builder@example.org" not in path.read_bytes(), path
 
 
+def test_the_packaged_clone_holds_its_own_objects_when_the_source_borrows_them(tmp_path):
+    store = tmp_path / "store"
+    store.mkdir()
+    git(store, "init", "--quiet", "--initial-branch", "main")
+    git(store, "-c", "user.name=B", "-c", "user.email=b@example.org", "commit", "--quiet", "--allow-empty", "-m", "one")
+    source = tmp_path / "source"
+    git(tmp_path, "clone", "--quiet", "--shared", str(store), str(source))
+    assert (source / ".git" / "objects" / "info" / "alternates").is_file()
+    clone = tmp_path / "clone"
+    assembly.clone_history(str(source), clone)
+    assert not (clone / ".git" / "objects" / "info" / "alternates").exists()
+    assert git(clone, "rev-parse", "HEAD") == git(store, "rev-parse", "HEAD")
+
+
 def test_the_installed_wheel_forgets_its_build_folder(tmp_path):
     site = tmp_path / "site-packages"
     info = site / "degelmann_deltarecon-0.1.2.dist-info"
@@ -773,15 +787,30 @@ def test_the_traces_claim(tmp_path, suffix):
     traced = write_archive(tmp_path / f"traced.{suffix}", {
         **CLEAN_MEMBERS,
         "deltarecon-0.1.2-x/delib-history/.git/logs/HEAD": b"0 1 Builder <b@example.org> clone: from x\n",
-        "deltarecon-0.1.2-x/python/site/direct_url.json": b'{"url":"file:///home/builder/deltarecon/dist/x.whl"}',
+        "deltarecon-0.1.2-x/delib-history/.git/objects/info/alternates": b"../../../store/objects\n",
+        "deltarecon-0.1.2-x/python/site/x-1.dist-info/direct_url.json":
+            b'{"url":"file:///home/build%20er/deltarecon/dist/x.whl"}',
+        "deltarecon-0.1.2-x/python/site/y.txt": b'{"url":"file:///home/builder/deltarecon/dist/x.whl"}',
         "deltarecon-0.1.2-x/notes.txt": f"built in {tmp_path}/out".encode(),
     })
     assert package_check.build_machine_traces(traced, needles) == [
         "deltarecon-0.1.2-x/delib-history/.git/logs/HEAD: the reflogs of delib-history",
-        "deltarecon-0.1.2-x/python/site/direct_url.json: names /home/builder",
-        "deltarecon-0.1.2-x/python/site/direct_url.json: names /home/builder/deltarecon",
+        "deltarecon-0.1.2-x/delib-history/.git/objects/info/alternates: the alternates of delib-history, "
+        "which name another object store",
+        "deltarecon-0.1.2-x/python/site/x-1.dist-info/direct_url.json: the install source of a distribution",
+        "deltarecon-0.1.2-x/python/site/y.txt: names /home/builder",
+        "deltarecon-0.1.2-x/python/site/y.txt: names /home/builder/deltarecon",
         f"deltarecon-0.1.2-x/notes.txt: names {tmp_path}",
     ]
+
+
+def test_a_zip_is_read_as_a_zip_under_a_name_without_its_suffix(tmp_path):
+    traced = write_archive(tmp_path / "traced.zip", {
+        **CLEAN_MEMBERS, "deltarecon-0.1.2-x/delib-history/.git/logs/HEAD": b"0 1 Builder clone\n"})
+    resolved = tmp_path / "blob"  # what a correctly named link to the zip may resolve to
+    traced.rename(resolved)
+    assert package_check.build_machine_traces(resolved, []) == [
+        "deltarecon-0.1.2-x/delib-history/.git/logs/HEAD: the reflogs of delib-history"]
 
 
 def test_an_archive_folder_one_below_the_root_is_no_needle():
