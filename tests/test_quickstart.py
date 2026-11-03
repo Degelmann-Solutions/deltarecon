@@ -550,6 +550,20 @@ def test_the_paths_of_the_commands_hold_when_runs_is_a_symbolic_link(cwd, clone,
         assert not any("--repositories" in argv for argv in steps.argvs)
 
 
+def test_a_clone_below_the_link_target_does_not_replace_the_checkouts(cwd):
+    """``runs`` links to ``store/`` inside the checkout, and ``store/`` holds a clone of its own: the commands
+    would find that one first, so they get the checkout's clone as ``--repositories``."""
+    elsewhere = cwd / "store" / "deeper"
+    elsewhere.mkdir(parents=True)
+    (cwd / "store" / "repositories" / "delib-history").mkdir(parents=True)
+    (cwd / "runs").symlink_to(elsewhere, target_is_directory=True)
+    status, steps, _ = run_demo("en")
+    assert status == 0
+    search = steps.argvs[-1]
+    assert ((cwd / FOLDER / search[search.index("--repositories") + 1]).resolve()
+            == (cwd / "repositories").resolve())
+
+
 def test_a_file_in_the_way_of_the_folder_is_not_called_an_existing_folder(cwd, capsys, monkeypatch):
     """On Windows a file named ``runs`` makes ``mkdir`` raise ``FileExistsError`` for the absent folder."""
     def refuse(self, *args, **kwargs):
