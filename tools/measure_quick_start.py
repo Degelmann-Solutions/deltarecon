@@ -229,7 +229,7 @@ def measure_windows(arguments: argparse.Namespace, names: list[str], steps: dict
         print(f"measure: {refusal}", file=sys.stderr)
         return 2
     executable, done = started.executable, started.done
-    package_sha256 = sha256_file(archive)
+    package_sha256 = sha256_file(started.folder / archive.name)  # the bytes the host ran
     if done.returncode != 0:
         print(f"measure: a host step failed with exit status {done.returncode} (see the host output above); "
               f"nothing written; the work folder {work} is left on the host", file=sys.stderr)
