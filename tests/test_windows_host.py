@@ -266,3 +266,15 @@ def test_a_failing_git_command_while_preparing_exits_1(host, capsys):
     assert len(runner.scripts) == 1  # the probe only
     assert capsys.readouterr().err == (f"windows_host: git bundle create failed in /somewhere; the work folder {WORK} "
                                        "is left on the host\n")
+
+
+def test_a_failing_git_status_is_not_a_clean_tree(host, capsys):
+    def git_text(*arguments, folder=None):
+        return None if arguments[0] == "status" else "x"
+
+    host.setattr(tool.common, "git_text", git_text)
+    host.setattr(tool, "prepare", lambda work: pytest.fail("prepared although git status failed"))
+    runner = Runner()
+    assert tool.main(["quick-start", "--work", WORK], runner) == 1
+    assert len(runner.scripts) == 1  # the probe only
+    assert capsys.readouterr().err.startswith("windows_host: git status --porcelain failed in ")

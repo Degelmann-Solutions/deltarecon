@@ -100,3 +100,14 @@ def test_no_library_module_imports_a_command_line_module():
                                                   "check_linux", "check_windows"}
     for path in libraries:
         assert not imported_modules(path) & commands, path
+
+
+def test_sha256_file_reads_in_blocks_and_equals_the_hash_of_the_bytes(tmp_path):
+    import hashlib
+
+    from tools.common import sha256_file
+
+    data = bytes(range(256)) * 20000  # several blocks
+    path = tmp_path / "archive.bin"
+    path.write_bytes(data)
+    assert sha256_file(path) == hashlib.sha256(data).hexdigest()

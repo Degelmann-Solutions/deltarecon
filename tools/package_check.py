@@ -34,6 +34,7 @@ PROBE_IMPORT = f"import {PROBE_MODULE}; print({PROBE_MODULE}.__file__)"
 TRACES_CLAIM = "no build-machine traces"
 # The reflogs of a clone name the builder and the folder it was cloned from; a package holds none.
 REFLOGS = f"{CLONE_NAME}/.git/logs"
+ALTERNATES = f"{CLONE_NAME}/.git/objects/info/alternates"
 
 
 def expected_packages(exported: str, markers: dict[str, str], version: str) -> list[tuple[str, str]]:
@@ -91,9 +92,10 @@ def trace_needles(archive: Path) -> list[str]:
 
 
 def _members(archive: Path):
-    """Each member of ``archive`` (a ``.zip`` or a ``.tar.gz``): its name, its bytes (empty for a
-    folder) and the target of a link (empty for other members)."""
-    if archive.name.endswith(".zip"):
+    """Each member of ``archive`` (a zip or a gzipped tar, told apart by content, not by the name a
+    resolved link may lack): its name, its bytes (empty for a folder) and the target of a link (empty
+    for other members)."""
+    if zipfile.is_zipfile(archive):
         with zipfile.ZipFile(archive) as zip_file:
             for info in zip_file.infolist():
                 yield info.filename, b"" if info.is_dir() else zip_file.read(info), ""
@@ -106,14 +108,21 @@ def _members(archive: Path):
 
 def build_machine_traces(archive: Path, needles: list[str]) -> list[str]:
     """The members of ``archive`` that carry a trace of the build machine, one line each: a member
-    below ``delib-history/.git/logs/``, or a member whose name, bytes or link target contains one of
-    ``needles``."""
+    below ``delib-history/.git/logs/``, the clone's ``objects/info/alternates``, a
+    ``*.dist-info/direct_url.json`` (its URL may percent-encode a path), or a member whose name, bytes
+    or link target contains one of ``needles``."""
     found = []
     encoded = [(needle, needle.encode("utf-8")) for needle in needles]
     for name, content, link in _members(archive):
         inside = "/".join(PurePosixPath(name).parts[1:])
         if inside == REFLOGS or inside.startswith(REFLOGS + "/"):
             found.append(f"{name}: the reflogs of {CLONE_NAME}")
+            continue
+        if inside == ALTERNATES:
+            found.append(f"{name}: the alternates of {CLONE_NAME}, which name another object store")
+            continue
+        if name.endswith(".dist-info/direct_url.json"):  # names where a wheel was installed from, maybe %-encoded
+            found.append(f"{name}: the install source of a distribution")
             continue
         for needle, raw in encoded:
             if needle in name or needle in link or raw in content:
