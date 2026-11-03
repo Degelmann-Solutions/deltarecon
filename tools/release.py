@@ -12,7 +12,7 @@ release then fails after both builds. The steps, in this order:
    ``dist/``, ``repositories/``) does not count. A clean tree makes the wheel that
    ``uv build --wheel`` builds from the working tree the commit's.
 2. The full commit of ``HEAD`` is recorded.
-3. ``build`` of ``tools/build_package.py`` builds the Linux package
+3. ``build`` of ``tools/assembly.py`` (the build of ``tools/build_package.py``) builds the Linux package
    (``x86_64-unknown-linux-gnu``, ``.tar.gz``), then the Windows package
    (``x86_64-pc-windows-msvc``, ``.zip``), both into the release folder and both from ``--source``
    (default the GitHub repository of ``delib-history``), which is passed on unchanged. Each
@@ -36,39 +36,32 @@ the release folder.
 Exit status: 0 when both archives, ``SHA256SUMS`` and the notes are written; 1 when a build step
 fails or ``HEAD`` or the working tree changed during the builds; 2 when the release cannot start
 (a working tree that is not clean, an existing release folder, ``git`` that cannot read this
-checkout) or ``build`` refuses. Standard library only, beside what ``tools/build_package.py``
-needs.
+checkout) or ``build`` refuses. Standard library and the DeltaRecon package of this checkout only,
+beside what ``tools/assembly.py`` needs.
 """
 from __future__ import annotations
 
 import argparse
-import importlib.util
 import sys
 from pathlib import Path
 
-ROOT = Path(__file__).resolve().parent.parent
-BUILD_PACKAGE_TOOL = ROOT / "tools" / "build_package.py"
+# Run as a file, the folder of this file is first on sys.path; the package ``tools`` needs its parent.
+if __package__ in (None, ""):
+    sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+
+from tools import assembly, common, targets  # noqa: E402
+from tools.common import REPOSITORY_URL, ROOT, Failed, Refused  # noqa: E402
+from tools.python_runtime import project  # noqa: E402
+
 SUMS = "SHA256SUMS"
 NOTES = "release-notes.md"
-
-
-def _load_tool(name: str, path: Path):
-    spec = importlib.util.spec_from_file_location(name, path)
-    module = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(module)
-    return module
-
-
-BUILD = _load_tool("build_package", BUILD_PACKAGE_TOOL)
-REPOSITORY_URL = BUILD.REPOSITORY_URL
-Failed, Refused = BUILD.Failed, BUILD.Refused
 # The targets in the order they are built, and the platform each names in the notes.
-TARGETS = (BUILD.TARGET, BUILD.WINDOWS_TARGET)
-PLATFORMS = {name: BUILD.TARGETS[name]["platform"] for name in TARGETS}
+TARGETS = (targets.TARGET, targets.WINDOWS_TARGET)
+PLATFORMS = {name: targets.TARGETS[name]["platform"] for name in TARGETS}
 
 
 def default_output(version: str) -> Path:
-    return BUILD.DEFAULT_OUTPUT / f"release-v{version}"
+    return assembly.DEFAULT_OUTPUT / f"release-v{version}"
 
 
 def dirty_paths(git) -> list[str]:
@@ -154,12 +147,12 @@ The Windows package is not signed, so SmartScreen or the browser may warn when i
 def release(output: Path, source: str, builder=None, git=None) -> tuple[str, list[Path]]:
     """Build both archives into ``output`` and write ``SHA256SUMS`` and the notes; the commit and the archives.
 
-    ``builder`` defaults to ``build`` of ``tools/build_package.py``, ``git`` to ``git_text`` of
-    ``tools/measure_quick_start.py`` (git in this checkout, None on failure).
+    ``builder`` defaults to ``build`` of ``tools/assembly.py``, ``git`` to ``git_text`` of
+    ``tools/common.py`` (git in this checkout, None on failure).
     """
-    builder = builder or BUILD.build
-    git = git or BUILD.MEASURE.git_text
-    version, python = BUILD.project()
+    builder = builder or assembly.build
+    git = git or common.git_text
+    version, python = project()
     dirty = dirty_paths(git)
     if dirty:
         raise Refused(f"the working tree is not clean: {', '.join(dirty)}")
@@ -178,8 +171,8 @@ def release(output: Path, source: str, builder=None, git=None) -> tuple[str, lis
     dirty = dirty_paths(git)
     if dirty:
         raise Failed(f"the working tree changed during the build: {', '.join(dirty)}")
-    hashes = {archive.name: BUILD.sha256_file(archive) for archive in archives}
-    rows = {name: (PLATFORMS[BUILD.target_of(Path(name), version)], digest) for name, digest in hashes.items()}
+    hashes = {archive.name: common.sha256_file(archive) for archive in archives}
+    rows = {name: (PLATFORMS[targets.target_of(Path(name), version)], digest) for name, digest in hashes.items()}
     (output / SUMS).write_bytes(sums_text(hashes).encode("utf-8"))
     (output / NOTES).write_bytes(notes_text(version, python, commit, rows).encode("utf-8"))
     return commit, archives
@@ -193,15 +186,15 @@ def parse(argv: list[str] | None) -> argparse.Namespace:
     parser.add_argument("--output", type=Path,
                         help="the release folder, which must not exist and must lie outside the working tree or in an "
                              "ignored folder (default dist/release-v<version>/)")
-    parser.add_argument("--source", default=BUILD.DEFAULT_SOURCE,
-                        help=f"what delib-history is cloned from, a URL or a local path (default {BUILD.DEFAULT_SOURCE})")
+    parser.add_argument("--source", default=assembly.DEFAULT_SOURCE,
+                        help=f"what delib-history is cloned from, a URL or a local path (default {assembly.DEFAULT_SOURCE})")
     return parser.parse_args(argv)
 
 
 def main(argv: list[str] | None = None) -> int:
     arguments = parse(argv)
     try:
-        output = (arguments.output or default_output(BUILD.project()[0])).resolve()
+        output = (arguments.output or default_output(project()[0])).resolve()
         commit, archives = release(output, arguments.source)
         print(f"release: written {', '.join(archive.name for archive in archives)}, {SUMS} and {NOTES} "
               f"of commit {commit} in {output}")

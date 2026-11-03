@@ -20,7 +20,8 @@ from degelmann.deltarecon import quickstart as demo
 from degelmann.deltarecon.__main__ import main
 from degelmann.deltarecon.run import REPOSITORIES_VARIABLE
 
-from conftest import ROOT, load_measure_tool
+from conftest import ROOT
+from tools import quick_start_steps
 
 NOW = datetime.datetime(2026, 10, 29, 12, 0, 0, tzinfo=datetime.timezone.utc)
 FOLDER = Path("runs") / "quickstart-20261029T120000Z"
@@ -139,7 +140,7 @@ def checkout_argvs(tmp_path: Path) -> dict[str, list[str]]:
 
 def test_the_steps_equal_the_readme_quick_start_without_replay():
     """The tool's steps without ``replay``, with the README's folders mapped to those of the demo folder."""
-    tool = load_measure_tool()
+    tool = quick_start_steps
     readme_profile = "profiles/tolerance-bruttobeitrag.json"
     folders = {"runs/n-full/request.json": str(Path("release-n") / "request.json"),
                "runs/n-full/run-record.json": str(Path("release-n") / "run-record.json"),

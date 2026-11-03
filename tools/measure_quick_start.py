@@ -27,7 +27,7 @@ session instead of the ``uv run`` steps here. ``ARCHIVE`` is the ``.zip`` that `
 build --target x86_64-pc-windows-msvc`` wrote. The tool copies it to a new host folder (``--work``, a
 local folder under ``C:\\`` that does not exist yet, default
 ``C:\\tmp\\deltarecon-measure\\<UTC timestamp>``), and runs the host chain script of
-``tools/build_package.py`` through ``powershell.exe``: it unpacks the zip into ``<work>\\package``,
+``tools/check_windows.py`` through ``powershell.exe``: it unpacks the zip into ``<work>\\package``,
 sets ``PATH`` to an empty folder, and runs the chosen steps through ``deltarecon.cmd`` with
 ``<work>\\runs`` in place of ``runs/``. The host output streams through to the terminal. The
 seconds of each step are those of the host's stopwatch (0.1 s resolution), so the start of
@@ -38,7 +38,7 @@ printed as ``OK`` or ``FAILED``. ``commit`` and ``dirty`` are those of this chec
 and ``cpu_count`` those the packaged Python reports on the host; memory is not measured there, so
 every ``peak_mib`` is null. The record holds a ``windows`` block with the host folder, the name of
 the zip, and its SHA-256; a zip does not carry its commit, so the note should name the commit it
-was built from. The host folder is left on the host. This mode loads ``tools/build_package.py``,
+was built from. The host folder is left on the host. This mode imports ``tools/check_windows.py``,
 which needs ``packaging`` of the development environment.
 
 Exit status: 0 when every step exits with its expected status (and, in the Windows mode, the search
@@ -48,87 +48,47 @@ end in a number, or the search differs from the pin (nothing is written then), 2
 cannot start (an unknown step, a malformed ``--beside``, an existing work folder or output file; in
 the Windows mode also an archive that is missing or whose name names no Windows package, no
 ``powershell.exe``, or a ``--work`` that is not a new local folder under ``C:\\``). Standard library
-only, except the Windows mode.
+and the DeltaRecon package of this checkout only, except the Windows mode. The steps are those of
+``tools/quick_start_steps.py``.
 """
 from __future__ import annotations
 
 import argparse
 import datetime
-import importlib.util
 import json
 import math
 import os
 import platform
 import re
 import shlex
-import shutil
 import subprocess
 import sys
 import time
-from pathlib import Path, PureWindowsPath
+from pathlib import Path
 
-ROOT = Path(__file__).resolve().parent.parent
-RUNS = "runs/"
+# Run as a file, the folder of this file is first on sys.path; the package ``tools`` needs its parent.
+if __package__ in (None, ""):
+    sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+
+from tools import host  # noqa: E402
+from tools.common import ROOT, Refused, engine_version, git_text, sha256_file  # noqa: E402
+from tools.python_runtime import project  # noqa: E402
+from tools.quick_start_steps import RUNS, STATES, STEPS, expand, rewrite  # noqa: E402
+from tools.targets import WINDOWS_TARGET, archive_name, target_of  # noqa: E402
+
 # What the peak memory of a step covers, in the record and below the table.
 PEAK_COVERS = ("the largest single process of the step (ru_maxrss of os.wait4), "
                "not the sum of processes alive at once")
 PEAK_LINE = "peak MiB: the largest single process of a step, not the sum of its worker processes"
 DEFAULT_BASELINE = ROOT / "measurements" / "baseline.json"
-BUILD_PACKAGE_TOOL = ROOT / "tools" / "build_package.py"
 WINDOWS_PARENT = "C:\\tmp\\deltarecon-measure"
 WINDOWS_PEAK_COVERS = "nothing: memory is not measured on the Windows host"
-# The lines of the host chain script of tools/build_package.py that carry the host's seconds.
+# The lines of the host chain script of tools/check_windows.py that carry the host's seconds.
 STEP_LINE = re.compile(r"build_package: chain: (\S+) exit (-?\d+) \(expected (-?\d+)\) in ([0-9]+(?:\.[0-9]+)?) s")
 UNPACK_LINE = re.compile(r"build_package: host: unpacked in ([0-9]+(?:\.[0-9]+)?) s")
 # What the packaged Python prints on the host: the platform, then the processor count. No double
 # quote, which PowerShell 5.1 drops from a native argument.
 PLATFORM_PROBE = "import os,platform;print(platform.platform());print(os.cpu_count())"
-
-
-def _step(command: str, needs: tuple[str, ...] = (), expect: int = 0) -> dict:
-    return {"argv": shlex.split(command), "needs": needs, "expect": expect}
-
-
-# The quick-start commands of the README, verbatim and in order; tests/test_measure.py keeps them in sync.
-STEPS: dict[str, dict] = {
-    "request": _step("uv run deltarecon request --revision fa368575a66d97c94e96dffc62b273ec95511b12 --label N "
-                     "--run-id run-n-full --output runs/n-full/request.json"),
-    "run": _step("uv run deltarecon run runs/n-full/request.json", ("request",)),
-    "replay": _step("uv run deltarecon replay runs/n-full/run-record.json", ("run",)),
-    "regression": _step("uv run deltarecon regression runs/n-full/run-record.json "
-                        "--revision 887b7181d22550eda2fb52fa1a6bd77376d4eb2e --output runs/regression-n",
-                        ("run",), expect=1),
-    "derive": _step("uv run deltarecon derive runs/n-full/run-record.json runs/regression-n/run/run-record.json "
-                    "--output runs/changes.json", ("run", "regression")),
-    "search": _step("uv run deltarecon search runs/n-full/run-record.json runs/regression-n/run/run-record.json "
-                    "--quantity Bruttobeitrag --periods 0-59 --tolerance profiles/tolerance-bruttobeitrag.json "
-                    "--target-only --output runs/search", ("run", "regression")),
-}
-
-# Where a step's result names its number of states: the file below the work folder and the reader.
-STATES = {
-    "search": ("search/search.result.json", lambda result: result["runs"]["search"]),
-}
-
-
-def rewrite(argv: list[str], work: Path) -> list[str]:
-    """``argv`` with the leading ``runs/`` of every argument replaced by the work folder."""
-    return [str(work / argument[len(RUNS):]) if argument.startswith(RUNS) else argument for argument in argv]
-
-
-def expand(names: list[str], steps: dict[str, dict] = STEPS) -> list[str]:
-    """The named steps and every step they need, in the order of ``steps``."""
-    wanted: set[str] = set()
-
-    def add(name: str) -> None:
-        if name not in wanted:
-            wanted.add(name)
-            for need in steps[name]["needs"]:
-                add(need)
-
-    for name in names:
-        add(name)
-    return [name for name in steps if name in wanted]
 
 
 def peak_mib(rusage) -> float:
@@ -149,23 +109,6 @@ def execute(argv: list[str], log: Path) -> tuple[int, float, float | None]:
             return process.returncode, seconds, peak_mib(rusage)
         code = process.wait()
         return code, time.perf_counter() - start, None
-
-
-def git_text(*arguments: str) -> str | None:
-    try:
-        done = subprocess.run(["git", "-C", str(ROOT), *arguments], capture_output=True, text=True)
-    except OSError:
-        return None
-    return done.stdout.strip() if done.returncode == 0 else None
-
-
-def engine_version(work: Path) -> str | None:
-    """The ``engine_version`` reference of the request the request step wrote."""
-    path = work / "n-full" / "request.json"
-    if not path.is_file():
-        return None
-    references = json.loads(path.read_text("utf-8"))["release"]["references"]
-    return next((r["value"] for r in references if r["kind"] == "engine_version"), None)
 
 
 def states_of(name: str, work: Path) -> int | None:
@@ -228,22 +171,8 @@ def beside(value: str) -> dict:
     return {"name": name, "seconds": number}
 
 
-_WINDOWS_TOOLS: list = []
-
-
-def windows_tools():
-    """``tools/build_package.py`` and the ``tools/windows_host.py`` it loads, loaded once on first use."""
-    if not _WINDOWS_TOOLS:
-        spec = importlib.util.spec_from_file_location("build_package", BUILD_PACKAGE_TOOL)
-        build = importlib.util.module_from_spec(spec)
-        spec.loader.exec_module(build)
-        _WINDOWS_TOOLS.append(build)
-    build = _WINDOWS_TOOLS[0]
-    return build, build.HOST
-
-
 def stream(argv: list[str], **options) -> subprocess.CompletedProcess:
-    """A runner for ``windows_host.powershell``: every output line (stdout and stderr merged) is
+    """A runner for ``host.powershell``: every output line (stdout and stderr merged) is
     echoed to this process as it comes and collected into ``stdout`` of the result."""
     process = subprocess.Popen(argv, stdin=options.get("stdin"), stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
                                text=True, encoding="utf-8", errors="replace")
@@ -273,45 +202,34 @@ def measure_windows(arguments: argparse.Namespace, names: list[str], steps: dict
     """Run ``names`` (expanded) through the Windows package on the host: an exit status, or the
     measured step entries, the durations beside, ``platform``, ``cpu_count``, ``engine_version`` and
     the ``windows`` block."""
-    build, host = windows_tools()
+    from tools.check_windows import start_host_chain, windows_python_script  # needs packaging
+
     archive = arguments.windows_package
-    version, _ = build.project()
+    version, _ = project()
     try:
-        target_name = build.target_of(archive, version)
-    except build.Refused as refusal:
+        target_name = target_of(archive, version)
+    except Refused as refusal:
         print(f"measure: {refusal}", file=sys.stderr)
         return 2
-    if target_name != build.WINDOWS_TARGET:
+    if target_name != WINDOWS_TARGET:
         print(f"measure: {archive.name} is no Windows package; expected "
-              f"{build.archive_name(version, build.WINDOWS_TARGET)}", file=sys.stderr)
+              f"{archive_name(version, WINDOWS_TARGET)}", file=sys.stderr)
         return 2
     archive = archive.resolve()
     if not archive.is_file():
         print(f"measure: no archive at {archive}", file=sys.stderr)
         return 2
     work = arguments.work or f"{WINDOWS_PARENT}\\{now:%Y%m%dT%H%M%SZ}"
+    ran = expand(names, steps)
     try:
-        executable = host.open_work(work, "powershell.exe is not on PATH; --windows-package runs in WSL on a "
-                                          "Windows host")
-    except host.Refused as refusal:
+        started = start_host_chain(archive, work, version, {step: steps[step] for step in ran}, "measure",
+                                   "powershell.exe is not on PATH; --windows-package runs in WSL on a Windows host",
+                                   runner=stream)
+    except Refused as refusal:
         print(f"measure: {refusal}", file=sys.stderr)
         return 2
-
-    package_sha256 = build.sha256_file(archive)
-    folder = Path(host.wsl_path(work))
-    folder.mkdir(parents=True)
-    (folder / "empty-path").mkdir()
-    print(f"measure: copying {archive} to {work}", flush=True)
-    shutil.copyfile(archive, folder / archive.name)
-    target = build.TARGETS[build.WINDOWS_TARGET]
-    name = build.package_name(version, build.WINDOWS_TARGET)
-    host_work = PureWindowsPath(work)
-    package = host_work / "package" / name
-    ran = expand(names, steps)
-    commands = build.chain_commands(package, host_work / "runs", {step: steps[step] for step in ran}, rewrite,
-                                    target["launcher"][0])
-    done = host.powershell(build.windows_chain_script(work, archive.name, name, commands), runner=stream,
-                           executable=executable)
+    executable, done = started.executable, started.done
+    package_sha256 = sha256_file(started.folder / archive.name)  # the bytes the host ran
     if done.returncode != 0:
         print(f"measure: a host step failed with exit status {done.returncode} (see the host output above); "
               f"nothing written; the work folder {work} is left on the host", file=sys.stderr)
@@ -322,9 +240,8 @@ def measure_windows(arguments: argparse.Namespace, names: list[str], steps: dict
         print(f"measure: the host output names no seconds for {', '.join(missing)}; nothing written", file=sys.stderr)
         return 1
 
-    python = str(package / PureWindowsPath(target["python"]))
-    probed = host.powershell(build.windows_python_script(work, python, ["-I", "-c", PLATFORM_PROBE], "probe the platform"),
-                             capture=True, executable=executable)
+    probed = host.powershell(windows_python_script(work, started.python, ["-I", "-c", PLATFORM_PROBE],
+                                                   "probe the platform"), capture=True, executable=executable)
     lines = host.lines_of(probed.stdout)
     if probed.returncode != 0 or len(lines) < 2 or not lines[-1].isdigit():
         print(f"measure: the packaged Python could not report its platform (exit status {probed.returncode}): "

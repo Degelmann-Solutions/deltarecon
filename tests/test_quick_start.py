@@ -7,7 +7,7 @@ first names them. ``sha256sum -c`` run inside a search folder compares the folde
 records are not pinned: they hold the time of the run and a random record id.
 
 The fast tests check the format of the pin and the check of a search folder against it on a
-synthetic folder. The chain test runs the quick start, the steps of ``tools/measure_quick_start.py``,
+synthetic folder. The chain test runs the quick start, the steps of ``tools/quick_start_steps.py``,
 which equal the README lines, in process; its twin runs the guided quick start ``deltarecon quickstart``.
 Both are skipped unless they are asked for:
 ``DELTARECON_QUICK_START=1``. The pinned hashes are never rewritten to make a test pass.
@@ -26,13 +26,14 @@ import pytest
 from degelmann.deltarecon.__main__ import main
 from degelmann.deltarecon.documents import sha256_file
 
-from conftest import CLONE, NEWER, REPOSITORIES, ROOT, artifacts, load_measure_tool, require_clone
+from conftest import CLONE, NEWER, REPOSITORIES, ROOT, artifacts, require_clone
+from tools import quick_start_steps
 
 PIN = ROOT / "measurements" / "quick-start-search.SHA256SUMS"
 SEARCH_RESULT = "search.result.json"
 PIN_LINE = re.compile(r"([0-9a-f]{64})  ((?:[A-Za-z0-9_.-]+/)*[A-Za-z0-9_.-]+)")
 
-tool = load_measure_tool()
+tool = quick_start_steps
 
 
 def parse_pin(text: str) -> dict[str, str]:
