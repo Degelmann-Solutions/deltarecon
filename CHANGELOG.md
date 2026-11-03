@@ -11,7 +11,7 @@ The SHA-256 values are those of `SHA256SUMS` in the release folder `dist/release
 - `deltarecon-0.1.3-x86_64-pc-windows-msvc.zip` SHA-256 `2ced94dff134ec6b8bd3e43fb5c15360b265b65941371ef34af63ccbd4d06621`
 - `deltarecon-0.1.3-x86_64-unknown-linux-gnu.tar.gz` SHA-256 `1ae77db92948ae22e740f67b9cc8132cd90b8ac55f878c6fe417be3419f7e7c2`
 - Release page: published.
-- Changes: the packages carry no trace of the build machine (no reflog in the packaged `delib-history`, its remote the public repository, no install path in the wheel metadata), start Python isolated from the current folder and the user's site-packages, and both hold one clone of `delib-history`; the guided demo reports a missing clone where it can be created and answers folder and clone errors with a message instead of a traceback.
+- Changes: the packages carry no trace of the build machine (no reflog in the packaged `delib-history`, its remote the public repository, no install path in the wheel metadata), start Python isolated from the current folder and the user's site-packages, and both hold one clone of `delib-history`; the guided demo reports a missing clone where it can be created and answers a folder it cannot create with a message instead of a traceback, and a clone that cannot be read is reported as such, not as missing.
 
 ## 0.1.2 — published 2026-11-02
 
@@ -38,4 +38,4 @@ The SHA-256 values are those of `SHA256SUMS` in the release folder `dist/release
 - `deltarecon-0.1.0-x86_64-pc-windows-msvc.zip` SHA-256 `607133cc76cc46a13013b2120b9418af611e345a3ca7a44251ad012529e4952a`
 - `deltarecon-0.1.0-x86_64-unknown-linux-gnu.tar.gz` SHA-256 `9726e286ed6f7655712fc08e9044a6f8fbd0750928e4504ffd873f37d30cc7e2`
 - Release page: deleted 2026-11-02; tag kept.
-- Changes: the first release: a package for Windows and one for Linux, each with a Python 3.14.9, the locked libraries, the contract pack and `delib-history`, which run the quick start without Python, uv or Git on the machine.
+- Changes: the first release: a package for Windows and one for Linux, each with a Python 3.14.9, the locked libraries, the contract pack and `delib-history`, built to run the quick start without Python, uv or Git on the machine.
