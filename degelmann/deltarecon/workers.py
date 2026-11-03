@@ -9,6 +9,13 @@ The number of workers is ``--workers N``, else the environment variable
 ``DELTARECON_WORKERS``, else the number of processors the process may use. It is never
 written to a document: every worker count gives the same bytes.
 
+Each worker computes with single-threaded BLAS: while a pool runs, ``OPENBLAS_NUM_THREADS``,
+``OMP_NUM_THREADS`` and ``MKL_NUM_THREADS`` are ``1`` in this process's environment, so every
+process the pool starts, the fork server included, inherits them before it loads numpy. A BLAS
+with one thread per processor in each of one worker per processor sets aside more memory than a
+small Windows machine can commit. The former values return when the pool is shut down. An engine
+that projects in its own process, without this function, leaves them as they are.
+
 ``multiprocessing`` and ``concurrent.futures`` are imported when a pool starts, so that the
 command line and the engine, which import this module, load no module that can start a
 process before a pool starts.
@@ -23,6 +30,7 @@ from .errors import UsageError
 
 WORKERS_VARIABLE = "DELTARECON_WORKERS"
 _WHOLE = re.compile(r"[0-9]+")
+SINGLE_THREAD = ("OPENBLAS_NUM_THREADS", "OMP_NUM_THREADS", "MKL_NUM_THREADS")
 
 
 def whole_number(text: str) -> int | None:
@@ -70,17 +78,27 @@ def ordered_map(start: Callable, start_arguments: Sequence, call: Callable, item
     """``call(item)`` for every item, in the order of ``items`` whatever order the workers finish in.
 
     The pool has ``min(workers, len(items))`` processes; each runs ``start(*start_arguments)``
-    once before its first call. An exception of a call or a broken pool propagates. The pool
-    is shut down, its processes ended, before this function returns or raises.
+    once before its first call, with the variables of ``SINGLE_THREAD`` at ``1``. An exception
+    of a call or a broken pool propagates. The pool is shut down, its processes ended, and the
+    former values of those variables restored before this function returns or raises.
     """
     from concurrent.futures import ProcessPoolExecutor
     items = list(items)
     if not items:
         return []
     processes = max(1, min(workers, len(items)))
-    executor = ProcessPoolExecutor(max_workers=processes, mp_context=start_context(preload),
-                                   initializer=start, initargs=tuple(start_arguments))
+    former = {name: os.environ.get(name) for name in SINGLE_THREAD}
+    os.environ.update(dict.fromkeys(SINGLE_THREAD, "1"))
     try:
-        return list(executor.map(call, items, chunksize=max(1, len(items) // (4 * processes))))
+        executor = ProcessPoolExecutor(max_workers=processes, mp_context=start_context(preload),
+                                       initializer=start, initargs=tuple(start_arguments))
+        try:
+            return list(executor.map(call, items, chunksize=max(1, len(items) // (4 * processes))))
+        finally:
+            executor.shutdown(wait=True, cancel_futures=True)
     finally:
-        executor.shutdown(wait=True, cancel_futures=True)
+        for name, value in former.items():
+            if value is None:
+                os.environ.pop(name, None)
+            else:
+                os.environ[name] = value

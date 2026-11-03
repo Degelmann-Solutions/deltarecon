@@ -483,6 +483,15 @@ def _stub_start(folder: str) -> None:
     _stub_session = StubSession(Path(folder))
 
 
+def _no_start() -> None:
+    """A worker start that opens nothing."""
+
+
+def _environment_of(name: str) -> str | None:
+    """The value of the variable ``name`` in a worker process."""
+    return os.environ.get(name)
+
+
 def _stub_project(model_point_id: str):
     """One point in a stub worker. An earlier point in writer order sleeps longer, so that the
     points finish in reverse; the base ``crash`` raises an error that is no model point failure."""
