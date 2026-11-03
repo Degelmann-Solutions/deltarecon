@@ -138,12 +138,18 @@ def clone_history(source: str, destination: Path) -> None:
 
     The clone keeps no trace of this machine: its remote ``origin`` is ``DEFAULT_SOURCE`` whatever
     ``source`` was, and ``.git/logs`` (the reflogs, which name the builder and ``source``) is removed.
-    Its branches, remote-tracking branches and history stay as ``git clone`` made them."""
-    run(["git", "clone", "--quiet", source, str(destination)], f"git clone of {source}")
+    The objects are copied through Git's transport (``--no-local``), so no ``objects/info/alternates``
+    names a folder of this machine. Its branches, remote-tracking branches and history stay as
+    ``git clone`` made them."""
+    # --no-local: the objects travel through Git's transport, so the clone holds them itself and keeps
+    # no ``objects/info/alternates`` naming a folder of this machine (a source made with --shared).
+    run(["git", "clone", "--quiet", "--no-local", source, str(destination)], f"git clone of {source}")
     if is_shallow(destination):
         raise Failed(f"the clone of {source} is shallow; the package needs the full history of {CLONE_NAME}")
     run(["git", "-C", str(destination), "remote", "set-url", "origin", DEFAULT_SOURCE], "git remote set-url")
-    shutil.rmtree(destination / ".git" / "logs", ignore_errors=True)
+    reflogs = destination / ".git" / "logs"
+    if reflogs.exists():
+        shutil.rmtree(reflogs)  # an error fails the build: reflogs left behind would name the builder
 
 
 def _anonymous(member: tarfile.TarInfo) -> tarfile.TarInfo:

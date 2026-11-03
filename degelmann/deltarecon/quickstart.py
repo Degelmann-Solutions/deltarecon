@@ -17,8 +17,9 @@ with that folder relative to the demo folder, when the demo is given ``--reposit
 ``DELTARECON_REPOSITORIES`` names a relative folder, or when neither is given and no folder
 ``repositories/`` holding the clone was found in the working directory or a parent, so that the
 command reports the missing clone at ``repositories/`` in the working directory and not in the demo
-folder; a clone found upward is passed as well when the resolved demo folder does not lie below the
-folder that holds it (``runs`` a symbolic link to a folder elsewhere). Otherwise no command gets it: from the demo folder a command finds ``repositories/`` of a
+folder; a clone found upward is passed as well when a search upward from the resolved demo folder
+would find another clone or none (``runs`` a symbolic link to a folder elsewhere, which may hold a
+``repositories/`` of its own). Otherwise no command gets it: from the demo folder a command finds ``repositories/`` of a
 checkout in a parent folder, and in a package the launcher's absolute variable applies. The search
 gets ``--tolerance`` with the profile relative to the demo folder, or absolute when no relative path
 exists (another drive on Windows). Both are computed from the resolved folders, so they hold when
@@ -52,7 +53,7 @@ import textwrap
 from pathlib import Path
 from typing import Callable
 
-from .run import CLONE_NAME, REPOSITORIES_VARIABLE, repositories_folder
+from .run import CLONE_NAME, REPOSITORIES_FOLDER, REPOSITORIES_VARIABLE, repositories_folder
 
 OLDER = "fa368575a66d97c94e96dffc62b273ec95511b12"  # release N on the fixed model
 NEWER = "887b7181d22550eda2fb52fa1a6bd77376d4eb2e"  # the state N+1, 32 revisions later
@@ -298,18 +299,27 @@ def clone_option(folder: Path, repositories: str | None) -> str | None:
     else from ``DELTARECON_REPOSITORIES`` when it names a relative folder, else, when no folder
     ``repositories/`` holding the clone is found upward, ``repositories/`` in the working directory (the
     folder ``run.repositories_folder`` falls back to), and also the clone folder found upward when the
-    resolved demo folder does not lie below the folder that holds it (``runs`` a symbolic link to a
-    folder elsewhere), since a command searches upward from the resolved demo folder. Otherwise
+    search upward from the resolved demo folder would find another clone or none (``runs`` a symbolic
+    link to a folder elsewhere, which may hold a ``repositories/`` of its own). Otherwise
     ``None``, and each command finds the clone itself (upward from the demo folder, or the absolute
     folder the variable names)."""
     named = os.environ.get(REPOSITORIES_VARIABLE)
     if repositories is None and named and Path(named).is_absolute():
         return None
     found = repositories_folder(repositories)
-    if (repositories is None and not named and (found / CLONE_NAME).is_dir()
-            and Path(folder).resolve().is_relative_to(found.resolve().parent)):
+    if repositories is None and not named and (found / CLONE_NAME).is_dir() and nearest_from(folder) == found.resolve():
         return None
     return relative_to(found, folder)
+
+
+def nearest_from(folder: Path) -> Path | None:
+    """The folder ``repositories/`` holding the clone that a command started in ``folder`` finds upward
+    (from the resolved folder, as ``Path.cwd()`` gives it there), resolved; ``None`` when there is none."""
+    start = Path(folder).resolve()
+    for candidate in (start, *start.parents):
+        if (candidate / REPOSITORIES_FOLDER / CLONE_NAME).is_dir():
+            return (candidate / REPOSITORIES_FOLDER).resolve()
+    return None
 
 
 def quoted(argument: str) -> str:
