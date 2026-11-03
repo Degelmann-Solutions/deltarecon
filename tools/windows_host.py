@@ -17,8 +17,8 @@ drives and relative paths are refused before anything runs. The folder is left o
 
 The scripts run through the helpers of ``tools/host.py``, which other host checks reuse.
 
-Exit status: 0 when every pinned file reports ``OK``; 1 when a Git command of the preparation here
-fails (the work folder is then left on the host), a host step fails (nothing is compared then) or a pinned file differs or is missing; 2 when the
+Exit status: 0 when every pinned file reports ``OK``; 1 when ``git status`` of this checkout fails
+(nothing is prepared then), a Git command of the preparation here fails (the work folder is then left on the host), a host step fails (nothing is compared then) or a pinned file differs or is missing; 2 when the
 tool cannot start (a refused or existing work folder, no ``powershell.exe``, a host without ``git`` or
 ``uv``). Standard library and the DeltaRecon package of this checkout only.
 """
@@ -140,7 +140,12 @@ def main(argv: list[str] | None = None, runner=subprocess.run) -> int:
         return 2
     for line in found:
         print(f"windows_host: host {line}")
-    if common.git_text("status", "--porcelain"):
+    try:
+        dirty = _git("status", "--porcelain")
+    except Failed as failure:  # a failed status must not read as a clean tree
+        print(f"windows_host: {failure}", file=sys.stderr)
+        return 1
+    if dirty:
         print("windows_host: the tree is dirty; uncommitted changes are not carried to the host")
     try:
         commit, bundles = prepare(work)

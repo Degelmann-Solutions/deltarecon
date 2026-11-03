@@ -198,7 +198,9 @@ def sha256_bytes(data: bytes) -> str:
 
 
 def sha256_file(path: Path) -> str:
-    return sha256_bytes(path.read_bytes())
+    """The SHA-256 of a file, read in blocks, so a large archive needs no more memory than a small one."""
+    with path.open("rb") as stream:
+        return hashlib.file_digest(stream, "sha256").hexdigest()
 
 
 def artifact_reference(base: Path, path: Path) -> dict:
