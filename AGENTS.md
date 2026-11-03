@@ -25,3 +25,4 @@ DeltaRecon is an open-source project. Contributors and agents read and write Eng
 - When a plan is closed, each of its `deferred:` entries moves to `deferred-work.md`.
 - A commit made after a story's review, a fix from its walkthrough included, gets its own review before the merge.
 - A package check looks at the archive's content (no path of the build machine, no `.git/logs`) and runs as a user would: from a folder that is not a checkout, with the user's environment.
+- After publishing a release, add its `CHANGELOG.md` entry from `dist/release-v<version>/` (commit, `delib-history` commit, archive SHA-256, date) in the first commit after the publication, as part of the publish story.
