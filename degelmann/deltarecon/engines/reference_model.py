@@ -96,7 +96,8 @@ else ``DELTARECON_WORKERS``, else one per processor the process may use, never m
 points. The parent restores the state, reads the model, exports it on the path ``export``,
 and maps each id to its row of the model point table. Each worker opens the same scratch
 folder once: on ``export`` it imports the package the parent exported, on ``modelx`` it
-reads the model with ``mx.read_model``. It projects a point by its row and returns the
+reads the model with ``mx.read_model``. It computes with single-threaded BLAS (see
+``workers.ordered_map``). It projects a point by its row and returns the
 periods or the message of its failure; the parent keeps the order of the selection. The
 pool ends with the session call, before the scratch folder is removed. With one worker the
 points are projected in the parent, one after the other. The worker count changes no byte of

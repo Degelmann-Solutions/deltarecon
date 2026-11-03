@@ -91,8 +91,9 @@ and export that is no run. The result and the run record name the switch.
 
 ``run``, ``replay``, ``regression``, ``walk``, and ``search`` project the model points of each
 state in ``--workers N`` worker processes, else as many as ``DELTARECON_WORKERS`` names, else
-one per processor; ``N`` and the variable must be whole numbers of at least 1. The count changes
-no byte of any document and is not recorded. ``request`` and ``derive`` project no point and do not
+one per processor; ``N`` and the variable must be whole numbers of at least 1. Each worker
+computes with single-threaded BLAS. The count changes no byte of any document and is not
+recorded. ``request`` and ``derive`` project no point and do not
 read the variable.
 
 ``quickstart`` is the guided quick start: it runs ``request``, ``run``, ``regression``, ``derive``

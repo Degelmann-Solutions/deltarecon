@@ -15,10 +15,10 @@ import pytest
 from degelmann.deltarecon import workers
 from degelmann.deltarecon.engines.reference_model import PATHS
 from degelmann.deltarecon.run import ModelPointFailure, UsageError
-from degelmann.deltarecon.workers import WORKERS_VARIABLE, ordered_map, worker_count
+from degelmann.deltarecon.workers import SINGLE_THREAD, WORKERS_VARIABLE, ordered_map, worker_count
 
 from conftest import (POINTS, ROOT, as_bits, POINT_TABLE, StubEngine, WorkerStub, _stub_project, _stub_start, cli, commit,
-                      edit_file, model_request, run_stub, stored, text, throwaway, with_columns, without_volatile)
+                      edit_file, model_request, run_stub, stored, text, throwaway, with_columns, without_volatile, _environment_of, _no_start)
 
 
 # --- stub engine ----------------------------------------------------------------------
@@ -52,10 +52,12 @@ def test_a_failed_stub_point_and_a_repeated_id_fail_as_in_the_loop(world):
         {"model_point_id": "MP-D", "message": "The release holds this model point id more than once."}]
 
 
-def test_an_error_in_a_worker_reaches_the_caller(world):
+def test_an_error_in_a_worker_reaches_the_caller(world, monkeypatch):
+    monkeypatch.setenv("OPENBLAS_NUM_THREADS", "8")
     (world / "rel" / "points.csv").write_text(POINTS.replace("MP-C,0,0,1e-05", "MP-C,0,0,crash"), "utf-8")
     with pytest.raises(RuntimeError, match="the stub worker crashes"):
         run_stub(world, engine=WorkerStub(2))
+    assert workers.os.environ["OPENBLAS_NUM_THREADS"] == "8"  # restored when the pool raised
     assert sorted(p.name for p in (world / "run").iterdir()) == ["request.json"]
 
 
@@ -73,6 +75,15 @@ def test_the_pool_has_no_more_processes_than_points(world, monkeypatch):
         ("ok", [(0, [2.0, 2.0]), (1, [2.0, 4.0]), (2, [2.0, 6.0])]), ("ok", [(12, [1.5, 19.5]), (13, [1.5, 21.0])])]
     assert sizes == [2]
     assert ordered_map(_stub_start, (folder,), _stub_project, [], 8) == [] and sizes == [2]
+
+
+def test_a_worker_starts_with_single_threaded_blas_and_the_parent_keeps_its_values(monkeypatch):
+    monkeypatch.setenv("OPENBLAS_NUM_THREADS", "8")
+    monkeypatch.delenv("OMP_NUM_THREADS", raising=False)
+    monkeypatch.setenv("MKL_NUM_THREADS", "")
+    assert SINGLE_THREAD == ("OPENBLAS_NUM_THREADS", "OMP_NUM_THREADS", "MKL_NUM_THREADS")
+    assert ordered_map(_no_start, (), _environment_of, list(SINGLE_THREAD), 3) == ["1", "1", "1"]
+    assert [workers.os.environ.get(name) for name in SINGLE_THREAD] == ["8", None, ""]
 
 
 # --- the worker count -----------------------------------------------------------------
