@@ -1676,7 +1676,11 @@ def test_request_command_without_a_clone_names_where_it_is_expected(monkeypatch,
                    "--label", "N", "--run-id", "x", "--output", output) == 1
         printed = capsys.readouterr().out
         assert printed.startswith("request: rejected\ndiagnostic: unknown_reference: ")
-        assert f"git clone {REPOSITORY_URL} {repositories / CLONE_NAME}" in printed
+        if repositories.name == "absent":
+            assert f"git clone {REPOSITORY_URL} {repositories / CLONE_NAME}" in printed
+        else:  # a folder that is there but no repository is not to be cloned into
+            assert f"The clone at {repositories / CLONE_NAME} cannot be read: NotGitRepository: " in printed
+            assert "git clone" not in printed
         assert not output.parent.exists()
 
 
@@ -2352,7 +2356,10 @@ def test_regression_command_without_a_clone_is_rejected_and_writes_nothing(
         assert regress(monkeypatch, recorded_subset, START, repositories, output) == 1
         printed = capsys.readouterr()
         assert printed.out.startswith("regression: rejected\ndiagnostic: unknown_reference: ")
-        assert f"git clone {REPOSITORY_URL} {repositories / CLONE_NAME}" in printed.out
+        if repositories.name == "absent":
+            assert f"git clone {REPOSITORY_URL} {repositories / CLONE_NAME}" in printed.out
+        else:
+            assert f"The clone at {repositories / CLONE_NAME} cannot be read: NotGitRepository: " in printed.out
         assert printed.err == "" and not output.exists()
     assert folder_hashes(recorded_subset) == before
 

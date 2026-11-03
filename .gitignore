@@ -229,7 +229,7 @@ _bmad-output/
 .claude/settings.local.json
 
 # Run folders of the quick start (requests, responses, exports, run records)
-/runs/
+runs/
 
 # Local environment files (keep the example)
 .env.*

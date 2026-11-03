@@ -23,3 +23,5 @@ DeltaRecon is an open-source project. Contributors and agents read and write Eng
 - Files under `oracle/` (requests, `SHA256SUMS`, a `REPRODUCTIONS.md` row) are committed only when a run renews the oracle or is required as a new reference reproduction. A run that confirms unchanged values changes nothing there. Walk folders and run outputs are never committed.
 - When an epic is sliced, every gate in its notes (such as a check before the merge) and every deferral dated to a gate gets a ticket that owns it. When a decision supersedes another, change the description and the affected entries in the same edit, not only the notes.
 - When a plan is closed, each of its `deferred:` entries moves to `deferred-work.md`.
+- A commit made after a story's review, a fix from its walkthrough included, gets its own review before the merge.
+- A package check looks at the archive's content (no path of the build machine, no `.git/logs`) and runs as a user would: from a folder that is not a checkout, with the user's environment.

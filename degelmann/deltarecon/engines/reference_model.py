@@ -157,7 +157,7 @@ import pandas as pd
 from dulwich.diff_tree import tree_changes
 from dulwich.object_store import iter_tree_contents
 from dulwich.objects import Commit, object_class
-from dulwich.objectspec import parse_commit
+from dulwich.objectspec import AmbiguousShortId, parse_commit
 from dulwich.repo import Repo
 
 from .. import changes as changes_contract
@@ -323,25 +323,33 @@ def state_revision(release: dict) -> str:
 # --- the clone ------------------------------------------------------------------------
 
 
+def _unreadable(clone: Path, error: Exception) -> str:
+    return f"The clone at {clone} cannot be read: {type(error).__name__}: {error}"
+
+
 @contextmanager
-def _reading(clone: Path, refusal: str):
+def _reading(clone: Path, refusal: str, misses: tuple[type[Exception], ...] = (KeyError,)):
     """The repository at ``clone``, opened for reading and closed after use.
 
     Nothing is written to the clone: no lock, no fetch. The references are read without
     ``refs/replace``, so a hash names the object with that hash and no other. A folder that
-    is no repository is not looked up above. Any error while the clone is opened or read
-    becomes the rejection ``unknown_reference`` with the message ``refusal``.
+    is no repository is not looked up above. A lookup miss while the clone is read (an
+    exception of ``misses``) becomes the rejection ``unknown_reference`` with the message
+    ``refusal``; any other error while the clone is opened or read becomes
+    ``unknown_reference`` with a message that the clone cannot be read and names the error.
     """
     try:
         repository = Repo(str(clone))
-    except Exception:
-        raise Rejection("unknown_reference", refusal) from None
+    except Exception as error:
+        raise Rejection("unknown_reference", _unreadable(clone, error)) from None
     try:
         yield repository
     except (Rejection, UsageError):
         raise
-    except Exception:
+    except misses:
         raise Rejection("unknown_reference", refusal) from None
+    except Exception as error:
+        raise Rejection("unknown_reference", _unreadable(clone, error)) from None
     finally:
         repository.close()  # Windows keeps an open pack file locked
 
@@ -356,13 +364,17 @@ def _object(store, object_id: str) -> tuple[str, bytes] | None:
 
 
 def find_clone(repositories: Path) -> Path:
-    """The local clone of the reference model repository below ``repositories``."""
+    """The local clone of the reference model repository below ``repositories``.
+
+    Without the folder of the clone the rejection says where to clone it; a folder that cannot
+    be opened as a repository (no repository, an unsupported extension) is rejected as a clone
+    that cannot be read, with the error.
+    """
     clone = Path(repositories).resolve() / CLONE_NAME
-    refusal = (f"There is no clone of {REPOSITORY_URL} at {clone}. "
-               f"Create it with: git clone {REPOSITORY_URL} {clone}")
     if not clone.is_dir():
-        raise Rejection("unknown_reference", refusal)
-    with _reading(clone, refusal):
+        raise Rejection("unknown_reference", f"There is no clone of {REPOSITORY_URL} at {clone}. "
+                        f"Create it with: git clone {REPOSITORY_URL} {clone}")
+    with _reading(clone, f"The clone at {clone} cannot be read."):
         pass
     return clone
 
@@ -371,13 +383,17 @@ def resolve_revision(name: str, repositories: Path) -> str:
     """The full hash of the commit that ``name`` names in the clone.
 
     A name is a full or a short hash, a branch, a tag, or ``HEAD``; a tag names the commit
-    it points to. Ancestry suffixes such as ``HEAD~1`` name no commit here.
+    it points to. Ancestry suffixes such as ``HEAD~1`` name no commit here. A name that names
+    nothing, more than one object, or an object that is no commit is refused as such; any other
+    error while the clone is read is refused as a clone that cannot be read.
     """
     clone = find_clone(repositories)
     refusal = f"The clone at {clone} holds no commit named {name!r}."
     if not name:  # an empty name is no reference; dulwich would look it up as ``refs/remotes//HEAD``
         raise Rejection("unknown_reference", refusal)
-    with _reading(clone, refusal) as repository:
+    # parse_commit raises KeyError for no match, ValueError for an object that is no commit, and
+    # AmbiguousShortId for a short hash that more than one commit starts with.
+    with _reading(clone, refusal, (KeyError, ValueError, AmbiguousShortId)) as repository:
         revision = parse_commit(repository, name.encode("utf-8")).id.decode("ascii")
     if not re.fullmatch(r"[0-9a-f]{40}", revision):
         raise Rejection("unknown_reference", refusal)

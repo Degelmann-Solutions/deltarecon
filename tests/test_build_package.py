@@ -9,20 +9,23 @@ injected fetcher; the only commands started are ``/bin/sh`` and local ``git``. N
 from __future__ import annotations
 
 import hashlib
+import io
+import json
 import os
 import stat
 import subprocess
+import sys
 import tarfile
 import tomllib
 import zipfile
-from pathlib import PureWindowsPath
+from pathlib import Path, PureWindowsPath
 
 from packaging.markers import default_environment
 
 import pytest
 
 from conftest import ROOT, git
-from tools import assembly, check_windows, common, guides, host, package_check, python_runtime, targets
+from tools import assembly, check_linux, check_windows, common, guides, host, package_check, python_runtime, targets
 from tools import build_package as tool
 from tools import quick_start_steps as measure
 LINUX = targets.TARGETS["x86_64-unknown-linux-gnu"]
@@ -55,7 +58,8 @@ def test_launcher_runs_with_an_empty_path_from_another_folder(tmp_path, relative
     done = subprocess.run([called, *arguments], cwd=elsewhere, capture_output=True, text=True,
                           env={"PATH": str(empty), common.REPOSITORIES_VARIABLE: "/somewhere/else"})
     assert done.returncode == 0, done.stderr
-    assert done.stdout.split("\n")[:-1] == [str(package.resolve()), "-m", "degelmann.deltarecon", *arguments]
+    assert done.stdout.split("\n")[:-1] == [str(package.resolve()), "-P", "-s", "-m", "degelmann.deltarecon",
+                                           *arguments]
 
 
 def test_launcher_is_executable_and_keeps_pythonpath(tmp_path):
@@ -64,6 +68,68 @@ def test_launcher_is_executable_and_keeps_pythonpath(tmp_path):
     text = launcher.read_text("utf-8")
     assert text.startswith("#!/bin/sh\n") and "\r" not in text
     assert ' -I' not in text and ' -E' not in text and "PYTHONPATH" not in text
+    assert text.index("unset PYTHONHOME\n") < text.index('exec "$here/python/bin/python3" -P -s -m degelmann.deltarecon')
+
+
+# The packaged code of ``launched_python``: reports where it was read from, its sys.path, PYTHONHOME,
+# whether the user site is in force, and where the probe module of PYTHONPATH was read from.
+REPORTER = """import json, os, site, sys
+import deltarecon_probe_engine as probe
+print(json.dumps({"main": __file__, "path": sys.path, "home": os.environ.get("PYTHONHOME"),
+                  "user_site": site.ENABLE_USER_SITE, "probe": probe.__file__}))
+"""
+
+
+def launched_python(folder: Path) -> Path:
+    """A package in ``folder`` whose ``python/`` is a real Python (a virtual environment of the
+    Python running the tests, with the system site-packages so a user site applies) holding a
+    ``degelmann.deltarecon`` that prints ``REPORTER``; its launcher."""
+    python = folder / "python"
+    subprocess.run([sys.executable, "-m", "venv", "--without-pip", "--system-site-packages", str(python)], check=True)
+    site_packages = Path(subprocess.run([str(python / "bin" / "python3"), "-I", "-c",
+                                         "import sysconfig; print(sysconfig.get_path('purelib'))"],
+                                        capture_output=True, text=True, check=True).stdout.strip())
+    main = site_packages / "degelmann" / "deltarecon" / "__main__.py"
+    main.parent.mkdir(parents=True)
+    (main.parent / "__init__.py").write_text("", "utf-8")
+    main.write_text(REPORTER, "utf-8")
+    return assembly.write_launcher(folder)
+
+
+def test_the_launcher_runs_the_packaged_code_whatever_the_caller_has(tmp_path):
+    launcher = launched_python(tmp_path / "package")
+    # The current folder holds another degelmann.deltarecon, which must not run.
+    checkout = tmp_path / "checkout"
+    planted = checkout / "degelmann" / "deltarecon"
+    planted.mkdir(parents=True)
+    (planted / "__init__.py").write_text("", "utf-8")
+    (planted / "__main__.py").write_text("print('the planted package ran')\n", "utf-8")
+    # A user site with a module, a bogus PYTHONHOME, and PYTHONPATH naming the engines folder (E7).
+    user_base = tmp_path / "user-base"
+    version = f"python{sys.version_info.major}.{sys.version_info.minor}"
+    user_site = user_base / "lib" / version / "site-packages"
+    user_site.mkdir(parents=True)
+    (user_site / "deltarecon_user_module.py").write_text("", "utf-8")
+    engines = tmp_path / "engines"
+    engines.mkdir()
+    (engines / f"{package_check.PROBE_MODULE}.py").write_text(package_check.PROBE_SOURCE, "utf-8")
+    empty = tmp_path / "empty"
+    empty.mkdir()
+    environment = {"PATH": str(empty), "HOME": str(tmp_path), "PYTHONUSERBASE": str(user_base),
+                   "PYTHONPATH": str(engines), "PYTHONHOME": str(tmp_path / "no-such-home")}
+    done = subprocess.run([str(launcher)], cwd=checkout, capture_output=True, text=True, env=environment)
+    assert done.returncode == 0, done.stderr
+    report = json.loads(done.stdout)
+    assert Path(report["main"]).is_relative_to(tmp_path / "package" / "python")
+    assert report["home"] is None and report["user_site"] is False
+    assert not any(entry in ("", ".", str(checkout)) for entry in report["path"])
+    assert str(user_site) not in report["path"]
+    assert Path(report["probe"]).parent == engines
+    # The same Python without the launcher's flags puts the current folder and the user site first.
+    control = subprocess.run([str(tmp_path / "package" / "python" / "bin" / "python3"), "-m", "degelmann.deltarecon"],
+                             cwd=checkout, capture_output=True, text=True,
+                             env={key: value for key, value in environment.items() if key != "PYTHONHOME"})
+    assert control.stdout == "the planted package ran\n"
 
 
 def test_pins_match_pyproject():
@@ -113,9 +179,9 @@ def test_the_windows_launcher_text(tmp_path):
     assert raw.count(b"\r\n") == raw.count(b"\n") and raw.endswith(b"\r\n")
     lines = raw.decode("utf-8").split("\r\n")
     assert "setlocal" in lines
-    assert lines.index("setlocal") < lines.index('set "DELTARECON_REPOSITORIES=%~dp0"')
+    assert lines.index("setlocal") < lines.index('set "PYTHONHOME="') < lines.index('set "DELTARECON_REPOSITORIES=%~dp0"')
     assert 'set "DELTARECON_REPOSITORIES=%DELTARECON_REPOSITORIES:~0,-1%"' in lines
-    assert '"%~dp0python\\python.exe" -m degelmann.deltarecon %*' in lines
+    assert lines.index('set "PYTHONHOME="') < lines.index('"%~dp0python\\python.exe" -P -s -m degelmann.deltarecon %*')
     assert lines[-2:] == ["exit /b %ERRORLEVEL%", ""]
     text = raw.decode("utf-8")
     assert " -I" not in text and " -E" not in text and "PYTHONPATH" not in text
@@ -326,8 +392,8 @@ def test_the_windows_host_script():
     script = check_windows.windows_chain_script(work, name + ".zip", name, commands)
     assert f"[System.IO.Compression.ZipFile]::ExtractToDirectory('{work}\\{name}.zip', '{work}\\package')" in script
     assert f"$env:PATH = '{work}\\empty-path'" in script
-    for variable in ("PYTHONPATH", "PYTHONHOME", "VIRTUAL_ENV", "DELTARECON_REPOSITORIES"):
-        assert f"'{variable}'" in script
+    # The host user's environment stays as it is; only PATH is replaced.
+    assert "Remove-Item" not in script and "Env:" not in script
     assert "foreach ($name in 'uv', 'git')" in script and "Get-Command $name -CommandType Application" in script
     position = script.index("foreach ($name in 'uv', 'git')")
     for step, command, expect in commands:
@@ -349,7 +415,10 @@ def test_the_windows_python_scripts():
     assert f"& '{python}' '-X' 'utf8' '-I' 'C:\\tmp\\w\\scripts\\l.py'" in lister
     probe = check_windows.windows_python_script(work, python, ["-X", "utf8", "C:\\tmp\\w\\scripts\\p.py"], "probe",
                                        pythonpath="C:\\tmp\\w\\engines")
-    assert probe.index("Remove-Item") < probe.index("$env:PYTHONPATH = 'C:\\tmp\\w\\engines'") < probe.index("& ")
+    assert probe.index("$env:PATH") < probe.index("$env:PYTHONPATH = 'C:\\tmp\\w\\engines'") < probe.index("& ")
+    # The probe starts the packaged Python directly, so it removes PYTHONHOME as the launcher does.
+    assert "Remove-Item" not in lister
+    assert probe.index("Remove-Item -LiteralPath 'Env:PYTHONHOME'") < probe.index("& ")
     assert f"& '{python}' '-X' 'utf8' 'C:\\tmp\\w\\scripts\\p.py'" in probe and "'-I'" not in probe
 
 
@@ -412,6 +481,110 @@ def test_a_shallow_clone_is_refused(tmp_path):
     assert not assembly.is_shallow(tmp_path / "full")
 
 
+def test_the_packaged_clone_keeps_no_trace_of_its_source(tmp_path):
+    source = tmp_path / "source"
+    source.mkdir()
+    git(source, "init", "--quiet", "--initial-branch", "main")
+    for number in (1, 2):
+        git(source, "-c", "user.name=Builder", "-c", "user.email=builder@example.org", "commit", "--quiet",
+            "--allow-empty", "-m", f"commit {number}")
+    git(source, "branch", "other", "HEAD~1")
+    clone = tmp_path / "clone"
+    assembly.clone_history(str(source), clone)
+    assert not (clone / ".git" / "logs").exists()
+    assert git(clone, "config", "remote.origin.url").decode().strip() == assembly.DEFAULT_SOURCE
+    assert git(clone, "rev-parse", "HEAD") == git(source, "rev-parse", "HEAD")
+    assert git(clone, "rev-parse", "origin/other") == git(source, "rev-parse", "other")
+    assert git(clone, "rev-list", "--count", "HEAD").decode().strip() == "2"
+    for path in (clone / ".git").rglob("*"):
+        if path.is_file():
+            assert str(tmp_path).encode() not in path.read_bytes() and b"builder@example.org" not in path.read_bytes(), path
+
+
+def test_the_packaged_clone_holds_its_own_objects_when_the_source_borrows_them(tmp_path):
+    store = tmp_path / "store"
+    store.mkdir()
+    git(store, "init", "--quiet", "--initial-branch", "main")
+    git(store, "-c", "user.name=B", "-c", "user.email=b@example.org", "commit", "--quiet", "--allow-empty", "-m", "one")
+    source = tmp_path / "source"
+    git(tmp_path, "clone", "--quiet", "--shared", str(store), str(source))
+    assert (source / ".git" / "objects" / "info" / "alternates").is_file()
+    clone = tmp_path / "clone"
+    assembly.clone_history(str(source), clone)
+    assert not (clone / ".git" / "objects" / "info" / "alternates").exists()
+    assert git(clone, "rev-parse", "HEAD") == git(store, "rev-parse", "HEAD")
+
+
+def test_the_installed_wheel_forgets_its_build_folder(tmp_path):
+    site = tmp_path / "site-packages"
+    info = site / "degelmann_deltarecon-0.1.2.dist-info"
+    info.mkdir(parents=True)
+    (info / "direct_url.json").write_text('{"url":"file:///home/builder/dist/x.whl"}', "utf-8")
+    record = ("degelmann/__init__.py,sha256=a,1\n"
+              "degelmann_deltarecon-0.1.2.dist-info/RECORD,,\n"
+              "degelmann_deltarecon-0.1.2.dist-info/direct_url.json,sha256=b,40\n"
+              "degelmann_deltarecon-0.1.2.dist-info/INSTALLER,sha256=c,2\n")
+    (info / "RECORD").write_text(record, "utf-8")
+    other = site / "numpy-2.5.3.dist-info"
+    other.mkdir()
+    (other / "RECORD").write_text("numpy/__init__.py,sha256=d,1\n", "utf-8")
+    assert assembly.drop_direct_url(site) == ["degelmann_deltarecon-0.1.2.dist-info/direct_url.json"]
+    assert not (info / "direct_url.json").exists()
+    assert (info / "RECORD").read_text("utf-8") == record.replace(
+        "degelmann_deltarecon-0.1.2.dist-info/direct_url.json,sha256=b,40\n", "")
+    assert (other / "RECORD").read_text("utf-8") == "numpy/__init__.py,sha256=d,1\n"
+    assert assembly.drop_direct_url(site) == []
+
+
+def tracked_checkout(folder: Path) -> Path:
+    """A Git checkout in ``folder`` with a tracked, an ignored and an untracked file in ``profiles/`` and a
+    ``pyproject.toml`` whose wheel force-includes ``profiles``."""
+    folder.mkdir()
+    git(folder, "init", "--quiet")
+    (folder / ".gitignore").write_text("*.local.json\n", "utf-8")
+    (folder / "profiles").mkdir()
+    (folder / "profiles" / "tolerance.json").write_text("{}", "utf-8")
+    (folder / "pyproject.toml").write_text('[tool.hatch.build.targets.wheel.force-include]\n'
+                                           '"profiles" = "degelmann/deltarecon/profiles"\n', "utf-8")
+    (folder / "degelmann").mkdir()
+    (folder / "degelmann" / "__init__.py").write_text("", "utf-8")
+    git(folder, "add", ".")
+    (folder / "profiles" / "mine.local.json").write_text("{}", "utf-8")  # ignored
+    (folder / "profiles" / "draft.json").write_text("{}", "utf-8")  # untracked
+    return folder
+
+
+def test_only_tracked_profiles_enter_the_package(tmp_path):
+    checkout = tracked_checkout(tmp_path / "checkout")
+    package = tmp_path / "package"
+    assert assembly.copy_tracked("profiles", package, root=checkout) == ["profiles/tolerance.json"]
+    assert sorted(path.name for path in (package / "profiles").iterdir()) == ["tolerance.json"]
+
+
+def test_a_wheel_member_git_does_not_track_is_named(tmp_path):
+    checkout = tracked_checkout(tmp_path / "checkout")
+    tracked = set(assembly.tracked_files(root=checkout))
+    wheel = tmp_path / "degelmann_deltarecon-0.1.2-py3-none-any.whl"
+    with zipfile.ZipFile(wheel, "w") as zip_file:
+        for name in ("degelmann/__init__.py", "degelmann/deltarecon/profiles/tolerance.json",
+                     "degelmann_deltarecon-0.1.2.dist-info/METADATA", "degelmann_deltarecon-0.1.2.dist-info/RECORD"):
+            zip_file.writestr(name, "")
+    assert assembly.wheel_strays(wheel, tracked, checkout / "pyproject.toml") == []
+    with zipfile.ZipFile(wheel, "a") as zip_file:
+        zip_file.writestr("degelmann/deltarecon/profiles/mine.local.json", "")
+        zip_file.writestr("degelmann/scratch.py", "")
+    assert assembly.wheel_strays(wheel, tracked, checkout / "pyproject.toml") == [
+        "degelmann/deltarecon/profiles/mine.local.json", "degelmann/scratch.py"]
+
+
+def test_the_wheel_of_this_checkout_maps_to_tracked_files():
+    included = tomllib.loads((ROOT / "pyproject.toml").read_text("utf-8"))["tool"]["hatch"]["build"]["targets"][
+        "wheel"]["force-include"]
+    tracked = set(assembly.tracked_files())
+    for outside in included:
+        assert any(name.startswith(outside + "/") for name in tracked), outside
+
+
 def test_check_refuses_a_work_folder_inside_the_checkout(tmp_path, capsys):
     archive = tmp_path / f"deltarecon-{VERSION}-x86_64-unknown-linux-gnu.tar.gz"
     archive.write_bytes(b"")
@@ -467,6 +640,8 @@ def test_the_starter_waits_for_enter_on_a_terminal(tmp_path):
 def test_the_linux_starter_text():
     text = targets.STARTER_TEXT
     assert text.startswith("#!/bin/sh\n") and "\r" not in text
+    # The file holds printf's escape \n, not a line break inside the quotes.
+    assert "    printf '%s\\n' 'Press Enter to close. / Enter schließt das Fenster.'\n" in text
     assert '*/*) here=${0%/*} ;;' in text and 'CDPATH= cd -- "$here" || exit 2' in text
     assert text.index('./deltarecon quickstart "$@"') < text.index("status=$?") < text.index("[ -t 0 ]")
     assert text.rstrip().endswith("exit $status")
@@ -540,10 +715,8 @@ def test_the_windows_demo_scripts():
                     f'call "{package}\\quickstart.cmd" --no-pause < NUL\r\n'
                     "exit /b %ERRORLEVEL%\r\n")
     script = check_windows.windows_demo_host_script("C:\\tmp\\w", "C:\\tmp\\w\\scripts\\demo.cmd")
-    assert "$env:PATH = 'C:\\tmp\\w\\empty-path'" in script
-    for variable in package_check.CLEARED:
-        assert f"'{variable}'" in script
-    assert script.index("Remove-Item") < script.index("& 'C:\\tmp\\w\\scripts\\demo.cmd'")
+    assert "$env:PATH = 'C:\\tmp\\w\\empty-path'" in script and "Remove-Item" not in script
+    assert script.index("$env:PATH") < script.index("& 'C:\\tmp\\w\\scripts\\demo.cmd'")
     assert "if ($LASTEXITCODE -ne 0)" in script and "guided demo" in script
     with pytest.raises(host.Refused):
         check_windows.windows_demo_host_script("/mnt/c/tmp/w", "C:\\tmp\\w\\scripts\\demo.cmd")
@@ -574,3 +747,110 @@ def test_the_demo_claim(tmp_path, monkeypatch, capsys, code, new, compared, hold
 def test_the_report_names_the_demo_claim(capsys):
     assert package_check.report({"chain and pin": True, "guided demo and pin": False}) is False
     assert "build_package: guided demo and pin: FAILED" in capsys.readouterr().out
+
+
+def test_the_check_keeps_the_callers_environment(monkeypatch, tmp_path):
+    for name, value in (("PYTHONPATH", "/caller/path"), ("PYTHONHOME", "/caller/home"), ("VIRTUAL_ENV", "/caller/venv"),
+                        (common.REPOSITORIES_VARIABLE, "/caller/repositories"), ("PATH", "/usr/bin")):
+        monkeypatch.setenv(name, value)
+    environment = package_check.check_environment(tmp_path)
+    assert environment == {**os.environ, "PATH": str(tmp_path)}
+    assert environment["PYTHONHOME"] == "/caller/home" and environment[common.REPOSITORIES_VARIABLE] == "/caller/repositories"
+    assert package_check.check_environment(tmp_path, PYTHONPATH="/engines")["PYTHONPATH"] == "/engines"
+    assert not hasattr(package_check, "CLEARED")
+
+
+def write_archive(path: Path, members: dict[str, bytes]) -> Path:
+    """A ``.zip`` or ``.tar.gz`` at ``path`` holding ``members`` (name to bytes)."""
+    if path.name.endswith(".zip"):
+        with zipfile.ZipFile(path, "w") as zip_file:
+            for name, content in members.items():
+                zip_file.writestr(name, content)
+    else:
+        with tarfile.open(path, "w:gz") as tar:
+            for name, content in members.items():
+                info = tarfile.TarInfo(name)
+                info.size = len(content)
+                tar.addfile(info, io.BytesIO(content))
+    return path
+
+
+CLEAN_MEMBERS = {"deltarecon-0.1.2-x/delib-history/.git/config": b"[remote \"origin\"]\n",
+                 "deltarecon-0.1.2-x/LICENSE": b"Apache"}
+
+
+@pytest.mark.parametrize("suffix", ["tar.gz", "zip"])
+def test_the_traces_claim(tmp_path, suffix):
+    needles = ["/home/builder", "/home/builder/deltarecon", str(tmp_path)]
+    clean = write_archive(tmp_path / f"clean.{suffix}", CLEAN_MEMBERS)
+    assert package_check.build_machine_traces(clean, needles) == []
+    traced = write_archive(tmp_path / f"traced.{suffix}", {
+        **CLEAN_MEMBERS,
+        "deltarecon-0.1.2-x/delib-history/.git/logs/HEAD": b"0 1 Builder <b@example.org> clone: from x\n",
+        "deltarecon-0.1.2-x/delib-history/.git/objects/info/alternates": b"../../../store/objects\n",
+        "deltarecon-0.1.2-x/python/site/x-1.dist-info/direct_url.json":
+            b'{"url":"file:///home/build%20er/deltarecon/dist/x.whl"}',
+        "deltarecon-0.1.2-x/python/site/y.txt": b'{"url":"file:///home/builder/deltarecon/dist/x.whl"}',
+        "deltarecon-0.1.2-x/notes.txt": f"built in {tmp_path}/out".encode(),
+    })
+    assert package_check.build_machine_traces(traced, needles) == [
+        "deltarecon-0.1.2-x/delib-history/.git/logs/HEAD: the reflogs of delib-history",
+        "deltarecon-0.1.2-x/delib-history/.git/objects/info/alternates: the alternates of delib-history, "
+        "which name another object store",
+        "deltarecon-0.1.2-x/python/site/x-1.dist-info/direct_url.json: the install source of a distribution",
+        "deltarecon-0.1.2-x/python/site/y.txt: names /home/builder",
+        "deltarecon-0.1.2-x/python/site/y.txt: names /home/builder/deltarecon",
+        f"deltarecon-0.1.2-x/notes.txt: names {tmp_path}",
+    ]
+
+
+def test_a_zip_is_read_as_a_zip_under_a_name_without_its_suffix(tmp_path):
+    traced = write_archive(tmp_path / "traced.zip", {
+        **CLEAN_MEMBERS, "deltarecon-0.1.2-x/delib-history/.git/logs/HEAD": b"0 1 Builder clone\n"})
+    resolved = tmp_path / "blob"  # what a correctly named link to the zip may resolve to
+    traced.rename(resolved)
+    assert package_check.build_machine_traces(resolved, []) == [
+        "deltarecon-0.1.2-x/delib-history/.git/logs/HEAD: the reflogs of delib-history"]
+
+
+def test_an_archive_folder_one_below_the_root_is_no_needle():
+    needles = package_check.trace_needles(Path("/tmp/a.tar.gz"))
+    assert "/tmp" not in needles and str(Path.home()) in needles and str(ROOT) in needles
+    assert str(Path("/tmp/dr-1-19-rel")) in package_check.trace_needles(Path("/tmp/dr-1-19-rel/a.tar.gz"))
+
+
+def test_the_linux_probe_runs_without_the_callers_pythonhome(monkeypatch, tmp_path):
+    monkeypatch.setenv("PYTHONHOME", "/caller/home")
+    monkeypatch.setenv("VIRTUAL_ENV", "/caller/venv")
+    environment = check_linux.probe_environment(tmp_path / "empty", tmp_path / "engines")
+    assert "PYTHONHOME" not in environment
+    assert environment["PYTHONPATH"] == str(tmp_path / "engines") and environment["PATH"] == str(tmp_path / "empty")
+    assert environment["VIRTUAL_ENV"] == "/caller/venv"
+
+
+def test_the_trace_needles_name_home_checkout_and_archive_folder(tmp_path):
+    needles = package_check.trace_needles(tmp_path / "out" / "a.zip")
+    assert needles[:1] == [str(Path.home())] and str(ROOT) in needles and needles[-1] == str(tmp_path / "out")
+    assert "/" not in needles
+
+
+def test_a_trace_fails_the_check_and_the_other_claims_still_run(tmp_path, monkeypatch, capsys):
+    archive = write_archive(tmp_path / f"deltarecon-{VERSION}-x86_64-unknown-linux-gnu.tar.gz", {
+        **CLEAN_MEMBERS, "deltarecon-0.1.2-x/delib-history/.git/logs/HEAD": b"x"})
+    ran = []
+
+    def check_linux(archive, work, target, version):
+        ran.append(archive)
+        return {"chain and pin": True, "installed packages equal uv.lock": True,
+                "import from a user-named folder": True, "guided demo and pin": True}
+
+    monkeypatch.setattr(tool, "check_linux", check_linux)
+    assert tool.main(["check", str(archive)]) == 1
+    out = capsys.readouterr().out
+    assert ran == [archive]
+    assert "build_package: chain and pin: OK" in out and "build_package: guided demo and pin: OK" in out
+    assert "build_package: traces: deltarecon-0.1.2-x/delib-history/.git/logs/HEAD: the reflogs" in out
+    assert out.rstrip().endswith("build_package: no build-machine traces: FAILED")
+    (tmp_path / "clean").mkdir()
+    clean = write_archive(tmp_path / "clean" / archive.name, CLEAN_MEMBERS)
+    assert tool.main(["check", str(clean)]) == 0

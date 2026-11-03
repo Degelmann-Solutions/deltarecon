@@ -18,7 +18,7 @@ import pytest
 
 from degelmann.deltarecon import quickstart as demo
 from degelmann.deltarecon.__main__ import main
-from degelmann.deltarecon.run import REPOSITORIES_VARIABLE
+from degelmann.deltarecon.run import CLONE_NAME, REPOSITORIES_VARIABLE
 
 from conftest import ROOT
 from tools import quick_start_steps
@@ -96,6 +96,8 @@ class Prompt:
 
 @pytest.fixture
 def cwd(tmp_path, monkeypatch):
+    """``tmp_path`` as the working directory, as a checkout with its clone folder ``repositories/delib-history``."""
+    (tmp_path / "repositories" / CLONE_NAME).mkdir(parents=True)
     monkeypatch.chdir(tmp_path)
     monkeypatch.setenv("COLUMNS", "100")
     monkeypatch.delenv(REPOSITORIES_VARIABLE, raising=False)
@@ -433,6 +435,152 @@ def test_the_clone_folder_of_the_commands(cwd, capsys, monkeypatch, variable, op
     assert [w[1:] for w in shown_commands(capsys.readouterr().out)] == steps.argvs
 
 
+@pytest.mark.parametrize("variable", [None, ""])
+def test_without_a_clone_upward_the_commands_name_the_repositories_folder_of_the_working_directory(
+        cwd, capsys, monkeypatch, variable):
+    """The missing clone is reported at ``repositories/`` of the working directory, not below ``runs/``."""
+    shutil.rmtree(cwd / "repositories")
+    if variable is not None:
+        monkeypatch.setenv(REPOSITORIES_VARIABLE, variable)
+    status, steps, _ = run_demo("en")
+    assert status == 0
+    expected = os.path.join("..", "..", "repositories")
+    assert all(argv[-2:] == ["--repositories", expected] for argv in steps.argvs)
+    assert [w[1:] for w in shown_commands(capsys.readouterr().out)] == steps.argvs
+
+
+def test_without_a_clone_the_request_step_names_the_clone_in_the_working_directory(cwd, capsys):
+    shutil.rmtree(cwd / "repositories")
+    status = demo.quickstart("en", False, None, ask=Prompt(), now=NOW)
+    assert status == 1
+    assert Path.cwd() == cwd
+    clone = cwd.resolve() / "repositories" / CLONE_NAME
+    out = capsys.readouterr().out
+    assert f"There is no clone of {demo_url()} at {clone}. Create it with: git clone {demo_url()} {clone}" in out
+    assert "runs" not in out.split("diagnostic:", 1)[1]
+
+
+def test_a_clone_in_a_parent_folder_gives_no_option(tmp_path, monkeypatch, capsys):
+    (tmp_path / "repositories" / CLONE_NAME).mkdir(parents=True)
+    work = tmp_path / "a" / "b"
+    work.mkdir(parents=True)
+    monkeypatch.chdir(work)
+    monkeypatch.delenv(REPOSITORIES_VARIABLE, raising=False)
+    status, steps, _ = run_demo("en")
+    assert status == 0
+    assert not any("--repositories" in argv for argv in steps.argvs)
+
+
+def test_a_folder_that_cannot_be_created_exits_with_2_and_a_message(cwd, capsys):
+    (cwd / "runs").write_text("a file, not a folder")
+    status, steps, _ = run_demo("en")
+    assert status == 2
+    assert steps.argvs == []
+    assert Path.cwd() == cwd
+    printed = capsys.readouterr()
+    assert printed.err.startswith(f"error: cannot create {FOLDER}: ") and printed.err.count("\n") == 1
+    assert "Traceback" not in printed.err and printed.out == ""
+
+
+@pytest.mark.skipif(os.name == "nt" or os.geteuid() == 0, reason="a read-only folder binds no administrator")
+def test_a_read_only_working_directory_exits_with_2_and_a_message(cwd, capsys):
+    cwd.chmod(0o555)
+    try:
+        status, steps, _ = run_demo("en")
+    finally:
+        cwd.chmod(0o755)
+    assert status == 2 and steps.argvs == []
+    assert capsys.readouterr().err == f"error: cannot create {FOLDER}: Permission denied\n"
+
+
+class Raising(Steps):
+    """A fake step that raises an operating-system error at the command ``name``."""
+
+    def __init__(self, name: str):
+        super().__init__()
+        self.name = name
+
+    def __call__(self, argv: list[str]) -> tuple[int, str]:
+        if argv[0] == self.name:
+            raise PermissionError(13, "Permission denied", "search.result.json")
+        return super().__call__(argv)
+
+
+class Silent(Steps):
+    """A fake step that writes no file for the command ``run``."""
+
+    def __call__(self, argv: list[str]) -> tuple[int, str]:
+        if argv[0] == "run":
+            self.argvs.append(argv)
+            return 0, ""
+        return super().__call__(argv)
+
+
+@pytest.mark.parametrize("step, message", [
+    (Raising("search"), "error: [Errno 13] Permission denied: 'search.result.json'\n"),
+    (Silent(), f"error: [Errno 2] No such file or directory: '{Path('release-n') / 'response.json'}'\n"),
+])
+def test_an_os_error_of_a_step_or_its_files_exits_with_2_and_a_message(cwd, capsys, step, message):
+    status, _, _ = run_demo("en", step=step)
+    assert status == 2
+    assert Path.cwd() == cwd
+    assert capsys.readouterr().err == message
+
+
+@pytest.mark.skipif(os.name == "nt", reason="a symbolic link needs a privilege on Windows")
+@pytest.mark.parametrize("clone, outside, option", [(False, False, True), (True, True, True), (True, False, False)])
+def test_the_paths_of_the_commands_hold_when_runs_is_a_symbolic_link(cwd, clone, outside, option):
+    """``runs`` links to a folder inside or outside the checkout; a command searches upward from the resolved
+    demo folder, so it gets ``--repositories`` unless that search finds the checkout's clone."""
+    if not clone:
+        shutil.rmtree(cwd / "repositories")
+    profile = profile_in(cwd)
+    elsewhere = (cwd.parent / f"{cwd.name}-store" if outside else cwd / "store") / "deeper"
+    elsewhere.mkdir(parents=True)
+    (cwd / "runs").symlink_to(elsewhere, target_is_directory=True)
+    status, steps, _ = run_demo("en")
+    assert status == 0
+    folder = cwd / FOLDER
+    assert steps.cwds[0].resolve() == (elsewhere / FOLDER.name).resolve()
+    search = steps.argvs[-1]
+    assert (folder / search[search.index("--tolerance") + 1]).resolve() == profile.resolve()
+    if option:
+        assert (folder / search[search.index("--repositories") + 1]).resolve() == (cwd / "repositories").resolve()
+    else:
+        assert not any("--repositories" in argv for argv in steps.argvs)
+
+
+def test_a_clone_below_the_link_target_does_not_replace_the_checkouts(cwd):
+    """``runs`` links to ``store/`` inside the checkout, and ``store/`` holds a clone of its own: the commands
+    would find that one first, so they get the checkout's clone as ``--repositories``."""
+    elsewhere = cwd / "store" / "deeper"
+    elsewhere.mkdir(parents=True)
+    (cwd / "store" / "repositories" / "delib-history").mkdir(parents=True)
+    (cwd / "runs").symlink_to(elsewhere, target_is_directory=True)
+    status, steps, _ = run_demo("en")
+    assert status == 0
+    search = steps.argvs[-1]
+    assert ((cwd / FOLDER / search[search.index("--repositories") + 1]).resolve()
+            == (cwd / "repositories").resolve())
+
+
+def test_a_file_in_the_way_of_the_folder_is_not_called_an_existing_folder(cwd, capsys, monkeypatch):
+    """On Windows a file named ``runs`` makes ``mkdir`` raise ``FileExistsError`` for the absent folder."""
+    def refuse(self, *args, **kwargs):
+        raise FileExistsError(183, "Cannot create a file when that file already exists", str(self))
+
+    monkeypatch.setattr(Path, "mkdir", refuse)
+    status, steps, _ = run_demo("en")
+    assert status == 2 and steps.argvs == []
+    assert capsys.readouterr().err == (f"error: cannot create {FOLDER}: "
+                                       "Cannot create a file when that file already exists\n")
+
+
+def demo_url() -> str:
+    from degelmann.deltarecon.engines.reference_model import REPOSITORY_URL
+    return REPOSITORY_URL
+
+
 def test_the_profile_of_the_search_is_relative_to_the_demo_folder(cwd):
     _, steps, _ = run_demo("en")
     search = steps.argvs[-1]
@@ -446,7 +594,7 @@ def test_a_path_without_a_relative_form_stays_absolute(monkeypatch):
         raise ValueError("path is on mount 'D:', start on mount 'C:'")
 
     monkeypatch.setattr(demo.os.path, "relpath", refuse)
-    assert demo.relative_to("/x/profiles/p.json", "runs/q") == str(Path("/x/profiles/p.json").absolute())
+    assert demo.relative_to("/x/profiles/p.json", "runs/q") == str(Path("/x/profiles/p.json").resolve())
 
 
 @pytest.mark.parametrize("env, system, expected", [

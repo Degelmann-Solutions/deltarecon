@@ -522,6 +522,60 @@ def test_a_revision_the_clone_does_not_hold_is_an_unknown_reference(repository, 
         assert caught.value.code == "unknown_reference" and "git clone" in caught.value.message
 
 
+def test_a_hash_names_its_own_commit_and_not_its_replacement(repository):
+    from degelmann.deltarecon.engines.reference_model import resolve_revision
+    repositories, clone, base = repository
+    last = revise(clone, "Second", {LAPSE: "lapse 2\n"})
+    git(clone, "replace", base, last)
+    assert git(clone, "for-each-ref", "refs/replace").decode("ascii").split()[-1] == f"refs/replace/{base}"
+    assert resolve_revision(base, repositories) == base
+    assert resolve_revision(base[:12], repositories) == base
+
+
+def unreadable(clone: Path, kind: str) -> None:
+    """Make the clone ``clone`` one that dulwich cannot open or read."""
+    if kind == "no repository":
+        shutil.rmtree(clone)
+        clone.mkdir()
+    elif kind == "unsupported extension":
+        git(clone, "config", "core.repositoryformatversion", "1")
+        git(clone, "config", "extensions.nosuchextension", "true")
+    else:  # a damaged object: the loose object of the commit HEAD names
+        head = git(clone, "rev-parse", "HEAD").decode("ascii").strip()
+        loose = clone / ".git" / "objects" / head[:2] / head[2:]
+        loose.chmod(0o644)
+        loose.write_bytes(b"not a zlib stream")
+
+
+@pytest.mark.parametrize("kind, error", [("no repository", "NotGitRepository"),
+                                         ("unsupported extension", "UnsupportedExtension"),
+                                         ("damaged object", "")])
+def test_a_clone_that_cannot_be_read_is_named_with_its_error_and_without_the_clone_hint(repository, kind, error):
+    from degelmann.deltarecon.engines.reference_model import find_clone, resolve_revision
+    repositories, clone, base = repository
+    unreadable(clone, kind)
+    reads = [lambda: resolve_revision(base, repositories)]
+    if kind != "damaged object":  # a damaged object is found only when it is read
+        reads.append(lambda: find_clone(repositories))
+    for read in reads:
+        with pytest.raises(Rejection) as caught:
+            read()
+        message = caught.value.message
+        assert caught.value.code == "unknown_reference"
+        assert message.startswith(f"The clone at {clone.resolve()} cannot be read: {error}"), message
+        assert "git clone" not in message and "holds no commit" not in message
+
+
+@pytest.mark.parametrize("name", ["no-such-branch", "1" * 40, "HEAD~1"])
+def test_a_readable_clone_without_the_name_holds_no_commit_named_it(repository, name):
+    from degelmann.deltarecon.engines.reference_model import resolve_revision
+    repositories, clone, base = repository
+    with pytest.raises(Rejection) as caught:
+        resolve_revision(name, repositories)
+    assert caught.value.code == "unknown_reference"
+    assert caught.value.message == f"The clone at {clone.resolve()} holds no commit named {name!r}."
+
+
 def test_the_revision_of_an_identity_is_read_whatever_its_engine_version_and_input_data(repository):
     from degelmann.deltarecon.engines.reference_model import ReferenceModel
     repositories, clone, base = repository

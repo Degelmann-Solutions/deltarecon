@@ -6,7 +6,8 @@ and peak memory per step and the cost per state of the search.
                                                [--windows-package ARCHIVE]
 
 Each step runs from the root of the repository, exactly as the README lists it, with the
-leading ``runs/`` of every path argument replaced by the work folder. ``--steps`` runs the named
+leading ``runs/`` of every path argument replaced by the work folder, and without
+``DELTARECON_REPOSITORIES``, so it reads the clone of this checkout. ``--steps`` runs the named
 steps and the steps they need before them, and reports only the named ones. The table shows the
 recorded baseline (``measurements/baseline.json`` by default) beside the measurement; the factor
 is the baseline seconds divided by the measured seconds, so a factor above 1 is a gain.
@@ -71,7 +72,7 @@ if __package__ in (None, ""):
     sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from tools import host  # noqa: E402
-from tools.common import ROOT, Refused, engine_version, git_text, sha256_file  # noqa: E402
+from tools.common import REPOSITORIES_VARIABLE, ROOT, Refused, engine_version, git_text, sha256_file  # noqa: E402
 from tools.python_runtime import project  # noqa: E402
 from tools.quick_start_steps import RUNS, STATES, STEPS, expand, rewrite  # noqa: E402
 from tools.targets import WINDOWS_TARGET, archive_name, target_of  # noqa: E402
@@ -98,10 +99,14 @@ def peak_mib(rusage) -> float:
 
 
 def execute(argv: list[str], log: Path) -> tuple[int, float, float | None]:
-    """Run one command from the root of the repository: its exit status, seconds and peak MiB."""
+    """Run one command from the root of the repository: its exit status, seconds and peak MiB.
+
+    The command runs without ``DELTARECON_REPOSITORIES``, so it reads the clone of this checkout
+    whatever the caller's environment names."""
+    environment = {name: value for name, value in os.environ.items() if name != REPOSITORIES_VARIABLE}
     with log.open("wb") as output:
         start = time.perf_counter()
-        process = subprocess.Popen(argv, cwd=ROOT, stdout=output, stderr=subprocess.STDOUT)
+        process = subprocess.Popen(argv, cwd=ROOT, env=environment, stdout=output, stderr=subprocess.STDOUT)
         if hasattr(os, "wait4"):
             _, status, rusage = os.wait4(process.pid, 0)
             seconds = time.perf_counter() - start

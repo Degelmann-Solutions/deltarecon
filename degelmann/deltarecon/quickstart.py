@@ -9,14 +9,21 @@ search. Step 1 is ``request`` and ``run``; steps 2 to 4 are ``regression``, ``de
 ``search``. Before each step the demo explains it, shows its commands and waits for Enter (not with
 ``--no-pause``); after it, it summarises the outcome from the files the step wrote. Each command
 runs in this process through ``__main__.main`` with its output captured, so it makes every check of
-the single command; the argv run is the argv shown, with every path relative to the demo folder, so
-each shown command runs on its own from there.
+the single command; the argv run is the argv shown, with every path relative to the demo folder.
 
-A command gets ``--repositories``, with the clone folder relative to the demo folder, only when the
-demo is given ``--repositories`` or ``DELTARECON_REPOSITORIES`` names a relative folder. Otherwise no
-command gets it: from the demo folder a command finds ``repositories/`` of a checkout in a parent
-folder, and in a package the launcher's absolute variable applies. The search gets ``--tolerance`` with the profile relative to the demo folder, or
-absolute when no relative path exists (another drive on Windows).
+The repositories folder is worked out from the working directory before the demo changes into its
+folder, as every command does it (``run.repositories_folder``). A command gets ``--repositories``,
+with that folder relative to the demo folder, when the demo is given ``--repositories``, when
+``DELTARECON_REPOSITORIES`` names a relative folder, or when neither is given and no folder
+``repositories/`` holding the clone was found in the working directory or a parent, so that the
+command reports the missing clone at ``repositories/`` in the working directory and not in the demo
+folder; a clone found upward is passed as well when a search upward from the resolved demo folder
+would find another clone or none (``runs`` a symbolic link to a folder elsewhere, which may hold a
+``repositories/`` of its own). Otherwise no command gets it: from the demo folder a command finds ``repositories/`` of a
+checkout in a parent folder, and in a package the launcher's absolute variable applies. The search
+gets ``--tolerance`` with the profile relative to the demo folder, or absolute when no relative path
+exists (another drive on Windows). Both are computed from the resolved folders, so they hold when
+``runs`` is a symbolic link.
 
 The texts are in English and German. Without ``--lang`` the first non-empty one of ``LC_ALL``,
 ``LC_MESSAGES`` and ``LANG`` decides, else ``locale.getlocale()``: a value that starts with ``de``
@@ -28,8 +35,9 @@ the working directory or one of its parents (in a checkout or a package, the fol
 else ``profiles/`` at the root of a checkout. It is looked up before the demo changes into its folder.
 
 Exit status: 0 when every step had its expected status, 1 when one had another (its captured output
-is printed and no later step runs), 2 when the folder exists already, 130 when the demo is
-interrupted.
+is printed and no later step runs), 2 when the folder exists already or cannot be created, or when an
+operating-system error ends a step or the reading of a step's files (``error: ...`` on stderr, no
+traceback), 130 when the demo is interrupted.
 """
 from __future__ import annotations
 
@@ -45,7 +53,7 @@ import textwrap
 from pathlib import Path
 from typing import Callable
 
-from .run import REPOSITORIES_VARIABLE
+from .run import CLONE_NAME, REPOSITORIES_FOLDER, REPOSITORIES_VARIABLE, repositories_folder
 
 OLDER = "fa368575a66d97c94e96dffc62b273ec95511b12"  # release N on the fixed model
 NEWER = "887b7181d22550eda2fb52fa1a6bd77376d4eb2e"  # the state N+1, 32 revisions later
@@ -276,26 +284,42 @@ def short(revision: str) -> str:
 
 
 def relative_to(path: Path | str, start: Path | str) -> str:
-    """``path`` relative to the folder ``start``, both taken from the working directory; absolute when no
-    relative path exists (another drive on Windows)."""
+    """``path`` relative to the folder ``start``, both taken from the working directory and resolved (so a
+    symbolic link on the way counts as the folder it names); absolute when no relative path exists
+    (another drive on Windows)."""
     try:
-        return os.path.relpath(Path(path).absolute(), Path(start).absolute())
+        return os.path.relpath(Path(path).resolve(), Path(start).resolve())
     except ValueError:
-        return str(Path(path).absolute())
+        return str(Path(path).resolve())
 
 
-def clone_option(folder: Path, repositories: str | None, env=None) -> str | None:
-    """The ``--repositories`` value of every command, relative to the demo folder ``folder``: from
-    ``repositories`` when given, else from ``DELTARECON_REPOSITORIES`` when it names a relative folder;
-    otherwise ``None``, and each command finds the clone itself (upward from the demo folder, or the
-    absolute folder the variable names)."""
-    env = os.environ if env is None else env
-    if repositories is None:
-        named = env.get(REPOSITORIES_VARIABLE)
-        if not named or Path(named).is_absolute():
-            return None
-        repositories = named
-    return relative_to(repositories, folder)
+def clone_option(folder: Path, repositories: str | None) -> str | None:
+    """The ``--repositories`` value of every command, relative to the demo folder ``folder``, worked out
+    from the working directory before the demo changes into ``folder``: from ``repositories`` when given,
+    else from ``DELTARECON_REPOSITORIES`` when it names a relative folder, else, when no folder
+    ``repositories/`` holding the clone is found upward, ``repositories/`` in the working directory (the
+    folder ``run.repositories_folder`` falls back to), and also the clone folder found upward when the
+    search upward from the resolved demo folder would find another clone or none (``runs`` a symbolic
+    link to a folder elsewhere, which may hold a ``repositories/`` of its own). Otherwise
+    ``None``, and each command finds the clone itself (upward from the demo folder, or the absolute
+    folder the variable names)."""
+    named = os.environ.get(REPOSITORIES_VARIABLE)
+    if repositories is None and named and Path(named).is_absolute():
+        return None
+    found = repositories_folder(repositories)
+    if repositories is None and not named and (found / CLONE_NAME).is_dir() and nearest_from(folder) == found.resolve():
+        return None
+    return relative_to(found, folder)
+
+
+def nearest_from(folder: Path) -> Path | None:
+    """The folder ``repositories/`` holding the clone that a command started in ``folder`` finds upward
+    (from the resolved folder, as ``Path.cwd()`` gives it there), resolved; ``None`` when there is none."""
+    start = Path(folder).resolve()
+    for candidate in (start, *start.parents):
+        if (candidate / REPOSITORIES_FOLDER / CLONE_NAME).is_dir():
+            return (candidate / REPOSITORIES_FOLDER).resolve()
+    return None
 
 
 def quoted(argument: str) -> str:
@@ -397,10 +421,12 @@ def quickstart(lang: str, pause: bool = True, repositories: str | None = None,
 
     try:
         folder.mkdir(parents=True)
-    except FileExistsError:
-        print(f"error: {folder} exists already", file=sys.stderr)
+    except OSError as error:  # FileExistsError too: on Windows a file named ``runs`` raises it
+        if isinstance(error, FileExistsError) and folder.exists():
+            print(f"error: {folder} exists already", file=sys.stderr)
+            return 2
+        print(f"error: cannot create {folder}: {error.strerror or error}", file=sys.stderr)
         return 2
-    argvs = steps(relative_to(profile_path(), folder), clone_option(folder, repositories))
     former = Path.cwd()
 
     def execute(name: str) -> bool:
@@ -431,6 +457,7 @@ def quickstart(lang: str, pause: bool = True, repositories: str | None = None,
         return all(execute(command) for command in commands)
 
     try:
+        argvs = steps(relative_to(profile_path(), folder), clone_option(folder, repositories))
         say(texts["opening_heading"])
         say()
         paragraph("opening")
@@ -514,5 +541,8 @@ def quickstart(lang: str, pause: bool = True, repositories: str | None = None,
         say()
         say(texts["stopped"])
         return 130
+    except OSError as error:  # an unwritable or vanished file of a step: a message, not a traceback
+        print(f"error: {error}", file=sys.stderr)
+        return 2
     finally:
         os.chdir(former)
