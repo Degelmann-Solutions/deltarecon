@@ -4,6 +4,15 @@ Every published release of DeltaRecon has an entry here, newest first: its tag a
 
 The SHA-256 values are those of `SHA256SUMS` in the release folder `dist/release-v<version>/` that the release was uploaded from; after each upload the archives were downloaded again and matched those values. The commit of `delib-history` is read from the clone inside both archives.
 
+## 0.1.4 — published 2026-11-04
+
+- Tag `v0.1.4`, commit `887584dbf90c2220e108b8fb4e911f7903def02c`
+- `delib-history` in the packages: `6a3ca53281ac353963412214cd2b54187facb728`
+- `deltarecon-0.1.4-x86_64-pc-windows-msvc.zip` SHA-256 `54c1d32bc50f5f2e148b66ef5550a0808d20abd00ac67f34e6d69aef31a43b72`
+- `deltarecon-0.1.4-x86_64-unknown-linux-gnu.tar.gz` SHA-256 `1f9345dd7e40321e19b7efee236db67a861718865ac5c295ed73cb5387b8a74a`
+- Release page: published.
+- Changes: the worker processes compute with single-threaded BLAS (`OPENBLAS_NUM_THREADS`, `OMP_NUM_THREADS` and `MKL_NUM_THREADS` are `1` while a pool runs), so one worker per processor no longer exhausts the memory a small Windows machine can commit; the number of workers is unchanged.
+
 ## 0.1.3 — published 2026-11-02
 
 - Tag `v0.1.3`, commit `ffc37ff3c3b30a9c417e77335f19859c1bd83085`
