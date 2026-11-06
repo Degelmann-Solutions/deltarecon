@@ -548,9 +548,9 @@ class Counting(WalkStub):
         super().__init__(*args, **options)
         self.calls = 0
 
-    def open(self, release, enabled, manifest_dir, repositories, hold=frozenset()):
+    def open(self, stage, release, enabled, manifest_dir, repositories, hold=frozenset()):
         self.calls += 1
-        return super().open(release, enabled, manifest_dir, repositories, hold)
+        return super().open(stage, release, enabled, manifest_dir, repositories, hold)
 
 
 def without_compare(node):
@@ -785,10 +785,10 @@ class Overflowing(WalkStub):
         self.cash = cash
 
     @contextmanager
-    def open(self, release, enabled, manifest_dir, repositories, hold=frozenset()):
+    def open(self, stage, release, enabled, manifest_dir, repositories, hold=frozenset()):
         revisions = [c["realisation"]["revision"] for c in enabled if c["realisation"]["type"] == "revision"]
         name = revisions[-1] if revisions else self._folder(release, repositories).name
-        with super().open(release, enabled, manifest_dir, repositories, hold) as session:
+        with super().open(stage, release, enabled, manifest_dir, repositories, hold) as session:
             plain = session.project
             session.project = lambda point: [(p, [v[0], self.cash[name] if point == "MP-X" else v[1]])
                                              for p, v in plain(point)]
@@ -1136,10 +1136,10 @@ def test_an_interrupted_search_leaves_no_folder(cancel):
     world, older, newer = cancel
 
     class Interrupting(WalkStub):
-        def open(self, release, enabled, manifest_dir, repositories, hold=frozenset()):
+        def open(self, stage, release, enabled, manifest_dir, repositories, hold=frozenset()):
             if len(enabled) == 2:
                 raise KeyboardInterrupt
-            return super().open(release, enabled, manifest_dir, repositories, hold)
+            return super().open(stage, release, enabled, manifest_dir, repositories, hold)
 
     with pytest.raises(KeyboardInterrupt):
         run_search(world, older, newer, Interrupting(CANCEL))

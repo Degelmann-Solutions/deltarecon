@@ -991,7 +991,8 @@ class ReferenceModel:
         return {"label": base["label"],
                 "references": release_references(state, input_revision, release_path(base))}
 
-    def resolve(self, release: dict, repositories: Path) -> None:
+    def resolve(self, stage: str, release: dict, repositories: Path) -> None:
+        # One stage: the run admits only a stage of ``stages``, so ``stage`` selects nothing here.
         self._locate(release, repositories)
 
     def history(self, older: dict, newer: dict, repositories: Path) -> History:
@@ -1015,8 +1016,8 @@ class ReferenceModel:
         return History(SOURCE, old, new, tuple(revisions))
 
     @contextmanager
-    def open(self, release: dict, enabled: list[dict], manifest_dir: Path | None, repositories: Path,
-             hold=frozenset()):
+    def open(self, stage: str, release: dict, enabled: list[dict], manifest_dir: Path | None,
+             repositories: Path, hold=frozenset()):
         clone, files = self._locate(release, repositories)
         path = release_path(release)
         revisions = [c["realisation"]["revision"] for c in enabled

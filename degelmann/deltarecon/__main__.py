@@ -274,7 +274,7 @@ def command_request(args) -> int:
         revision = reference_model.resolve_revision(args.revision, repositories)
         release = {"label": args.label,
                    "references": reference_model.release_references(revision, path=args.path)}
-        selected.resolve(release, repositories)
+        selected.resolve(reference_model.STAGE, release, repositories)
     except Rejection as rejection:  # nothing is written
         print("request: rejected")
         print_diagnostic(rejection.diagnostic())

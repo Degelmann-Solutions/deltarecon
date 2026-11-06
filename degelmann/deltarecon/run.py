@@ -212,13 +212,13 @@ def _engine(call, *arguments):
 
 
 @contextmanager
-def _opened(engine: Engine, release: dict, enabled: list[dict], manifest_dir: Path | None,
+def _opened(engine: Engine, stage: str, release: dict, enabled: list[dict], manifest_dir: Path | None,
             repositories: Path, hold: frozenset[str] = frozenset()):
     """``engine.open`` with every exception of entering or leaving it as an engine error.
 
     An exception of the body wins over one that leaving raises while the body unwinds.
     """
-    context = _engine(engine.open, release, enabled, manifest_dir, repositories, hold)
+    context = _engine(engine.open, stage, release, enabled, manifest_dir, repositories, hold)
     session = _engine(context.__enter__)
     try:
         yield session
@@ -498,14 +498,15 @@ def run_request(request_path: Path, engine: Engine, repositories: Path | None = 
     try:
         if request["stage"] not in engine.stages or request["stage"] not in STAGE_QUANTITIES:
             raise Rejection("unsupported_stage", f"The stage {request['stage']} is not supported.")
-        _engine(engine.resolve, request["release"], repositories)
+        _engine(engine.resolve, request["stage"], request["release"], repositories)
         enabled = []
         if request["changes"]["enabled"]:  # the empty set is always valid and needs no manifest
             manifest_path = check_artifact(folder, request["changes"]["manifest"])
             enabled = load_change_set(request, manifest_path, engine.realisations)
         hold = changes_contract.check_hold(request, enabled, engine.holdable)
         manifest_dir = manifest_path.parent if enabled else None
-        with _opened(engine, request["release"], enabled, manifest_dir, repositories, hold) as session:
+        with _opened(engine, request["stage"], request["release"], enabled, manifest_dir, repositories,
+                     hold) as session:
             inventory = read_inventory(session)
             parameters = inventory
             available = _engine(lambda: list(session.model_point_ids()))

@@ -128,8 +128,10 @@ class Engine(Protocol):
     # each with the classes of the paths that carry it, for example ``input_data``: ``data``.
     holdable: Mapping[str, frozenset[str]]
 
-    def resolve(self, release: dict, repositories: Path) -> None:
-        """Check that the release identity names a state the engine can restore.
+    def resolve(self, stage: str, release: dict, repositories: Path) -> None:
+        """Check that the release identity names a state of the stage ``stage`` the engine can restore.
+
+        ``stage`` is the stage of the request, one of ``stages``.
 
         ``repositories`` is the folder that holds what the engine restores a release from,
         for example local clones. Nothing is restored and nothing is written.
@@ -138,9 +140,11 @@ class Engine(Protocol):
         be resolved.
         """
 
-    def open(self, release: dict, enabled: list[dict], manifest_dir: Path | None,
+    def open(self, stage: str, release: dict, enabled: list[dict], manifest_dir: Path | None,
              repositories: Path, hold: frozenset[str] = frozenset()) -> ContextManager[Session]:
-        """Restore the release state, apply the enabled changes, and open it for reading.
+        """Restore the release state of the stage ``stage``, apply the enabled changes, and open it for reading.
+
+        ``stage`` is the stage of the request, one of ``stages``.
 
         ``enabled`` holds the enabled changes in application order; every one has a
         realisation type the engine declares. ``manifest_dir`` is the folder of the change

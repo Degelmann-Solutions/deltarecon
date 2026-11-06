@@ -259,7 +259,7 @@ def replay(record_path: Path, engine: Engine, repositories: Path | None = None,
     # refuses the replay. For a run that ended with an error, any other exception of the
     # engine is left to the repeated run, which records it as its outcome.
     try:
-        engine.resolve(request["release"], repositories)
+        engine.resolve(request["stage"], request["release"], repositories)
     except (Rejection, UsageError):
         raise
     except Exception:

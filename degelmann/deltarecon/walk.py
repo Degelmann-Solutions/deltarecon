@@ -246,7 +246,7 @@ def prepare(older_record: Path | str, newer_record: Path | str, engine: Engine, 
                 raise Rejection("reference_mismatch", f"The references of the kind {kind} move with the states, "
                                 f"and the {'base' if side == OLDER else 'last'} revision does not name what the "
                                 f"{side} record names.")
-    engine.resolve(base, repositories)
+    engine.resolve(stage, base, repositories)
     return Prepared(older, newer, profile, manifest, hold, base, dict(holdable))
 
 

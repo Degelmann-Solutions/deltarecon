@@ -19,6 +19,7 @@ import pytest
 from degelmann.deltarecon.__main__ import main
 from degelmann.deltarecon.documents import (RECORD_SCHEMA, RUN_SCHEMA, Rejection, document_bytes, read_document,
                                   schema_errors, sha256_file)
+from degelmann.deltarecon.replay import replay
 from degelmann.deltarecon.run import STAGE_QUANTITIES, UsageError, run_request
 from degelmann.deltarecon.walk import exact_sums, held_kinds, walk, written
 
@@ -365,6 +366,25 @@ def test_a_target_only_record_is_refused_before_a_stage_mismatch(world, monkeypa
     assert caught.value.code == "target_only_record" and not (world / "walk").exists()
 
 
+@pytest.mark.parametrize("stage", ["liability_cashflow", "other_stage"])
+def test_resolve_and_open_receive_the_stage_of_each_request(world, monkeypatch, stage):
+    """The run, the walk, and the replay hand the engine the stage of the request."""
+    build(world)
+    monkeypatch.setitem(STAGE_QUANTITIES, "other_stage", STAGE_QUANTITIES["liability_cashflow"])
+    engine = TwoStages()
+    older, newer = record(world, "w0", engine, stage=stage), record(world, "w4", engine, stage=stage)
+    assert engine.stages_received == [("resolve", stage), ("open", stage)] * 2
+    walker = TwoStages()
+    done = run_walk(world, older, newer, walker)
+    assert done.attributed
+    # The check of the base before the first run, then each state's run resolves and opens.
+    states = len(done.result["states"])
+    assert walker.stages_received == [("resolve", stage)] + [("resolve", stage), ("open", stage)] * states
+    again = TwoStages()
+    assert replay(older, again, world).outcome == "reproduced_exactly"
+    assert again.stages_received == [("resolve", stage), ("resolve", stage), ("open", stage)]
+
+
 def test_records_of_different_selections_are_refused(world):
     build(world)
     older = record(world, "w0", selection={"mode": "subset", "model_point_ids": ["MP-A"]})
@@ -419,10 +439,10 @@ def test_an_interrupted_walk_leaves_no_folder(linear):
     world, older, newer = linear
 
     class Interrupting(WalkStub):
-        def open(self, release, enabled, manifest_dir, repositories, hold=frozenset()):
+        def open(self, stage, release, enabled, manifest_dir, repositories, hold=frozenset()):
             if len(enabled) == 2:
                 raise KeyboardInterrupt
-            return super().open(release, enabled, manifest_dir, repositories, hold)
+            return super().open(stage, release, enabled, manifest_dir, repositories, hold)
 
     with pytest.raises(KeyboardInterrupt):
         run_walk(world, older, newer, Interrupting())

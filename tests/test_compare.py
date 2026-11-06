@@ -489,8 +489,8 @@ def engine_with(**attributes) -> StubEngine:
 
     class OtherEngine(StubEngine):
         @contextmanager
-        def open(self, release, enabled, manifest_dir, repositories, hold=frozenset()):
-            with super().open(release, enabled, manifest_dir, repositories, hold) as opened:
+        def open(self, stage, release, enabled, manifest_dir, repositories, hold=frozenset()):
+            with super().open(stage, release, enabled, manifest_dir, repositories, hold) as opened:
                 opened.__class__ = session
                 yield opened
 
