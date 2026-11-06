@@ -680,3 +680,23 @@ def test_the_command_line_passes_its_options(monkeypatch):
     assert seen == {"lang": "en", "pause": False, "repositories": "x"}
     assert main(["quickstart"]) == 0
     assert seen == {"lang": "de", "pause": True, "repositories": None}
+
+
+def test_the_demo_computes_with_the_reference_model_whatever_the_engine_variables_say(monkeypatch):
+    """Each step runs with ``DELTARECON_ENGINE`` and ``DELTARECON_ENGINE_PATH`` unset; they return
+    afterwards."""
+    from degelmann.deltarecon import __main__ as command_line
+    monkeypatch.setenv(command_line.ENGINE_VARIABLE, "no_such_engine_module:Engine")
+    monkeypatch.setenv(command_line.ENGINE_PATH_VARIABLE, "/no/such/folder")
+    seen = []
+
+    def step(argv):
+        seen.append((os.environ.get(command_line.ENGINE_VARIABLE), os.environ.get(command_line.ENGINE_PATH_VARIABLE),
+                     command_line.engine_class().__name__))
+        return 0
+
+    monkeypatch.setattr(command_line, "main", step)
+    assert demo.main_step(["run", "request.json"]) == (0, "")
+    assert seen == [(None, None, "ReferenceModel")]
+    assert os.environ[command_line.ENGINE_VARIABLE] == "no_such_engine_module:Engine"
+    assert os.environ[command_line.ENGINE_PATH_VARIABLE] == "/no/such/folder"

@@ -357,12 +357,28 @@ def table(header: tuple[str, ...], rows: list[tuple[str, ...]], right: set[int] 
             for entry in [header, *rows]]
 
 
+@contextlib.contextmanager
+def _without(*names: str):
+    """The environment without the variables ``names`` while the block runs."""
+    former = {name: os.environ.pop(name) for name in names if name in os.environ}
+    try:
+        yield
+    finally:
+        os.environ.update(former)
+
+
 def main_step(argv: list[str]) -> tuple[int, str]:
-    """Run one command through ``__main__.main`` in this process: its exit status and its output."""
-    from .__main__ import main
+    """Run one command through ``__main__.main`` in this process: its exit status and its output.
+
+    The demo always computes with the reference model, the engine of ``delib-history``: while the
+    command runs, ``DELTARECON_ENGINE`` and ``DELTARECON_ENGINE_PATH`` are unset, and they return
+    afterwards.
+    """
+    from .__main__ import ENGINE_PATH_VARIABLE, ENGINE_VARIABLE, main
 
     output = io.StringIO()
-    with contextlib.redirect_stdout(output), contextlib.redirect_stderr(output):
+    with _without(ENGINE_VARIABLE, ENGINE_PATH_VARIABLE), contextlib.redirect_stdout(output), \
+            contextlib.redirect_stderr(output):
         try:
             status = main(argv)
         except SystemExit as exit_:  # a usage error of argparse

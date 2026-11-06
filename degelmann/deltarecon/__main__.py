@@ -126,7 +126,10 @@ itself, with ``N`` for ``--workers N``, and with 1 for ``request`` and ``derive`
 that is not of the form ``MODULE:CLASS`` with an absolute module name, a module that is not found
 or whose import raises ``ImportError``, an attribute the module does not hold or that is not a
 class, and an engine path that is not a folder are usage errors. ``compare`` and ``quickstart`` take no such option, and
-``compare`` loads no engine. ``request`` and ``regression`` still read the release from the clone
+``compare`` loads no engine. ``quickstart`` always computes with the reference model and
+ignores both variables. ``replay``, ``regression``, ``walk``, and ``search`` refuse a record of a
+stage whose quantities DeltaRecon does not hold (at present all but ``liability_cashflow``) with
+``unsupported_stage`` before anything runs. ``request`` and ``regression`` still read the release from the clone
 of the reference model repository.
 
 ``compare`` takes its tolerance profile from the request. ``replay``, ``regression``,

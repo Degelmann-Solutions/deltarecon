@@ -20,8 +20,10 @@ from degelmann.deltarecon.__main__ import main
 from degelmann.deltarecon.compare import COMPARED_QUANTITIES
 from degelmann.deltarecon.documents import (RECORD_SCHEMA, RUN_SCHEMA, Rejection, document_bytes, read_document,
                                   schema_errors, sha256_file)
-from degelmann.deltarecon.replay import replay
+from degelmann.deltarecon.regression import read_regression_input, regression
+from degelmann.deltarecon.replay import read_recorded_run, replay
 from degelmann.deltarecon.run import UsageError, run_request
+from degelmann.deltarecon.search import search
 from degelmann.deltarecon.walk import exact_sums, held_kinds, walk, written
 
 from conftest import (LAPSE_TABLE, MODEL_CODE, PARAMS, PARAMS_RATE, POINTS, POINTS_B, POINTS_E, POINT_TABLE,
@@ -422,6 +424,53 @@ def test_a_replay_of_a_stage_the_core_holds_no_quantities_for_is_rejected(world)
         replay(older, engine, world)
     assert caught.value.code == "unsupported_stage" and engine.opened == 0
     assert not (older.parent / "replay").exists()
+
+
+@pytest.mark.parametrize("procedure", ["walk", "search", "regression"])
+def test_a_stage_the_core_cannot_compare_is_refused_before_anything_runs(world, procedure):
+    """Until entry 12 the core compares only the stages it holds quantities for; another stage is
+    refused with ``unsupported_stage`` when the procedure is called, before a state runs."""
+    build(world)
+    older = record(world, "w0", TwoStages(), stage="other_stage")
+    newer = record(world, "w4", TwoStages(), stage="other_stage")
+    engine = TwoStages()
+    with pytest.raises(Rejection) as caught:
+        if procedure == "walk":
+            run_walk(world, older, newer, engine)
+        elif procedure == "search":
+            search(older, newer, world / "search", engine, repositories=world)
+        else:
+            read_regression_input(older, engine.stages)
+    assert caught.value.code == "unsupported_stage"
+    assert engine.stages_received == [] and engine.opened == 0
+    assert not (world / "walk").exists() and not (world / "search").exists()
+
+
+def test_a_regression_of_a_stage_the_core_cannot_compare_writes_nothing(world, monkeypatch, capsys):
+    build(world)
+    older = record(world, "w0", TwoStages(), stage="other_stage")
+    engine = TwoStages()
+    monkeypatch.setattr("degelmann.deltarecon.__main__.engine", lambda *workers: engine)
+    before = folder_hashes(world)
+    status = main(["regression", str(older), "--revision", "w4", "--output", str(world / "out"),
+                   "--repositories", str(world)])
+    assert status == 1 and "diagnostic: unsupported_stage: " in capsys.readouterr().out
+    assert engine.stages_received == [] and folder_hashes(world) == before
+    with pytest.raises(Rejection) as caught:  # the library function refuses it as well
+        regression(read_recorded_run(older, engine.stages), {"label": "x", "references": []}, world / "out",
+                   engine, repositories=world)
+    assert caught.value.code == "unsupported_stage" and not (world / "out").exists()
+
+
+def test_records_of_a_compared_and_another_stage_are_refused_as_unsupported(world):
+    """The record of the stage the core cannot compare is refused before the stage mismatch."""
+    build(world)
+    older = record(world, "w0", TwoStages())
+    newer = record(world, "w4", TwoStages(), stage="other_stage")
+    engine = TwoStages()
+    with pytest.raises(Rejection) as caught:
+        run_walk(world, older, newer, engine)
+    assert caught.value.code == "unsupported_stage" and engine.opened == 0 and not (world / "walk").exists()
 
 
 def test_records_of_different_selections_are_refused(world):
