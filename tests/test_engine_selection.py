@@ -191,6 +191,28 @@ def test_an_engine_path_that_is_not_a_folder_is_a_usage_error(world, engines, mo
     assert not (world / "run" / "response.json").exists()
 
 
+@pytest.mark.parametrize("spec", ["degelmann.deltarecon.protocol:Engine", "os:PathLike"])
+def test_a_protocol_or_abstract_class_is_a_usage_error(world, engines, monkeypatch, capsys, spec):
+    assert run_world(monkeypatch, world, "--engine", spec) == 2
+    message = capsys.readouterr().err
+    assert message.startswith("error: ") and message.count("\n") == 1 and "protocol or an abstract class" in message
+    assert not (world / "run" / "response.json").exists()
+
+
+def test_a_class_that_cannot_take_the_worker_count_is_a_usage_error(world, engines, monkeypatch, capsys):
+    """A class whose ``__init__`` takes no argument runs without ``--workers`` and is refused with it."""
+    (engines / "stub_engine_plain.py").write_text(
+        "from conftest import StubEngine\n\n\nclass Engine(StubEngine):\n    pass\n", "utf-8")
+    monkeypatch.delitem(sys.modules, "stub_engine_plain", raising=False)
+    assert run_world(monkeypatch, world, "--engine", "stub_engine_plain:Engine", "--engine-path", engines) == 0
+    capsys.readouterr()
+    status = cli(monkeypatch, "run", world / "run" / "request.json", "--repositories", world,
+                 "--engine", "stub_engine_plain:Engine", "--engine-path", engines, "--workers", "2")
+    message = capsys.readouterr().err
+    assert status == 2 and message.count("\n") == 1 and "cannot be called with the worker count" in message
+    sys.modules.pop("stub_engine_plain", None)
+
+
 @pytest.mark.parametrize("command", ["request", "run", "replay", "regression", "derive", "walk", "search"])
 def test_every_command_that_uses_an_engine_takes_the_options(command, capsys):
     with pytest.raises(SystemExit):

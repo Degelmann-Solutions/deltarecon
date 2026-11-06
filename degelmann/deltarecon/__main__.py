@@ -119,19 +119,21 @@ exists already, and 130 when it is interrupted.
 engine class ``--engine MODULE:CLASS`` names, else the one the environment variable
 ``DELTARECON_ENGINE`` names, else ``degelmann.deltarecon.engines.reference_model:ReferenceModel``,
 the reference model. ``--engine-path DIR``, else the folder ``DELTARECON_ENGINE_PATH`` names, is
-put on the import path before the class is loaded; the variable is read only when no
-``--engine`` is given, so ``--engine`` alone decides the engine. An option wins over its
-variable, and an empty variable counts as unset. The class is called with the worker count alone: with no argument
-when the command is given no ``--workers``, so the engine takes its count from the environment
-itself, with ``N`` for ``--workers N``, and with 1 for ``request`` and ``derive``. A selection
-that is not of the form ``MODULE:CLASS`` with an absolute module name, a module that is not found
-or whose import raises ``ImportError``, an attribute the module does not hold or that is not a
-class, and an engine path that is not a folder are usage errors. ``compare`` and ``quickstart`` take no such option, and
-``compare`` loads no engine. ``quickstart`` always computes with the reference model: it runs
-each command with ``--engine`` and the reference model, which it does not show. ``replay``, ``regression``, ``walk``, and ``search`` refuse a record of a
-stage whose quantities DeltaRecon does not hold (at present all but ``liability_cashflow``) with
-``unsupported_stage`` before anything runs. ``request`` and ``regression`` still read the release from the clone
-of the reference model repository.
+put on the import path before the class is loaded; the variable is read only when no ``--engine``
+is given, so ``--engine`` alone decides the engine. An option wins over its variable, and an empty
+variable counts as unset. The class is called with the worker count alone: with no argument when
+the command is given no ``--workers``, so the engine takes its count from the environment itself,
+with ``N`` for ``--workers N``, and with 1 for ``request`` and ``derive``. A selection that is not
+of the form ``MODULE:CLASS`` with an absolute module name, a module that is not found or whose
+import raises ``ImportError``, an attribute the module does not hold or that is not a class, a
+protocol or abstract class, a class that cannot be called with the worker count, and an engine path
+that is not a folder are usage errors. ``compare`` and ``quickstart`` take no such option, and
+``compare`` loads no engine. ``quickstart`` always computes with the reference model: it runs each
+command with ``--engine`` and the reference model, which it does not show. ``replay``,
+``regression``, ``walk``, and ``search`` refuse a record of a stage whose quantities DeltaRecon
+does not hold (at present all but ``liability_cashflow``) with ``unsupported_stage`` before
+anything runs. ``request`` and ``regression`` still read the release from the clone of the
+reference model repository.
 
 ``compare`` takes its tolerance profile from the request. ``replay``, ``regression``,
 ``walk``, and ``search`` compare exactly unless ``--tolerance FILE`` names a tolerance profile: a JSON file in the
@@ -163,6 +165,7 @@ from __future__ import annotations
 
 import argparse
 import importlib
+import inspect
 import os
 import sys
 from pathlib import Path
@@ -232,6 +235,9 @@ def engine_class(spec: str | None = None, path: str | None = None):
     if not isinstance(cls, type):
         raise UsageError(f"the engine {spec!r} cannot be loaded: {class_name!r} of the module "
                          f"{module_name!r} is not a class")
+    if getattr(cls, "_is_protocol", False) or inspect.isabstract(cls):
+        raise UsageError(f"the engine {spec!r} cannot be loaded: {class_name!r} is a protocol or an "
+                         "abstract class, which cannot be called")
     return cls
 
 
@@ -239,7 +245,16 @@ def engine(workers: int | None = None):
     """The engine the command selects: its class called with the worker count, or with no
     argument when the command is given none."""
     cls = engine_class(*selection)
-    return cls() if workers is None else cls(workers)
+    arguments = () if workers is None else (workers,)
+    try:
+        inspect.signature(cls).bind(*arguments)
+    except TypeError:
+        raise UsageError(f"the engine class {cls.__qualname__} cannot be called with "
+                         f"{'no argument' if workers is None else 'the worker count'}; an engine class "
+                         "takes the worker count as its one optional argument") from None
+    except ValueError:  # no signature to inspect, as for some built-in classes; the call decides
+        pass
+    return cls(*arguments)
 
 
 def state_engine(args):
@@ -287,9 +302,9 @@ def command_request(args) -> int:
         print("request: rejected")
         print_diagnostic(rejection.diagnostic())
         return 1
-    selection = ({"mode": "subset", "model_point_ids": list(args.subset)} if args.subset
+    chosen = ({"mode": "subset", "model_point_ids": list(args.subset)} if args.subset
                  else {"mode": "full"})
-    request = run_request_document(reference_model.STAGE, args.run_id, release, changes, selection, "the request")
+    request = run_request_document(reference_model.STAGE, args.run_id, release, changes, chosen, "the request")
     output.parent.mkdir(parents=True, exist_ok=True)
     write_new(output, document_bytes(request))
     print(f"request: {os.path.relpath(output)}")

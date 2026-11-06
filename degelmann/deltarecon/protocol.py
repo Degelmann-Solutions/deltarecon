@@ -44,8 +44,8 @@ class UsageError(Exception):
     changes where a run without one is required); a request it is about to write, such as a
     state request a walk or a search builds, would violate its schema; an output exists already;
     a number of workers is not a whole number of at least 1; a switch is given without the
-    switch or the value it needs; an option has a value it does not take; or the history of a
-    clone is cut off. It writes no document and is not a :class:`Rejection`.
+    switch or the value it needs; an option has a value it does not take; the engine a command
+    selects cannot be loaded or called; or the history of a clone is cut off. It writes no document and is not a :class:`Rejection`.
     """
 
 
