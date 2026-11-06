@@ -163,9 +163,8 @@ from dulwich.repo import Repo
 
 from .. import changes as changes_contract
 from ..compare import target_window
-from ..documents import Rejection
-from ..run import (CLONE_NAME, SCRATCH_PREFIX, History, ModelPointFailure, Revision, UsageError,
-                   from_worker_outcome, worker_outcome)
+from ..protocol import SCRATCH_PREFIX, History, ModelPointFailure, Rejection, Revision, UsageError
+from ..run import CLONE_NAME, from_worker_outcome, worker_outcome
 from ..workers import ordered_map, worker_count
 
 STAGE = "liability_cashflow"

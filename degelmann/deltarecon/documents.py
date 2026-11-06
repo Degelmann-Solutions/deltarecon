@@ -25,6 +25,8 @@ from pathlib import Path
 from jsonschema import Draft202012Validator
 from referencing import Registry, Resource
 
+from .protocol import Rejection  # re-exported: the core and the tests import it from here
+
 CONTRACT_VERSION = "3.1"
 PACKAGED_CONTRACTS = Path(__file__).resolve().parent / "contracts"
 CONTRACTS = PACKAGED_CONTRACTS if PACKAGED_CONTRACTS.is_dir() else Path(__file__).resolve().parents[2] / "contracts"
@@ -37,25 +39,6 @@ RUN_SCHEMA = "run.schema.json"
 CHANGES_SCHEMA = "changes.schema.json"
 RECORD_SCHEMA = "run-record.schema.json"
 RUN_REQUEST = f"{RUN_SCHEMA}#/$defs/run_request"
-
-
-class Rejection(Exception):
-    """A broken rule of the contracts, with the diagnostic it leads to."""
-
-    def __init__(self, code: str, message: str, *, model_point_ids=None, change_ids=None):
-        super().__init__(f"{code}: {message}")
-        self.code = code
-        self.message = message
-        self.model_point_ids = list(model_point_ids or [])
-        self.change_ids = list(change_ids or [])
-
-    def diagnostic(self) -> dict:
-        entry = {"code": self.code, "message": self.message}
-        if self.model_point_ids:
-            entry["model_point_ids"] = self.model_point_ids
-        if self.change_ids:
-            entry["change_ids"] = self.change_ids
-        return entry
 
 
 class DuplicateMember(ValueError):

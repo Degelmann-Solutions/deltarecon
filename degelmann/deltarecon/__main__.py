@@ -115,6 +115,20 @@ with ``de`` or ``German``, else English. It exits with 0 when every step has its
 1 when one has another (the demo prints the output of that step and stops), 2 when the folder
 exists already, and 130 when it is interrupted.
 
+``request``, ``run``, ``replay``, ``regression``, ``derive``, ``walk``, and ``search`` load the
+engine class ``--engine MODULE:CLASS`` names, else the one the environment variable
+``DELTARECON_ENGINE`` names, else ``degelmann.deltarecon.engines.reference_model:ReferenceModel``,
+the reference model. ``--engine-path DIR``, else the folder ``DELTARECON_ENGINE_PATH`` names, is
+put on the import path before the class is loaded. An option wins over its variable, and an
+empty variable counts as unset. The class is called with the worker count alone: with no argument
+when the command is given no ``--workers``, so the engine takes its count from the environment
+itself, with ``N`` for ``--workers N``, and with 1 for ``request`` and ``derive``. A selection
+that is not of the form ``MODULE:CLASS`` with an absolute module name, a module that is not found
+or whose import raises ``ImportError``, an attribute the module does not hold or that is not a
+class, and an engine path that is not a folder are usage errors. ``compare`` and ``quickstart`` take no such option, and
+``compare`` loads no engine. ``request`` and ``regression`` still read the release from the clone
+of the reference model repository.
+
 ``compare`` takes its tolerance profile from the request. ``replay``, ``regression``,
 ``walk``, and ``search`` compare exactly unless ``--tolerance FILE`` names a tolerance profile: a JSON file in the
 form of the ``tolerance`` member of a compare request. There is no default profile.
@@ -144,6 +158,7 @@ output exists already or the history of the clone is cut off.
 from __future__ import annotations
 
 import argparse
+import importlib
 import os
 import sys
 from pathlib import Path
@@ -161,10 +176,62 @@ from .signature import render_coverage, render_model_points, render_table
 from .workers import WORKERS_VARIABLE, whole_number
 
 
+# The engine class a command loads: ``--engine <module>:<class>``, else this variable, else
+# the reference model. ``--engine-path``, else the path variable, names a folder that is put
+# on the import path first. An empty variable counts as unset.
+ENGINE_VARIABLE = "DELTARECON_ENGINE"
+ENGINE_PATH_VARIABLE = "DELTARECON_ENGINE_PATH"
+DEFAULT_ENGINE = "degelmann.deltarecon.engines.reference_model:ReferenceModel"
+
+# The ``--engine`` and ``--engine-path`` of the command ``main`` runs, ``None`` where it is not
+# given; ``main`` sets them before it dispatches and resets them afterwards.
+selection: tuple[str | None, str | None] = (None, None)
+
+
+def engine_class(spec: str | None = None, path: str | None = None):
+    """The engine class a selection names, imported on use, so that parsing the command line
+    and a command without an engine load no engine module.
+
+    Raises :class:`UsageError` when the folder is not a folder, the selection is not of the form
+    ``<module>:<class>`` with an absolute module name, the module is not found or its import raises
+    :class:`ImportError`, or the module has no such attribute or it is not a class.
+    """
+    if path is None:
+        path = os.environ.get(ENGINE_PATH_VARIABLE) or None
+    if path is not None:
+        folder = Path(path).resolve() if path else None
+        if folder is None or not folder.is_dir():
+            raise UsageError(f"the engine path {path!r} is not a folder")
+        if str(folder) in sys.path:
+            sys.path.remove(str(folder))
+        sys.path.insert(0, str(folder))
+        importlib.invalidate_caches()
+    if spec is None:
+        spec = os.environ.get(ENGINE_VARIABLE) or DEFAULT_ENGINE
+    module_name, colon, class_name = spec.partition(":")
+    if not colon or not module_name or not class_name or module_name.startswith("."):
+        raise UsageError(f"the engine {spec!r} is not of the form <module>:<class> with an absolute module name")
+    try:
+        module = importlib.import_module(module_name)
+    except ImportError as error:
+        raise UsageError(f"the engine {spec!r} cannot be loaded: the module {module_name!r} "
+                         f"cannot be imported ({error})") from None
+    try:
+        cls = getattr(module, class_name)
+    except AttributeError:
+        raise UsageError(f"the engine {spec!r} cannot be loaded: the module {module_name!r} "
+                         f"has no {class_name!r}") from None
+    if not isinstance(cls, type):
+        raise UsageError(f"the engine {spec!r} cannot be loaded: {class_name!r} of the module "
+                         f"{module_name!r} is not a class")
+    return cls
+
+
 def engine(workers: int | None = None):
-    # The adapter is the only module that imports the calculation engine.
-    from .engines.reference_model import ReferenceModel
-    return ReferenceModel(workers)
+    """The engine the command selects: its class called with the worker count, or with no
+    argument when the command is given none."""
+    cls = engine_class(*selection)
+    return cls() if workers is None else cls(workers)
 
 
 def state_engine(args):
@@ -201,12 +268,13 @@ def command_request(args) -> int:
             raise UsageError("the manifest must be a file in the folder of the request or below it")
         changes["manifest"] = {"path": manifest.relative_to(output.parent).as_posix(),
                                "sha256": sha256_file(manifest)}
+    # One worker: a request projects no point, so DELTARECON_WORKERS does not concern it.
+    selected = engine(1)
     try:  # the request names a release only if a run would accept it
         revision = reference_model.resolve_revision(args.revision, repositories)
         release = {"label": args.label,
                    "references": reference_model.release_references(revision, path=args.path)}
-        # One worker: a request projects no point, so DELTARECON_WORKERS does not concern it.
-        engine(1).resolve(release, repositories)
+        selected.resolve(release, repositories)
     except Rejection as rejection:  # nothing is written
         print("request: rejected")
         print_diagnostic(rejection.diagnostic())
@@ -584,6 +652,14 @@ def main(argv: list[str] | None = None) -> int:
                              help="the number of worker processes that project the model points of a "
                                   f"state (default: {WORKERS_VARIABLE}, else one per processor)")
 
+    for command in (request, run, again, regress, history, stepper, halver):
+        command.add_argument("--engine", metavar="MODULE:CLASS",
+                             help="the engine class to load (default: the one "
+                                  f"{ENGINE_VARIABLE} names, else the reference model)")
+        command.add_argument("--engine-path", metavar="DIR",
+                             help="a folder to put on the import path before the engine is loaded "
+                                  f"(default: the folder {ENGINE_PATH_VARIABLE} names)")
+
     for command in (request, regress):
         # The choices are reference_model.PATHS, written out so that loading this module does not import modelx.
         command.add_argument("--path", choices=("export", "modelx"), default="export",
@@ -599,11 +675,15 @@ def main(argv: list[str] | None = None) -> int:
                                   "one of its parents)")
 
     args = parser.parse_args(argv)
+    global selection
+    previous, selection = selection, (getattr(args, "engine", None), getattr(args, "engine_path", None))
     try:
         return args.handler(args)
     except (UsageError, FileExistsError) as error:
         print(f"error: {error}", file=sys.stderr)
         return 2
+    finally:
+        selection = previous
 
 
 if __name__ == "__main__":

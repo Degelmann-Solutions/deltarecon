@@ -2,5 +2,5 @@
 
 The core modules (``documents``, ``export``, ``changes``, ``run``, ``replay``) handle
 documents, exports, and run records and know no calculation engine. An engine sits behind
-the small protocol of ``degelmann.deltarecon.run``; the adapters live under ``degelmann.deltarecon.engines``.
+the small protocol of ``degelmann.deltarecon.protocol``; the adapters live under ``degelmann.deltarecon.engines``.
 """
