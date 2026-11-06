@@ -9,7 +9,10 @@ search. Step 1 is ``request`` and ``run``; steps 2 to 4 are ``regression``, ``de
 ``search``. Before each step the demo explains it, shows its commands and waits for Enter (not with
 ``--no-pause``); after it, it summarises the outcome from the files the step wrote. Each command
 runs in this process through ``__main__.main`` with its output captured, so it makes every check of
-the single command; the argv run is the argv shown, with every path relative to the demo folder.
+the single command; the argv run is the argv shown, with every path relative to the demo folder, and
+``--engine`` with the reference model added at its end, which the demo does not show: the demo
+always computes with the engine of ``delib-history``, whatever ``DELTARECON_ENGINE`` and
+``DELTARECON_ENGINE_PATH`` name.
 
 The repositories folder is worked out from the working directory before the demo changes into its
 folder, as every command does it (``run.repositories_folder``). A command gets ``--repositories``,
@@ -357,30 +360,19 @@ def table(header: tuple[str, ...], rows: list[tuple[str, ...]], right: set[int] 
             for entry in [header, *rows]]
 
 
-@contextlib.contextmanager
-def _without(*names: str):
-    """The environment without the variables ``names`` while the block runs."""
-    former = {name: os.environ.pop(name) for name in names if name in os.environ}
-    try:
-        yield
-    finally:
-        os.environ.update(former)
-
-
 def main_step(argv: list[str]) -> tuple[int, str]:
     """Run one command through ``__main__.main`` in this process: its exit status and its output.
 
-    The demo always computes with the reference model, the engine of ``delib-history``: while the
-    command runs, ``DELTARECON_ENGINE`` and ``DELTARECON_ENGINE_PATH`` are unset, and they return
-    afterwards.
+    The command runs with ``--engine`` and the reference model added, so the demo always computes
+    with the engine of ``delib-history``; given ``--engine``, a command reads neither
+    ``DELTARECON_ENGINE`` nor ``DELTARECON_ENGINE_PATH``.
     """
-    from .__main__ import ENGINE_PATH_VARIABLE, ENGINE_VARIABLE, main
+    from .__main__ import DEFAULT_ENGINE, main
 
     output = io.StringIO()
-    with _without(ENGINE_VARIABLE, ENGINE_PATH_VARIABLE), contextlib.redirect_stdout(output), \
-            contextlib.redirect_stderr(output):
+    with contextlib.redirect_stdout(output), contextlib.redirect_stderr(output):
         try:
-            status = main(argv)
+            status = main([*argv, "--engine", DEFAULT_ENGINE])
         except SystemExit as exit_:  # a usage error of argparse
             status = exit_.code if isinstance(exit_.code, int) else 2
     return status, output.getvalue()

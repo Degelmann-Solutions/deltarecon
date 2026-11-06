@@ -119,15 +119,16 @@ exists already, and 130 when it is interrupted.
 engine class ``--engine MODULE:CLASS`` names, else the one the environment variable
 ``DELTARECON_ENGINE`` names, else ``degelmann.deltarecon.engines.reference_model:ReferenceModel``,
 the reference model. ``--engine-path DIR``, else the folder ``DELTARECON_ENGINE_PATH`` names, is
-put on the import path before the class is loaded. An option wins over its variable, and an
-empty variable counts as unset. The class is called with the worker count alone: with no argument
+put on the import path before the class is loaded; the variable is read only when no
+``--engine`` is given, so ``--engine`` alone decides the engine. An option wins over its
+variable, and an empty variable counts as unset. The class is called with the worker count alone: with no argument
 when the command is given no ``--workers``, so the engine takes its count from the environment
 itself, with ``N`` for ``--workers N``, and with 1 for ``request`` and ``derive``. A selection
 that is not of the form ``MODULE:CLASS`` with an absolute module name, a module that is not found
 or whose import raises ``ImportError``, an attribute the module does not hold or that is not a
 class, and an engine path that is not a folder are usage errors. ``compare`` and ``quickstart`` take no such option, and
-``compare`` loads no engine. ``quickstart`` always computes with the reference model and
-ignores both variables. ``replay``, ``regression``, ``walk``, and ``search`` refuse a record of a
+``compare`` loads no engine. ``quickstart`` always computes with the reference model: it runs
+each command with ``--engine`` and the reference model, which it does not show. ``replay``, ``regression``, ``walk``, and ``search`` refuse a record of a
 stage whose quantities DeltaRecon does not hold (at present all but ``liability_cashflow``) with
 ``unsupported_stage`` before anything runs. ``request`` and ``regression`` still read the release from the clone
 of the reference model repository.
@@ -180,8 +181,9 @@ from .workers import WORKERS_VARIABLE, whole_number
 
 
 # The engine class a command loads: ``--engine <module>:<class>``, else this variable, else
-# the reference model. ``--engine-path``, else the path variable, names a folder that is put
-# on the import path first. An empty variable counts as unset.
+# the reference model. ``--engine-path`` names a folder that is put on the import path first;
+# the path variable does so only when no ``--engine`` is given (for the engine the engine
+# variable names, or the reference model), so ``--engine`` alone decides the engine. An empty variable counts as unset.
 ENGINE_VARIABLE = "DELTARECON_ENGINE"
 ENGINE_PATH_VARIABLE = "DELTARECON_ENGINE_PATH"
 DEFAULT_ENGINE = "degelmann.deltarecon.engines.reference_model:ReferenceModel"
@@ -195,11 +197,14 @@ def engine_class(spec: str | None = None, path: str | None = None):
     """The engine class a selection names, imported on use, so that parsing the command line
     and a command without an engine load no engine module.
 
+    ``path``, else ``DELTARECON_ENGINE_PATH`` when ``spec`` is not given (the engine then comes
+    from ``DELTARECON_ENGINE`` or is the reference model), is put on the import path first.
+
     Raises :class:`UsageError` when the folder is not a folder, the selection is not of the form
     ``<module>:<class>`` with an absolute module name, the module is not found or its import raises
     :class:`ImportError`, or the module has no such attribute or it is not a class.
     """
-    if path is None:
+    if path is None and spec is None:  # without --engine: the path variable belongs to the engine variable or the default
         path = os.environ.get(ENGINE_PATH_VARIABLE) or None
     if path is not None:
         folder = Path(path).resolve() if path else None
@@ -661,7 +666,7 @@ def main(argv: list[str] | None = None) -> int:
                                   f"{ENGINE_VARIABLE} names, else the reference model)")
         command.add_argument("--engine-path", metavar="DIR",
                              help="a folder to put on the import path before the engine is loaded "
-                                  f"(default: the folder {ENGINE_PATH_VARIABLE} names)")
+                                  f"(default: the folder {ENGINE_PATH_VARIABLE} names, read only without --engine)")
 
     for command in (request, regress):
         # The choices are reference_model.PATHS, written out so that loading this module does not import modelx.

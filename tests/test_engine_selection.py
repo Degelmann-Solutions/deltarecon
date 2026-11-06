@@ -91,6 +91,25 @@ def test_the_option_wins_over_the_variable(world, engines, monkeypatch):
     assert loaded("stub_engine_b") == [None]
 
 
+def test_the_path_variable_is_not_read_when_the_option_names_the_engine(world, engines, monkeypatch, capsys):
+    """With ``--engine`` the path variable is not read: its folder is not put on the import path, so
+    a module there cannot be named, and a missing folder there is no error."""
+    monkeypatch.setenv(ENGINE_PATH_VARIABLE, str(engines))
+    assert run_world(monkeypatch, world, "--engine", "stub_engine_a:Engine") == 2
+    assert "'stub_engine_a'" in capsys.readouterr().err and str(engines) not in sys.path
+    monkeypatch.setenv(ENGINE_PATH_VARIABLE, str(engines / "missing"))
+    assert command_line.engine_class(DEFAULT_ENGINE).__name__ == "ReferenceModel"  # no "is not a folder"
+
+
+def test_the_path_variable_belongs_to_the_engine_variable(monkeypatch):
+    """Without ``--engine`` and without ``DELTARECON_ENGINE`` the default engine is loaded; a missing
+    folder in the path variable is then a usage error, as before."""
+    monkeypatch.delenv(ENGINE_VARIABLE, raising=False)
+    monkeypatch.setenv(ENGINE_PATH_VARIABLE, "/no/such/folder")
+    with pytest.raises(command_line.UsageError, match="is not a folder"):
+        command_line.engine_class()
+
+
 def test_the_class_is_called_with_the_worker_count_of_the_command(world, engines, monkeypatch):
     assert run_world(monkeypatch, world, "--engine", "stub_engine_a:Engine", "--engine-path", engines,
                      "--workers", "3") == 0
