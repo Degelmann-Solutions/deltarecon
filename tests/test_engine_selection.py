@@ -222,6 +222,15 @@ def test_the_protocol_module_imports_the_standard_library_alone():
     assert done.stdout.strip() == "[]"
 
 
+def test_the_compared_quantities_are_those_the_reference_model_declares():
+    """The core copy of the quantities a compare checks against cannot drift from the adapter's."""
+    from degelmann.deltarecon.compare import COMPARED_QUANTITIES
+    from degelmann.deltarecon.engines.reference_model import STAGE_QUANTITIES, ReferenceModel
+    assert list(ReferenceModel.stages) == ["liability_cashflow"]
+    assert tuple(ReferenceModel.stages["liability_cashflow"]) == COMPARED_QUANTITIES["liability_cashflow"]
+    assert tuple(STAGE_QUANTITIES["liability_cashflow"]) == COMPARED_QUANTITIES["liability_cashflow"]
+
+
 def test_each_moved_name_is_one_class_wherever_it_is_imported_from():
     from degelmann.deltarecon.engines import reference_model
     assert documents.Rejection is protocol.Rejection is run.Rejection is reference_model.Rejection

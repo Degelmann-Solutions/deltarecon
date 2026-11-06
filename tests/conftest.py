@@ -390,7 +390,7 @@ class StubEngine:
     ``points.csv`` of the release folder of the request when ``input_data`` is held.
     """
 
-    stages = frozenset({"liability_cashflow"})
+    stages = {"liability_cashflow": ("Anzahl Verträge", "Netto-Cashflow")}  # the names of StubSession
     realisations = frozenset({"text_patch", "revision"})
     determines = frozenset({"release_folder", "input_data"})
     holdable = {"input_data": frozenset({"data"})}
@@ -769,7 +769,20 @@ def record(world: Path, name: str, engine=None, folder: str | None = None, furth
 
 
 class TwoStages(WalkStub):
-    stages = frozenset({"liability_cashflow", "other_stage"})
+    """The walk stub with a second stage, ``other_stage``, of quantity names of its own.
+
+    A session reports the names of the stage it was opened for, with the values and units of
+    :class:`StubSession`.
+    """
+
+    stages = {"liability_cashflow": ("Anzahl Verträge", "Netto-Cashflow"),
+              "other_stage": ("Bestand", "Zahlungsstrom")}
+
+    @contextmanager
+    def open(self, stage, release, enabled, manifest_dir, repositories, hold=frozenset()):
+        with super().open(stage, release, enabled, manifest_dir, repositories, hold) as session:
+            session.quantities = [(name, unit) for name, (_, unit) in zip(self.stages[stage], StubSession.quantities)]
+            yield session
 
 
 # --- the stub histories of the search ---

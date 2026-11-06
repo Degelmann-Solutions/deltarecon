@@ -20,9 +20,10 @@ from pathlib import Path
 import pytest
 
 from degelmann.deltarecon.__main__ import main
+from degelmann.deltarecon.compare import COMPARED_QUANTITIES
 from degelmann.deltarecon.documents import (RECORD_SCHEMA, RUN_SCHEMA, Rejection, document_bytes, read_document,
                                   schema_errors, sha256_file)
-from degelmann.deltarecon.run import STAGE_QUANTITIES, UsageError, run_request
+from degelmann.deltarecon.run import UsageError, run_request
 from degelmann.deltarecon.search import Target, read_target, restrict, search, walk_changes
 from degelmann.deltarecon.walk import prepare, read_walk_folder, walk
 
@@ -1007,7 +1008,7 @@ def test_what_the_walk_refuses_the_search_refuses(world, monkeypatch, capsys, ca
 @pytest.mark.parametrize("case, status", [("stage-mismatch", 1), ("failed-run", 2)])
 def test_a_stage_mismatch_or_a_failed_record_is_refused_as_by_the_walk(world, monkeypatch, capsys, case, status):
     build(world)
-    monkeypatch.setitem(STAGE_QUANTITIES, "other_stage", STAGE_QUANTITIES["liability_cashflow"])
+    monkeypatch.setitem(COMPARED_QUANTITIES, "other_stage", TwoStages.stages["other_stage"])
     older, newer = record(world, "w0", TwoStages()), record(world, "w4", TwoStages())
     if case == "stage-mismatch":
         newer = record(world, "w4", TwoStages(), folder="other", stage="other_stage")

@@ -167,6 +167,16 @@ def test_the_version_is_checked_before_the_schema(world):
     assert result.response["diagnostics"][0]["code"] == "unsupported_version"
 
 
+def test_a_session_name_outside_the_declared_domain_stops_the_run(world):
+    """The engine declares the domain; a session name outside it is an error of the core, as today."""
+    class NarrowEngine(StubEngine):
+        stages = {"liability_cashflow": ("Netto-Cashflow",)}
+
+    with pytest.raises(RuntimeError, match="the engine declares quantities the stage does not allow: "
+                                           "the domain reference defines no quantity 'Anzahl Verträge'"):
+        run_stub(world, engine=NarrowEngine())
+
+
 def test_unsupported_stage_is_rejected_with_a_record(world):
     result, engine = run_stub(world, stub_request(world, stage="asset_cashflow"))
     folder = world / "run"
@@ -1073,14 +1083,10 @@ def test_replay_rule_16_names_a_stage_mismatch(world):
     record["stage"] = "other_stage"
     (folder / "run-record.json").write_bytes(document_bytes(record))
     engine = StubEngine()
-    engine.stages = frozenset({"liability_cashflow", "other_stage"})
-    from degelmann.deltarecon import replay as replay_module, run as run_module
-    run_module.STAGE_QUANTITIES["other_stage"] = run_module.STAGE_QUANTITIES["liability_cashflow"]
-    try:
-        with pytest.raises(Rejection) as caught:
-            replay_module.replay(folder / "run-record.json", engine, repositories=world)
-    finally:
-        del run_module.STAGE_QUANTITIES["other_stage"]
+    engine.stages = {**StubEngine.stages, "other_stage": StubEngine.stages["liability_cashflow"]}
+    from degelmann.deltarecon import replay as replay_module
+    with pytest.raises(Rejection) as caught:
+        replay_module.replay(folder / "run-record.json", engine, repositories=world)
     assert caught.value.code == "stage_mismatch"
     assert not (folder / "replay").exists()
 

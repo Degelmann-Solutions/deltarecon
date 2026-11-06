@@ -10,7 +10,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from pathlib import Path
-from typing import ContextManager, Mapping, Protocol
+from typing import ContextManager, Mapping, Protocol, Sequence
 
 # An engine restores a release into a folder of the system's temporary folder whose name
 # starts with this prefix. A message of the outcome ``error`` names it ``<scratch>``.
@@ -121,7 +121,10 @@ class Engine(Protocol):
     ignores it.
     """
 
-    stages: frozenset[str]
+    # Each stage the engine supports, with the quantity names of its domain reference in domain
+    # order. The core admits a request of a stage named here alone and checks the names a
+    # session declares against that stage's domain (rule 7 of the run contract).
+    stages: Mapping[str, Sequence[str]]
     realisations: frozenset[str]  # the realisation types of a change the engine can apply
     determines: frozenset[str]    # the kinds of release reference one revision fixes
     # The kinds the engine can hold at the release of a request while revisions are enabled,

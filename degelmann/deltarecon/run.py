@@ -38,6 +38,7 @@ from contextlib import contextmanager
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
+from typing import Sequence
 
 from . import changes as changes_contract
 from .documents import (CHANGES_SCHEMA, CONTRACT_VERSION, RECORD_SCHEMA, RUN_REQUEST, RUN_SCHEMA,
@@ -58,17 +59,6 @@ REPOSITORIES_FOLDER = "repositories"
 REPOSITORIES_VARIABLE = "DELTARECON_REPOSITORIES"
 # The folder of the clone of the reference model repository below the repositories folder.
 CLONE_NAME = "delib-history"
-
-# The quantities of each stage, in the order of its domain reference.
-STAGE_QUANTITIES = {
-    "liability_cashflow": [
-        "Anzahl Verträge", "Bruttobeitrag", "Zahlbeitrag", "Beitragsverrechnung",
-        "garantierte Todesfallleistung", "garantierter Rückkaufswert",
-        "garantierte Erlebensfallleistung", "kalkulatorische Kosten",
-        "Kosten 2. Ordnung ohne Provisionen", "Provisionen", "Netto-Cashflow",
-    ],
-}
-
 
 def worker_outcome(call, *arguments) -> tuple[str, object]:
     """The outcome of ``call(*arguments)`` in a form a worker process returns: ``("ok", value)``, or
@@ -98,9 +88,12 @@ class RunResult:
     values: dict[tuple[str, int], list[float]] | None = field(default=None, repr=False)
 
 
-def quantity_errors(stage: str, names: list[str]) -> str | None:
-    """Rule 7: declared names are domain names, unique, and in domain order."""
-    domain = STAGE_QUANTITIES[stage]
+def quantity_errors(domain: Sequence[str], names: list[str]) -> str | None:
+    """Rule 7: declared names are names of ``domain``, unique, and in its order.
+
+    ``domain`` holds the quantity names of the domain reference of a stage, in domain order.
+    """
+    domain = list(domain)
     if not names:
         return "no quantity is declared"
     if len(set(names)) != len(names):
@@ -326,17 +319,18 @@ def project_target(session: Session, model_point_ids: list[str], target: dict, n
                                   model_point_ids)
 
 
-def calculate(session: Session, stage: str, selected: list[str], available: list[str],
+def calculate(session: Session, domain: Sequence[str], selected: list[str], available: list[str],
               names: list[str] | None = None, target: dict | None = None):
     """Project the selection. Return the export rows, the period ranges, and the failures.
 
+    ``domain`` holds the quantity names of the stage of the request, as the engine declares them.
     ``names`` are the quantity names the session declares; without them they are read. With
     ``target`` only the target quantities are projected, in the target window of each point; a
     point without a period in its window is left out.
     """
     if names is None:
         names = [name for name, _ in _engine(lambda: list(session.quantities))]
-    problem = quantity_errors(stage, names)
+    problem = quantity_errors(domain, names)
     if problem:
         raise RuntimeError(f"the engine declares quantities the stage does not allow: {problem}")
     # An id the release holds more than once fails in the core and is never projected.
@@ -496,7 +490,7 @@ def run_request(request_path: Path, engine: Engine, repositories: Path | None = 
     head = {"document": "run_response", "contract_version": CONTRACT_VERSION, **repeated}
     manifest_path, parameters, rows, values = None, [], None, None
     try:
-        if request["stage"] not in engine.stages or request["stage"] not in STAGE_QUANTITIES:
+        if request["stage"] not in engine.stages:
             raise Rejection("unsupported_stage", f"The stage {request['stage']} is not supported.")
         _engine(engine.resolve, request["stage"], request["release"], repositories)
         enabled = []
@@ -521,7 +515,7 @@ def run_request(request_path: Path, engine: Engine, repositories: Path | None = 
             _check_model_point_ids(selected)
             declared = _engine(lambda: [(name, unit) for name, unit in session.quantities])
             time_basis = {"id": _engine(lambda: session.time_basis)}
-            rows, ranges, failures = calculate(session, request["stage"], selected, available,
+            rows, ranges, failures = calculate(session, engine.stages[request["stage"]], selected, available,
                                                [name for name, _ in declared], target)
             quantities = [{"name": name, "unit": unit} for name, unit in declared
                           if target is None or name in target["quantities"]]

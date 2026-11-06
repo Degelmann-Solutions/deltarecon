@@ -18,10 +18,11 @@ import pytest
 
 from degelmann.deltarecon import changes as changes_contract
 from degelmann.deltarecon.__main__ import main
+from degelmann.deltarecon.compare import COMPARED_QUANTITIES
 from degelmann.deltarecon.derive import build_manifest, derive, remainder
 from degelmann.deltarecon.documents import CHANGES_SCHEMA, Rejection, document_bytes, read_document, schema_errors, sha256_file
 from degelmann.deltarecon.replay import replay
-from degelmann.deltarecon.run import STAGE_QUANTITIES, History, Revision, UsageError
+from degelmann.deltarecon.run import History, Revision, UsageError
 
 from conftest import (CLONE_NAME, LAPSE_TABLE, NEW_BUSINESS, PARAMS, POINTS, POINTS_B, PRODUCT_FOLDER, START,
                       REPOSITORIES, REPOSITORY_URL, ROOT, StubEngine, branch, change, cli, clone_state, commit,
@@ -311,11 +312,12 @@ def test_a_manifest_that_cannot_be_derived_is_rejected_with_its_code_and_writes_
 
 
 class TwoStages(HistoryStub):
-    stages = frozenset({"liability_cashflow", "other_stage"})
+    stages = {"liability_cashflow": StubEngine.stages["liability_cashflow"],
+              "other_stage": StubEngine.stages["liability_cashflow"]}
 
 
 def test_records_of_two_stages_are_a_stage_mismatch(world, monkeypatch, capsys):
-    monkeypatch.setitem(STAGE_QUANTITIES, "other_stage", STAGE_QUANTITIES["liability_cashflow"])
+    monkeypatch.setitem(COMPARED_QUANTITIES, "other_stage", TwoStages.stages["other_stage"])
     older = record(world, "r0", engine=TwoStages())
     newer = record(world, "r3", engine=TwoStages(), stage="other_stage")
     before = folder_hashes(world)

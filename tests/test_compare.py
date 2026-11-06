@@ -20,8 +20,8 @@ from pathlib import Path
 import pytest
 
 from degelmann.deltarecon.__main__ import main
-from degelmann.deltarecon.compare import (COMPARE_SCHEMA, CheckedRun, compare, compare_runs, exceeds, no_deviation,
-                                parameter_diff, read_tolerance, round_half_away)
+from degelmann.deltarecon.compare import (COMPARE_SCHEMA, COMPARED_QUANTITIES, CheckedRun, compare, compare_runs,
+                                          exceeds, no_deviation, parameter_diff, read_tolerance, round_half_away)
 from degelmann.deltarecon.export import read_deviations
 from degelmann.deltarecon.documents import RECORD_SCHEMA, Rejection, document_bytes, schema_errors, sha256_file
 from degelmann.deltarecon.run import UsageError
@@ -488,6 +488,9 @@ def engine_with(**attributes) -> StubEngine:
     session = type("OtherSession", (StubSession,), attributes)
 
     class OtherEngine(StubEngine):
+        # The whole domain of the stage, so that the run admits the names the session declares.
+        stages = {"liability_cashflow": COMPARED_QUANTITIES["liability_cashflow"]}
+
         @contextmanager
         def open(self, stage, release, enabled, manifest_dir, repositories, hold=frozenset()):
             with super().open(stage, release, enabled, manifest_dir, repositories, hold) as opened:
@@ -498,9 +501,9 @@ def engine_with(**attributes) -> StubEngine:
 
 
 def other_stage(world: Path, monkeypatch) -> None:
-    from degelmann.deltarecon import run as run_module
-    monkeypatch.setitem(run_module.STAGE_QUANTITIES, "other_stage",
-                        run_module.STAGE_QUANTITIES["liability_cashflow"])
+    from degelmann.deltarecon import compare as compare_module
+    monkeypatch.setitem(compare_module.COMPARED_QUANTITIES, "other_stage",
+                        compare_module.COMPARED_QUANTITIES["liability_cashflow"])
     run_side(world, "right")
     response = stored(world / "right" / "response.json")
     response["stage"] = "other_stage"

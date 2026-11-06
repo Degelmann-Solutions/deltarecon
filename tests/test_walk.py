@@ -17,10 +17,11 @@ from pathlib import Path
 import pytest
 
 from degelmann.deltarecon.__main__ import main
+from degelmann.deltarecon.compare import COMPARED_QUANTITIES
 from degelmann.deltarecon.documents import (RECORD_SCHEMA, RUN_SCHEMA, Rejection, document_bytes, read_document,
                                   schema_errors, sha256_file)
 from degelmann.deltarecon.replay import replay
-from degelmann.deltarecon.run import STAGE_QUANTITIES, UsageError, run_request
+from degelmann.deltarecon.run import UsageError, run_request
 from degelmann.deltarecon.walk import exact_sums, held_kinds, walk, written
 
 from conftest import (LAPSE_TABLE, MODEL_CODE, PARAMS, PARAMS_RATE, POINTS, POINTS_B, POINTS_E, POINT_TABLE,
@@ -358,9 +359,10 @@ def test_the_record_of_a_target_only_run_is_refused_and_nothing_runs(world, monk
 def test_a_target_only_record_is_refused_before_a_stage_mismatch(world, monkeypatch, side):
     """Rule 1 of the checks before the first run comes before rule 2."""
     build(world)
-    monkeypatch.setitem(STAGE_QUANTITIES, "other_stage", STAGE_QUANTITIES["liability_cashflow"])
+    monkeypatch.setitem(COMPARED_QUANTITIES, "other_stage", TwoStages.stages["other_stage"])
     older = record(world, "w0", TwoStages(), **target_only(side, "older"))
-    newer = record(world, "w4", TwoStages(), stage="other_stage", **target_only(side, "newer"))
+    target = {**TARGET, "quantities": [TwoStages.stages["other_stage"][0]]}  # the stage's own name
+    newer = record(world, "w4", TwoStages(), stage="other_stage", **({"target": target} if side == "newer" else {}))
     with pytest.raises(Rejection) as caught:
         run_walk(world, older, newer, TwoStages())
     assert caught.value.code == "target_only_record" and not (world / "walk").exists()
@@ -370,7 +372,7 @@ def test_a_target_only_record_is_refused_before_a_stage_mismatch(world, monkeypa
 def test_resolve_and_open_receive_the_stage_of_each_request(world, monkeypatch, stage):
     """The run, the walk, and the replay hand the engine the stage of the request."""
     build(world)
-    monkeypatch.setitem(STAGE_QUANTITIES, "other_stage", STAGE_QUANTITIES["liability_cashflow"])
+    monkeypatch.setitem(COMPARED_QUANTITIES, "other_stage", TwoStages.stages["other_stage"])
     engine = TwoStages()
     older, newer = record(world, "w0", engine, stage=stage), record(world, "w4", engine, stage=stage)
     assert engine.stages_received == [("resolve", stage), ("open", stage)] * 2
@@ -383,6 +385,43 @@ def test_resolve_and_open_receive_the_stage_of_each_request(world, monkeypatch, 
     again = TwoStages()
     assert replay(older, again, world).outcome == "reproduced_exactly"
     assert again.stages_received == [("resolve", stage), ("resolve", stage), ("open", stage)]
+
+
+@pytest.mark.parametrize("stage", ["liability_cashflow", "other_stage"])
+def test_a_run_of_each_declared_stage_names_the_quantities_the_engine_declares_for_it(world, stage):
+    build(world)
+    engine = TwoStages()
+    path = world / "stage-run" / "request.json"
+    path.parent.mkdir()
+    path.write_bytes(document_bytes(stub_request(world, stage=stage, release={
+        "label": "N", "references": StubEngine.references(world / "w0", "w0")})))
+    result = run_request(path, engine, repositories=world)
+    assert result.outcome == "succeeded", result.response
+    assert [q["name"] for q in result.response["quantities"]] == list(engine.stages[stage])
+    assert [q["unit"] for q in result.response["quantities"]] == ["policies", "EUR"]
+
+
+def test_a_run_of_a_stage_the_engine_does_not_declare_is_rejected(world):
+    build(world)
+    engine = TwoStages()
+    path = world / "stage-run" / "request.json"
+    path.parent.mkdir()
+    path.write_bytes(document_bytes(stub_request(world, stage="third_stage", release={
+        "label": "N", "references": StubEngine.references(world / "w0", "w0")})))
+    result = run_request(path, engine, repositories=world)
+    assert result.outcome == "rejected" and engine.opened == 0
+    assert result.response["diagnostics"][0]["code"] == "unsupported_stage"
+
+
+def test_a_replay_of_a_stage_the_core_holds_no_quantities_for_is_rejected(world):
+    """Until entry 12 the core checks a response only against the quantities it holds itself."""
+    build(world)
+    older = record(world, "w0", TwoStages(), stage="other_stage")
+    engine = TwoStages()
+    with pytest.raises(Rejection) as caught:
+        replay(older, engine, world)
+    assert caught.value.code == "unsupported_stage" and engine.opened == 0
+    assert not (older.parent / "replay").exists()
 
 
 def test_records_of_different_selections_are_refused(world):
@@ -409,7 +448,7 @@ def test_a_differing_engine_version_is_named_as_remainder(world):
                                           ("existing-output", 2)])
 def test_what_derive_refuses_the_walk_refuses_and_no_command_overwrites(world, monkeypatch, capsys, case, status):
     build(world)
-    monkeypatch.setitem(STAGE_QUANTITIES, "other_stage", STAGE_QUANTITIES["liability_cashflow"])
+    monkeypatch.setitem(COMPARED_QUANTITIES, "other_stage", TwoStages.stages["other_stage"])
     older, newer = record(world, "w0", TwoStages()), record(world, "w4", TwoStages())
     if case == "wrong-order":
         older, newer = newer, older

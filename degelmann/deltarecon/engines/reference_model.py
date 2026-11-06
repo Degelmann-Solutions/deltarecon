@@ -168,6 +168,15 @@ from ..run import CLONE_NAME, from_worker_outcome, worker_outcome
 from ..workers import ordered_map, worker_count
 
 STAGE = "liability_cashflow"
+# The quantities of each stage, in the order of its domain reference.
+STAGE_QUANTITIES = {
+    "liability_cashflow": [
+        "Anzahl Verträge", "Bruttobeitrag", "Zahlbeitrag", "Beitragsverrechnung",
+        "garantierte Todesfallleistung", "garantierter Rückkaufswert",
+        "garantierte Erlebensfallleistung", "kalkulatorische Kosten",
+        "Kosten 2. Ordnung ohne Provisionen", "Provisionen", "Netto-Cashflow",
+    ],
+}
 SOURCE = "git"
 REPOSITORY_URL = "https://github.com/Degelmann-Solutions/delib-history"
 PRODUCT_FOLDER = "risikolebensversicherung"
@@ -931,7 +940,7 @@ class ReferenceModel:
     """The engine of the stage ``liability_cashflow``: modelx with the model ``RLV_DE_S``,
     computed through its export or through modelx, as the engine version names."""
 
-    stages = frozenset({STAGE})
+    stages = {STAGE: tuple(STAGE_QUANTITIES[STAGE])}
     realisations = frozenset({changes_contract.TEXT_PATCH, changes_contract.REVISION})
     determines = DETERMINED_KINDS
     holdable = {"input_data": frozenset({"data"})}  # the model point table, the class ``data``
