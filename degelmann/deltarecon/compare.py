@@ -45,7 +45,7 @@ from .documents import (CONTRACT_VERSION, RECORD_SCHEMA, RUN_SCHEMA, Rejection, 
                         check_artifact, check_document, check_schema, check_version, parse_document,
                         read_document, schema_errors, strict_json_text, write_document, write_new)
 from .export import check_export, deviation_bytes, format_number, read_deviations
-from .run import STAGE_QUANTITIES, UsageError, _key_order, _typed_key, quantity_errors, run_record
+from .run import UsageError, _key_order, _typed_key, quantity_errors, run_record
 from .signature import signature_table
 
 COMPARE_SCHEMA = "compare.schema.json"
@@ -53,6 +53,18 @@ COMPARE_REQUEST = f"{COMPARE_SCHEMA}#/$defs/compare_request"
 TOLERANCE = f"{COMPARE_SCHEMA}#/$defs/tolerance"
 RESULT_NAME = "compare.result.json"
 RECORD_NAME = "compare.run-record.json"
+# The quantities of each stage a compare and a replay check run responses against, in the order
+# of its domain reference: a copy of what the reference model declares, kept here so that a
+# compare loads no engine. Entry 12 (contract 3.2) replaces it by the quantities the run
+# responses name.
+COMPARED_QUANTITIES = {
+    "liability_cashflow": (
+        "Anzahl Verträge", "Bruttobeitrag", "Zahlbeitrag", "Beitragsverrechnung",
+        "garantierte Todesfallleistung", "garantierter Rückkaufswert",
+        "garantierte Erlebensfallleistung", "kalkulatorische Kosten",
+        "Kosten 2. Ordnung ohne Provisionen", "Provisionen", "Netto-Cashflow",
+    ),
+}
 SIGNATURE_NAME = "signature-table.json"
 DEVIATIONS_NAME = "compare.deviations.csv"
 
@@ -413,9 +425,10 @@ def check_run(response: dict, folder: Path, side: str) -> CheckedRun:
     if response["outcome"] != "succeeded":
         raise Rejection(response["diagnostics"][0]["code"],
                         f"The {side} run was rejected; only a succeeded run is compared.")
-    if response["stage"] not in STAGE_QUANTITIES:
+    if response["stage"] not in COMPARED_QUANTITIES:
         raise Rejection("unsupported_stage", f"The stage {response['stage']} of the {side} run is not supported.")
-    problem = quantity_errors(response["stage"], [quantity["name"] for quantity in response["quantities"]])
+    problem = quantity_errors(COMPARED_QUANTITIES[response["stage"]],
+                              [quantity["name"] for quantity in response["quantities"]])
     if problem:  # rule 7
         raise Rejection("quantity_mismatch", f"The {side} run declares its quantities wrongly: {problem}.")
     export_path = check_artifact(folder, response["export"]["artifact"])  # rule 8
@@ -464,7 +477,7 @@ def _compare_request(request: dict, folder: Path,
     """
     paths = {}
     try:
-        if request["stage"] not in STAGE_QUANTITIES:
+        if request["stage"] not in COMPARED_QUANTITIES:
             raise Rejection("unsupported_stage", f"The stage {request['stage']} is not supported.")
         sides = (("left", request["left"]), ("right", request["right"]))
         for name, side in sides:

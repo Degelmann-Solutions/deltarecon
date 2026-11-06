@@ -47,7 +47,7 @@ def projected(revision: str, path: str) -> tuple[list[str], dict[str, object]]:
     """The model point ids of a state on one path and, per point, its values as ``float.hex``
     by period or the message of its failure."""
     release = {"label": "guard", "references": release_references(revision, revision, path)}
-    with ReferenceModel().open(release, [], None, REPOSITORIES) as session:
+    with ReferenceModel().open("liability_cashflow", release, [], None, REPOSITORIES) as session:
         ids = session.model_point_ids()
         points = {}
         for point in ids:

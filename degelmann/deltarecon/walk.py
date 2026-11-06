@@ -59,7 +59,7 @@ from .derive import CLASS_ORDER, build_manifest, read_derive_input, remainder
 from .documents import (CONTRACT_VERSION, RECORD_SCHEMA, RUN_SCHEMA, SCHEMA_FOLDERS, Rejection, artifact_reference,
                         check_artifact, copy_files, document_bytes, parse_document, read_document, sha256_file,
                         write_document, write_new)
-from .replay import RecordedRun, check_response
+from .replay import RecordedRun, check_compared_stage, check_response
 from .run import Engine, RunResult, UsageError, repositories_folder, run_record, run_request, run_request_document
 
 LOCALISE_SCHEMA = "localise.schema.json"
@@ -218,8 +218,12 @@ class Prepared:
 def prepare(older_record: Path | str, newer_record: Path | str, engine: Engine, repositories: Path,
             tolerance: Path | str | None, procedure: str = "walk") -> Prepared:
     """The checks of ``localise.md`` before the first run. A refusal raises a :class:`Rejection`."""
+    # The states are compared: a stage the core cannot compare is refused before anything runs,
+    # after the other refusals of the same record, as for a regression.
     older = read_derive_input(older_record, engine.stages)
+    check_compared_stage(older.record["stage"])
     newer = read_derive_input(newer_record, engine.stages)
+    check_compared_stage(newer.record["stage"])
     stage = older.record["stage"]
     if newer.record["stage"] != stage:
         raise Rejection("stage_mismatch", f"The older record names the stage {stage}, the newer one "
@@ -246,7 +250,7 @@ def prepare(older_record: Path | str, newer_record: Path | str, engine: Engine, 
                 raise Rejection("reference_mismatch", f"The references of the kind {kind} move with the states, "
                                 f"and the {'base' if side == OLDER else 'last'} revision does not name what the "
                                 f"{side} record names.")
-    engine.resolve(base, repositories)
+    engine.resolve(stage, base, repositories)
     return Prepared(older, newer, profile, manifest, hold, base, dict(holdable))
 
 

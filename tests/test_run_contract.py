@@ -167,6 +167,16 @@ def test_the_version_is_checked_before_the_schema(world):
     assert result.response["diagnostics"][0]["code"] == "unsupported_version"
 
 
+def test_a_session_name_outside_the_declared_domain_stops_the_run(world):
+    """The engine declares the domain; a session name outside it is an error of the core, as today."""
+    class NarrowEngine(StubEngine):
+        stages = {"liability_cashflow": ("Netto-Cashflow",)}
+
+    with pytest.raises(RuntimeError, match="the engine declares quantities the stage does not allow: "
+                                           "the domain reference defines no quantity 'Anzahl Verträge'"):
+        run_stub(world, engine=NarrowEngine())
+
+
 def test_unsupported_stage_is_rejected_with_a_record(world):
     result, engine = run_stub(world, stub_request(world, stage="asset_cashflow"))
     folder = world / "run"
@@ -619,17 +629,17 @@ class ScratchEngine(StubEngine):
             raise self.error(f"first line\ncannot read {self.scratch}/rel/points.csv beside "
                              f"{Path(repositories).resolve()}/rel/params.csv")
 
-    def resolve(self, release, repositories):
+    def resolve(self, stage, release, repositories):
         self.scratch = Path(tempfile.gettempdir()) / f"{SCRATCH_PREFIX}resolve"
         self.fail("resolve", repositories)
-        super().resolve(release, repositories)
+        super().resolve(stage, release, repositories)
 
     @contextmanager
-    def open(self, release, enabled, manifest_dir, repositories, hold=frozenset()):
+    def open(self, stage, release, enabled, manifest_dir, repositories, hold=frozenset()):
         with tempfile.TemporaryDirectory(prefix=SCRATCH_PREFIX) as scratch:
             self.scratch = scratch
             self.fail("enter", repositories)
-            with super().open(release, enabled, manifest_dir, repositories, hold) as session:
+            with super().open(stage, release, enabled, manifest_dir, repositories, hold) as session:
                 for name in ("model_point_ids", "parameters"):
                     if self.where == name:
                         setattr(session, name, lambda name=name: self.fail(name, repositories))
@@ -741,11 +751,11 @@ class AnyRelease(StubEngine):
         return folder
 
     @contextmanager
-    def open(self, release, enabled, manifest_dir, repositories, hold=frozenset()):
+    def open(self, stage, release, enabled, manifest_dir, repositories, hold=frozenset()):
         with tempfile.TemporaryDirectory(prefix=SCRATCH_PREFIX) as scratch:
             if self.raises:
                 raise ReadError(f"the table {scratch}/tables/lapse_table.csv has no column policy_year")
-            with super().open(release, enabled, manifest_dir, repositories, hold) as session:
+            with super().open(stage, release, enabled, manifest_dir, repositories, hold) as session:
                 yield session
 
 
@@ -1073,14 +1083,10 @@ def test_replay_rule_16_names_a_stage_mismatch(world):
     record["stage"] = "other_stage"
     (folder / "run-record.json").write_bytes(document_bytes(record))
     engine = StubEngine()
-    engine.stages = frozenset({"liability_cashflow", "other_stage"})
-    from degelmann.deltarecon import replay as replay_module, run as run_module
-    run_module.STAGE_QUANTITIES["other_stage"] = run_module.STAGE_QUANTITIES["liability_cashflow"]
-    try:
-        with pytest.raises(Rejection) as caught:
-            replay_module.replay(folder / "run-record.json", engine, repositories=world)
-    finally:
-        del run_module.STAGE_QUANTITIES["other_stage"]
+    engine.stages = {**StubEngine.stages, "other_stage": StubEngine.stages["liability_cashflow"]}
+    from degelmann.deltarecon import replay as replay_module
+    with pytest.raises(Rejection) as caught:
+        replay_module.replay(folder / "run-record.json", engine, repositories=world)
     assert caught.value.code == "stage_mismatch"
     assert not (folder / "replay").exists()
 
@@ -1262,8 +1268,8 @@ class CoreBreaker(StubEngine):
     """An engine whose inventory the record does not allow: an error of the core stops the run."""
 
     @contextmanager
-    def open(self, release, enabled, manifest_dir, repositories, hold=frozenset()):
-        with super().open(release, enabled, manifest_dir, repositories, hold) as session:
+    def open(self, stage, release, enabled, manifest_dir, repositories, hold=frozenset()):
+        with super().open(stage, release, enabled, manifest_dir, repositories, hold) as session:
             session.parameters = lambda: [{"name": "rate", "type": "scalar"}]
             yield session
 
@@ -1271,7 +1277,7 @@ class CoreBreaker(StubEngine):
 class OpenBreaks(StubEngine):
     """An engine that raises while it restores the release: the run ends with the outcome error."""
 
-    def open(self, release, enabled, manifest_dir, repositories, hold=frozenset()):
+    def open(self, stage, release, enabled, manifest_dir, repositories, hold=frozenset()):
         raise RuntimeError("the engine broke")
 
 
@@ -1409,8 +1415,8 @@ def test_regression_of_an_unchanged_release_shows_no_deviation(world, capsys):
 
 class OtherTimeBasis(StubEngine):
     @contextmanager
-    def open(self, release, enabled, manifest_dir, repositories, hold=frozenset()):
-        with super().open(release, enabled, manifest_dir, repositories, hold) as session:
+    def open(self, stage, release, enabled, manifest_dir, repositories, hold=frozenset()):
+        with super().open(stage, release, enabled, manifest_dir, repositories, hold) as session:
             if release["label"] == "regression":
                 session.time_basis = "valuation_year"
             yield session
@@ -2057,7 +2063,7 @@ def test_projection_releases_the_item_space_of_each_point(tmp_path, path):
     edit_file(clone, POINT_TABLE, lines[15] + "\n", with_columns(columns, lines[15], duration_y=term) + "\n")
     revision = commit(clone, "Set a duration that equals the term")
     release = {"label": "N", "references": release_references(revision, path=path)}
-    with ReferenceModel().open(release, [], None, repositories) as session:
+    with ReferenceModel().open("liability_cashflow", release, [], None, repositories) as session:
         projection = session._computing.Projection
         assert (projection is session._model.Projection) == (path == "modelx")
 
@@ -3057,7 +3063,7 @@ def test_the_reference_engine_exports_a_product_folder_once_per_engine_object(tm
     points = [NEW_BUSINESS, in_force_id()]
 
     def projected(enabled=(), manifest_dir=None, use=release) -> list:
-        with engine.open(use, list(enabled), manifest_dir, REPOSITORIES) as session:
+        with engine.open("liability_cashflow", use, list(enabled), manifest_dir, REPOSITORIES) as session:
             assert (session._state / PRODUCT_FOLDER / reference_model.EXPORT_FOLDER).is_dir()
             return [session.project(point) for point in points] if use is release else []
 
@@ -3160,8 +3166,8 @@ def test_the_replay_still_repeats_a_target_only_run(world):
 
 class _NoTargetEngine(StubEngine):
     @contextmanager
-    def open(self, release, enabled, manifest_dir, repositories, hold=frozenset()):
-        with super().open(release, enabled, manifest_dir, repositories, hold) as session:
+    def open(self, stage, release, enabled, manifest_dir, repositories, hold=frozenset()):
+        with super().open(stage, release, enabled, manifest_dir, repositories, hold) as session:
             session.project_target = None  # a session that cannot compute a target
             yield session
 

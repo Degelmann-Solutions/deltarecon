@@ -34,13 +34,13 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 from . import changes as changes_contract
-from .compare import (COMPARE_REQUEST, CompareResult, compare, compare_request_document, no_deviation,
-                      read_tolerance)
+from .compare import (COMPARE_REQUEST, COMPARED_QUANTITIES, CompareResult, compare, compare_request_document,
+                      no_deviation, read_tolerance)
 from .documents import (CHANGES_SCHEMA, CONTRACT_VERSION, RECORD_SCHEMA, RUN_REQUEST, RUN_SCHEMA,
                         Rejection, artifact_reference, check_artifact, copy_files, document_bytes,
                         parse_document, read_document, same_release, write_document)
 from .export import check_export
-from .run import (RECORD_NAME, STAGE_QUANTITIES, Engine, UsageError, quantity_errors,
+from .run import (RECORD_NAME, Engine, UsageError, quantity_errors,
                   repositories_folder, run_record, run_request)
 
 # The contract versions of the run records a replay repeats; a 1.0 record is not replayed.
@@ -122,6 +122,12 @@ def check_repeated(request: dict, response: dict) -> None:
                         "identity, change set, selection, and target of its request.")
 
 
+def check_compared_stage(stage: str) -> None:
+    """Refuse a stage whose quantities the core does not hold to check a response against."""
+    if stage not in COMPARED_QUANTITIES:
+        raise Rejection("unsupported_stage", f"The stage {stage} is not supported.")
+
+
 def check_response(request: dict, response: dict, folder: Path, values: dict | None = None) -> dict:
     """Rules 6 to 13 of the run contract for a succeeded response. Return the export values.
 
@@ -131,7 +137,9 @@ def check_response(request: dict, response: dict, folder: Path, values: dict | N
     wrote the export and the response from those values.
     """
     check_repeated(request, response)  # rule 6
-    problem = quantity_errors(response["stage"], [q["name"] for q in response["quantities"]])  # rule 7
+    check_compared_stage(response["stage"])
+    problem = quantity_errors(COMPARED_QUANTITIES[response["stage"]],
+                              [q["name"] for q in response["quantities"]])  # rule 7
     if problem:
         raise Rejection("quantity_mismatch", f"The response declares its quantities wrongly: {problem}.")
     if values is not None:
@@ -154,7 +162,7 @@ def read_recorded_run(record_path: Path, stages, allow_error: bool = False) -> R
         raise UsageError(f"no run record at {record_path}")
     record = read_document(record_path, RECORD_SCHEMA)
     stage = record["stage"]
-    if stage not in stages or stage not in STAGE_QUANTITIES:
+    if stage not in stages:
         raise Rejection("unsupported_stage", f"The stage {stage} is not supported.")
     outcomes = ("succeeded", "error") if allow_error else ("succeeded",)
     if record["procedure"]["type"] != "run" or record["outcome"] not in outcomes:
@@ -246,6 +254,7 @@ def replay(record_path: Path, engine: Engine, repositories: Path | None = None,
         raise UsageError(f"no tolerance file at {tolerance}")
 
     recorded = read_recorded_run(record_path, engine.stages, allow_error=True)
+    check_compared_stage(recorded.record["stage"])
     if recorded.record["contract_version"] not in REPLAY_VERSIONS:
         raise Rejection("unsupported_version",
                         f"The replay repeats only runs recorded under contract version "
@@ -259,7 +268,7 @@ def replay(record_path: Path, engine: Engine, repositories: Path | None = None,
     # refuses the replay. For a run that ended with an error, any other exception of the
     # engine is left to the repeated run, which records it as its outcome.
     try:
-        engine.resolve(request["release"], repositories)
+        engine.resolve(request["stage"], request["release"], repositories)
     except (Rejection, UsageError):
         raise
     except Exception:

@@ -680,3 +680,21 @@ def test_the_command_line_passes_its_options(monkeypatch):
     assert seen == {"lang": "en", "pause": False, "repositories": "x"}
     assert main(["quickstart"]) == 0
     assert seen == {"lang": "de", "pause": True, "repositories": None}
+
+
+def test_the_demo_computes_with_the_reference_model_whatever_the_engine_variables_say(monkeypatch, tmp_path):
+    """Each step runs with ``--engine`` and the reference model added, so neither engine variable
+    reaches it; the shown argv stays without the option."""
+    from degelmann.deltarecon import __main__ as command_line
+    monkeypatch.setenv(command_line.ENGINE_VARIABLE, "no_such_engine_module:Engine")
+    monkeypatch.setenv(command_line.ENGINE_PATH_VARIABLE, str(tmp_path / "missing"))
+    loaded = []
+    real = command_line.engine_class
+    monkeypatch.setattr(command_line, "engine_class", lambda *selection: loaded.append(real(*selection)) or loaded[-1])
+    shown = ["run", str(tmp_path / "request.json")]  # through the real main: the request is missing
+    status, output = demo.main_step(shown)
+    assert [cls.__name__ for cls in loaded] == ["ReferenceModel"]
+    assert "no_such_engine_module" not in output and "is not a folder" not in output
+    assert shown == ["run", str(tmp_path / "request.json")]
+    for clone in (None, "../repositories"):
+        assert all("--engine" not in argv for argv in demo.steps("tolerance-bruttobeitrag.json", clone).values())

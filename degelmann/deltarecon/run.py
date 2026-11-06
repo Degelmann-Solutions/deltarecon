@@ -1,9 +1,10 @@
 """The run procedure of ``contracts/v3/run.md``.
 
 A run reads a run request and writes, beside it, the response, the per-model-point
-export, and the run record. The calculation sits behind the :class:`Engine` protocol; this
-module knows no engine. An engine restores the release state a request names and applies
-the enabled changes to it; this module copies no release and applies no change.
+export, and the run record. The calculation sits behind the
+:class:`~degelmann.deltarecon.protocol.Engine` protocol; this module knows no engine. An
+engine restores the release state a request names and applies the enabled changes to it;
+this module copies no release and applies no change.
 
 Order of the request checks: JSON profile, contract version, schema, stage, release
 references, manifest and patch artifacts, manifest rules, combination rules, the held kinds
@@ -37,15 +38,17 @@ from contextlib import contextmanager
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import ContextManager, Mapping, Protocol
+from typing import Sequence
 
 from . import changes as changes_contract
-from .errors import UsageError  # re-exported: other modules and the tests import it from here
 from .documents import (CHANGES_SCHEMA, CONTRACT_VERSION, RECORD_SCHEMA, RUN_REQUEST, RUN_SCHEMA,
                         Rejection, artifact_reference, check_artifact, check_schema, check_version,
                         new_record_id, parse_document, read_document, schema_errors, validator,
                         write_document)
 from .export import write_export
+# Re-exported: other modules and the tests import these names from here.
+from .protocol import (SCRATCH_PREFIX, Engine, History, ModelPointFailure, Revision, Session,  # noqa: F401
+                       UsageError)
 
 RESPONSE_NAME = "response.json"
 EXPORT_NAME = "results.csv"
@@ -56,24 +59,6 @@ REPOSITORIES_FOLDER = "repositories"
 REPOSITORIES_VARIABLE = "DELTARECON_REPOSITORIES"
 # The folder of the clone of the reference model repository below the repositories folder.
 CLONE_NAME = "delib-history"
-# An engine restores a release into a folder of the system's temporary folder whose name
-# starts with this prefix. A message of the outcome ``error`` names it ``<scratch>``.
-SCRATCH_PREFIX = "deltarecon-"
-
-# The quantities of each stage, in the order of its domain reference.
-STAGE_QUANTITIES = {
-    "liability_cashflow": [
-        "Anzahl Verträge", "Bruttobeitrag", "Zahlbeitrag", "Beitragsverrechnung",
-        "garantierte Todesfallleistung", "garantierter Rückkaufswert",
-        "garantierte Erlebensfallleistung", "kalkulatorische Kosten",
-        "Kosten 2. Ordnung ohne Provisionen", "Provisionen", "Netto-Cashflow",
-    ],
-}
-
-
-class ModelPointFailure(Exception):
-    """The engine could not calculate one model point."""
-
 
 def worker_outcome(call, *arguments) -> tuple[str, object]:
     """The outcome of ``call(*arguments)`` in a form a worker process returns: ``("ok", value)``, or
@@ -90,136 +75,6 @@ def from_worker_outcome(outcome: tuple[str, object]):
     return value if kind == "ok" else ModelPointFailure(value)
 
 
-class Session(Protocol):
-    """One release state, opened for a run."""
-
-    time_basis: str
-    quantities: list[tuple[str, str]]  # name and unit, in export column order
-
-    def model_point_ids(self) -> list[str]:
-        """The public id of every model point of the release state, repeats included."""
-
-    def project(self, model_point_id: str) -> list[tuple[int, list[float]]]:
-        """The periods of one model point with one value per quantity.
-
-        Raises :class:`ModelPointFailure` when the model point cannot be calculated.
-        """
-
-    # A session may also offer ``project_many(model_point_ids)``: the outcome of each id in
-    # the given order, its periods as ``project`` returns them or the ModelPointFailure that
-    # ``project`` would raise. Any other exception propagates. A session without it is
-    # projected point by point through ``project``.
-    #
-    # A session that computes a target offers ``project_target(model_point_ids, quantities,
-    # periods)``: ``quantities`` are names the session declares, in its declared order, and
-    # ``periods`` is ``(first, last)`` in projection periods or ``None``. The outcome of each id
-    # in the given order is a ModelPointFailure or the periods of its target window, with one
-    # value per name of ``quantities``: from the period of its valuation date s plus ``first`` to
-    # the lesser of s plus ``last`` and its last period, or every period without ``periods``. A
-    # point whose window is empty has no period. No model check is evaluated: a point fails only
-    # when a target value cannot be calculated. A session without it cannot run a target.
-
-    def parameters(self) -> list[dict]:
-        """The parameter inventory of the release state, in the form of the run record.
-
-        The order of the parameters and of the rows of a keyed table carries no meaning.
-        """
-
-
-@dataclass(frozen=True)
-class Revision:
-    """One revision on the main line of a history, as an engine reports it."""
-
-    id: str                 # the full identifier of the revision
-    message: str            # its log message as written; it may be empty
-    classes: frozenset[str]  # the classes of the paths it touches: data, parameter, code
-
-
-@dataclass(frozen=True)
-class History:
-    """The history between two release identities."""
-
-    source: str                # the kind of history, for example ``git``
-    older: str                 # the identifier of the older revision
-    newer: str                 # the identifier of the newer revision
-    revisions: tuple[Revision, ...]  # the main line after ``older`` up to ``newer``, oldest first
-
-
-class Engine(Protocol):
-    """A calculation engine behind the run contract."""
-
-    stages: frozenset[str]
-    realisations: frozenset[str]  # the realisation types of a change the engine can apply
-    determines: frozenset[str]    # the kinds of release reference one revision fixes
-    # The kinds the engine can hold at the release of a request while revisions are enabled,
-    # each with the classes of the paths that carry it, for example ``input_data``: ``data``.
-    holdable: Mapping[str, frozenset[str]]
-
-    def resolve(self, release: dict, repositories: Path) -> None:
-        """Check that the release identity names a state the engine can restore.
-
-        ``repositories`` is the folder that holds what the engine restores a release from,
-        for example local clones. Nothing is restored and nothing is written.
-
-        Raises a :class:`Rejection` with ``unknown_reference`` when the references cannot
-        be resolved.
-        """
-
-    def open(self, release: dict, enabled: list[dict], manifest_dir: Path | None,
-             repositories: Path, hold: frozenset[str] = frozenset()) -> ContextManager[Session]:
-        """Restore the release state, apply the enabled changes, and open it for reading.
-
-        ``enabled`` holds the enabled changes in application order; every one has a
-        realisation type the engine declares. ``manifest_dir`` is the folder of the change
-        manifest, which the paths of its artifacts are relative to; it is ``None`` when no
-        change is enabled. What ``repositories`` holds is never altered. A scratch folder
-        is created in the system's temporary folder with a name that starts with
-        :data:`SCRATCH_PREFIX`.
-
-        For changes of the type ``revision`` the engine restores the state after the last
-        enabled revision. ``hold`` names the kinds of release reference it then takes from
-        ``release`` instead of from that revision; each is a kind of ``holdable``.
-
-        Raises a :class:`Rejection` with ``invalid_manifest`` when a change does not apply.
-        Any other exception, here or from a call of the session other than ``project``,
-        ends the run with the outcome ``error``.
-        """
-
-    def history(self, older: dict, newer: dict, repositories: Path) -> History:
-        """The history between the revisions two release identities name.
-
-        Which references of an identity name its revision is the engine's matter; it reads
-        no reference that a revision does not fix and does not check its own version. The
-        result lists every revision on the main line after the older one, up to and
-        including the newer one, each with its log message and the classes of the paths it
-        touches against the revision before it. It is empty when both identities name one
-        revision. Nothing is restored and nothing is written.
-
-        The message is the text of the revision as it was written, decoded by the engine:
-        bytes that are not UTF-8 become U+FFFD. The line breaks at its end stay; the caller
-        removes them and puts the identifier in the place of an empty message.
-
-        Raises a :class:`Rejection` with ``unknown_reference`` when an identity names no
-        revision the engine can read, and with ``unrelated_revisions`` when the older
-        revision does not lie on the main line of the newer one. Raises a
-        :class:`UsageError` when the history at hand is cut off.
-        """
-
-    def state_release(self, base: dict, revision: str | None, hold: frozenset[str],
-                      repositories: Path) -> dict:
-        """The release identity of the state after ``revision``, as this engine would record it.
-
-        ``base`` is a recorded release identity, of any engine version. The result has the
-        label of ``base``, names the present engine, on the computation path ``base`` names
-        when the engine has several, and names the state after ``revision``
-        with the kinds in ``hold`` taken from ``base``; for ``revision`` ``None`` it names
-        the state of ``base`` itself. Nothing is restored and nothing is written.
-
-        Raises a :class:`Rejection` with ``unknown_reference`` when ``base`` names no state
-        the engine can read.
-        """
-
-
 @dataclass
 class RunResult:
     outcome: str
@@ -233,9 +88,12 @@ class RunResult:
     values: dict[tuple[str, int], list[float]] | None = field(default=None, repr=False)
 
 
-def quantity_errors(stage: str, names: list[str]) -> str | None:
-    """Rule 7: declared names are domain names, unique, and in domain order."""
-    domain = STAGE_QUANTITIES[stage]
+def quantity_errors(domain: Sequence[str], names: list[str]) -> str | None:
+    """Rule 7: declared names are names of ``domain``, unique, and in its order.
+
+    ``domain`` holds the quantity names of the domain reference of a stage, in domain order.
+    """
+    domain = list(domain)
     if not names:
         return "no quantity is declared"
     if len(set(names)) != len(names):
@@ -347,13 +205,13 @@ def _engine(call, *arguments):
 
 
 @contextmanager
-def _opened(engine: Engine, release: dict, enabled: list[dict], manifest_dir: Path | None,
+def _opened(engine: Engine, stage: str, release: dict, enabled: list[dict], manifest_dir: Path | None,
             repositories: Path, hold: frozenset[str] = frozenset()):
     """``engine.open`` with every exception of entering or leaving it as an engine error.
 
     An exception of the body wins over one that leaving raises while the body unwinds.
     """
-    context = _engine(engine.open, release, enabled, manifest_dir, repositories, hold)
+    context = _engine(engine.open, stage, release, enabled, manifest_dir, repositories, hold)
     session = _engine(context.__enter__)
     try:
         yield session
@@ -461,17 +319,18 @@ def project_target(session: Session, model_point_ids: list[str], target: dict, n
                                   model_point_ids)
 
 
-def calculate(session: Session, stage: str, selected: list[str], available: list[str],
+def calculate(session: Session, domain: Sequence[str], selected: list[str], available: list[str],
               names: list[str] | None = None, target: dict | None = None):
     """Project the selection. Return the export rows, the period ranges, and the failures.
 
+    ``domain`` holds the quantity names of the stage of the request, as the engine declares them.
     ``names`` are the quantity names the session declares; without them they are read. With
     ``target`` only the target quantities are projected, in the target window of each point; a
     point without a period in its window is left out.
     """
     if names is None:
         names = [name for name, _ in _engine(lambda: list(session.quantities))]
-    problem = quantity_errors(stage, names)
+    problem = quantity_errors(domain, names)
     if problem:
         raise RuntimeError(f"the engine declares quantities the stage does not allow: {problem}")
     # An id the release holds more than once fails in the core and is never projected.
@@ -631,16 +490,17 @@ def run_request(request_path: Path, engine: Engine, repositories: Path | None = 
     head = {"document": "run_response", "contract_version": CONTRACT_VERSION, **repeated}
     manifest_path, parameters, rows, values = None, [], None, None
     try:
-        if request["stage"] not in engine.stages or request["stage"] not in STAGE_QUANTITIES:
+        if request["stage"] not in engine.stages:
             raise Rejection("unsupported_stage", f"The stage {request['stage']} is not supported.")
-        _engine(engine.resolve, request["release"], repositories)
+        _engine(engine.resolve, request["stage"], request["release"], repositories)
         enabled = []
         if request["changes"]["enabled"]:  # the empty set is always valid and needs no manifest
             manifest_path = check_artifact(folder, request["changes"]["manifest"])
             enabled = load_change_set(request, manifest_path, engine.realisations)
         hold = changes_contract.check_hold(request, enabled, engine.holdable)
         manifest_dir = manifest_path.parent if enabled else None
-        with _opened(engine, request["release"], enabled, manifest_dir, repositories, hold) as session:
+        with _opened(engine, request["stage"], request["release"], enabled, manifest_dir, repositories,
+                     hold) as session:
             inventory = read_inventory(session)
             parameters = inventory
             available = _engine(lambda: list(session.model_point_ids()))
@@ -655,7 +515,7 @@ def run_request(request_path: Path, engine: Engine, repositories: Path | None = 
             _check_model_point_ids(selected)
             declared = _engine(lambda: [(name, unit) for name, unit in session.quantities])
             time_basis = {"id": _engine(lambda: session.time_basis)}
-            rows, ranges, failures = calculate(session, request["stage"], selected, available,
+            rows, ranges, failures = calculate(session, engine.stages[request["stage"]], selected, available,
                                                [name for name, _ in declared], target)
             quantities = [{"name": name, "unit": unit} for name, unit in declared
                           if target is None or name in target["quantities"]]

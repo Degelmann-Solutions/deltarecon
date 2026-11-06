@@ -390,7 +390,7 @@ class StubEngine:
     ``points.csv`` of the release folder of the request when ``input_data`` is held.
     """
 
-    stages = frozenset({"liability_cashflow"})
+    stages = {"liability_cashflow": ("Anzahl Verträge", "Netto-Cashflow")}  # the names of StubSession
     realisations = frozenset({"text_patch", "revision"})
     determines = frozenset({"release_folder", "input_data"})
     holdable = {"input_data": frozenset({"data"})}
@@ -399,6 +399,7 @@ class StubEngine:
     def __init__(self):
         self.opened = 0
         self.received = []  # the enabled changes of the last call of ``open``
+        self.stages_received = []  # ("resolve" or "open", stage) of every call, in order
 
     def history(self, older, newer, repositories):
         """The part of ``line`` after the folder of ``older`` up to the folder of ``newer``."""
@@ -439,12 +440,14 @@ class StubEngine:
             raise Rejection("unknown_reference", "The references do not name the release state.")
         return folder
 
-    def resolve(self, release, repositories):
+    def resolve(self, stage, release, repositories):
+        self.stages_received.append(("resolve", stage))
         self._folder(release, repositories)
 
     @contextmanager
-    def open(self, release, enabled, manifest_dir, repositories, hold=frozenset()):
+    def open(self, stage, release, enabled, manifest_dir, repositories, hold=frozenset()):
         """Restore the state to a scratch folder and apply the text patches there."""
+        self.stages_received.append(("open", stage))
         folder = self._folder(release, repositories)
         revisions = [c["realisation"]["revision"] for c in enabled if c["realisation"]["type"] == "revision"]
         with tempfile.TemporaryDirectory() as scratch:
@@ -526,8 +529,8 @@ class WorkerStub(StubEngine):
         self.workers, self.asked = workers, []
 
     @contextmanager
-    def open(self, release, enabled, manifest_dir, repositories, hold=frozenset()):
-        with super().open(release, enabled, manifest_dir, repositories, hold) as session:
+    def open(self, stage, release, enabled, manifest_dir, repositories, hold=frozenset()):
+        with super().open(stage, release, enabled, manifest_dir, repositories, hold) as session:
             yield WorkerSession(session.folder, self)
 
 
@@ -728,12 +731,12 @@ class WalkStub(StubEngine):
         return super()._folder({**release, "references": kept}, repositories)
 
     @contextmanager
-    def open(self, release, enabled, manifest_dir, repositories, hold=frozenset()):
+    def open(self, stage, release, enabled, manifest_dir, repositories, hold=frozenset()):
         revisions = [c["realisation"]["revision"] for c in enabled if c["realisation"]["type"] == "revision"]
         name = revisions[-1] if revisions else self._folder(release, repositories).name
         if name in self.broken:
             raise RuntimeError(f"the state {name} cannot be read")
-        with super().open(release, enabled, manifest_dir, repositories, hold) as session:
+        with super().open(stage, release, enabled, manifest_dir, repositories, hold) as session:
             session.__class__ = WalkSession
             delta = self.drift.get(name)
             if delta is not None:
@@ -766,7 +769,20 @@ def record(world: Path, name: str, engine=None, folder: str | None = None, furth
 
 
 class TwoStages(WalkStub):
-    stages = frozenset({"liability_cashflow", "other_stage"})
+    """The walk stub with a second stage, ``other_stage``, of quantity names of its own.
+
+    A session reports the names of the stage it was opened for, with the values and units of
+    :class:`StubSession`.
+    """
+
+    stages = {"liability_cashflow": ("Anzahl Verträge", "Netto-Cashflow"),
+              "other_stage": ("Bestand", "Zahlungsstrom")}
+
+    @contextmanager
+    def open(self, stage, release, enabled, manifest_dir, repositories, hold=frozenset()):
+        with super().open(stage, release, enabled, manifest_dir, repositories, hold) as session:
+            session.quantities = [(name, unit) for name, (_, unit) in zip(self.stages[stage], StubSession.quantities)]
+            yield session
 
 
 # --- the stub histories of the search ---

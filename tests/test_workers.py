@@ -176,7 +176,7 @@ def test_the_workers_give_the_bits_and_the_messages_of_the_parent(path, unknown_
     from degelmann.deltarecon.engines.reference_model import ReferenceModel, release_references
     repositories, revision, ids, index = unknown_sex
     release = {"label": "N", "references": release_references(revision, path=path)}
-    with ReferenceModel(workers=3).open(release, [], None, repositories) as session:
+    with ReferenceModel(workers=3).open("liability_cashflow", release, [], None, repositories) as session:
         pooled = session.project_many(ids)
         alone = []
         for point in ids:
@@ -204,7 +204,7 @@ def test_one_worker_projects_in_the_parent_without_a_pool(monkeypatch, unknown_s
 
     monkeypatch.setattr(reference_model, "ordered_map", no_pool)
     release = {"label": "N", "references": reference_model.release_references(revision)}
-    with reference_model.ReferenceModel(workers=1).open(release, [], None, repositories) as session:
+    with reference_model.ReferenceModel(workers=1).open("liability_cashflow", release, [], None, repositories) as session:
         outcomes = session.project_many(ids)
     assert [isinstance(outcome, ModelPointFailure) for outcome in outcomes] == [False, False, True]
     assert all(outcomes[:2])
