@@ -10,7 +10,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from pathlib import Path
-from typing import ContextManager, Mapping, Protocol, Sequence
+from typing import ContextManager, Mapping, Protocol
 
 # An engine restores a release into a folder of the system's temporary folder whose name
 # starts with this prefix. A message of the outcome ``error`` names it ``<scratch>``.
@@ -90,6 +90,30 @@ class Session(Protocol):
 
 
 @dataclass(frozen=True)
+class DomainReference:
+    """The domain reference of a stage, by its label: what the quantities, their units and signs,
+    and the time basis of the stage mean. Both members are opaque non-empty strings; ``version``
+    changes only when the text of the reference changes meaning."""
+
+    id: str
+    version: str
+
+
+# The domain reference of ``liability_cashflow`` as published in version 3 of the contract pack,
+# ``contracts/v3/domain/liability_cashflow.md``. The pair is reserved for that text.
+LIABILITY_CASHFLOW = DomainReference("liability_cashflow", "3")
+
+
+@dataclass(frozen=True)
+class StageDeclaration:
+    """A stage an engine declares: its domain reference and the quantity names that reference
+    defines, in domain order."""
+
+    domain_reference: DomainReference
+    quantities: tuple[str, ...]
+
+
+@dataclass(frozen=True)
 class Revision:
     """One revision on the main line of a history, as an engine reports it."""
 
@@ -121,10 +145,14 @@ class Engine(Protocol):
     ignores it.
     """
 
-    # Each stage the engine supports, with the quantity names of its domain reference in domain
-    # order. The core admits a request of a stage named here alone and checks the names a
-    # session declares against that stage's domain (rule 7 of the run contract).
-    stages: Mapping[str, Sequence[str]]
+    # Each stage the engine supports, with its declaration: the domain reference the engine names
+    # for it and the quantity names of that reference in domain order. The core admits a request
+    # of a stage named here alone, checks the names a session declares against the declared
+    # quantities (rule 7 of the run contract), and writes the domain reference into every response
+    # of the stage. A comparison checks no list of its own: both sides name the same stage, domain
+    # reference, and quantities. Walk, search, regression, and replay refuse a record whose domain
+    # reference differs from the one declared here for its stage.
+    stages: Mapping[str, StageDeclaration]
     realisations: frozenset[str]  # the realisation types of a change the engine can apply
     determines: frozenset[str]    # the kinds of release reference one revision fixes
     # The kinds the engine can hold at the release of a request while revisions are enabled,

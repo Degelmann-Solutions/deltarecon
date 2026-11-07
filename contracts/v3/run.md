@@ -12,7 +12,7 @@ Schemas: [schemas/run.schema.json](schemas/run.schema.json) and
 ```json
 {
   "document": "run_request",
-  "contract_version": "3.1",
+  "contract_version": "3.2",
   "stage": "liability_cashflow",
   "run_id": "run-n-subset-changes",
   "release": { "label": "N", "references": [ { "kind": "engine_version", "value": "engine build 2026.09" } ] },
@@ -41,7 +41,7 @@ are is the engine's declaration in the response, see rule 7. A request with
 `target` asks for the target alone, see [Target-only run](#target-only-run).
 
 Schema assertions: all members above but `changes.hold` and `target` are
-present; `contract_version` is `3.0` or `3.1`;
+present; `contract_version` is `3.0`, `3.1`, or `3.2`;
 the references are not empty; the enabled ids are distinct; the manifest is
 present when a change is enabled; `changes.hold`, when present, names at least
 one kind and no kind twice; `target`, when present, names at least one quantity
@@ -155,8 +155,9 @@ A response with the outcome `succeeded`:
 ```json
 {
   "document": "run_response",
-  "contract_version": "3.1",
+  "contract_version": "3.2",
   "stage": "liability_cashflow",
+  "domain_reference": { "id": "liability_cashflow", "version": "3" },
   "run_id": "run-n-subset-changes",
   "outcome": "succeeded",
   "release": { "label": "N", "references": [ { "kind": "engine_version", "value": "engine build 2026.09" } ] },
@@ -175,6 +176,7 @@ A response with the outcome `succeeded`:
 | Member | Meaning |
 |---|---|
 | `stage`, `run_id`, `release`, `changes`, `selection` | Repeated from the request, unchanged. |
+| `domain_reference` | The domain reference the engine declares for the stage, see [README.md](README.md#stage-identifier). It follows `stage`. Every response that carries the `stage` of a stage the engine declares carries it, whatever its outcome. |
 | `target` | Repeated from the request, unchanged, when the request carries it. |
 | `time_basis` | The declared time basis, by the identifier of the domain reference. |
 | `quantities` | The quantities the engine exports, with their units, in export column order. |
@@ -216,12 +218,17 @@ Reader rules for the caller:
    response that carries a `target` the request does not is a difference. A
    different stage is rejected with `stage_mismatch`, any other difference with
    `request_mismatch`.
-7. Every declared quantity name is a name the domain reference of the stage
-   defines, no name is declared twice, and the names stand in the order of the
-   domain reference. An engine may export a subset of the quantities, with at
-   least one. Otherwise the caller rejects with `quantity_mismatch`. The
-   time basis identifier and the units are the run's own declaration and are
-   not checked here; the compare contract checks that two runs agree on them.
+7. Every declared quantity name is a name the domain reference that the
+   response names defines, no name is declared twice, and the names stand in
+   the order of that domain reference. An engine may export a subset of the
+   quantities, with at least one. Otherwise the caller rejects with
+   `quantity_mismatch`. The rule is the run's obligation against its engine's
+   declaration of the stage: a caller that holds the quantities of the domain
+   reference applies it in full; a caller that does not, such as a comparison,
+   checks that no name is declared twice, and the compare contract checks that
+   two runs declare the same names in the same order. The time basis
+   identifier and the units are the run's own declaration and are not checked
+   here; the compare contract checks that two runs agree on them.
 8. The export file exists and has the stated hash, see
    [README.md](README.md#artifact-references-and-byte-hashes).
 9. The export can be read under the CSV profile and the reader grammar of the
@@ -259,8 +266,9 @@ If the engine cannot calculate a selected model point, the run has failed:
 ```json
 {
   "document": "run_response",
-  "contract_version": "3.1",
+  "contract_version": "3.2",
   "stage": "liability_cashflow",
+  "domain_reference": { "id": "liability_cashflow", "version": "3" },
   "run_id": "run-failed-run",
   "outcome": "failed",
   "release": { "label": "N", "references": [ { "kind": "code_state", "value": "revision 1047" } ] },
@@ -270,6 +278,8 @@ If the engine cannot calculate a selected model point, the run has failed:
 }
 ```
 
+- The response repeats the members of the request as a succeeded response
+  does and names the `domain_reference` of the stage after `stage`.
 - The outcome is `failed`, and `failed_model_points` names every failing model
   point the engine found, with a message for a person. A failed response has no
   `diagnostics` member; the code `model_point_failed` is implied by the outcome.
@@ -286,8 +296,9 @@ request names, the run ends with the outcome `error`:
 ```json
 {
   "document": "run_response",
-  "contract_version": "3.1",
+  "contract_version": "3.2",
   "stage": "liability_cashflow",
+  "domain_reference": { "id": "liability_cashflow", "version": "3" },
   "run_id": "run-n-full",
   "outcome": "error",
   "release": { "label": "N", "references": [ { "kind": "code_state", "value": "revision 1047" } ] },
@@ -298,7 +309,8 @@ request names, the run ends with the outcome `error`:
 ```
 
 - The response repeats `stage`, `run_id`, `release`, `changes`, `selection`,
-  and `target` when present of the request, as a failed response does, and carries `diagnostics` in place
+  and `target` when present of the request, and names the `domain_reference` of
+  the stage, as a failed response does, and carries `diagnostics` in place
   of `failed_model_points`. It carries no export.
 - `diagnostics` holds one entry with one of three codes:
 
@@ -326,8 +338,9 @@ If the engine does not accept a request, it answers with the outcome `rejected`:
 ```json
 {
   "document": "run_response",
-  "contract_version": "3.1",
+  "contract_version": "3.2",
   "stage": "liability_cashflow",
+  "domain_reference": { "id": "liability_cashflow", "version": "3" },
   "run_id": "run-unknown-model-point",
   "outcome": "rejected",
   "diagnostics": [
@@ -338,8 +351,12 @@ If the engine does not accept a request, it answers with the outcome `rejected`:
 
 - `stage` and `run_id` are repeated from the request where they can be read. A
   request that is not JSON, or that lacks them, leaves nothing to repeat.
+- `domain_reference` follows `stage` when the engine declares the stage. A
+  rejection with `unsupported_stage`, of a stage the engine does not declare,
+  omits it.
 - Schema assertions: `document`, `contract_version`, `outcome`, and
-  `diagnostics` are present; `stage` and `run_id` are optional.
+  `diagnostics` are present; `stage`, `domain_reference`, and `run_id` are
+  optional; `domain_reference` is present only with `stage`.
 - `diagnostics` holds at least one entry with a code from
   [README.md](README.md#diagnostics).
 - A rejected run has calculated nothing and exports nothing.
@@ -352,7 +369,7 @@ envelope for every deterministic procedure, not only for a stage run:
 ```json
 {
   "document": "run_record",
-  "contract_version": "3.1",
+  "contract_version": "3.2",
   "stage": "liability_cashflow",
   "record_id": "record-6f1c2d3e-4a5b-4c6d-8e7f-0a1b2c3d4e5f",
   "procedure": { "type": "run" },

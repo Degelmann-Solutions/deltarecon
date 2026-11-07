@@ -18,7 +18,9 @@ which states what it found, what it saved, and, checked against a walk, what it
 missed.
 
 A domain reference per stage names the quantities, their units and signs, and the
-time basis: [domain/liability_cashflow.md](domain/liability_cashflow.md).
+time basis. This pack publishes the one of `liability_cashflow`,
+[domain/liability_cashflow.md](domain/liability_cashflow.md); an engine names the
+domain reference of every other stage it declares, see [Stage identifier](#stage-identifier).
 
 The pack stands alone. It prescribes messages and files, not an implementation.
 The schemas under [schemas/](schemas/) state what a document must look like. The
@@ -42,6 +44,9 @@ Each contract file separates two kinds of statement:
 - **Caller:** the party that sends a request to an engine and reads the response.
 - **Reader:** whoever consumes a document or an export. Callers and engines are both readers.
 - **Stage:** one step of the process chain, named by a stage identifier.
+- **Domain reference:** the text that defines what the results of a stage mean:
+  its quantities, their units and signs, and its time basis. A run response
+  names it by an identifier and a version, see [Stage identifier](#stage-identifier).
 - **Release:** one version of a stage: its input data, parameters, code, and engine.
 - **Model point:** the smallest result unit an engine exports for a stage. It is a
   single insurance contract, an aggregated contract record, or an output group.
@@ -70,11 +75,37 @@ Each contract file separates two kinds of statement:
 ## Stage identifier
 
 A stage identifier is a lower-case name that matches `^[a-z][a-z0-9_]*$`. Version 3
-defines one stage:
+defines one stage with a domain reference of this pack, and an engine may declare
+further stages:
 
 | Stage identifier | Domain reference |
 |---|---|
-| `liability_cashflow` | [domain/liability_cashflow.md](domain/liability_cashflow.md) |
+| `liability_cashflow` | [domain/liability_cashflow.md](domain/liability_cashflow.md), named `{ "id": "liability_cashflow", "version": "3" }` |
+| any other identifier an engine declares | the domain reference the engine names for it |
+
+An engine declares the stages it supports, and for each a domain reference. A run
+response names that reference in the member `domain_reference`, see
+[run.md](run.md#run-response):
+
+```json
+"domain_reference": { "id": "liability_cashflow", "version": "3" }
+```
+
+- `id` and `version` are opaque, non-empty strings. Two domain references are the
+  same when their `id` values are equal and their `version` values are equal,
+  code point by code point.
+- The pair `liability_cashflow`, `3` is reserved for the domain reference of
+  `liability_cashflow` that this pack publishes,
+  [domain/liability_cashflow.md](domain/liability_cashflow.md). Its `version`
+  changes only when that text changes meaning, which a minor version of the
+  contracts cannot do.
+- An engine names the domain reference of a stage of its own with an `id` of its
+  own. It should qualify the `id` with a prefix of its own, for example
+  `acme/lapse_cashflow`, so that two engines do not name two texts by one `id`. It
+  changes `version` when the text changes meaning.
+- A reader need not resolve a domain reference: it compares references for
+  equality. That the quantities of a response are those of its domain reference
+  is the run's obligation, rule 7 of [run.md](run.md#result-completeness).
 
 Every document carries the members `stage` and `contract_version`, with one
 exception: a rejected run response omits `stage` when the request it answers
@@ -84,7 +115,11 @@ references it, and that response carries both.
 
 Reader rules:
 
-1. A reader rejects a document whose stage it does not support, with `unsupported_stage`.
+1. A reader rejects a document whose stage it does not support, with
+   `unsupported_stage`. An engine supports the stages it declares. A reader that
+   reads no engine, such as a comparison, supports a stage whose run responses
+   name a domain reference; for a response written before 3.2 see the
+   [reader rule for documents of earlier versions](#version-compatibility).
 2. A run response names the stage of its request, and a change manifest names
    the stage of the request that references it. Otherwise the reader rejects
    with `stage_mismatch`. A response with another `run_id` than its request is
@@ -93,41 +128,120 @@ Reader rules:
 
 ## Version compatibility
 
-The contract version is the string `3.1`: a major and a minor number.
+The contract version is the string `3.2`: a major and a minor number.
 
 - A minor version adds optional members, new diagnostic codes, or new registered
   names. It removes and redefines nothing.
 - A major version may change anything.
 - A reader accepts exactly the versions it implements. It rejects every other
   version with `unsupported_version` and does not guess. It checks the version
-  before it applies a schema. The schemas in this pack accept `3.0` and `3.1`,
-  and they are closed: a member they do not name is an error.
+  before it applies a schema. The schemas in this pack accept `3.0`, `3.1`, and
+  `3.2`, and they are closed: a member they do not name is an error.
 - The path of this pack, `contracts/v3/`, names the major version. Version 1.0
   stays published unchanged under [`contracts/v1/`](../v1/README.md), and
   version 2.0 under [`contracts/v2/`](../v2/README.md).
 
-Reader rule for documents of versions 1.0, 2.0, and 3.0:
+Reader rule for documents of versions 1.0, 2.0, 3.0, and 3.1:
 
-- A reader of version 3.1 also reads documents of versions 1.0, 2.0, and 3.0.
-  It checks each document against the schemas of its own version: a 1.0
+- A reader of version 3.2 also reads documents of versions 1.0, 2.0, 3.0, and
+  3.1. It checks each document against the schemas of its own version: a 1.0
   document against the schemas under [`../v1/schemas/`](../v1/schemas/), a 2.0
-  document against the schemas under [`../v2/schemas/`](../v2/schemas/), a 3.0
-  or 3.1 document against the schemas of this pack. A schema fault in a 1.0 or
-  2.0 document is a fault against the schema of its version.
-- A run request and a compare request of version 1.0, 2.0, or 3.0 are
-  accepted. Every document a 3.1 writer produces in answer, and every other
-  document it writes, carries `3.1`.
-- A run record of version 1.0, 2.0, or 3.0, with the documents it lists, serves
-  as input to every procedure that reads recorded runs, except the replay: a
-  replay repeats only runs recorded under 2.0, 3.0, or 3.1 and rejects a 1.0
-  run record with `unsupported_version`. For a run recorded under 2.0 or 3.0
-  with the outcome `error`, the recorded and the repeated response may differ
-  in `contract_version` only, see [compare.md](compare.md#replay-criterion).
-- A walk folder written under 1.0, 2.0, or 3.0 is a reference for a search when
-  it passes the reader rules of a walk folder, see
+  document against the schemas under [`../v2/schemas/`](../v2/schemas/), a 3.0,
+  3.1, or 3.2 document against the schemas of this pack. A schema fault in a
+  1.0 or 2.0 document is a fault against the schema of its version.
+- A run request and a compare request of version 1.0, 2.0, 3.0, or 3.1 are
+  accepted. Every document a 3.2 writer produces in answer, and every other
+  document it writes, carries `3.2`.
+- A run response of version 1.0, 2.0, 3.0, or 3.1 has no member
+  `domain_reference`. A reader reads one of the stage `liability_cashflow` as
+  naming `{ "id": "liability_cashflow", "version": "3" }`, the domain reference
+  of this pack: its quantities, units, signs, and time bases are unchanged since
+  1.0. One of any other stage names no domain reference: a comparison, a
+  replay, a walk, a search, and a regression refuse it with
+  `unsupported_stage`, before a state runs.
+- A run record of version 1.0, 2.0, 3.0, or 3.1, with the documents it lists,
+  serves as input to every procedure that reads recorded runs, except the
+  replay: a replay repeats only runs recorded under 2.0, 3.0, 3.1, or 3.2 and
+  rejects a 1.0 run record with `unsupported_version`. For a run recorded under
+  2.0, 3.0, or 3.1 with the outcome `error`, the recorded and the repeated
+  response may differ in `contract_version` and `domain_reference` only, see
+  [compare.md](compare.md#replay-criterion).
+- A walk folder written under 1.0, 2.0, 3.0, or 3.1 is a reference for a search
+  when it passes the reader rules of a walk folder, see
   [localise.md](localise.md#reader-rules-of-a-walk-folder); its change
   manifests may differ from the manifest derived again in `contract_version`
   only.
+
+### Changes from 3.1
+
+Version 3.2 is a minor version. It opens the stage table for stages an engine
+declares, adds one optional member of the run response and one diagnostic code,
+and lets a comparison take the quantities of a stage from the two responses it
+reads:
+
+- The stage table: a stage is `liability_cashflow`, with the domain reference of
+  this pack, or any stage an engine declares, with a domain reference the engine
+  names. A stage is supported when the engine declares it. See
+  [Stage identifier](#stage-identifier).
+- The member `domain_reference` of the run response, an object of `id` and
+  `version`: every response that carries the `stage` of a stage the engine
+  declares carries it, right after `stage`, with the outcome `succeeded`,
+  `failed`, `error`, or `rejected`; a rejection with `unsupported_stage` omits
+  it. The pair `liability_cashflow`, `3` is reserved for the domain reference
+  this pack publishes. See [run.md](run.md#run-response).
+- A response without the member, as every response written under 1.0 to 3.1:
+  of the stage `liability_cashflow` it is read as naming
+  `{ "id": "liability_cashflow", "version": "3" }`, so the records of earlier
+  versions and the runs of 3.2 compare; of any other stage a comparison, a
+  replay, a walk, a search, and a regression refuse it with
+  `unsupported_stage`, before a state runs. See the
+  [reader rule for documents of earlier versions](#version-compatibility).
+- The diagnostic `domain_reference_mismatch`: two compared responses that name
+  different domain references, by any difference in `id` or `version`, are
+  `incompatible`, a second sentence of rule 2 of
+  [compare.md](compare.md#compatibility). A walk, a search, a regression, and a
+  replay refuse a record whose domain reference differs from the one the engine
+  declares for its stage, before a state runs, see
+  [localise.md](localise.md#before-the-first-run) and the
+  [reader rules of a walk folder](localise.md#reader-rules-of-a-walk-folder).
+- Rule 4 of [compare.md](compare.md#compatibility): both responses declare the
+  same quantity names in the same order. Under 3.1 rule 7 fixed the order on
+  both sides; now the comparison checks it, and two runs whose names stand in
+  different orders are `incompatible` with `quantity_mismatch`.
+- Rule 7 of [run.md](run.md#result-completeness) is the run's obligation against
+  its engine's declaration of the stage. A comparison and a replay check the
+  names of a response against no list of their own, for `liability_cashflow`
+  too; they reject a name declared twice. So a response that declares a name
+  outside the domain reference of its stage, which a 3.1 reader rejected in a
+  comparison with `quantity_mismatch`, is no longer rejected by a comparison: it
+  is compared when the other response declares the same names in the same
+  order.
+- A derivation, which compares nothing, reads the record of every stage the
+  engine declares, also one written before 3.2 that names no domain reference,
+  where a 3.1 reader of the tool refused one of a stage other than
+  `liability_cashflow` with `unsupported_stage`.
+- A comparison refuses no stage by a list of its own: a compare request that
+  names another stage than its two responses is `incompatible` with
+  `stage_mismatch` under rule 2, where a 3.1 reader rejected a stage outside
+  its list with `unsupported_stage`.
+- The compare result and the signature table carry no domain reference. They
+  name the stage and the quantities as before; the domain reference is that of
+  both compared responses.
+- `common.schema.json`: `contract_version` is `3.0`, `3.1`, or `3.2`, and the
+  definition `domain_reference`. `run.schema.json`: the optional member
+  `domain_reference` of the responses `succeeded`, `failed`, `error`, and
+  `rejected`; a rejected response that carries it carries `stage`. No other
+  schema changes.
+- The replay of a run recorded under 2.0, 3.0, or 3.1 with the outcome `error`:
+  its repeated response is written under 3.2 and names the domain reference, so
+  the byte comparison of the two responses ignores `contract_version` and
+  `domain_reference`, see [compare.md](compare.md#replay-criterion).
+
+A 3.2 reader reads every document written under 3.1 as before, apart from the
+checks of a comparison named above. The examples of this pack carry `3.0`: they
+are 3.0 documents, name no domain reference, and stay valid. A reader of 3.1
+rejects a 3.2 document with `unsupported_version`, since a reader accepts
+exactly the versions it implements.
 
 ### Changes from 3.0
 
@@ -475,8 +589,9 @@ first broken rule in that order.
 | `duplicate_member` | An object repeats a member name. |
 | `schema_violation` | A document violates its schema. An empty or duplicate selection, a negative tolerance, a missing tolerance profile, and a rounding or a bound above zero without a derivation are cases of it, and so is a target whose first period lies after its last. |
 | `unsupported_version` | The contract version is not one the reader implements, or a replay is asked for a run record of version 1.0. |
-| `unsupported_stage` | The reader does not support the stage. |
+| `unsupported_stage` | The reader does not support the stage: the engine does not declare it, or a response of it names no domain reference. |
 | `stage_mismatch` | Documents that belong together name different stages. |
+| `domain_reference_mismatch` | Two compared runs name different domain references, or a walk, a search, a regression, or a replay is asked for a record whose domain reference differs from the one the engine declares for its stage; then nothing runs. |
 | `request_mismatch` | A response does not repeat the run id, release identity, change set, or selection of its request, or a run record holds other release identities than the documents it lists. |
 | `inconsistent_response` | A response contradicts itself: a model point is listed twice, a period range is reversed, or the stated row count does not fit the ranges. |
 | `unknown_reference` | The engine cannot resolve a release reference. |
@@ -502,7 +617,7 @@ first broken rule in that order.
 | `unrequested_coordinate` | A result holds a coordinate that was not requested or not declared. |
 | `unit_mismatch` | Two runs declare different units for a quantity. |
 | `time_basis_mismatch` | Two runs declare different time bases. |
-| `quantity_mismatch` | A run declares a quantity name that the domain reference of its stage does not define, a name twice, or the names in another order than the domain reference; or two compared runs declare different quantity names. |
+| `quantity_mismatch` | A run declares a quantity name that the domain reference of its stage does not define, a name twice, or the names in another order than the domain reference; or two compared runs declare different quantity names, or the same names in different orders. |
 | `unknown_quantity` | A compare request sets a tolerance for a quantity that the two runs do not declare, a deviation file names a quantity that its compare result does not declare, or the target of a run request names a quantity the engine does not declare. |
 | `target_not_supported` | The engine cannot compute the target of a run request: it runs no target-only run. |
 | `non_finite_difference` | The difference of the right and the left value of a common coordinate is not a finite number. |
@@ -512,7 +627,7 @@ first broken rule in that order.
 | `reference_mismatch` | A walk is asked for two recorded results whose moving references do not fit the history: the base revision does not name what the older result names, or the last revision not what the newer one names. Nothing runs. |
 | `walk_not_attributed` | A search is checked against a walk that does not attribute every revision. Nothing runs. |
 | `target_only_record` | A regression, a derivation, a walk, or a search is asked for the record of a target-only run, a run whose request names a target. Nothing runs. |
-| `walk_mismatch` | A search is checked against a walk folder that fails the reader rules of a walk folder, among them a state whose request names a target, or whose walk names other records, another tolerance profile, other held kinds, another manifest, or ran its states on another request or engine than the search would use. Nothing runs. |
+| `walk_mismatch` | A search is checked against a walk folder that fails the reader rules of a walk folder, among them a state whose request names a target or whose response names another domain reference than the two records, or whose walk names other records, another tolerance profile, other held kinds, another manifest, or ran its states on another request or engine than the search would use. Nothing runs. |
 
 A walk and a search report what they find in their result, not as a diagnostic:
 the findings `state_zero_not_reproduced`, `state_n_not_reproduced`,
@@ -535,7 +650,7 @@ in [examples/index.json](examples/index.json) as `matrix_rows`.
 | `inconsistent-result` | Wrong stage; unrequested or missing result coordinates; for a reference that carries a byte hash, a missing artifact or a wrong hash | Reject. There is no successful partial result. | [run.md](run.md#result-completeness), [artifact references](#artifact-references-and-byte-hashes) |
 | `model-point-failure` | One model point fails in the engine | The run outcome is `failed` and names the failing points. | [run.md](run.md#failure-outcome) |
 | `engine-error` | The engine has accepted the request and cannot restore or read the state, or the state holds no model point or a forbidden id | The run outcome is `error` with its diagnostic. Response and run record are written; there is no export. | [run.md](run.md#error-outcome) |
-| `incompatible-compare` | Compare with different units or time basis | Outcome `incompatible`. There is no comparison result. | [compare.md](compare.md#compatibility) |
+| `incompatible-compare` | Compare with different units, time basis, or domain references | Outcome `incompatible`. There is no comparison result. | [compare.md](compare.md#compatibility) |
 | `coverage-difference` | Compare with different selections, or different period ranges for a model point | Added and removed coordinates are reported separately and never replaced by zero. | [compare.md](compare.md#coverage-differences) |
 | `tolerance-boundary` | A value exactly at the tolerance boundary | Not a deviation. The inequality is strict. | [compare.md](compare.md#tolerance-rule) |
 | `non-finite-difference` | Two finite values whose difference is not finite | The comparison is `rejected` with `non_finite_difference` and names the model points. There is no deviation file and no signature table. | [compare.md](compare.md#tolerance-rule) |

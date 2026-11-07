@@ -520,15 +520,41 @@ def test_localise_contract_is_no_stage_contract_and_names_its_findings():
     assert "It is no stage contract. No engine implements it" in text
     for code in ("state_zero_not_reproduced", "state_n_not_reproduced", "state_did_not_run", "step_not_compared",
                  "non_finite_difference", "selection_mismatch", "reference_mismatch", "interval_not_resolved",
-                 "walk_not_attributed", "walk_mismatch", "target_only_record"):
+                 "walk_not_attributed", "walk_mismatch", "target_only_record", "domain_reference_mismatch"):
         assert f"`{code}`" in text, code
     assert "does not see contributions that cancel within one\ninterval" in text  # known limit 6
     readme = (PACK / "README.md").read_text("utf-8")
     for code in ("invalid_hold", "selection_mismatch", "reference_mismatch", "walk_not_attributed", "walk_mismatch",
-                 "target_only_record"):
+                 "target_only_record", "domain_reference_mismatch"):
         assert f"| `{code}` |" in readme, code
     assert "sums of\ndifferences" not in (PACK / "compare.md").read_text("utf-8")
     assert "localise.md#contribution" in (PACK / "compare.md").read_text("utf-8")
+
+
+def test_readme_states_the_changes_from_3_1():
+    """Contract 3.2: the member, the absent-member rule, the code, rule 4, and rule 7."""
+    readme = (PACK / "README.md").read_text("utf-8")
+    section = readme.split("### Changes from 3.1")[1].split("### Changes from 3.0")[0]
+    for named in ("`domain_reference`", "`{ \"id\": \"liability_cashflow\", \"version\": \"3\" }`",
+                  "A response without the member", "`unsupported_stage`", "`domain_reference_mismatch`",
+                  "Rule 4 of [compare.md]", "same quantity names in the same order", "Rule 7 of [run.md]",
+                  "is no longer rejected by a comparison", "carry no domain reference"):
+        assert named in section, named
+    assert "The contract version is the string `3.2`" in readme
+    # The stage table is open, the pair is reserved, and the domain text states its pair.
+    assert "| any other identifier an engine declares | the domain reference the engine names for it |" in readme
+    assert "The pair `liability_cashflow`, `3` is reserved" in readme
+    assert '`{ "id": "liability_cashflow", "version": "3" }`' in (PACK / "domain" / "liability_cashflow.md").read_text(
+        "utf-8")
+    compare_text = (PACK / "compare.md").read_text("utf-8")
+    assert "4. Both responses declare the same quantity names in the same order." in compare_text
+    assert "`incompatible` with\n   `domain_reference_mismatch`." in compare_text
+
+
+def test_the_examples_name_no_domain_reference():
+    """The examples are 3.0 documents: none carries the member of 3.2."""
+    for path in EXAMPLES.rglob("*.json"):
+        assert "domain_reference" not in path.read_text("utf-8"), path
 
 
 # --- index --------------------------------------------------------------------------
@@ -671,13 +697,15 @@ def test_each_version_has_its_own_schemas():
         for other in versions:
             if other != version:
                 assert list(validator("run.schema.json", other).iter_errors(request)), (version, other)
-    # Version 3.1 is a minor version of the pack of 3.0: its schemas read both, the earlier packs neither.
-    request = {**strict_json(ROOT / "contracts" / "v3" / "examples" / "reference" / "full-run.request.json"),
-               "contract_version": "3.1"}
-    assert not list(validator("run.schema.json", "3.1").iter_errors(request))
-    assert not list(validator("run.schema.json", "3.0").iter_errors(request))
-    for other in ("1.0", "2.0"):
-        assert list(validator("run.schema.json", other).iter_errors(request)), other
+    # Versions 3.1 and 3.2 are minor versions of the pack of 3.0: its schemas read all three, the earlier
+    # packs none.
+    for minor in ("3.1", "3.2"):
+        request = {**strict_json(ROOT / "contracts" / "v3" / "examples" / "reference" / "full-run.request.json"),
+                   "contract_version": minor}
+        for reader in ("3.0", "3.1", "3.2"):
+            assert not list(validator("run.schema.json", reader).iter_errors(request)), (minor, reader)
+        for other in ("1.0", "2.0"):
+            assert list(validator("run.schema.json", other).iter_errors(request)), (minor, other)
 
 
 def test_schema_level_cases_exist():

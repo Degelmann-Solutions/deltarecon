@@ -17,9 +17,9 @@ from pathlib import Path
 import pytest
 
 from degelmann.deltarecon.__main__ import main
-from degelmann.deltarecon.compare import COMPARED_QUANTITIES
 from degelmann.deltarecon.documents import (RECORD_SCHEMA, RUN_SCHEMA, Rejection, document_bytes, read_document,
                                   schema_errors, sha256_file)
+from degelmann.deltarecon.protocol import DomainReference, StageDeclaration
 from degelmann.deltarecon.regression import read_regression_input, regression
 from degelmann.deltarecon.replay import read_recorded_run, replay
 from degelmann.deltarecon.run import UsageError, run_request
@@ -29,7 +29,7 @@ from degelmann.deltarecon.walk import exact_sums, held_kinds, walk, written
 from conftest import (LAPSE_TABLE, MODEL_CODE, PARAMS, PARAMS_RATE, POINTS, POINTS_B, POINTS_E, POINT_TABLE,
                       START, ROOT, StubEngine, TwoStages, WalkStub, build, change, cli, clone_state, commit,
                       export_coordinates, folder_hashes, git, patch_text, projection_periods, record, stored,
-                      stub_request, throwaway, with_manifest, write_files)
+                      stub_request, throwaway, with_manifest, write_files, written_under)
 
 QUANTITIES = ["Anzahl Verträge", "Netto-Cashflow"]
 
@@ -361,9 +361,8 @@ def test_the_record_of_a_target_only_run_is_refused_and_nothing_runs(world, monk
 def test_a_target_only_record_is_refused_before_a_stage_mismatch(world, monkeypatch, side):
     """Rule 1 of the checks before the first run comes before rule 2."""
     build(world)
-    monkeypatch.setitem(COMPARED_QUANTITIES, "other_stage", TwoStages.stages["other_stage"])
     older = record(world, "w0", TwoStages(), **target_only(side, "older"))
-    target = {**TARGET, "quantities": [TwoStages.stages["other_stage"][0]]}  # the stage's own name
+    target = {**TARGET, "quantities": [TwoStages.stages["other_stage"].quantities[0]]}  # the stage's own name
     newer = record(world, "w4", TwoStages(), stage="other_stage", **({"target": target} if side == "newer" else {}))
     with pytest.raises(Rejection) as caught:
         run_walk(world, older, newer, TwoStages())
@@ -374,7 +373,6 @@ def test_a_target_only_record_is_refused_before_a_stage_mismatch(world, monkeypa
 def test_resolve_and_open_receive_the_stage_of_each_request(world, monkeypatch, stage):
     """The run, the walk, and the replay hand the engine the stage of the request."""
     build(world)
-    monkeypatch.setitem(COMPARED_QUANTITIES, "other_stage", TwoStages.stages["other_stage"])
     engine = TwoStages()
     older, newer = record(world, "w0", engine, stage=stage), record(world, "w4", engine, stage=stage)
     assert engine.stages_received == [("resolve", stage), ("open", stage)] * 2
@@ -399,7 +397,7 @@ def test_a_run_of_each_declared_stage_names_the_quantities_the_engine_declares_f
         "label": "N", "references": StubEngine.references(world / "w0", "w0")})))
     result = run_request(path, engine, repositories=world)
     assert result.outcome == "succeeded", result.response
-    assert [q["name"] for q in result.response["quantities"]] == list(engine.stages[stage])
+    assert [q["name"] for q in result.response["quantities"]] == list(engine.stages[stage].quantities)
     assert [q["unit"] for q in result.response["quantities"]] == ["policies", "EUR"]
 
 
@@ -415,40 +413,73 @@ def test_a_run_of_a_stage_the_engine_does_not_declare_is_rejected(world):
     assert result.response["diagnostics"][0]["code"] == "unsupported_stage"
 
 
-def test_a_replay_of_a_stage_the_core_holds_no_quantities_for_is_rejected(world):
-    """Until entry 12 the core checks a response only against the quantities it holds itself."""
+class OtherDeclaration(TwoStages):
+    """``TwoStages`` with another version of the domain reference of ``other_stage``: the engine declares
+    another reference than the records of ``TwoStages`` name."""
+
+    stages = {**TwoStages.stages, "other_stage": StageDeclaration(
+        DomainReference(TwoStages.stages["other_stage"].domain_reference.id, "2"),
+        TwoStages.stages["other_stage"].quantities)}
+
+
+def other_stage_records(world: Path, earlier: bool) -> tuple[Path, Path]:
+    """Two records of ``other_stage``; ``earlier``: written under 3.1, whose responses name no domain reference."""
     build(world)
-    older = record(world, "w0", TwoStages(), stage="other_stage")
-    engine = TwoStages()
-    with pytest.raises(Rejection) as caught:
+    if earlier:
+        with written_under("3.1"):
+            return (record(world, "w0", TwoStages(), stage="other_stage"),
+                    record(world, "w4", TwoStages(), stage="other_stage"))
+    return record(world, "w0", TwoStages(), stage="other_stage"), record(world, "w4", TwoStages(), stage="other_stage")
+
+
+def run_procedure(world: Path, procedure: str, older: Path, newer: Path, engine) -> None:
+    if procedure == "walk":
+        run_walk(world, older, newer, engine)
+    elif procedure == "search":
+        search(older, newer, world / "search", engine, repositories=world)
+    elif procedure == "regression":
+        read_regression_input(older, engine.stages)
+    else:
         replay(older, engine, world)
-    assert caught.value.code == "unsupported_stage" and engine.opened == 0
-    assert not (older.parent / "replay").exists()
 
 
-@pytest.mark.parametrize("procedure", ["walk", "search", "regression"])
-def test_a_stage_the_core_cannot_compare_is_refused_before_anything_runs(world, procedure):
-    """Until entry 12 the core compares only the stages it holds quantities for; another stage is
-    refused with ``unsupported_stage`` when the procedure is called, before a state runs."""
-    build(world)
-    older = record(world, "w0", TwoStages(), stage="other_stage")
-    newer = record(world, "w4", TwoStages(), stage="other_stage")
-    engine = TwoStages()
+@pytest.mark.parametrize("procedure", ["walk", "search", "regression", "replay"])
+@pytest.mark.parametrize("earlier, engine, code", [
+    (True, TwoStages, "unsupported_stage"), (False, OtherDeclaration, "domain_reference_mismatch")],
+    ids=["3.1-record-of-another-stage", "another-reference"])
+def test_a_record_the_core_cannot_compare_is_refused_before_anything_runs(world, procedure, earlier, engine, code):
+    """A record of another stage than ``liability_cashflow`` written before 3.2 names no domain reference and
+    is refused with ``unsupported_stage``; a record whose domain reference differs from the engine's
+    declaration for its stage with ``domain_reference_mismatch``. Both when the procedure is called,
+    before a state runs."""
+    older, newer = other_stage_records(world, earlier)
+    engine = engine()
+    before = folder_hashes(world)
     with pytest.raises(Rejection) as caught:
-        if procedure == "walk":
-            run_walk(world, older, newer, engine)
-        elif procedure == "search":
-            search(older, newer, world / "search", engine, repositories=world)
-        else:
-            read_regression_input(older, engine.stages)
-    assert caught.value.code == "unsupported_stage"
-    assert engine.stages_received == [] and engine.opened == 0
-    assert not (world / "walk").exists() and not (world / "search").exists()
+        run_procedure(world, procedure, older, newer, engine)
+    assert caught.value.code == code
+    assert engine.stages_received == [] and engine.opened == 0 and folder_hashes(world) == before
 
 
-def test_a_regression_of_a_stage_the_core_cannot_compare_writes_nothing(world, monkeypatch, capsys):
-    build(world)
-    older = record(world, "w0", TwoStages(), stage="other_stage")
+@pytest.mark.parametrize("procedure", ["walk", "search", "regression", "replay"])
+def test_records_of_a_stage_an_engine_declares_are_compared(world, procedure):
+    """Contract 3.2: a 3.2 record names the domain reference the engine declares for its stage."""
+    older, newer = other_stage_records(world, earlier=False)
+    engine = TwoStages()
+    if procedure == "walk":
+        assert run_walk(world, older, newer, engine).attributed
+    elif procedure == "search":
+        assert search(older, newer, world / "search", engine, repositories=world).searched
+    elif procedure == "regression":
+        recorded = read_regression_input(older, engine.stages)
+        done = regression(recorded, recorded.record["releases"][0], world / "out", engine, repositories=world)
+        assert done.comparison.outcome == "compared" and done.no_deviation
+    else:
+        assert replay(older, engine, world).outcome == "reproduced_exactly"
+
+
+def test_a_regression_of_a_record_the_core_cannot_compare_writes_nothing(world, monkeypatch, capsys):
+    older, _ = other_stage_records(world, earlier=True)
     engine = TwoStages()
     monkeypatch.setattr("degelmann.deltarecon.__main__.engine", lambda *workers: engine)
     before = folder_hashes(world)
@@ -462,11 +493,12 @@ def test_a_regression_of_a_stage_the_core_cannot_compare_writes_nothing(world, m
     assert caught.value.code == "unsupported_stage" and not (world / "out").exists()
 
 
-def test_records_of_a_compared_and_another_stage_are_refused_as_unsupported(world):
-    """The record of the stage the core cannot compare is refused before the stage mismatch."""
+def test_a_record_the_core_cannot_compare_is_refused_before_the_stage_mismatch(world):
+    """The 3.1 record of another stage, which names no domain reference, is refused before the stage mismatch."""
     build(world)
     older = record(world, "w0", TwoStages())
-    newer = record(world, "w4", TwoStages(), stage="other_stage")
+    with written_under("3.1"):
+        newer = record(world, "w4", TwoStages(), stage="other_stage")
     engine = TwoStages()
     with pytest.raises(Rejection) as caught:
         run_walk(world, older, newer, engine)
@@ -497,7 +529,6 @@ def test_a_differing_engine_version_is_named_as_remainder(world):
                                           ("existing-output", 2)])
 def test_what_derive_refuses_the_walk_refuses_and_no_command_overwrites(world, monkeypatch, capsys, case, status):
     build(world)
-    monkeypatch.setitem(COMPARED_QUANTITIES, "other_stage", TwoStages.stages["other_stage"])
     older, newer = record(world, "w0", TwoStages()), record(world, "w4", TwoStages())
     if case == "wrong-order":
         older, newer = newer, older

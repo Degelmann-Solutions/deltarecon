@@ -6,9 +6,17 @@ record of the comparison. This module knows no engine: it reads the documents an
 exports of two runs.
 
 Order of the checks: JSON profile, contract version, and schema of the request; the
-stage; the artifacts the request names; the two responses as documents; rule 1 with rules
-7 to 13 of the run contract, the left run before the right one; rules 2 to 5; rule 6; the
-finite differences; the two run records and rule 7.
+artifacts the request names; the two responses as documents; rule 1 with rules 7 to 13 of
+the run contract, the left run before the right one; rules 2 to 5; rule 6; the finite
+differences; the two run records and rule 7.
+
+A comparison holds no list of stages or quantities. A response names the domain reference of
+its stage (:func:`domain_reference`); one that names none is read as naming that of
+``liability_cashflow`` when it is of that stage, and is rejected with ``unsupported_stage``
+otherwise. Rule 7 of the run contract is the run's obligation against its engine's declaration:
+here a response is checked only for a name declared twice. Rule 2 checks that both responses
+name the same stage and domain reference, rule 4 that they declare the same names in the same
+order.
 
 A request that fails the JSON profile, the version check, or its schema raises a
 :class:`~degelmann.deltarecon.documents.Rejection` and nothing is written. Every later broken rule
@@ -45,7 +53,8 @@ from .documents import (CONTRACT_VERSION, RECORD_SCHEMA, RUN_SCHEMA, Rejection, 
                         check_artifact, check_document, check_schema, check_version, parse_document,
                         read_document, schema_errors, strict_json_text, write_document, write_new)
 from .export import check_export, deviation_bytes, format_number, read_deviations
-from .run import UsageError, _key_order, _typed_key, quantity_errors, run_record
+from .protocol import LIABILITY_CASHFLOW
+from .run import UsageError, _key_order, _typed_key, run_record
 from .signature import signature_table
 
 COMPARE_SCHEMA = "compare.schema.json"
@@ -53,18 +62,6 @@ COMPARE_REQUEST = f"{COMPARE_SCHEMA}#/$defs/compare_request"
 TOLERANCE = f"{COMPARE_SCHEMA}#/$defs/tolerance"
 RESULT_NAME = "compare.result.json"
 RECORD_NAME = "compare.run-record.json"
-# The quantities of each stage a compare and a replay check run responses against, in the order
-# of its domain reference: a copy of what the reference model declares, kept here so that a
-# compare loads no engine. Entry 12 (contract 3.2) replaces it by the quantities the run
-# responses name.
-COMPARED_QUANTITIES = {
-    "liability_cashflow": (
-        "Anzahl Verträge", "Bruttobeitrag", "Zahlbeitrag", "Beitragsverrechnung",
-        "garantierte Todesfallleistung", "garantierter Rückkaufswert",
-        "garantierte Erlebensfallleistung", "kalkulatorische Kosten",
-        "Kosten 2. Ordnung ohne Provisionen", "Provisionen", "Netto-Cashflow",
-    ),
-}
 SIGNATURE_NAME = "signature-table.json"
 DEVIATIONS_NAME = "compare.deviations.csv"
 
@@ -391,11 +388,30 @@ def _insert_after(document: dict, after: str, name: str, value) -> dict:
     return placed
 
 
+def domain_reference(response: dict) -> dict | None:
+    """The domain reference a run response names, as ``{"id", "version"}``. A response without the
+    member, written under a version before 3.2, names that of ``liability_cashflow`` as published in
+    pack v3 when it is of that stage, and none of any other stage: ``None``."""
+    if "domain_reference" in response:
+        return response["domain_reference"]
+    if response.get("stage") == "liability_cashflow":
+        return {"id": LIABILITY_CASHFLOW.id, "version": LIABILITY_CASHFLOW.version}
+    return None
+
+
+def _named(reference: dict) -> str:
+    return f"{reference['id']} version {reference['version']}"
+
+
 def _check_compatible(request: dict, left: dict, right: dict) -> None:
     """Rules 2 to 5."""
     if not left["stage"] == right["stage"] == request["stage"]:
         raise _Incompatible("stage_mismatch", f"The request names the stage {request['stage']}, the left "
                             f"run {left['stage']}, and the right run {right['stage']}.")
+    left_reference, right_reference = domain_reference(left), domain_reference(right)
+    if left_reference != right_reference:
+        raise _Incompatible("domain_reference_mismatch", f"The left run names the domain reference "
+                            f"{_named(left_reference)} and the right run {_named(right_reference)}.")
     if left["time_basis"]["id"] != right["time_basis"]["id"]:
         raise _Incompatible("time_basis_mismatch", f"The left run declares the time basis "
                             f"{left['time_basis']['id']} and the right run {right['time_basis']['id']}.")
@@ -404,6 +420,9 @@ def _check_compatible(request: dict, left: dict, right: dict) -> None:
     if set(left_units) != set(right_units):
         other = sorted(set(left_units) ^ set(right_units))[0]
         raise _Incompatible("quantity_mismatch", f"Only one of the two runs declares the quantity {other}.")
+    if list(left_units) != list(right_units):
+        raise _Incompatible("quantity_mismatch", "The two runs declare the same quantity names in different "
+                            "orders.")
     for name, unit in left_units.items():
         if right_units[name] != unit:
             raise _Incompatible("unit_mismatch", f"The left run declares {name} in {unit} and the right "
@@ -425,12 +444,12 @@ def check_run(response: dict, folder: Path, side: str) -> CheckedRun:
     if response["outcome"] != "succeeded":
         raise Rejection(response["diagnostics"][0]["code"],
                         f"The {side} run was rejected; only a succeeded run is compared.")
-    if response["stage"] not in COMPARED_QUANTITIES:
-        raise Rejection("unsupported_stage", f"The stage {response['stage']} of the {side} run is not supported.")
-    problem = quantity_errors(COMPARED_QUANTITIES[response["stage"]],
-                              [quantity["name"] for quantity in response["quantities"]])
-    if problem:  # rule 7
-        raise Rejection("quantity_mismatch", f"The {side} run declares its quantities wrongly: {problem}.")
+    if domain_reference(response) is None:
+        raise Rejection("unsupported_stage", f"The {side} run names no domain reference of its stage "
+                        f"{response['stage']}; the stage is not supported.")
+    names = [quantity["name"] for quantity in response["quantities"]]
+    if len(set(names)) != len(names):  # rule 7, as far as a comparison checks it
+        raise Rejection("quantity_mismatch", f"The {side} run declares a quantity name twice.")
     export_path = check_artifact(folder, response["export"]["artifact"])  # rule 8
     return CheckedRun(response, check_export(response, export_path))  # rules 9 to 13
 
@@ -477,8 +496,6 @@ def _compare_request(request: dict, folder: Path,
     """
     paths = {}
     try:
-        if request["stage"] not in COMPARED_QUANTITIES:
-            raise Rejection("unsupported_stage", f"The stage {request['stage']} is not supported.")
         sides = (("left", request["left"]), ("right", request["right"]))
         for name, side in sides:
             for member in ("response", "run_record"):

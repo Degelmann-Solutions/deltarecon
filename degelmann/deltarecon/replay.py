@@ -6,7 +6,7 @@ record, and compares the recorded run, as the left side, with the repeated run, 
 right side, through the compare procedure of ``contracts/v3/compare.md``. Without a
 tolerance profile the comparison is exact.
 
-- The replay repeats runs recorded under contract version 2.0, 3.0, or 3.1. A run record written
+- The replay repeats runs recorded under contract version 2.0, 3.0, 3.1, or 3.2. A run record written
   under 1.0 is read by ``regression``, ``derive``, ``walk``, and ``search``, but it is not
   replayed: the replay rejects it with ``unsupported_version`` (``contracts/v3/README.md``,
   "Version compatibility").
@@ -22,7 +22,11 @@ tolerance profile the comparison is exact.
   deviation file.
 - A recorded run with the outcome ``error`` has no export. It is repeated, nothing is
   compared, and it is ``reproduced_exactly`` when the new response is byte for byte the
-  recorded one, else ``not_reproduced``. The replay record lists the new response only.
+  recorded one, else ``not_reproduced``; for a run recorded under 2.0, 3.0, or 3.1 apart from
+  ``contract_version`` and ``domain_reference``. The replay record lists the new response only.
+- A record whose response names another domain reference than the engine declares for its
+  stage is refused with ``domain_reference_mismatch``, and one of a stage other than
+  ``liability_cashflow`` whose response names none with ``unsupported_stage``.
 - A rejected replay raises a :class:`~degelmann.deltarecon.documents.Rejection` and writes nothing.
   The replay stays strict: the engine resolves the recorded release identity as it is, so
   the run is repeated on the computation path its engine version names.
@@ -34,17 +38,17 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 from . import changes as changes_contract
-from .compare import (COMPARE_REQUEST, COMPARED_QUANTITIES, CompareResult, compare, compare_request_document,
+from .compare import (COMPARE_REQUEST, CompareResult, compare, compare_request_document, domain_reference,
                       no_deviation, read_tolerance)
 from .documents import (CHANGES_SCHEMA, CONTRACT_VERSION, RECORD_SCHEMA, RUN_REQUEST, RUN_SCHEMA,
                         Rejection, artifact_reference, check_artifact, copy_files, document_bytes,
                         parse_document, read_document, same_release, write_document)
 from .export import check_export
-from .run import (RECORD_NAME, Engine, UsageError, quantity_errors,
+from .run import (RECORD_NAME, WITHOUT_DOMAIN_REFERENCE, Engine, StageDeclaration, UsageError,
                   repositories_folder, run_record, run_request)
 
 # The contract versions of the run records a replay repeats; a 1.0 record is not replayed.
-REPLAY_VERSIONS = ("2.0", "3.0", "3.1")
+REPLAY_VERSIONS = ("2.0", "3.0", "3.1", "3.2")
 REPLAY_FOLDER = "replay"
 REPLAY_RECORD_NAME = "replay-record.json"
 REPLAY_COMPARE_REQUEST_NAME = "replay-compare.request.json"
@@ -122,14 +126,37 @@ def check_repeated(request: dict, response: dict) -> None:
                         "identity, change set, selection, and target of its request.")
 
 
-def check_compared_stage(stage: str) -> None:
-    """Refuse a stage whose quantities the core does not hold to check a response against."""
-    if stage not in COMPARED_QUANTITIES:
+def check_compared_stage(response: dict, declaration: StageDeclaration) -> None:
+    """Refuse a response that cannot be compared: one that names no domain reference
+    (:func:`~degelmann.deltarecon.compare.domain_reference`) with ``unsupported_stage``, and one that
+    names another domain reference than ``declaration``, the engine's declaration of its stage, with
+    ``domain_reference_mismatch``."""
+    reference = domain_reference(response)
+    if reference is None:
+        raise Rejection("unsupported_stage", f"The response names no domain reference of its stage "
+                        f"{response['stage']}; the stage is not supported.")
+    declared = declaration.domain_reference
+    if reference != {"id": declared.id, "version": declared.version}:
+        raise Rejection("domain_reference_mismatch", f"The recorded run names the domain reference "
+                        f"{reference['id']} version {reference['version']}, and the engine declares "
+                        f"{declared.id} version {declared.version} for the stage {response['stage']}.")
+
+
+def check_recorded_stage(recorded: RecordedRun, stages) -> None:
+    """:func:`check_compared_stage` of the response of a recorded run against the engine's declaration
+    of its stage in ``stages``: before anything runs, for a replay, a regression, a walk, and a search."""
+    stage = recorded.record["stage"]
+    if stage not in stages:
         raise Rejection("unsupported_stage", f"The stage {stage} is not supported.")
+    check_compared_stage(recorded.response, stages[stage])
 
 
 def check_response(request: dict, response: dict, folder: Path, values: dict | None = None) -> dict:
     """Rules 6 to 13 of the run contract for a succeeded response. Return the export values.
+
+    Rule 7 is the run's obligation against its engine's declaration; it is checked here, as by a
+    comparison, only for a name declared twice. The names are checked against the other side when
+    the response is compared.
 
     ``values`` are the values of a run this process has just made, as the core wrote them into
     its export (:attr:`~degelmann.deltarecon.run.RunResult.values`). With them only rules 6 and 7
@@ -137,9 +164,8 @@ def check_response(request: dict, response: dict, folder: Path, values: dict | N
     wrote the export and the response from those values.
     """
     check_repeated(request, response)  # rule 6
-    check_compared_stage(response["stage"])
-    problem = quantity_errors(COMPARED_QUANTITIES[response["stage"]],
-                              [q["name"] for q in response["quantities"]])  # rule 7
+    names = [q["name"] for q in response["quantities"]]
+    problem = "a quantity name is declared twice" if len(set(names)) != len(names) else None  # rule 7
     if problem:
         raise Rejection("quantity_mismatch", f"The response declares its quantities wrongly: {problem}.")
     if values is not None:
@@ -254,7 +280,7 @@ def replay(record_path: Path, engine: Engine, repositories: Path | None = None,
         raise UsageError(f"no tolerance file at {tolerance}")
 
     recorded = read_recorded_run(record_path, engine.stages, allow_error=True)
-    check_compared_stage(recorded.record["stage"])
+    check_recorded_stage(recorded, engine.stages)
     if recorded.record["contract_version"] not in REPLAY_VERSIONS:
         raise Rejection("unsupported_version",
                         f"The replay repeats only runs recorded under contract version "
@@ -332,16 +358,20 @@ def replay(record_path: Path, engine: Engine, repositories: Path | None = None,
 def _replay_of_an_error(recorded: RecordedRun, result, replay_record_path: Path) -> ReplayResult:
     """Write the replay record of a run that ended with an error. Nothing is compared.
 
-    The repeated response must equal the recorded one byte for byte. For a run recorded under an
-    earlier version the two may differ in ``contract_version`` only: the recorded version is written
-    into the repeated response before the bytes are compared.
+    The repeated response must equal the recorded one byte for byte. For a run recorded under 2.0,
+    3.0, or 3.1 the two may differ in ``contract_version`` and ``domain_reference`` only: the member
+    ``domain_reference`` is removed from the repeated response and the recorded version is set in it,
+    its members in their order, before the bytes are compared.
     """
     folder = recorded.folder
     repeated = result.response_path.read_bytes()
     stored = (folder / recorded.response_ref["path"]).read_bytes()
     version = recorded.response["contract_version"]
     if version != CONTRACT_VERSION:
-        repeated = document_bytes({**parse_document(repeated), "contract_version": version})
+        document = parse_document(repeated)
+        if version in WITHOUT_DOMAIN_REFERENCE:
+            document.pop("domain_reference", None)
+        repeated = document_bytes({**document, "contract_version": version})
     same = repeated == stored
     outcome = "reproduced_exactly" if same else "not_reproduced"
     replay_record = run_record(

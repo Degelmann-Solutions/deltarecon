@@ -18,16 +18,17 @@ import pytest
 
 from degelmann.deltarecon import changes as changes_contract
 from degelmann.deltarecon.__main__ import main
-from degelmann.deltarecon.compare import COMPARED_QUANTITIES
 from degelmann.deltarecon.derive import build_manifest, derive, remainder
 from degelmann.deltarecon.documents import CHANGES_SCHEMA, Rejection, document_bytes, read_document, schema_errors, sha256_file
 from degelmann.deltarecon.replay import replay
+from degelmann.deltarecon.protocol import StageDeclaration
 from degelmann.deltarecon.run import History, Revision, UsageError
 
-from conftest import (CLONE_NAME, LAPSE_TABLE, NEW_BUSINESS, PARAMS, POINTS, POINTS_B, PRODUCT_FOLDER, START,
-                      REPOSITORIES, REPOSITORY_URL, ROOT, StubEngine, branch, change, cli, clone_state, commit,
-                      commit_message, edit_file, empty_repository, folder_hashes, git, git_environment, merge,
-                      patch_text, run_stub, stored, stub_request, throwaway, with_manifest, write_files)
+from conftest import (CLONE_NAME, LAPSE_TABLE, NEW_BUSINESS, OTHER_REFERENCE, PARAMS, POINTS, POINTS_B,
+                      PRODUCT_FOLDER, START, REPOSITORIES, REPOSITORY_URL, ROOT, StubEngine, branch, change, cli,
+                      clone_state, commit, commit_message, edit_file, empty_repository, folder_hashes, git,
+                      git_environment, merge, patch_text, run_stub, stored, stub_request, throwaway, with_manifest,
+                      write_files)
 
 # --- the core on the stub engine ----------------------------------------------------
 
@@ -79,7 +80,7 @@ def test_linear_history_gives_one_chained_change_per_revision(world):
     assert list(manifest) == ["document", "contract_version", "stage", "manifest_id", "base_release",
                               "history", "changes"]
     assert (manifest["document"], manifest["contract_version"], manifest["stage"]) == (
-        "change_manifest", "3.1", "liability_cashflow")
+        "change_manifest", "3.2", "liability_cashflow")
     assert manifest["manifest_id"] == "history-r0-r3" and manifest["base_release"] == "N"
     assert manifest["history"] == {"source": "git", "from": "r0", "to": "r3",
                                    "determines": ["input_data", "release_folder"], "remainder": []}
@@ -313,11 +314,10 @@ def test_a_manifest_that_cannot_be_derived_is_rejected_with_its_code_and_writes_
 
 class TwoStages(HistoryStub):
     stages = {"liability_cashflow": StubEngine.stages["liability_cashflow"],
-              "other_stage": StubEngine.stages["liability_cashflow"]}
+              "other_stage": StageDeclaration(OTHER_REFERENCE, StubEngine.stages["liability_cashflow"].quantities)}
 
 
 def test_records_of_two_stages_are_a_stage_mismatch(world, monkeypatch, capsys):
-    monkeypatch.setitem(COMPARED_QUANTITIES, "other_stage", TwoStages.stages["other_stage"])
     older = record(world, "r0", engine=TwoStages())
     newer = record(world, "r3", engine=TwoStages(), stage="other_stage")
     before = folder_hashes(world)

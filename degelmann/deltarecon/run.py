@@ -20,6 +20,11 @@ model point, and an error of the core still stops the procedure. A session may p
 selection at once through ``project_many``; its outcomes are checked in writer order as
 those of ``project``.
 
+Every response that repeats a stage the engine declares, whatever its outcome, names after ``stage``
+the domain reference the engine declares for it, ``domain_reference``; a rejection with
+``unsupported_stage`` names none. The quantity names a session declares are checked against the
+quantities of that declaration (rule 7).
+
 A request with ``target`` is a target-only run: the session computes the target quantities
 in the target window of each model point through ``project_target`` and evaluates no model
 check. A target quantity the session does not declare is rejected with ``unknown_quantity``,
@@ -47,8 +52,8 @@ from .documents import (CHANGES_SCHEMA, CONTRACT_VERSION, RECORD_SCHEMA, RUN_REQ
                         write_document)
 from .export import write_export
 # Re-exported: other modules and the tests import these names from here.
-from .protocol import (SCRATCH_PREFIX, Engine, History, ModelPointFailure, Revision, Session,  # noqa: F401
-                       UsageError)
+from .protocol import (LIABILITY_CASHFLOW, SCRATCH_PREFIX, DomainReference, Engine, History,  # noqa: F401
+                       ModelPointFailure, Revision, Session, StageDeclaration, UsageError)
 
 RESPONSE_NAME = "response.json"
 EXPORT_NAME = "results.csv"
@@ -59,6 +64,9 @@ REPOSITORIES_FOLDER = "repositories"
 REPOSITORIES_VARIABLE = "DELTARECON_REPOSITORIES"
 # The folder of the clone of the reference model repository below the repositories folder.
 CLONE_NAME = "delib-history"
+# The contract versions whose run responses have no member ``domain_reference``: a run written under
+# one of them, as the tests write genuine earlier documents, names no domain reference.
+WITHOUT_DOMAIN_REFERENCE = ("1.0", "2.0", "3.0", "3.1")
 
 def worker_outcome(call, *arguments) -> tuple[str, object]:
     """The outcome of ``call(*arguments)`` in a form a worker process returns: ``("ok", value)``, or
@@ -377,12 +385,25 @@ def _repeatable(document: dict, member: str, definition: str) -> bool:
         validator(f"common.schema.json#/$defs/{definition}").iter_errors(document[member]))
 
 
-def rejected_response(document, rejection: Rejection) -> dict:
-    """A rejected response. Stage and run id are repeated where they can be read."""
+def domain_reference_member(stage: str, stages) -> dict:
+    """The member ``domain_reference`` of a response of ``stage``, placed after ``stage``: the domain
+    reference the engine declares for it in ``stages``. Empty for a stage the engine does not declare,
+    whose rejection with ``unsupported_stage`` names none, and when the tool writes a version without
+    the member."""
+    if CONTRACT_VERSION in WITHOUT_DOMAIN_REFERENCE or stage not in stages:
+        return {}
+    reference = stages[stage].domain_reference
+    return {"domain_reference": {"id": reference.id, "version": reference.version}}
+
+
+def rejected_response(document, rejection: Rejection, stages=None) -> dict:
+    """A rejected response. Stage and run id are repeated where they can be read, and after the stage
+    the domain reference ``stages``, the engine's declaration, names for it."""
     response = {"document": "run_response", "contract_version": CONTRACT_VERSION}
     if isinstance(document, dict):
         if _repeatable(document, "stage", "stage"):
             response["stage"] = document["stage"]
+            response.update(domain_reference_member(document["stage"], stages or {}))
         if _repeatable(document, "run_id", "id"):
             response["run_id"] = document["run_id"]
     response["outcome"] = "rejected"
@@ -480,11 +501,12 @@ def run_request(request_path: Path, engine: Engine, repositories: Path | None = 
         check_schema(request, RUN_REQUEST)
         check_target_periods(request.get("target"))
     except Rejection as rejection:
-        response = rejected_response(request, rejection)
+        response = rejected_response(request, rejection, engine.stages)
         write_document(response_path, response, RUN_SCHEMA)
         return RunResult("rejected", response, response_path)
 
-    repeated = {name: request[name] for name in ("stage", "run_id")}
+    repeated = {"stage": request["stage"], **domain_reference_member(request["stage"], engine.stages),
+                "run_id": request["run_id"]}
     carried = {name: request[name] for name in ("release", "changes", "selection", "target") if name in request}
     target = request.get("target")
     head = {"document": "run_response", "contract_version": CONTRACT_VERSION, **repeated}
@@ -515,12 +537,12 @@ def run_request(request_path: Path, engine: Engine, repositories: Path | None = 
             _check_model_point_ids(selected)
             declared = _engine(lambda: [(name, unit) for name, unit in session.quantities])
             time_basis = {"id": _engine(lambda: session.time_basis)}
-            rows, ranges, failures = calculate(session, engine.stages[request["stage"]], selected, available,
-                                               [name for name, _ in declared], target)
+            rows, ranges, failures = calculate(session, engine.stages[request["stage"]].quantities, selected,
+                                               available, [name for name, _ in declared], target)
             quantities = [{"name": name, "unit": unit} for name, unit in declared
                           if target is None or name in target["quantities"]]
     except Rejection as rejection:
-        response, parameters = rejected_response(request, rejection), []
+        response, parameters = rejected_response(request, rejection, engine.stages), []
     except _EngineError as error:
         response = {**head, "outcome": "error", **carried, "diagnostics": [Rejection(
             "state_not_readable", error_message(error.error, repositories)).diagnostic()]}

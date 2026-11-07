@@ -65,7 +65,13 @@ Nothing runs and nothing is written:
 1. Both records are records of full runs that succeeded without an enabled
    change, and pass the reader rules of [run.md](run.md#run-record). A record of
    a [target-only run](run.md#target-only-run), whose request names a target, is
-   refused with `target_only_record`. Any other record that does not fit is a
+   refused with `target_only_record`. The response of each record names the
+   domain reference the engine declares for its stage, read under the
+   [reader rule for documents of earlier versions](README.md#version-compatibility).
+   A record whose response names another one is refused with
+   `domain_reference_mismatch`; a record written before 3.2 of a stage other
+   than `liability_cashflow`, whose response names none, with
+   `unsupported_stage`. Any other record that does not fit is a
    fault of the input, not a diagnostic.
 2. Both records name one stage. Otherwise `stage_mismatch`.
 3. Both records hold the same selection: both full, or both the same set of
@@ -149,9 +155,9 @@ add up to the difference of the two states.
 
 ### Stage step
 
-Localising starts with the stage, then the revisions within it. Version 3 defines
-one stage, so the stage step is trivial: the walk runs in the stage both records
-name, and `stage` of the walk result names it.
+Localising starts with the stage, then the revisions within it. Both records
+name one stage, so the stage step is trivial: the walk runs in the stage both
+records name, and `stage` of the walk result names it.
 
 ## Findings
 
@@ -173,7 +179,7 @@ not run or is not reproduced, these are all of them.
 ```json
 {
   "document": "walk_result",
-  "contract_version": "3.1",
+  "contract_version": "3.2",
   "stage": "liability_cashflow",
   "walk_id": "walk-run-n-full-run-n1-full",
   "manifest": { "path": "changes.json", "sha256": "…" },
@@ -391,8 +397,8 @@ Before anything runs, the search reads the walk folder under the
   names other records (by the byte hashes of its copies of the two run records),
   another tolerance profile, other held kinds, or a manifest that differs, byte
   for byte, from the one the search derives again, apart from a
-  `contract_version` the reader reads (a walk folder written under 1.0, 2.0, or
-  3.0 holds the manifest with `1.0`, `2.0`, or `3.0`), or when it fails the
+  `contract_version` the reader reads (a walk folder written under 1.0, 2.0,
+  3.0, or 3.1 holds the manifest with `1.0`, `2.0`, `3.0`, or `3.1`), or when it fails the
   [environment rule](#same-environment).
 
 A refused search writes nothing.
@@ -494,6 +500,9 @@ folder applies these rules; a folder that breaks one is no reference:
   reproduced belongs to a state that succeeded.
 - No state's request `request.json`, in its state folder, names a target: a
   walk runs every state in full.
+- The response of every state that succeeded names the domain reference of the
+  two records, each read under the
+  [reader rule for documents of earlier versions](README.md#version-compatibility).
 
 The **state folder** of state k is the folder of its response in the walk
 result. It holds the request `request.json`, the response, the export, and the
@@ -531,7 +540,7 @@ A search has the findings of a walk, with these meanings, and one of its own:
 ```json
 {
   "document": "search_result",
-  "contract_version": "3.1",
+  "contract_version": "3.2",
   "stage": "liability_cashflow",
   "search_id": "search-run-n-full-run-n1-full",
   "walk": { "walk_id": "walk-run-n-full-run-n1-full", "result": { "path": "walk/walk.result.json", "sha256": "…" } },

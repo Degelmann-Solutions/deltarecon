@@ -163,7 +163,8 @@ from dulwich.repo import Repo
 
 from .. import changes as changes_contract
 from ..compare import target_window
-from ..protocol import SCRATCH_PREFIX, History, ModelPointFailure, Rejection, Revision, UsageError
+from ..protocol import (LIABILITY_CASHFLOW, SCRATCH_PREFIX, History, ModelPointFailure, Rejection, Revision,
+                        StageDeclaration, UsageError)
 from ..run import CLONE_NAME, from_worker_outcome, worker_outcome
 from ..workers import ordered_map, worker_count
 
@@ -940,7 +941,8 @@ class ReferenceModel:
     """The engine of the stage ``liability_cashflow``: modelx with the model ``RLV_DE_S``,
     computed through its export or through modelx, as the engine version names."""
 
-    stages = {STAGE: tuple(STAGE_QUANTITIES[STAGE])}
+    # The stage of the domain reference of the pack, under the pair the pack reserves for it.
+    stages = {STAGE: StageDeclaration(LIABILITY_CASHFLOW, tuple(STAGE_QUANTITIES[STAGE]))}
     realisations = frozenset({changes_contract.TEXT_PATCH, changes_contract.REVISION})
     determines = DETERMINED_KINDS
     holdable = {"input_data": frozenset({"data"})}  # the model point table, the class ``data``

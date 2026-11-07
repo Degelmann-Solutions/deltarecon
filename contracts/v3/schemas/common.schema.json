@@ -6,7 +6,7 @@
   "$defs": {
     "contract_version": {
       "description": "Version of the stage contracts the document follows.",
-      "enum": ["3.0", "3.1"]
+      "enum": ["3.0", "3.1", "3.2"]
     },
     "stage": {
       "description": "Stage identifier, for example liability_cashflow.",
@@ -130,6 +130,16 @@
           }
         }
       ]
+    },
+    "domain_reference": {
+      "description": "The domain reference of a stage, by the label its engine names: an identifier and a version, both opaque. The pair liability_cashflow, 3 is reserved for the domain reference of liability_cashflow published in pack v3.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "version"],
+      "properties": {
+        "id": { "$ref": "#/$defs/id" },
+        "version": { "$ref": "#/$defs/id" }
+      }
     },
     "time_basis": {
       "description": "Declared time basis of the period index. The identifier is defined in a domain reference.",

@@ -28,6 +28,7 @@ from degelmann.deltarecon.documents import (CHANGES_SCHEMA, RECORD_SCHEMA, RUN_R
 from degelmann.deltarecon.export import (check_export, export_bytes, export_errors, format_number,
                                is_profile_number, read_export)
 from degelmann.deltarecon.compare import COMPARE_SCHEMA
+from degelmann.deltarecon.protocol import LIABILITY_CASHFLOW, StageDeclaration
 from degelmann.deltarecon.regression import read_regression_input, regression
 from degelmann.deltarecon.replay import check_response, replay
 from degelmann.deltarecon.run import SCRATCH_PREFIX, ModelPointFailure, UsageError, run_request
@@ -61,7 +62,7 @@ def test_full_run_exports_every_model_point_and_writes_the_record(world):
         stored(folder / "request.json")
     for member in ("stage", "run_id", "release", "changes", "selection"):
         assert response[member] == request[member]
-    assert response["contract_version"] == record["contract_version"] == "3.1"
+    assert response["contract_version"] == record["contract_version"] == "3.2"
     assert response["time_basis"] == {"id": "policy_month"}
     assert response["model_points"] == [
         {"model_point_id": "MP-A", "first_period": 12, "last_period": 13},
@@ -141,7 +142,7 @@ def test_bad_request_is_rejected_with_the_response_alone(world, case, code):
         "duplicate-selection": request_bytes(
             world, selection={"mode": "subset", "model_point_ids": ["MP-A", "MP-A"]}),
         "unknown-member": request_bytes(world, priority="high"),
-        "a-response": document_bytes({"document": "run_response", "contract_version": "3.1",
+        "a-response": document_bytes({"document": "run_response", "contract_version": "3.2",
                                       "stage": "liability_cashflow", "run_id": "run-stub",
                                       "outcome": "rejected",
                                       "diagnostics": [{"code": "invalid_json", "message": "x"}]}),
@@ -155,7 +156,7 @@ def test_bad_request_is_rejected_with_the_response_alone(world, case, code):
     response = stored(folder / "response.json")
     assert not schema_errors(response, RUN_SCHEMA)
     assert [d["code"] for d in response["diagnostics"]] == [code]
-    assert response["contract_version"] == "3.1"
+    assert response["contract_version"] == "3.2"
     # Stage and run id are repeated where they can be read.
     readable = case not in {"not-json", "non-finite", "too-large", "not-an-object", "byte-order-mark",
                             "duplicate-member", "lone-surrogate"}
@@ -170,7 +171,7 @@ def test_the_version_is_checked_before_the_schema(world):
 def test_a_session_name_outside_the_declared_domain_stops_the_run(world):
     """The engine declares the domain; a session name outside it is an error of the core, as today."""
     class NarrowEngine(StubEngine):
-        stages = {"liability_cashflow": ("Netto-Cashflow",)}
+        stages = {"liability_cashflow": StageDeclaration(LIABILITY_CASHFLOW, ("Netto-Cashflow",))}
 
     with pytest.raises(RuntimeError, match="the engine declares quantities the stage does not allow: "
                                            "the domain reference defines no quantity 'Anzahl Verträge'"):
@@ -188,6 +189,54 @@ def test_unsupported_stage_is_rejected_with_a_record(world):
     assert record["stage"] == result.response["stage"] == "asset_cashflow"
     assert record["outcome"] == "rejected" and record["parameters"] == []
     assert roles(record["outputs"]) == {"response": "response.json"}
+
+
+LIABILITY_REFERENCE = {"id": "liability_cashflow", "version": "3"}
+
+
+@pytest.mark.parametrize("outcome", ["succeeded", "failed", "error", "rejected", "rejected-schema"])
+def test_every_response_of_a_declared_stage_names_its_domain_reference_after_the_stage(world, outcome):
+    """Contract 3.2: whatever the outcome, a response that carries a stage the engine declares names the domain
+    reference the engine declares for it, right after ``stage``."""
+    members = {}
+    if outcome == "failed":
+        (world / "rel" / "points.csv").write_text(POINTS.replace("MP-B,0,2,2", "MP-B,0,2,raise"), "utf-8")
+    elif outcome == "error":
+        (world / "rel" / "points.csv").write_text("id,first,last,base\n", "utf-8")
+    elif outcome == "rejected":
+        members["selection"] = {"mode": "subset", "model_point_ids": ["MP-9999"]}
+    elif outcome == "rejected-schema":
+        members["selection"] = {"mode": "none"}
+    result, _ = run_stub(world, stub_request(world, **members))
+    assert result.outcome == outcome.split("-")[0]
+    response = stored(world / "run" / "response.json")
+    assert list(response)[:4] == ["document", "contract_version", "stage", "domain_reference"]
+    assert response["domain_reference"] == LIABILITY_REFERENCE
+    assert_documents_valid(world / "run")
+
+
+def test_a_rejection_of_an_undeclared_stage_names_no_domain_reference(world):
+    result, _ = run_stub(world, stub_request(world, stage="asset_cashflow"))
+    assert result.response["diagnostics"][0]["code"] == "unsupported_stage"
+    assert list(result.response)[:4] == ["document", "contract_version", "stage", "run_id"]
+
+
+def test_a_run_written_under_3_1_names_no_domain_reference(world):
+    with written_under("3.1"):
+        result, _ = run_stub(world, stub_request(world, contract_version="3.1"))
+    assert result.outcome == "succeeded" and "domain_reference" not in result.response
+    assert stored(world / "run" / "response.json")["contract_version"] == "3.1"
+
+
+def test_the_schema_requires_the_stage_of_a_rejection_that_names_a_domain_reference():
+    rejected = {"document": "run_response", "contract_version": "3.2", "outcome": "rejected",
+                "diagnostics": [{"code": "invalid_json", "message": "Not JSON."}]}
+    assert not schema_errors(rejected, RUN_SCHEMA)
+    assert schema_errors({**rejected, "domain_reference": LIABILITY_REFERENCE}, RUN_SCHEMA)
+    assert not schema_errors({**rejected, "stage": "liability_cashflow", "domain_reference": LIABILITY_REFERENCE},
+                             RUN_SCHEMA)
+    assert schema_errors({**rejected, "stage": "liability_cashflow", "domain_reference": {"id": "", "version": "3"}},
+                         RUN_SCHEMA)
 
 
 def test_unknown_model_point_rejects_the_whole_request(world):
@@ -979,7 +1028,7 @@ def test_replay_of_an_unchanged_run_is_reproduced_exactly(world, with_changes):
     record = stored(folder / "replay-record.json")
     assert not schema_errors(record, RECORD_SCHEMA)
     assert record["procedure"] == {"type": "replay"} and record["outcome"] == "reproduced_exactly"
-    assert record["stage"] == "liability_cashflow" and record["contract_version"] == "3.1"
+    assert record["stage"] == "liability_cashflow" and record["contract_version"] == "3.2"
     # Every execution has its own record id: the replay, the repeated run, and the recorded run.
     repeated = stored(folder / "replay" / "run-record.json")
     assert RECORD_ID.fullmatch(record["record_id"]) and RECORD_ID.fullmatch(repeated["record_id"])
@@ -2208,7 +2257,7 @@ def test_unsupported_realisation_over_a_revision_is_rejected_and_names_the_chang
                folder, **{"class": "parameter"}),
         change("chg-switch", None, folder, realisation={"type": "engine_switch", "switch": "RC-1"}),
     ]
-    manifest = {"document": "change_manifest", "contract_version": "3.1", "stage": "liability_cashflow",
+    manifest = {"document": "change_manifest", "contract_version": "3.2", "stage": "liability_cashflow",
                 "manifest_id": "changes-synthetic", "base_release": "N", "changes": entries}
     (folder / "changes.json").write_bytes(document_bytes(manifest))
     assert cli(monkeypatch, "request", "--revision", START, "--repositories", REPOSITORIES, "--label", "N",
@@ -2230,7 +2279,7 @@ def test_an_enabled_revision_the_clone_does_not_hold_ends_with_the_outcome_error
     folder = tmp_path / "run"
     folder.mkdir()
     manifest = {
-        "document": "change_manifest", "contract_version": "3.1", "stage": "liability_cashflow",
+        "document": "change_manifest", "contract_version": "3.2", "stage": "liability_cashflow",
         "manifest_id": f"history-{START}-{'1' * 40}", "base_release": "N",
         "history": {"source": "git", "from": START, "to": "1" * 40,
                     "determines": ["code_state", "input_data", "parameter_set"], "remainder": []},
@@ -2277,7 +2326,7 @@ def test_changes_over_a_revision_and_replay_without_the_clone(monkeypatch, tmp_p
         change("chg-claim-expense", patch_text(MODEL_CODE, code, new_code), folder, **{"class": "code"}),
         change("chg-rename-point", patch_text(POINT_TABLE, points, new_points), folder),
     ]
-    manifest = {"document": "change_manifest", "contract_version": "3.1", "stage": "liability_cashflow",
+    manifest = {"document": "change_manifest", "contract_version": "3.2", "stage": "liability_cashflow",
                 "manifest_id": "changes-synthetic", "base_release": "N", "changes": entries}
     (folder / "changes.json").write_bytes(document_bytes(manifest))
     assert not schema_errors(manifest, CHANGES_SCHEMA)
@@ -2555,10 +2604,11 @@ def test_full_changed_case_on_all_model_points_of_release_n(monkeypatch, tmp_pat
     # table is the one that main wrote before the deviations left the result (story 9).
     assert compared["deviations"]["path"] == "compare.deviations.csv"
     assert (out / "compare.result.json").stat().st_size < 64 * 1024
-    # Contract version 3.1: the 3.0 table 5ddfe219... with "contract_version": "3.1", byte for byte; that
-    # table was the 2.0 table 7ba6c115... with "3.0", and that the table of 1.0 (4fc28fbd...) with "2.0".
+    # Contract version 3.2: the 3.1 table b39e4206... with "contract_version": "3.2", byte for byte (a
+    # signature table carries no domain reference); that table was the 3.0 table 5ddfe219... with "3.1", that
+    # the 2.0 table 7ba6c115... with "3.0", and that the table of 1.0 (4fc28fbd...) with "2.0".
     assert sha256_file(out / "signature-table.json") == \
-        "b39e4206d7991f2652ab1f458a913d149fbceef43600d08575d8e19c422cfa6d"
+        "b0cc7b29166f3e405a4f4b332daa997c842a8d76f1fa61f3d913d6f16f3775e0"
     assert len(stored(recorded / "response.json")["model_points"]) == 350
     # Exactly the new business deviates: no in-force point lies in policy year 1.
     lines = text(POINT_TABLE).splitlines()
@@ -3106,7 +3156,7 @@ def test_a_target_only_stub_run_computes_the_target_window_of_each_point(world):
     folder = world / "run"
     assert_documents_valid(folder)
     response = stored(folder / "response.json")
-    assert response["target"] == CASH_TARGET and list(response)[7:9] == ["selection", "target"]
+    assert response["target"] == CASH_TARGET and list(response)[8:10] == ["selection", "target"]
     assert response["quantities"] == [{"name": "Netto-Cashflow", "unit": "EUR"}]
     # MP-C has projection period 0 alone: its window is empty, and it is absent although selected.
     assert response["model_points"] == [{"model_point_id": "MP-A", "first_period": 13, "last_period": 13},
