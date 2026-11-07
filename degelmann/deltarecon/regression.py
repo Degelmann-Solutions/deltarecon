@@ -31,7 +31,7 @@ from pathlib import Path
 
 from .compare import COMPARE_REQUEST, CompareResult, compare, compare_request_document, read_tolerance
 from .documents import artifact_reference, copy_files, document_bytes, write_document, write_new
-from .replay import RecordedRun, check_compared_stage, read_recorded_run, refuse_target_only
+from .replay import RecordedRun, check_recorded_stage, read_recorded_run, refuse_target_only
 from .run import (RECORD_NAME, Engine, RunResult, UsageError, repositories_folder, run_request,
                   run_request_document)
 
@@ -54,14 +54,16 @@ class RegressionResult:
 def read_regression_input(record_path: Path | str, stages) -> RecordedRun:
     """The recorded run a regression starts from: succeeded, full, and without enabled changes.
 
-    The record of a target-only run is refused with ``target_only_record``, and the record of a
-    stage the core cannot compare with ``unsupported_stage``, before anything runs."""
+    The record of a target-only run is refused with ``target_only_record``; a record whose response
+    names another domain reference than the engine declares for its stage in ``stages`` with
+    ``domain_reference_mismatch``, and one of a stage other than ``liability_cashflow`` whose
+    response, written before 3.2, names none with ``unsupported_stage``; all before anything runs."""
     recorded = read_recorded_run(Path(record_path), stages)
     refuse_target_only(recorded)
     if recorded.request["changes"]["enabled"]:
         raise UsageError("the recorded run has enabled changes; a regression run takes the record of "
                          "a run without enabled changes")
-    check_compared_stage(recorded.record["stage"])  # the run is compared; a stage the core cannot compare runs nothing
+    check_recorded_stage(recorded, stages)  # the run is compared; a record that cannot be runs nothing
     return recorded
 
 
@@ -78,7 +80,7 @@ def regression(recorded: RecordedRun, release: dict, output: Path | str, engine:
         raise UsageError(f"{output} exists already; a regression run overwrites no file")
     if recorded.request["changes"]["enabled"]:
         raise UsageError("the recorded run has enabled changes")
-    check_compared_stage(recorded.record["stage"])
+    check_recorded_stage(recorded, engine.stages)
     profile = read_tolerance(tolerance, recorded.response["quantities"])
     run_id = f"regression-{recorded.request['run_id']}"
     request = run_request_document(recorded.record["stage"], run_id, release, {"enabled": []},

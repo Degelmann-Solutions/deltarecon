@@ -28,6 +28,10 @@ of the earlier chain, and the step numbers, run ids and labels are unchanged; a 
 no revision. The archived walk result is not compared, because it holds the
 hashes of the 2.0 responses and the revisions. The pinned hashes are never rewritten to make a test
 pass.
+
+The tool writes contract version 3.2; the oracle stays on 3.1 until entry 10 of the epic "Engine protocol
+without gaps" archives it and renews it under 3.2. Until then the reproduction writes under 3.1
+(:func:`conftest.written_under`), the version the oracle was published in.
 """
 from __future__ import annotations
 
@@ -44,7 +48,8 @@ from degelmann.deltarecon.compare import first_periods, read_result_deviations
 from degelmann.deltarecon.documents import RUN_SCHEMA, document_bytes, parse_document, read_document
 from degelmann.deltarecon.signature import signature_table
 
-from conftest import CLONE, NEWER, RELEASE_N, REPOSITORIES, ROOT, START, export_coordinates, git, require_clone
+from conftest import (CLONE, NEWER, RELEASE_N, REPOSITORIES, ROOT, START, export_coordinates, git, require_clone,
+                      written_under)
 
 ORACLE = ROOT / "oracle"
 PUBLISHED_VERSION = "3.1"
@@ -210,15 +215,16 @@ def test_reference_walk_reproduces_every_published_hash(monkeypatch, tmp_path):
     require_clone(CLONE, NEWER)
     monkeypatch.chdir(ROOT)
     records = []
-    for name, (run_id, _, _) in sorted(REQUESTS.items()):
-        request = tmp_path / run_id / "request.json"
-        request.parent.mkdir()
-        shutil.copyfile(ORACLE / name, request)
-        assert main(["run", str(request), "--repositories", str(REPOSITORIES)]) == 0
-        records.append(str(request.parent / "run-record.json"))
     walk = tmp_path / "oracle-walk"
-    assert main(["walk", *records, "--tolerance", str(PROFILE), "--output", str(walk),
-                 "--repositories", str(REPOSITORIES)]) == 0
+    with written_under(PUBLISHED_VERSION):  # the oracle stays on 3.1 until entry 10 renews it under 3.2
+        for name, (run_id, _, _) in sorted(REQUESTS.items()):
+            request = tmp_path / run_id / "request.json"
+            request.parent.mkdir()
+            shutil.copyfile(ORACLE / name, request)
+            assert main(["run", str(request), "--repositories", str(REPOSITORIES)]) == 0
+            records.append(str(request.parent / "run-record.json"))
+        assert main(["walk", *records, "--tolerance", str(PROFILE), "--output", str(walk),
+                     "--repositories", str(REPOSITORIES)]) == 0
     written = {path.name for path in walk.glob("*.signature-table.json")} | {WALK_RESULT}
     hashes = listed_hashes()
     assert set(hashes) == written

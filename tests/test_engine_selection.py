@@ -263,13 +263,13 @@ def test_the_protocol_module_imports_the_standard_library_alone():
     assert done.stdout.strip() == "[]"
 
 
-def test_the_compared_quantities_are_those_the_reference_model_declares():
-    """The core copy of the quantities a compare checks against cannot drift from the adapter's."""
-    from degelmann.deltarecon.compare import COMPARED_QUANTITIES
+def test_the_reference_model_declares_its_stage_under_the_pair_the_pack_reserves():
+    """``liability_cashflow`` with the domain reference ``liability_cashflow``, version ``3``, and the
+    quantities of that reference in domain order."""
     from degelmann.deltarecon.engines.reference_model import STAGE_QUANTITIES, ReferenceModel
-    assert list(ReferenceModel.stages) == ["liability_cashflow"]
-    assert tuple(ReferenceModel.stages["liability_cashflow"]) == COMPARED_QUANTITIES["liability_cashflow"]
-    assert tuple(STAGE_QUANTITIES["liability_cashflow"]) == COMPARED_QUANTITIES["liability_cashflow"]
+    assert ReferenceModel.stages == {"liability_cashflow": protocol.StageDeclaration(
+        protocol.DomainReference("liability_cashflow", "3"), tuple(STAGE_QUANTITIES["liability_cashflow"]))}
+    assert protocol.LIABILITY_CASHFLOW == protocol.DomainReference("liability_cashflow", "3")
 
 
 def test_each_moved_name_is_one_class_wherever_it_is_imported_from():

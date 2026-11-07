@@ -20,20 +20,26 @@ from pathlib import Path
 import pytest
 
 from degelmann.deltarecon.__main__ import main
-from degelmann.deltarecon.compare import (COMPARE_SCHEMA, COMPARED_QUANTITIES, CheckedRun, compare, compare_runs,
+from degelmann.deltarecon.compare import (COMPARE_SCHEMA, CheckedRun, compare, compare_runs, domain_reference,
                                           exceeds, no_deviation, parameter_diff, read_tolerance, round_half_away)
 from degelmann.deltarecon.export import read_deviations
 from degelmann.deltarecon.documents import RECORD_SCHEMA, Rejection, document_bytes, schema_errors, sha256_file
+from degelmann.deltarecon.protocol import LIABILITY_CASHFLOW, StageDeclaration
 from degelmann.deltarecon.run import UsageError
 from degelmann.deltarecon.signature import render_table, signature_table
 
-from conftest import (EXACT, EXAMPLES, POINTS, RECORD_ID, StubEngine, StubSession, compare_request, deviates,
-                      deviation_rows, expected_deviations, folder_hashes, projection_periods, rehash, roles,
-                      rounded, run_side, stored, without_volatile, written_under)
+from conftest import (EXACT, EXAMPLES, OTHER_REFERENCE, POINTS, RECORD_ID, StubEngine, StubSession, TwoStages,
+                      build, compare_request, deviates, deviation_rows, expected_deviations, folder_hashes,
+                      projection_periods, record, rehash, roles, rounded, run_side, stored, without_volatile,
+                      written_under)
 
 COUNT, CASH = "Anzahl Verträge", "Netto-Cashflow"
 OUTPUTS = ["compare.deviations.csv", "compare.result.json", "compare.run-record.json", "signature-table.json"]
 HEADER_ONLY = "model_point_id,period,quantity,left,right\n"
+# The quantities of the domain reference of liability_cashflow, in domain order.
+DOMAIN = ("Anzahl Verträge", "Bruttobeitrag", "Zahlbeitrag", "Beitragsverrechnung", "garantierte Todesfallleistung",
+          "garantierter Rückkaufswert", "garantierte Erlebensfallleistung", "kalkulatorische Kosten",
+          "Kosten 2. Ordnung ohne Provisionen", "Provisionen", "Netto-Cashflow")
 
 
 def entry(upper=(0, 0), lower=(0, 0), decimals=None) -> dict:
@@ -483,13 +489,14 @@ def test_alignment_is_by_the_exact_id_and_does_not_depend_on_the_row_order(world
 # --- incompatible -------------------------------------------------------------------
 
 
-def engine_with(**attributes) -> StubEngine:
-    """A stub engine whose sessions declare another time basis or other quantities."""
+def engine_with(domain=DOMAIN, **attributes) -> StubEngine:
+    """A stub engine whose sessions declare another time basis or other quantities. ``domain`` is the
+    quantities the engine declares for the stage, by default the whole domain, so that the run admits the
+    names the session declares."""
     session = type("OtherSession", (StubSession,), attributes)
 
     class OtherEngine(StubEngine):
-        # The whole domain of the stage, so that the run admits the names the session declares.
-        stages = {"liability_cashflow": COMPARED_QUANTITIES["liability_cashflow"]}
+        stages = {"liability_cashflow": StageDeclaration(LIABILITY_CASHFLOW, tuple(domain))}
 
         @contextmanager
         def open(self, stage, release, enabled, manifest_dir, repositories, hold=frozenset()):
@@ -501,17 +508,22 @@ def engine_with(**attributes) -> StubEngine:
 
 
 def other_stage(world: Path, monkeypatch) -> None:
-    from degelmann.deltarecon import compare as compare_module
-    monkeypatch.setitem(compare_module.COMPARED_QUANTITIES, "other_stage",
-                        compare_module.COMPARED_QUANTITIES["liability_cashflow"])
     run_side(world, "right")
     response = stored(world / "right" / "response.json")
     response["stage"] = "other_stage"
     (world / "right" / "response.json").write_bytes(document_bytes(response))
 
 
+def other_reference(world: Path, monkeypatch) -> None:
+    run_side(world, "right")
+    response = stored(world / "right" / "response.json")
+    response["domain_reference"] = {**response["domain_reference"], "version": "4"}
+    (world / "right" / "response.json").write_bytes(document_bytes(response))
+
+
 INCOMPATIBLE = {
     "stage_mismatch": other_stage,
+    "domain_reference_mismatch": other_reference,
     "time_basis_mismatch": lambda world, _: run_side(world, "right", engine=engine_with(time_basis="valuation_year")),
     "quantity_mismatch": lambda world, _: run_side(world, "right", engine=engine_with(
         quantities=[("Anzahl Verträge", "policies"), ("Provisionen", "EUR")])),
@@ -538,8 +550,18 @@ def test_runs_that_cannot_be_compared_are_incompatible(world, monkeypatch, capsy
 
 
 def test_the_rules_are_applied_in_their_numbered_order(world):
-    """Stage before time basis before quantity names before units before the tolerance names."""
+    """Domain reference before time basis before quantity names before units before the tolerance names."""
     run_side(world, "left")
+    run_side(world, "right", engine=engine_with(
+        time_basis="valuation_year", quantities=[("Anzahl Verträge", "pieces"), ("Provisionen", "EUR")]))
+    edit_document(world / "right" / "response.json",
+                  lambda r: r.update(domain_reference={"id": "acme/liability_cashflow", "version": "3"}))
+    rehash(world / "right")
+    assert compare(compare_request(world, {"Zahlbeitrag": entry()})).result["diagnostics"][0]["code"] == \
+        "domain_reference_mismatch"
+    for name in OUTPUTS:
+        (world / name).unlink(missing_ok=True)
+    shutil.rmtree(world / "right")
     run_side(world, "right", engine=engine_with(
         time_basis="valuation_year", quantities=[("Anzahl Verträge", "pieces"), ("Provisionen", "EUR")]))
     result = compare(compare_request(world, {"Zahlbeitrag": entry()})).result
@@ -550,6 +572,68 @@ def test_the_rules_are_applied_in_their_numbered_order(world):
     run_side(world, "right", engine=engine_with(quantities=[("Anzahl Verträge", "pieces"), ("Provisionen", "EUR")]))
     assert compare(compare_request(world, {"Zahlbeitrag": entry()})).result["diagnostics"][0]["code"] == \
         "quantity_mismatch"
+
+
+def test_two_runs_of_a_stage_an_engine_declares_are_compared_without_an_engine(world, capsys):
+    """Contract 3.2: a comparison takes the stage, the domain reference, and the quantities from the two
+    responses; it holds no list of its own."""
+    build(world)
+    older = record(world, "w0", TwoStages(), stage="other_stage")
+    newer = record(world, "w4", TwoStages(), stage="other_stage")
+    for path in (older, newer):
+        response = stored(path.parent / "response.json")
+        assert response["domain_reference"] == {"id": OTHER_REFERENCE.id, "version": OTHER_REFERENCE.version}
+        assert list(response)[2:4] == ["stage", "domain_reference"]
+    request = compare_request(world, left=older.parent.name, right=newer.parent.name, stage="other_stage")
+    main(["compare", str(request)])  # the command loads no engine
+    assert "compare: rejected" not in capsys.readouterr().out
+    result = stored(world / "compare.result.json")
+    assert result["outcome"] == "compared" and result["stage"] == "other_stage"
+    assert [q["name"] for q in result["quantities"]] == list(TwoStages.stages["other_stage"].quantities)
+    # The compare result and the signature table carry no domain reference.
+    assert "domain_reference" not in result
+    assert "domain_reference" not in stored(world / "signature-table.json")
+    # Another reference on one side is incompatible.
+    for name in OUTPUTS:
+        (world / name).unlink(missing_ok=True)
+    edit_document(newer.parent / "response.json",
+                  lambda r: r.update(domain_reference={"id": OTHER_REFERENCE.id, "version": "2"}))
+    request = compare_request(world, left=older.parent.name, right=newer.parent.name, stage="other_stage")
+    result = compare(request).result
+    assert result["outcome"] == "incompatible"
+    assert [d["code"] for d in result["diagnostics"]] == ["domain_reference_mismatch"]
+
+
+def test_the_same_names_in_another_order_are_incompatible(world):
+    """Rule 4: both responses declare the same quantity names in the same order."""
+    run_side(world, "left")
+    run_side(world, "right", engine=engine_with(domain=(CASH, COUNT),
+                                                quantities=[(CASH, "EUR"), (COUNT, "policies")]))
+    assert [q["name"] for q in stored(world / "right" / "response.json")["quantities"]] == [CASH, COUNT]
+    result = compare(compare_request(world)).result
+    assert result["outcome"] == "incompatible"
+    assert [d["code"] for d in result["diagnostics"]] == ["quantity_mismatch"]
+
+
+@pytest.mark.parametrize("earlier", ["left", "right"])
+def test_a_3_1_run_of_liability_cashflow_compares_with_a_3_2_run(world, earlier):
+    """A response without the member, of liability_cashflow, names the pair the pack reserves."""
+    for side in ("left", "right"):
+        if side == earlier:
+            with written_under("3.1"):
+                run_side(world, side)
+        else:
+            run_side(world, side)
+    assert "domain_reference" not in stored(world / earlier / "response.json")
+    result = compare(compare_request(world)).result
+    assert result["outcome"] == "compared" and result["deviating_model_points"] == []
+
+
+def test_the_domain_reference_of_a_response_without_the_member():
+    named = {"id": "acme/lapse_cashflow", "version": "7"}
+    assert domain_reference({"stage": "other_stage", "domain_reference": named}) == named
+    assert domain_reference({"stage": "liability_cashflow"}) == {"id": "liability_cashflow", "version": "3"}
+    assert domain_reference({"stage": "other_stage"}) is None
 
 
 # --- rejected -----------------------------------------------------------------------
@@ -607,9 +691,9 @@ REJECTED = {
     "failed-response": (failed_run, {}, "model_point_failed", True),
     "error-response": (error_run, {}, "no_model_point", True),
     "rejected-response": (rejected_run, {}, "unknown_model_point", False),
-    "rule-7-quantity-order": (lambda w: edit_document(w / "right" / "response.json",
-                                                      lambda r: r["quantities"].reverse()), {},
-                              "quantity_mismatch", True),
+    "rule-7-name-twice": (lambda w: edit_document(w / "right" / "response.json", lambda r: r.update(
+        quantities=[{"name": COUNT, "unit": "policies"}, {"name": COUNT, "unit": "EUR"}])), {},
+        "quantity_mismatch", True),
     "rule-8-export-missing": (lambda w: (w / "right" / "results.csv").unlink(), {}, "artifact_missing", True),
     "rule-8-export-other-hash": (lambda w: edit_export(w / "right", "MP-B,1,2,4\n", "MP-B,1,2,5\n", rehash=False),
                                  {}, "artifact_hash_mismatch", True),
@@ -637,8 +721,15 @@ REJECTED = {
     "response-not-a-response": (lambda w: shutil.copyfile(w / "right" / "request.json",
                                                           w / "right" / "response.json"), {},
                                 "schema_violation", False),
-    "unsupported-stage": (lambda w: None, {}, "unsupported_stage", True),
+    "unsupported-stage": (lambda w: edit_document(w / "right" / "response.json", earlier_other_stage), {},
+                          "unsupported_stage", True),
 }
+
+
+def earlier_other_stage(response: dict) -> None:
+    """The response as one of another stage written under 3.1: it names no domain reference."""
+    del response["domain_reference"]
+    response.update(contract_version="3.1", stage="other_stage")
 
 
 @pytest.mark.parametrize("case", sorted(REJECTED))
@@ -646,8 +737,7 @@ def test_a_broken_rule_rejects_the_comparison_with_its_diagnostic(world, capsys,
     alter, per_quantity, code, with_record = REJECTED[case]
     run_side(world, "left"), run_side(world, "right")
     alter(world)
-    members = {"stage": "asset_cashflow"} if case == "unsupported-stage" else {}
-    assert main(["compare", str(compare_request(world, per_quantity, **members))]) == 1
+    assert main(["compare", str(compare_request(world, per_quantity))]) == 1
     output = capsys.readouterr().out
     assert "compare: rejected" in output and f"diagnostic: {code}:" in output
     result = stored(world / "compare.result.json")

@@ -31,10 +31,11 @@ the request names; the response and the run record are written as for every outc
 and the repeated run, and writes ``replay-compare.request.json``,
 ``replay-compare.result.json``, ``replay-compare.deviations.csv`` when the runs are
 compared, and ``replay-record.json``. A recorded run with the outcome ``error`` is
-repeated and its response compared byte for byte, apart from ``contract_version`` for a run
-recorded under 2.0 or 3.0; nothing else is compared. The record must name one of the present
-engine versions, and the replay repeats the run on the computation path it names. A run record written under contract version
-2.0, 3.0, or 3.1 is replayed; one written under 1.0 is rejected with ``unsupported_version``.
+repeated and its response compared byte for byte, apart from ``contract_version`` and
+``domain_reference`` for a run recorded under 2.0, 3.0, or 3.1; nothing else is compared. The record
+must name one of the present engine versions, and the replay repeats the run on the computation path
+it names. A run record written under contract version 2.0, 3.0, 3.1, or 3.2 is replayed; one written
+under 1.0 is rejected with ``unsupported_version``.
 
 ``compare`` compares the two runs a compare request names and writes
 ``compare.result.json`` beside the request, ``compare.deviations.csv`` and
@@ -130,10 +131,12 @@ protocol or abstract class, a class that cannot be called with the worker count,
 that is not a folder are usage errors. ``compare`` and ``quickstart`` take no such option, and
 ``compare`` loads no engine. ``quickstart`` always computes with the reference model: it runs each
 command with ``--engine`` and the reference model, which it does not show. ``replay``,
-``regression``, ``walk``, and ``search`` refuse a record of a stage whose quantities DeltaRecon
-does not hold (at present all but ``liability_cashflow``) with ``unsupported_stage`` before
-anything runs. ``request`` and ``regression`` still read the release from the clone of the
-reference model repository.
+``regression``, ``walk``, and ``search`` refuse, before anything runs, a record whose response names
+another domain reference than the engine declares for its stage with ``domain_reference_mismatch``,
+and a record written before contract version 3.2, whose response names no domain reference, of a
+stage other than ``liability_cashflow`` with ``unsupported_stage``. ``compare`` takes the stage, the
+domain reference, and the quantities from the two responses and checks that they agree. ``request``
+and ``regression`` still read the release from the clone of the reference model repository.
 
 ``compare`` takes its tolerance profile from the request. ``replay``, ``regression``,
 ``walk``, and ``search`` compare exactly unless ``--tolerance FILE`` names a tolerance profile: a JSON file in the

@@ -36,6 +36,7 @@ from degelmann.deltarecon import changes as changes_contract
 from degelmann.deltarecon.__main__ import main
 from degelmann.deltarecon.documents import (CONTRACT_VERSION, RECORD_SCHEMA, RUN_REQUEST, RUN_SCHEMA, Rejection,
                                             document_bytes, schema_errors, sha256_file)
+from degelmann.deltarecon.protocol import LIABILITY_CASHFLOW, DomainReference, StageDeclaration
 from degelmann.deltarecon.regression import read_regression_input, regression
 from degelmann.deltarecon.run import (REPOSITORIES_VARIABLE, History, ModelPointFailure, Revision, from_worker_outcome,
                                       run_request, worker_outcome)
@@ -390,7 +391,8 @@ class StubEngine:
     ``points.csv`` of the release folder of the request when ``input_data`` is held.
     """
 
-    stages = {"liability_cashflow": ("Anzahl Verträge", "Netto-Cashflow")}  # the names of StubSession
+    # The names of StubSession, under the domain reference of the pack.
+    stages = {"liability_cashflow": StageDeclaration(LIABILITY_CASHFLOW, ("Anzahl Verträge", "Netto-Cashflow"))}
     realisations = frozenset({"text_patch", "revision"})
     determines = frozenset({"release_folder", "input_data"})
     holdable = {"input_data": frozenset({"data"})}
@@ -768,6 +770,10 @@ def record(world: Path, name: str, engine=None, folder: str | None = None, furth
     return result.record_path
 
 
+# The domain reference ``TwoStages`` names for its second stage, qualified by a prefix of its own.
+OTHER_REFERENCE = DomainReference("deltarecon-tests/other_stage", "1")
+
+
 class TwoStages(WalkStub):
     """The walk stub with a second stage, ``other_stage``, of quantity names of its own.
 
@@ -775,13 +781,14 @@ class TwoStages(WalkStub):
     :class:`StubSession`.
     """
 
-    stages = {"liability_cashflow": ("Anzahl Verträge", "Netto-Cashflow"),
-              "other_stage": ("Bestand", "Zahlungsstrom")}
+    stages = {"liability_cashflow": StageDeclaration(LIABILITY_CASHFLOW, ("Anzahl Verträge", "Netto-Cashflow")),
+              "other_stage": StageDeclaration(OTHER_REFERENCE, ("Bestand", "Zahlungsstrom"))}
 
     @contextmanager
     def open(self, stage, release, enabled, manifest_dir, repositories, hold=frozenset()):
         with super().open(stage, release, enabled, manifest_dir, repositories, hold) as session:
-            session.quantities = [(name, unit) for name, (_, unit) in zip(self.stages[stage], StubSession.quantities)]
+            session.quantities = [(name, unit) for name, (_, unit)
+                                  in zip(self.stages[stage].quantities, StubSession.quantities)]
             yield session
 
 

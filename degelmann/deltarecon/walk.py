@@ -10,7 +10,10 @@ compares opaque references for equality and asks the engine everything else.
 
 Before anything runs:
 
-- neither record is that of a target-only run (``target_only_record``);
+- neither record is that of a target-only run (``target_only_record``), and the response of each
+  names the domain reference the engine declares for its stage (``domain_reference_mismatch``; a
+  response written before 3.2 of a stage other than ``liability_cashflow`` names none,
+  ``unsupported_stage``);
 - both records name one stage (``stage_mismatch``) and one selection
   (``selection_mismatch``);
 - the manifest is derived as by ``derive``;
@@ -54,12 +57,12 @@ from pathlib import Path
 
 from . import changes as changes_contract
 from .compare import (COMPARE_REQUEST, CheckedRun, CompareResult, align, compare, compare_request_document,
-                      compare_runs, read_tolerance, shows_no_deviation)
+                      compare_runs, domain_reference, read_tolerance, shows_no_deviation)
 from .derive import CLASS_ORDER, build_manifest, read_derive_input, remainder
 from .documents import (CONTRACT_VERSION, RECORD_SCHEMA, RUN_SCHEMA, SCHEMA_FOLDERS, Rejection, artifact_reference,
                         check_artifact, copy_files, document_bytes, parse_document, read_document, sha256_file,
                         write_document, write_new)
-from .replay import RecordedRun, check_compared_stage, check_response
+from .replay import RecordedRun, check_recorded_stage, check_response
 from .run import Engine, RunResult, UsageError, repositories_folder, run_record, run_request, run_request_document
 
 LOCALISE_SCHEMA = "localise.schema.json"
@@ -218,12 +221,13 @@ class Prepared:
 def prepare(older_record: Path | str, newer_record: Path | str, engine: Engine, repositories: Path,
             tolerance: Path | str | None, procedure: str = "walk") -> Prepared:
     """The checks of ``localise.md`` before the first run. A refusal raises a :class:`Rejection`."""
-    # The states are compared: a stage the core cannot compare is refused before anything runs,
-    # after the other refusals of the same record, as for a regression.
+    # The states are compared: a record that names another domain reference than the engine
+    # declares, or none, is refused before anything runs, after the other refusals of the same
+    # record, as for a regression.
     older = read_derive_input(older_record, engine.stages)
-    check_compared_stage(older.record["stage"])
+    check_recorded_stage(older, engine.stages)
     newer = read_derive_input(newer_record, engine.stages)
-    check_compared_stage(newer.record["stage"])
+    check_recorded_stage(newer, engine.stages)
     stage = older.record["stage"]
     if newer.record["stage"] != stage:
         raise Rejection("stage_mismatch", f"The older record names the stage {stage}, the newer one "
@@ -734,6 +738,14 @@ def read_walk_folder(folder: Path | str, prepared: Prepared) -> WalkFolder:
             raise _mismatch(f"The folder of state {k} holds no readable request or run record.") from None
         if "target" in request:  # a walk runs every state in full
             raise _mismatch(f"The request of state {k} of the walk names a target; a walk runs no target-only state.")
+        if state["outcome"] == "succeeded":  # its response names the domain reference of the two records
+            try:
+                response = read_document(folder / state["response"]["path"], RUN_SCHEMA, "run_response")
+            except (OSError, Rejection):
+                raise _mismatch(f"The folder of state {k} holds no readable response.") from None
+            if domain_reference(response) != domain_reference(prepared.older.response):
+                raise _mismatch(f"The response of state {k} of the walk names another domain reference than "
+                                "the two records.")
         release, enabled, hold, selection = state_request(prepared, k)
         changes = request.get("changes", {})
         if (request.get("release") != release or changes.get("enabled") != enabled

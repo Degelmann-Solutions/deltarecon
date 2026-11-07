@@ -11,6 +11,11 @@ synthetic folder. The chain test runs the quick start, the steps of ``tools/quic
 which equal the README lines, in process; its twin runs the guided quick start ``deltarecon quickstart``.
 Both are skipped unless they are asked for:
 ``DELTARECON_QUICK_START=1``. The pinned hashes are never rewritten to make a test pass.
+
+The pin was renewed once, in the commit that introduces contract version 3.2: the search folder of the
+quick start written under 3.1 (pin ``8fb7c40c...`` of ``search.result.json``), normalised by dropping
+``domain_reference``, setting ``contract_version``, and masking the ``sha256`` values, equals the folder
+written under 3.2 (pin ``745ebe65...``); every export and deviation file kept its bytes.
 """
 from __future__ import annotations
 
@@ -29,6 +34,8 @@ from degelmann.deltarecon.documents import sha256_file
 from conftest import CLONE, NEWER, REPOSITORIES, ROOT, artifacts, require_clone
 from tools import quick_start_steps
 
+# Contract version 3.2: search.result.json 745ebe65... renews the 3.1 pin 8fb7c40c...; the documents differ in
+# contract_version, the member domain_reference of the responses, and the hashes of the documents they reference.
 PIN = ROOT / "measurements" / "quick-start-search.SHA256SUMS"
 SEARCH_RESULT = "search.result.json"
 PIN_LINE = re.compile(r"([0-9a-f]{64})  ((?:[A-Za-z0-9_.-]+/)*[A-Za-z0-9_.-]+)")

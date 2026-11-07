@@ -20,7 +20,6 @@ from pathlib import Path
 import pytest
 
 from degelmann.deltarecon.__main__ import main
-from degelmann.deltarecon.compare import COMPARED_QUANTITIES
 from degelmann.deltarecon.documents import (RECORD_SCHEMA, RUN_SCHEMA, Rejection, document_bytes, read_document,
                                   schema_errors, sha256_file)
 from degelmann.deltarecon.run import UsageError, run_request
@@ -321,7 +320,7 @@ def test_a_walk_folder_written_under_an_earlier_version_is_a_reference(cancel, v
     run_walk(world, older, newer, WalkStub(CANCEL), output="walk-2")
     result = run_search(world, older, newer, WalkStub(CANCEL), walk=walked).result
     again = run_search(world, older, newer, WalkStub(CANCEL), output="search-2", walk=world / "walk-2").result
-    assert result["contract_version"] == "3.1"
+    assert result["contract_version"] == "3.2"
     assert result["missed"] == again["missed"] == [{"revision": "c1", "quantity": CASH},
                                                    {"revision": "c2", "quantity": CASH}]
     # The copy of the walk keeps its bytes and its version.
@@ -1008,7 +1007,6 @@ def test_what_the_walk_refuses_the_search_refuses(world, monkeypatch, capsys, ca
 @pytest.mark.parametrize("case, status", [("stage-mismatch", 1), ("failed-run", 2)])
 def test_a_stage_mismatch_or_a_failed_record_is_refused_as_by_the_walk(world, monkeypatch, capsys, case, status):
     build(world)
-    monkeypatch.setitem(COMPARED_QUANTITIES, "other_stage", TwoStages.stages["other_stage"])
     older, newer = record(world, "w0", TwoStages()), record(world, "w4", TwoStages())
     if case == "stage-mismatch":
         newer = record(world, "w4", TwoStages(), folder="other", stage="other_stage")
@@ -1074,8 +1072,18 @@ def break_chain(result):
     result["steps"][1]["from_state"] = 0
 
 
+def other_domain_reference(folder: Path) -> None:
+    """The response of state 2 names another domain reference; the walk result names its new hash."""
+    path = folder / "state-02" / "response.json"
+    response = stored(path)
+    response["domain_reference"] = {"id": "acme/liability_cashflow", "version": "3"}
+    path.write_bytes(document_bytes(response))
+    rewrite_walk_result(folder, lambda result: result["states"][2]["response"].update(sha256=sha256_file(path)))
+
+
 @pytest.mark.parametrize("case", ["other-records", "other-tolerance", "other-history", "tampered-export",
-                                  "duplicated-state", "omitted-state", "broken-chain", "no-walk-folder"])
+                                  "duplicated-state", "omitted-state", "broken-chain", "no-walk-folder",
+                                  "other-domain-reference"])
 def test_a_walk_that_does_not_fit_is_refused_with_walk_mismatch(cancel, case):
     world, older, newer = cancel
     profile = {"per_quantity": {CASH: {"upper": {"abs_tol": 1, "rel_tol": 0}, "lower": {"abs_tol": 1, "rel_tol": 0},
@@ -1098,10 +1106,14 @@ def test_a_walk_that_does_not_fit_is_refused_with_walk_mismatch(cancel, case):
     elif case in ("duplicated-state", "omitted-state", "broken-chain"):
         rewrite_walk_result(world / "walk", {"duplicated-state": duplicate_state, "omitted-state": omit_state,
                                              "broken-chain": break_chain}[case])
+    elif case == "other-domain-reference":
+        other_domain_reference(world / "walk")
     before = folder_hashes(world)
     with pytest.raises(Rejection) as caught:
         run_search(world, older, newer, WalkStub(CANCEL), walk=world / "walk")
     assert caught.value.code == "walk_mismatch", caught.value.message
+    if case == "other-domain-reference":
+        assert "names another domain reference than the two records" in caught.value.message
     assert folder_hashes(world) == before and not (world / "search").exists()
 
 

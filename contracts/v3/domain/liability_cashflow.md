@@ -9,6 +9,7 @@ exchanged and compared.
 | | |
 |---|---|
 | Stage identifier | `liability_cashflow` |
+| Domain reference | `{ "id": "liability_cashflow", "version": "3" }`: this text as published in version 3 of the stage contracts. A run response names it in `domain_reference`, see [../README.md](../README.md#stage-identifier). The pair is reserved for this text; its `version` changes only when the text changes meaning. |
 | Content | Projected liability cash flows of a life insurance portfolio, per model point and period. |
 | Valuation | Gross of reinsurance and undiscounted. The stage produces cash flows, not reserves. |
 

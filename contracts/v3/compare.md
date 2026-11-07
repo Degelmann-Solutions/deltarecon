@@ -17,7 +17,7 @@ or the recorded one. The output is the [compare result](#compare-result), the
 ```json
 {
   "document": "compare_request",
-  "contract_version": "3.1",
+  "contract_version": "3.2",
   "stage": "liability_cashflow",
   "compare_id": "compare-n-full-vs-subset-changes",
   "left": {
@@ -68,18 +68,28 @@ Reader rules:
    and its export. Rule 10 is applied to the selection that the response itself
    repeats. A response of a [target-only run](run.md#target-only-run) passes
    these rules as they read under its `target`. The run requests are not part of
-   a comparison, so rule 6, which needs the request, is not applied. Otherwise the comparison is
+   a comparison, so rule 6, which needs the request, is not applied. Of rule 7 a
+   comparison checks that no name is declared twice: it holds no list of the
+   quantities of a domain reference, and rule 4 checks the names against the
+   other side. A response that names no domain reference, read under the
+   [reader rule for documents of earlier versions](README.md#version-compatibility),
+   is of a stage the comparison does not support and is rejected with
+   `unsupported_stage`. Otherwise the comparison is
    `rejected` with the diagnostic of the broken rule. A response that has not
    succeeded is rejected with the code its outcome implies: `model_point_failed`
    for `failed`, and the code of its first diagnostic for `rejected` and
    `error`. For `error` the message says that the run has ended with an error.
 2. Both responses and the request name the same stage. Otherwise the outcome is
-   `incompatible` with `stage_mismatch`.
+   `incompatible` with `stage_mismatch`. Both responses name the same domain
+   reference, read under the
+   [reader rule for documents of earlier versions](README.md#version-compatibility);
+   any difference in `id` or `version` makes the outcome `incompatible` with
+   `domain_reference_mismatch`.
 3. Both responses declare the same time basis identifier. Otherwise the outcome
    is `incompatible` with `time_basis_mismatch`. A reader never converts periods
    from one basis to another.
-4. Both responses declare the same quantity names. Otherwise the outcome is
-   `incompatible` with `quantity_mismatch`.
+4. Both responses declare the same quantity names in the same order. Otherwise
+   the outcome is `incompatible` with `quantity_mismatch`.
 5. Both responses declare the same unit for every quantity. Otherwise the
    outcome is `incompatible` with `unit_mismatch`. A reader never converts units.
 
@@ -89,7 +99,7 @@ file, no coverage lists, and no parameter diff.
 ```json
 {
   "document": "compare_result",
-  "contract_version": "3.1",
+  "contract_version": "3.2",
   "stage": "liability_cashflow",
   "compare_id": "compare-unit-mismatch",
   "outcome": "incompatible",
@@ -247,7 +257,7 @@ only.
 ```json
 {
   "document": "compare_result",
-  "contract_version": "3.1",
+  "contract_version": "3.2",
   "stage": "liability_cashflow",
   "compare_id": "compare-n-full-vs-subset-changes",
   "outcome": "compared",
@@ -351,7 +361,7 @@ comparison without deviation.
 ```json
 {
   "document": "signature_table",
-  "contract_version": "3.1",
+  "contract_version": "3.2",
   "stage": "liability_cashflow",
   "compare_id": "compare-n-full-vs-subset-changes",
   "left": { "run_id": "run-n-full", "release_label": "N" },
@@ -542,9 +552,10 @@ side, reports no deviation.
 - A recorded run with the outcome `error` has no export to compare. It is
   reproduced exactly when the repeated run writes a response byte for byte
   equal to the recorded one, and not reproduced otherwise. For a run recorded
-  under 2.0 or 3.0 the two responses may differ in `contract_version` only: the
-  recorded version is set in the repeated response, with its members in their
-  order, before the bytes are compared.
+  under 2.0, 3.0, or 3.1 the two responses may differ in `contract_version` and
+  `domain_reference` only: the member `domain_reference` is removed from the
+  repeated response and the recorded version is set in it, with its members in
+  their order, before the bytes are compared.
 - The repeated run uses the release identity that the run record holds, and
   the enabled changes and the selection of the request that the record lists.
 
