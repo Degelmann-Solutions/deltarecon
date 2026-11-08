@@ -143,6 +143,9 @@ class Engine(Protocol):
     for ``request`` and ``derive``, which project no model point. The core does not read
     ``DELTARECON_WORKERS``. An engine that has no use for workers accepts the argument and
     ignores it.
+
+    ``request`` writes the release identity :meth:`describe` gives for the revision and the engine
+    options it is given, and checks it through :meth:`resolve` before anything is written.
     """
 
     # Each stage the engine supports, with its declaration: the domain reference the engine names
@@ -169,6 +172,23 @@ class Engine(Protocol):
 
         Raises a :class:`Rejection` with ``unknown_reference`` when the references cannot
         be resolved.
+        """
+
+    def describe(self, stage: str, label: str, revision: str, options: Mapping[str, str], repositories: Path,
+                 input_revision: str | None = None) -> dict:
+        """The release identity of the run contract for the revision ``revision`` of the stage ``stage``.
+
+        The result is ``{"label": label, "references": [...]}``: the complete set of references
+        that names the state of ``revision``, as :meth:`resolve` reads it. How ``revision`` is
+        named is the engine's matter, for example a hash, a branch, a tag, or ``HEAD``.
+        ``input_revision``, when given, is the identifier of a revision as a recorded release
+        identity holds it, taken as given and not resolved again; the input data is then that
+        of this revision. ``options`` are the engine options of the command line, by key, for
+        example a computation path.
+
+        Nothing is restored and nothing is written. Raises a :class:`UsageError` for an option
+        the engine does not take, a key or a value, before it reads the revision, and a
+        :class:`Rejection` with ``unknown_reference`` when ``revision`` names nothing.
         """
 
     def open(self, stage: str, release: dict, enabled: list[dict], manifest_dir: Path | None,

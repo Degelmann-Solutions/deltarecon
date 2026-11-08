@@ -9,6 +9,7 @@ run and its replay (``conftest.py``).
 from __future__ import annotations
 
 import hashlib
+import inspect
 import json
 import os
 import re
@@ -2658,12 +2659,100 @@ def test_request_command_names_the_engine_version_of_the_path(monkeypatch, tmp_p
     assert named_revisions(request)["engine_version"] == engine_version(path or "export")
 
 
-def test_request_command_refuses_an_unknown_path(monkeypatch, tmp_path, capsys):
-    with pytest.raises(SystemExit) as caught:
-        cli(monkeypatch, "request", "--revision", START, "--repositories", REPOSITORIES, "--label", "N",
-            "--run-id", "x", "--output", tmp_path / "run" / "request.json", "--path", "lifelib")
-    assert caught.value.code == 2 and "invalid choice: 'lifelib'" in capsys.readouterr().err
+def request_with_options(monkeypatch, output: Path, *options: str) -> int:
+    return cli(monkeypatch, "request", "--revision", START, "--repositories", REPOSITORIES, "--label", "N",
+               "--run-id", "x", "--output", output, *options)
+
+
+@pytest.mark.parametrize("options, message", [
+    (("--engine-option", "path=lifelib"), "no computation path 'lifelib'"),
+    (("--engine-option", "colour=red"), "takes no engine option 'colour'"),
+    (("--engine-option", "path=export", "--engine-option", "colour=red"), "takes no engine option 'colour'"),
+    (("--engine-option", "path=export", "--engine-option", "path=modelx"), "the engine option 'path' is given twice"),
+])
+def test_request_command_refuses_an_option_the_engine_does_not_take(monkeypatch, tmp_path, capsys, options, message):
+    assert request_with_options(monkeypatch, tmp_path / "run" / "request.json", *options) == 2
+    printed = capsys.readouterr()
+    assert printed.out == "" and printed.err.startswith("error: ") and message in printed.err
     assert not (tmp_path / "run").exists()
+
+
+@pytest.mark.parametrize("option", ["path", "=modelx", ""])
+def test_request_command_refuses_an_option_that_is_not_key_value(monkeypatch, tmp_path, capsys, option):
+    with pytest.raises(SystemExit) as caught:
+        request_with_options(monkeypatch, tmp_path / "run" / "request.json", "--engine-option", option)
+    assert caught.value.code == 2 and "must be of the form key=value" in capsys.readouterr().err
+    assert not (tmp_path / "run").exists()
+
+
+def test_the_path_option_is_no_longer_taken(monkeypatch, tmp_path, capsys):
+    """``--path`` is replaced by ``--engine-option path=...``, without an alias."""
+    for arguments in (["request", "--revision", START, "--label", "N", "--run-id", "x"],
+                      ["regression", "record.json", "--revision", START]):
+        with pytest.raises(SystemExit) as caught:
+            main([*arguments, "--output", str(tmp_path / "out"), "--path", "modelx"])
+        assert caught.value.code == 2 and "unrecognized arguments: --path modelx" in capsys.readouterr().err
+    assert not (tmp_path / "out").exists()
+
+
+@pytest.mark.parametrize("options, message", [
+    (("--engine-option", "path=lifelib"), "no computation path 'lifelib'"),
+    (("--engine-option", "colour=red"), "takes no engine option 'colour'"),
+    (("--engine-option", "path=export", "--engine-option", "path=modelx"), "the engine option 'path' is given twice"),
+])
+def test_regression_command_refuses_an_option_the_engine_does_not_take(monkeypatch, tmp_path, capsys, options,
+                                                                       message):
+    out = tmp_path / "out"
+    assert cli(monkeypatch, "regression", tmp_path / "run-record.json", "--revision", START,
+               "--repositories", REPOSITORIES, "--output", out, *options) == 2
+    printed = capsys.readouterr()
+    assert printed.out == "" and printed.err.startswith("error: ") and message in printed.err
+    assert not out.exists()
+
+
+def test_request_command_writes_the_bytes_of_the_baseline_on_the_path_modelx(monkeypatch, tmp_path):
+    """The expected file was written by ``request --path modelx`` before the engine described the
+    release; its engine version is replaced by the present one, every other byte is compared."""
+    from degelmann.deltarecon.engines.reference_model import engine_version
+    expected = (ROOT / "tests" / "data" / "request-path-modelx.json").read_bytes()
+    recorded = re.search(rb'"value": "(modelx [^"]*)"', expected).group(1)
+    assert expected.count(recorded) == 1
+    expected = expected.replace(recorded, engine_version("modelx").encode("utf-8"))
+    output = tmp_path / "run" / "request.json"
+    assert cli(monkeypatch, "request", "--revision", START, "--label", "N", "--run-id", "run-n-modelx",
+               "--subset", "RLV-000001", "--repositories", REPOSITORIES, "--engine-option", "path=modelx",
+               "--output", output) == 0
+    assert output.read_bytes() == expected
+
+
+def test_request_command_rejects_a_stage_the_engine_does_not_declare(monkeypatch, tmp_path, capsys):
+    output = tmp_path / "run" / "request.json"
+    assert request_with_options(monkeypatch, output, "--stage", "nonsense") == 1
+    assert capsys.readouterr().out == ("request: rejected\n"
+                                       "diagnostic: unsupported_stage: The stage nonsense is not supported.\n")
+    assert not output.parent.exists()
+
+
+def test_request_command_holds_no_reference_to_the_reference_model():
+    from degelmann.deltarecon.__main__ import command_request
+    assert "reference_model" not in inspect.getsource(command_request)
+
+
+def test_the_reference_model_describes_a_release_with_the_input_data_as_given(monkeypatch):
+    from degelmann.deltarecon.engines.reference_model import ReferenceModel, engine_version, reference_value
+    other = "0" * 40  # an identifier as a record holds it: not resolved again
+    described = ReferenceModel(1).describe("liability_cashflow", "N", START[:10], {"path": "modelx"},
+                                           REPOSITORIES, input_revision=other)
+    assert described == {"label": "N", "references": [
+        {"kind": "code_state", "value": RELEASE_VALUE}, {"kind": "parameter_set", "value": RELEASE_VALUE},
+        {"kind": "input_data", "value": reference_value(other)},
+        {"kind": "engine_version", "value": engine_version("modelx")}]}
+    # The options are checked before the clone is read.
+    with pytest.raises(UsageError, match="'colour'"):
+        ReferenceModel(1).describe("liability_cashflow", "N", "nosuch", {"colour": "red"}, Path("/no/such"))
+    with pytest.raises(Rejection) as caught:
+        ReferenceModel(1).describe("liability_cashflow", "N", "nosuch", {}, REPOSITORIES)
+    assert caught.value.code == "unknown_reference"
 
 
 @contextmanager
@@ -2999,7 +3088,7 @@ def test_regression_runs_on_the_path_it_is_given(monkeypatch, tmp_path, capsys, 
     from degelmann.deltarecon.engines.reference_model import engine_version
     recorded = named_revisions(stored(recorded_subset / "request.json"))["engine_version"]
     assert recorded == engine_version("export")
-    for options, path in (((), "export"), (("--path", "modelx"), "modelx")):
+    for options, path in (((), "export"), (("--engine-option", "path=modelx"), "modelx")):
         out = tmp_path / path
         assert regress(monkeypatch, recorded_subset, START, REPOSITORIES, out, *options) == 0
         assert "regression: no deviation above tolerance" in capsys.readouterr().out

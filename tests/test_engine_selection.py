@@ -7,6 +7,7 @@ engine, so they need no calculation engine.
 """
 from __future__ import annotations
 
+import json
 import subprocess
 import sys
 import textwrap
@@ -226,6 +227,112 @@ def test_compare_and_quickstart_take_no_engine_option(command, capsys):
     with pytest.raises(SystemExit):
         command_line.main([command, "--help"])
     assert "--engine" not in capsys.readouterr().out
+
+
+# --- requests through the protocol ----------------------------------------------------------
+
+TWO_STAGES = "stub_two_stages"
+TWO_STAGES_MODULE = textwrap.dedent("""\
+    from conftest import TwoStages
+
+
+    class Engine(TwoStages):
+        def __init__(self, workers=None):
+            super().__init__()
+    """)
+
+
+@pytest.fixture
+def two_stages(engines, monkeypatch):
+    """The folder of ``engines`` with the module ``stub_two_stages``, whose class ``Engine`` is the
+    stub with two stages, callable with the worker count."""
+    (engines / f"{TWO_STAGES}.py").write_text(TWO_STAGES_MODULE, "utf-8")
+    monkeypatch.delitem(sys.modules, TWO_STAGES, raising=False)
+    yield engines
+    sys.modules.pop(TWO_STAGES, None)
+
+
+def stub_request_command(monkeypatch, world, folder, output, *options) -> int:
+    return cli(monkeypatch, "request", "--revision", "rel", "--repositories", world, "--label", "N",
+               "--run-id", "run-x", "--output", output, "--engine", f"{TWO_STAGES}:Engine",
+               "--engine-path", folder, *options)
+
+
+@pytest.mark.parametrize("stage", ["liability_cashflow", "other_stage"])
+def test_a_request_of_each_declared_stage_is_described_by_the_engine(world, two_stages, monkeypatch, capsys,
+                                                                     stage):
+    from conftest import StubEngine
+    output = world / stage / "request.json"
+    assert stub_request_command(monkeypatch, world, two_stages, output, "--stage", stage) == 0
+    assert capsys.readouterr().out.startswith("request: ")
+    request = stored(output)
+    assert request["stage"] == stage
+    assert request["release"] == {"label": "N", "references": StubEngine.references(world / "rel", "rel")}
+
+
+def test_a_request_without_a_stage_of_an_engine_with_several_is_a_usage_error(world, two_stages, monkeypatch,
+                                                                             capsys):
+    output = world / "none" / "request.json"
+    assert stub_request_command(monkeypatch, world, two_stages, output) == 2
+    message = capsys.readouterr().err
+    assert message.startswith("error: ") and "liability_cashflow, other_stage" in message and "--stage" in message
+    assert not output.parent.exists()
+
+
+def test_a_request_without_a_stage_takes_the_only_one(world, engines, monkeypatch, capsys):
+    output = world / "only" / "request.json"
+    assert cli(monkeypatch, "request", "--revision", "rel", "--repositories", world, "--label", "N",
+               "--run-id", "run-x", "--output", output, "--engine", "stub_engine_a:Engine",
+               "--engine-path", engines) == 0
+    assert stored(output)["stage"] == "liability_cashflow"
+
+
+@pytest.mark.parametrize("options, status, printed", [
+    (("--stage", "nonsense"), 1, "request: rejected\ndiagnostic: unsupported_stage: "),
+    (("--stage", "other_stage", "--engine-option", "colour=red"), 2, "error: the stub engine takes no engine option"),
+])
+def test_a_request_the_engine_refuses_writes_nothing(world, two_stages, monkeypatch, capsys, options, status,
+                                                     printed):
+    output = world / "refused" / "request.json"
+    assert stub_request_command(monkeypatch, world, two_stages, output, *options) == status
+    captured = capsys.readouterr()
+    assert (captured.out if status == 1 else captured.err).startswith(printed)
+    assert not output.parent.exists()
+
+
+def test_a_request_of_a_revision_the_engine_does_not_hold_is_rejected(world, two_stages, monkeypatch, capsys):
+    output = world / "nosuch" / "request.json"
+    assert cli(monkeypatch, "request", "--revision", "nosuch", "--repositories", world, "--label", "N",
+               "--run-id", "run-x", "--output", output, "--engine", f"{TWO_STAGES}:Engine",
+               "--engine-path", two_stages, "--stage", "other_stage") == 1
+    assert capsys.readouterr().out.startswith("request: rejected\ndiagnostic: unknown_reference: ")
+    assert not output.parent.exists()
+
+
+def test_a_request_through_another_engine_loads_no_reference_model(world, tmp_path):
+    """In a fresh process, ``request`` writes a request of each stage of the stub with two stages, and
+    passes ``--engine-option`` to it, without loading modelx or the reference model."""
+    folder = tmp_path / "fresh-engines"
+    folder.mkdir()
+    (folder / f"{TWO_STAGES}.py").write_text(TWO_STAGES_MODULE, "utf-8")
+    script = textwrap.dedent(f"""\
+        import json, sys
+        sys.path.insert(0, {str(ROOT / "tests")!r})
+        from degelmann.deltarecon.__main__ import main
+        common = ["--revision", "rel", "--repositories", {str(world)!r}, "--label", "N", "--run-id", "run-x",
+                  "--engine", "{TWO_STAGES}:Engine", "--engine-path", {str(folder)!r}]
+        statuses = [main(["request", *common, "--stage", stage, "--output", {str(world)!r} + f"/{{stage}}/request.json"])
+                    for stage in ("liability_cashflow", "other_stage")]
+        statuses.append(main(["request", *common, "--stage", "other_stage", "--engine-option", "colour=red",
+                              "--output", {str(world)!r} + "/option/request.json"]))
+        print(json.dumps([statuses, "modelx" in sys.modules, {REFERENCE_MODULE!r} in sys.modules]))
+        """)
+    done = subprocess.run([sys.executable, "-c", script], capture_output=True, text=True, cwd=ROOT, check=True)
+    assert json.loads(done.stdout.strip().splitlines()[-1]) == [[0, 0, 2], False, False]
+    assert "the stub engine takes no engine option 'colour'" in done.stderr
+    for stage in ("liability_cashflow", "other_stage"):
+        assert stored(world / stage / "request.json")["stage"] == stage
+    assert not (world / "option").exists()
 
 
 # --- lazy loading ------------------------------------------------------------------------

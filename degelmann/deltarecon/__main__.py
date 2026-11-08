@@ -16,11 +16,17 @@
         --walk runs/walk --output runs/search
     uv run python -m degelmann.deltarecon quickstart
 
-``request`` writes a run request with the complete release identity of a commit of the
-reference model repository. ``--revision`` names a commit of the local clone by a full or
-abbreviated hash, a branch, a tag, or ``HEAD``; an ancestry suffix such as ``HEAD~1`` is
-refused. The request holds the full hash. ``--path
-export|modelx`` chooses the computation path the engine version names, export by default.
+``request`` writes a run request with the complete release identity the engine describes for
+``--revision`` and the engine options, after the engine has checked that it can restore it.
+How the revision is named is the engine's matter: the reference model reads a commit of the
+local clone of its repository, named by a full or abbreviated hash, a branch, a tag, or
+``HEAD``; an ancestry suffix such as ``HEAD~1`` is refused, and the request holds the full
+hash. ``--engine-option KEY=VALUE`` (repeatable, each key once) passes an option to the
+engine; the reference model takes only ``path=export|modelx``, the computation path the engine
+version names, export by default. Another key or value, or a key given twice, is a usage error.
+``--stage`` names the stage of the request; without it the request is of the engine's only
+stage, and an engine that declares several needs it. A stage the engine does not declare is
+rejected with ``unsupported_stage``, and nothing is written.
 ``run`` writes
 ``response.json``, ``results.csv``, and ``run-record.json`` beside the request.
 
@@ -46,9 +52,9 @@ compare request writes nothing.
 ``regression`` runs the commit ``--revision`` names on the input data and the selection of
 a recorded run, compares the recorded run with the new one, and prints "no deviation above
 tolerance" or the deviating model points and the signature table. It writes everything
-into the new folder ``--output``. ``--path export|modelx`` chooses the computation path the
-engine version names, export by default. The recorded run may come from another engine
-version; the new run uses the present engine on that path, and the output names both versions.
+into the new folder ``--output``. ``--engine-option path=export|modelx`` chooses the
+computation path the engine version names, export by default. The recorded run may come
+from another engine version; the new run uses the present engine on that path, and the output names both versions.
 The record of a target-only run is rejected with ``target_only_record``, and nothing runs.
 
 ``derive`` reads the records of two succeeded runs without enabled changes, the older one
@@ -135,8 +141,8 @@ command with ``--engine`` and the reference model, which it does not show. ``rep
 another domain reference than the engine declares for its stage with ``domain_reference_mismatch``,
 and a record written before contract version 3.2, whose response names no domain reference, of a
 stage other than ``liability_cashflow`` with ``unsupported_stage``. ``compare`` takes the stage, the
-domain reference, and the quantities from the two responses and checks that they agree. ``request``
-and ``regression`` still read the release from the clone of the reference model repository.
+domain reference, and the quantities from the two responses and checks that they agree.
+``regression`` still reads the release from the clone of the reference model repository.
 
 ``compare`` takes its tolerance profile from the request. ``replay``, ``regression``,
 ``walk``, and ``search`` compare exactly unless ``--tolerance FILE`` names a tolerance profile: a JSON file in the
@@ -160,9 +166,11 @@ comparison or a regression run that
 shows a deviation or a coverage difference, is incompatible, or is rejected, a
 manifest that cannot be derived, a walk that is refused, stops, or leaves a revision
 unattributed because state 0 or the last state does not run or is not reproduced, a
-search that is refused or stops, and a request or regression whose revision, release, or
-clone the repositories do not hold; 2 when the command cannot start, for example because an
-output exists already or the history of the clone is cut off.
+search that is refused or stops, a request of a stage the engine does not declare, and a
+request or regression whose revision, release, or clone the repositories do not hold; 2
+when the command cannot start, for example because an output exists already, an engine
+option is not taken, a request names no ``--stage`` and the engine declares several stages,
+or the history of the clone is cut off.
 """
 from __future__ import annotations
 
@@ -173,7 +181,7 @@ import os
 import sys
 from pathlib import Path
 
-from .documents import Rejection, document_bytes, sha256_file, write_new
+from .documents import Rejection
 from .compare import CompareResult, compare
 from .derive import derive
 from .search import TARGET_ONLY, search
@@ -181,7 +189,7 @@ from .walk import walk
 from .regression import read_regression_input, regression
 from .replay import replay
 from .run import (REPOSITORIES_FOLDER, REPOSITORIES_VARIABLE, UsageError, repositories_folder, run_request,
-                  run_request_document)
+                  write_request)
 from .signature import render_coverage, render_model_points, render_table
 from .workers import WORKERS_VARIABLE, whole_number
 
@@ -280,36 +288,40 @@ def print_diagnostic(diagnostic: dict) -> None:
             print(f"  {label}: {', '.join(diagnostic[member])}")
 
 
-def command_request(args) -> int:
-    from .engines import reference_model
+def engine_option(text: str) -> tuple[str, str]:
+    """One ``--engine-option key=value``: the pair of a non-empty key and its value."""
+    key, equals, value = text.partition("=")
+    if not equals or not key:
+        raise argparse.ArgumentTypeError(f"must be of the form key=value with a non-empty key, not {text!r}")
+    return key, value
 
-    output = Path(args.output).resolve()
+
+def engine_options(pairs) -> dict[str, str]:
+    """The engine options of a command by key, without loading an engine. Which keys and values
+    an engine takes is the engine's matter; a key given twice is a usage error."""
+    options: dict[str, str] = {}
+    for key, value in pairs or ():
+        if key in options:
+            raise UsageError(f"the engine option {key!r} is given twice")
+        options[key] = value
+    return options
+
+
+def command_request(args) -> int:
+    options = engine_options(args.engine_option)
     repositories = repositories_folder(args.repositories)
-    if output.exists():
-        raise UsageError(f"{output} exists already; no file is overwritten")
-    changes = {"enabled": list(args.enable)}
-    if args.manifest:
-        manifest = Path(args.manifest).resolve()
-        if not manifest.is_file() or output.parent not in manifest.parents:
-            raise UsageError("the manifest must be a file in the folder of the request or below it")
-        changes["manifest"] = {"path": manifest.relative_to(output.parent).as_posix(),
-                               "sha256": sha256_file(manifest)}
     # One worker: a request projects no point, so DELTARECON_WORKERS does not concern it.
     selected = engine(1)
-    try:  # the request names a release only if a run would accept it
-        revision = reference_model.resolve_revision(args.revision, repositories)
-        release = {"label": args.label,
-                   "references": reference_model.release_references(revision, path=args.path)}
-        selected.resolve(reference_model.STAGE, release, repositories)
-    except Rejection as rejection:  # nothing is written
+    try:  # the request names a release only if a run would accept it; nothing is written otherwise
+        output = write_request(selected, Path(args.output), stage=args.stage, label=args.label,
+                               revision=args.revision, options=options, run_id=args.run_id,
+                               subset=args.subset, enable=args.enable,
+                               manifest=Path(args.manifest) if args.manifest else None,
+                               repositories=repositories)
+    except Rejection as rejection:
         print("request: rejected")
         print_diagnostic(rejection.diagnostic())
         return 1
-    chosen = ({"mode": "subset", "model_point_ids": list(args.subset)} if args.subset
-                 else {"mode": "full"})
-    request = run_request_document(reference_model.STAGE, args.run_id, release, changes, chosen, "the request")
-    output.parent.mkdir(parents=True, exist_ok=True)
-    write_new(output, document_bytes(request))
     print(f"request: {os.path.relpath(output)}")
     return 0
 
@@ -415,6 +427,9 @@ def command_regression(args) -> int:
     output = Path(args.output).resolve()
     if output.exists():
         raise UsageError(f"{output} exists already; a regression run overwrites no file")
+    # Read before anything is written; until regression reads the release through the protocol, the
+    # options are those of the reference model.
+    path = reference_model.path_option(engine_options(args.engine_option))
     repositories = repositories_folder(args.repositories)
     states = state_engine(args)
     try:
@@ -426,7 +441,7 @@ def command_regression(args) -> int:
     try:
         # The newer commit is the state; the input data stays that of the recorded run. The
         # recorded run may come from another engine version or path; the new run uses this
-        # engine on the path --path names.
+        # engine on the path --engine-option path=... names.
         _, input_revision = reference_model.recorded_identity(recorded.record["releases"][0])
         revision = reference_model.resolve_revision(args.revision, repositories)
     except Rejection as rejection:  # nothing is written
@@ -434,7 +449,7 @@ def command_regression(args) -> int:
         print_diagnostic(rejection.diagnostic())
         return 1
     release = {"label": args.label,
-               "references": reference_model.release_references(revision, input_revision, args.path)}
+               "references": reference_model.release_references(revision, input_revision, path)}
     result = regression(recorded, release, output, states, repositories, args.tolerance)
     if result.comparison is None:
         print(f"regression: the run of the revision has the outcome {result.run.outcome}; nothing is compared")
@@ -592,9 +607,12 @@ def main(argv: list[str] | None = None) -> int:
     commands = parser.add_subparsers(dest="command", required=True)
 
     request = commands.add_parser("request", help="write a run request with the complete release identity")
-    request.add_argument("--revision", required=True, metavar="COMMIT",
-                         help="the release: a commit of the clone of the reference model repository, named "
-                              "by a full or abbreviated hash, a branch, a tag, or HEAD (no suffix such as HEAD~1)")
+    request.add_argument("--revision", required=True, metavar="REVISION",
+                         help="the release, a name the engine reads; for the reference model a commit of the "
+                              "clone of its repository, named by a full or abbreviated hash, a branch, a tag, "
+                              "or HEAD (no suffix such as HEAD~1)")
+    request.add_argument("--stage", help="the stage of the request, one the engine declares "
+                                         "(default: the engine's only stage)")
     request.add_argument("--label", required=True, help="label of the release, for example N")
     request.add_argument("--run-id", required=True)
     request.add_argument("--output", required=True, help="path of the request to write")
@@ -687,11 +705,13 @@ def main(argv: list[str] | None = None) -> int:
                                   f"(default: the folder {ENGINE_PATH_VARIABLE} names, read only without --engine)")
 
     for command in (request, regress):
-        # The choices are reference_model.PATHS, written out so that loading this module does not import modelx.
-        command.add_argument("--path", choices=("export", "modelx"), default="export",
-                             help="the computation path the engine version of the release names: "
-                                  "export, through the modelx export of the model (default), or "
-                                  "modelx, through modelx itself; a run never falls back to the other")
+        # Parsed into pairs here; the engine checks keys and values, so parsing loads no engine.
+        command.add_argument("--engine-option", type=engine_option, action="append", default=[],
+                             metavar="KEY=VALUE",
+                             help="an option of the engine; repeatable, each key once. The reference model "
+                                  "takes path=export|modelx, the computation path the engine version of the "
+                                  "release names: export, through the modelx export of the model (default), "
+                                  "or modelx, through modelx itself; a run never falls back to the other")
 
     for command in (request, run, again, regress, history, stepper, halver, guided):
         command.add_argument("--repositories", metavar="DIR",

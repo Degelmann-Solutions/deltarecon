@@ -43,13 +43,13 @@ from contextlib import contextmanager
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Sequence
+from typing import Mapping, Sequence
 
 from . import changes as changes_contract
 from .documents import (CHANGES_SCHEMA, CONTRACT_VERSION, RECORD_SCHEMA, RUN_REQUEST, RUN_SCHEMA,
                         Rejection, artifact_reference, check_artifact, check_schema, check_version,
-                        new_record_id, parse_document, read_document, schema_errors, validator,
-                        write_document)
+                        document_bytes, new_record_id, parse_document, read_document, schema_errors,
+                        sha256_file, validator, write_document, write_new)
 from .export import write_export
 # Re-exported: other modules and the tests import these names from here.
 from .protocol import (LIABILITY_CASHFLOW, SCRATCH_PREFIX, DomainReference, Engine, History,  # noqa: F401
@@ -441,6 +441,51 @@ def run_request_document(stage: str, run_id: str, release: dict, changes: dict, 
     if errors:
         raise UsageError(f"{subject} would violate its schema at {errors[0]}")
     return request
+
+
+def write_request(engine: Engine, output: Path, *, stage: str | None, label: str, revision: str,
+                  options: Mapping[str, str], run_id: str, subset: Sequence[str], enable: Sequence[str],
+                  manifest: Path | None, repositories: Path) -> Path:
+    """Write the run request of the release the engine describes for ``revision`` to the new file
+    ``output`` and return its path.
+
+    Without ``stage`` the request is of the engine's only stage. The request names a release only
+    if a run would accept it: the release identity :meth:`Engine.describe` gives is checked through
+    :meth:`Engine.resolve` before anything is written. ``subset`` names the model points of a
+    subset run, none a full run; ``enable`` the ids of the enabled changes of ``manifest``.
+
+    Raises :class:`UsageError` when ``output`` exists, ``manifest`` is no file in the folder of the
+    request or below it, no stage is named and the engine declares several, or the engine does not
+    take an option; :class:`Rejection` with ``unsupported_stage`` for a stage the engine does not
+    declare and with ``unknown_reference`` when the revision or the release cannot be resolved.
+    Nothing is written then.
+    """
+    output = Path(output).resolve()
+    if output.exists():
+        raise UsageError(f"{output} exists already; no file is overwritten")
+    changes = {"enabled": list(enable)}
+    if manifest is not None:
+        manifest = Path(manifest).resolve()
+        if not manifest.is_file() or output.parent not in manifest.parents:
+            raise UsageError("the manifest must be a file in the folder of the request or below it")
+        changes["manifest"] = {"path": manifest.relative_to(output.parent).as_posix(),
+                               "sha256": sha256_file(manifest)}
+    declared = list(engine.stages)
+    if stage is None:
+        if len(declared) != 1:
+            raise UsageError(f"the engine declares the stages {', '.join(declared)}; name one with --stage")
+        stage = declared[0]
+    elif stage not in engine.stages:
+        raise Rejection("unsupported_stage", f"The stage {stage} is not supported.")
+    # Called directly: a usage error and a rejection of the engine keep their meaning.
+    described = engine.describe(stage, label, revision, options, repositories)
+    release = {"label": label, "references": described["references"]}
+    engine.resolve(stage, release, repositories)
+    chosen = {"mode": "subset", "model_point_ids": list(subset)} if subset else {"mode": "full"}
+    request = run_request_document(stage, run_id, release, changes, chosen, "the request")
+    output.parent.mkdir(parents=True, exist_ok=True)
+    write_new(output, document_bytes(request))
+    return output
 
 
 def check_target_periods(target: dict | None) -> None:
