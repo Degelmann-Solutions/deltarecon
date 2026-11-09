@@ -1,0 +1,14 @@
+# Reproductions of the oracle
+
+The first row is the run that computed the published hashes under contract version 3.1. Every later row is one run of the README section "Reproduce the reference attribution" from fresh clones, checked with `sha256sum -c` against `SHA256SUMS` in this folder. The published hashes are never changed to match a run; a run that differs is recorded here with the differing files and the cause.
+
+| Date | Operating system | CPU | Python | Engine version | deltarecon | delib-history | Result |
+|---|---|---|---|---|---|---|---|
+| 2026-10-28 | Linux 6.6.87.2 under WSL2 | Intel Core i7-12800HX, x86-64 | 3.14.9, uv-managed, installed by `uv sync` (uv 0.13.5) | `modelx 0.33.0 export, pandas 3.0.6, numpy 2.5.3, Python 3.14.9` | `7b0a0789fe70e856591499de7c4e3a25e7a61a27`, the commit that publishes contract version 3.1, in a clean worktree | `fa368575a66d97c94e96dffc62b273ec95511b12` to `887b7181d22550eda2fb52fa1a6bd77376d4eb2e`, in a local clone that holds the chain | the run that computed the published hashes; 24 of 24 signature tables equal those of the 3.0 archive apart from `contract_version`, and, rebuilt in policy months, those of the 2.0 archive apart from `contract_version` |
+
+The run used a clean worktree of deltarecon at the commit above and the local clone of `delib-history`; it did not use fresh clones. Its requests are the bytes `deltarecon request` writes for the two revisions on the default computation path, the export, and equal the requests of the 3.0 archive apart from `contract_version`. It ran the commands of the README section "Reproduce the reference attribution" from `mkdir` to the walk, with `--repositories` naming the local clone. Each of its 24 signature tables, with `contract_version` set back to `3.0`, hashes to the digest the `SHA256SUMS` of the 3.0 archive lists, and, rebuilt in policy months and with `contract_version` set back to `2.0`, to the digest the `SHA256SUMS` of the 2.0 archive lists. Every listed hash is new, because each table and each response the walk result references carries `3.1`. Durations: the two runs about 3 s each, the walk of 33 states about 3 minutes 11 s.
+
+## Archive
+
+- The oracle published on 2026-10-27 under contract version 3.0 is kept unchanged in [`archive/2026-10-27/`](archive/2026-10-27/): its two requests, its `SHA256SUMS`, and its `REPRODUCTIONS.md` with the computations on the reference chain and the reproduction from fresh clones of 2026-10-27. Its hashes were reproduced from fresh clones on 2026-10-27 with an earlier form of deltarecon commit `86cd759`; the last commit that writes 3.0 is `cfc07c7`.
+- The oracle published on 2026-10-22 under contract version 2.0 is kept unchanged in [`archive/2026-10-22/`](archive/2026-10-22/): its two requests, its `SHA256SUMS`, and its `REPRODUCTIONS.md` with the computation under Linux and the reproduction under Windows. It is reproduced with deltarecon at commit `a53516d`.
