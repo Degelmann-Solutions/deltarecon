@@ -279,7 +279,7 @@ def chain_output(commands, seconds: float = 1.5, failing: str | None = None) -> 
         lines += [f"build_package: chain: step {step}", "output of the step",
                   f"build_package: chain: {step} exit {code} (expected {expect}) in {seconds:.1f} s"]
         if code != expect:
-            lines.append(f"build_package: step {step} exit {code}, expected {expect}")
+            lines.append(f"build_package: chain: step {step} exit {code}, expected {expect}")
             return 1, "\r\n".join(lines)
     return 0, "\r\n".join(lines)
 

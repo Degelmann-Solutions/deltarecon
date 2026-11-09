@@ -54,10 +54,10 @@ is written when the folder or the archive exists already. A symbolic link in the
 fails the build.
 
 ``check`` takes the target from the archive's name, which must be ``deltarecon-<version>-<target>``
-with the target's suffix. It unpacks the archive into a new folder and proves five claims,
-printing each result. The chain, the import and the demo run with the caller's environment as it
-is (on Windows the host user's), ``PYTHONPATH``, ``PYTHONHOME``, ``VIRTUAL_ENV`` and
-``DELTARECON_REPOSITORIES`` included, with only ``PATH`` replaced by an empty folder:
+with the target's suffix. It unpacks the archive into a new folder and proves ten claims,
+printing each result. The chain, the import, the demo and the toy engine run with the caller's
+environment as it is (on Windows the host user's), ``PYTHONPATH``, ``PYTHONHOME``, ``VIRTUAL_ENV``
+and ``DELTARECON_REPOSITORIES`` included, with only ``PATH`` replaced by an empty folder:
 
 1. The README quick start (``STEPS`` of ``tools/quick_start_steps.py``) runs through the
    launcher from the work folder, which holds no ``repositories/``, with ``PATH`` an empty folder
@@ -73,8 +73,24 @@ is (on Windows the host user's), ``PYTHONPATH``, ``PYTHONHOME``, ``VIRTUAL_ENV``
    with the environment of the chain; it exits with 0, and exactly one new folder
    ``runs/quickstart-*/`` in the package folder holds a ``search/`` that matches the pin. On Linux
    its output goes to ``<work>/logs/quickstart.log``.
-5. No build-machine traces, read from the archive itself in WSL for both targets after the other
-   four: no member lies below ``delib-history/.git/logs/``, and no member's name, bytes or link
+5. to 9. ``toy engine: request``, ``toy engine: run``, ``toy engine: regression``, ``toy engine:
+   compare`` and ``toy engine: search``: an engine other than the reference model runs through the
+   unpacked package without a rebuild. The files of ``examples/toy_engine/`` that Git tracks are
+   copied to ``<work>/toy-engine`` (on Windows ``<work>\\toy-engine``), outside the package folder.
+   For each stage, ``toy_premium`` and ``toy_claims``, the launcher runs from the work folder with
+   ``--engine toy_engine:ToyEngine --engine-path <work>/toy-engine`` and no ``--repositories`` (the
+   engine finds its history beside its module): request and run of ``r1`` and of ``r5`` (exit 0
+   each), a regression of the ``r1`` run record on ``r5`` (exit 1), a compare of the two runs (exit
+   1; its request is written from WSL), and a search of the two run records on the stage's quantity,
+   ``premium`` or ``expected_claims`` (exit 0). A claim holds when every call of its command, both
+   stages, exits with its expected status; the search claim also needs both ends of each search
+   ``reproduced`` and the contributing revisions ``r2`` and ``r4`` (``toy_premium``) or ``r2``,
+   ``r4`` and ``r5`` (``toy_claims``). After an unexpected exit status the later steps of the stage
+   are skipped and their claims fail. On Linux the output of each step goes to
+   ``<work>/logs/toy-<stage>-<step>.log``; on Windows each stage runs as two host scripts whose output
+   passes through.
+10. No build-machine traces, read from the archive itself in WSL for both targets after the other
+   nine claims: no member lies below ``delib-history/.git/logs/``, and no member's name, bytes or link
    target contains the home folder of this machine, the checkout root or the archive's own folder.
    Each offending member is printed.
 
@@ -125,7 +141,7 @@ from tools.targets import TARGET, TARGETS, WINDOWS_TARGET, package_name, target_
 
 def check(archive: Path, work: str | None) -> bool:
     """Check ``archive`` for the target its name bears: here for Linux, on the Windows host for Windows;
-    then, for both, the archive itself for traces of this machine. Whether all five claims hold."""
+    then, for both, the archive itself for traces of this machine. Whether all ten claims hold."""
     version, _ = project()
     target_name = target_of(archive, version)
     archive = archive.resolve()
