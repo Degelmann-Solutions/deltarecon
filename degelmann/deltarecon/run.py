@@ -481,7 +481,7 @@ def check_target(session: Session, target: dict) -> None:
         raise Rejection("target_not_supported", "The engine cannot compute a target-only run.")
 
 
-def run_request(request_path: Path, engine: Engine, repositories: Path | None = None) -> RunResult:
+def run_request(request_path: Path, engine: Engine, repositories: Path | str | None = None) -> RunResult:
     """Run the request stored at ``request_path`` and write the documents of the run beside it."""
     request_path = Path(request_path).resolve()
     repositories = engine.repositories_folder(repositories)

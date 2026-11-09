@@ -67,7 +67,7 @@ def read_regression_input(record_path: Path | str, stages) -> RecordedRun:
 
 
 def regression(recorded: RecordedRun, release: dict, output: Path | str, engine: Engine,
-               repositories: Path | None = None, tolerance: Path | str | None = None) -> RegressionResult:
+               repositories: Path | str | None = None, tolerance: Path | str | None = None) -> RegressionResult:
     """Run ``release`` on the selection of ``recorded`` and compare the two runs.
 
     ``recorded`` comes from :func:`read_regression_input`. ``tolerance`` names a tolerance

@@ -108,7 +108,7 @@ def build_manifest(history: History, stage: str, base_release: str, determines, 
 
 
 def derive(older_record: Path | str, newer_record: Path | str, output: Path | str, engine: Engine,
-           repositories: Path | None = None) -> DeriveResult:
+           repositories: Path | str | None = None) -> DeriveResult:
     """Derive the change manifest between two recorded runs and write it to ``output``."""
     output = Path(output).resolve()
     repositories = engine.repositories_folder(repositories)

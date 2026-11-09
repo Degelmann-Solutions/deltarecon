@@ -112,7 +112,7 @@ def flat(text: str) -> str:
 def run_demo(lang="en", pause=False, statuses=None, ask=None, repositories=None, step=None):
     steps = step or Steps(statuses)
     ask = ask or Prompt()
-    status = demo.quickstart(lang, pause, repositories, step=steps, ask=ask, now=NOW)
+    status = demo.quickstart(lang, pause, repositories, step=steps, ask=ask, now=NOW, command=main)
     return status, steps, ask
 
 
@@ -451,7 +451,7 @@ def test_without_a_clone_upward_the_commands_name_the_repositories_folder_of_the
 
 def test_without_a_clone_the_request_step_names_the_clone_in_the_working_directory(cwd, capsys):
     shutil.rmtree(cwd / "repositories")
-    status = demo.quickstart("en", False, None, ask=Prompt(), now=NOW)
+    status = demo.quickstart("en", False, None, ask=Prompt(), now=NOW, command=main)
     assert status == 1
     assert Path.cwd() == cwd
     clone = cwd.resolve() / "repositories" / CLONE_NAME
@@ -673,13 +673,13 @@ def test_the_happy_path_shows_the_profile_of_the_working_directory(cwd, capsys):
 
 def test_the_command_line_passes_its_options(monkeypatch):
     seen = {}
-    monkeypatch.setattr(demo, "quickstart", lambda lang, pause, repositories: seen.update(
-        lang=lang, pause=pause, repositories=repositories) or 0)
+    monkeypatch.setattr(demo, "quickstart", lambda lang, pause, repositories, *, command: seen.update(
+        lang=lang, pause=pause, repositories=repositories, command=command) or 0)
     monkeypatch.setattr(demo, "system_language", lambda: "de")
     assert main(["quickstart", "--no-pause", "--lang", "en", "--repositories", "x"]) == 0
-    assert seen == {"lang": "en", "pause": False, "repositories": "x"}
+    assert seen == {"lang": "en", "pause": False, "repositories": "x", "command": main}
     assert main(["quickstart"]) == 0
-    assert seen == {"lang": "de", "pause": True, "repositories": None}
+    assert seen == {"lang": "de", "pause": True, "repositories": None, "command": main}
 
 
 def test_the_demo_computes_with_the_reference_model_whatever_the_engine_variables_say(monkeypatch, tmp_path):
@@ -692,7 +692,7 @@ def test_the_demo_computes_with_the_reference_model_whatever_the_engine_variable
     real = command_line.engine_class
     monkeypatch.setattr(command_line, "engine_class", lambda *selection: loaded.append(real(*selection)) or loaded[-1])
     shown = ["run", str(tmp_path / "request.json")]  # through the real main: the request is missing
-    status, output = demo.main_step(shown)
+    status, output = demo.main_step(shown, command=main)
     assert [cls.__name__ for cls in loaded] == ["ReferenceModel"]
     assert "no_such_engine_module" not in output and "is not a folder" not in output
     assert shown == ["run", str(tmp_path / "request.json")]

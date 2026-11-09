@@ -550,7 +550,7 @@ def flags(result: dict, deviations: list[dict], names: list[str]) -> list[bool]:
 
 
 def walk(older_record: Path | str, newer_record: Path | str, output: Path | str, engine: Engine,
-         repositories: Path | None = None, tolerance: Path | str | None = None) -> WalkResult:
+         repositories: Path | str | None = None, tolerance: Path | str | None = None) -> WalkResult:
     """Walk every state between two recorded runs and write the walk result into ``output``."""
     output = Path(output).resolve()
     repositories = engine.repositories_folder(repositories)

@@ -43,7 +43,7 @@ from conftest import (CLONE, CLONE_NAME, EXACT, LAPSE_TABLE, MODEL_CODE, NEW_BUS
                       model_request, without_volatile, written_under)
 
 CORE_MODULES = ["errors", "documents", "export", "changes", "run", "compare", "signature", "replay", "regression",
-                "derive", "walk", "search", "workers", "__main__"]
+                "derive", "walk", "search", "workers", "engine_selection", "quickstart", "__main__"]
 POINTS_PLUS_E = POINTS + "MP-E,0,1,7\n"
 
 

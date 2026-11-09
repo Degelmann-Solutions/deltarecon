@@ -1,9 +1,12 @@
 """The imports of the package keep the core apart from the reference model: no module outside
 ``engines/`` imports the reference model, in any form, and no module imports a private name (one
-that starts with ``_``, dunder names excepted) from a module of the package.
+that starts with ``_``, dunder names excepted) from a module of the package. ``quickstart`` does not
+import ``__main__``, so the two form no import cycle, and ``__main__`` imports ``quickstart`` at
+module level only.
 
 The check reads the source of every module with :mod:`ast`; it runs nothing. It is also run on
-synthetic sources, so that it is known to report both kinds of import.
+synthetic sources, so that it is known to report both kinds of forbidden import and to find an
+import of ``__main__``, at module or function level.
 """
 from __future__ import annotations
 
@@ -78,6 +81,61 @@ def violations(source: str, relative: Path) -> list[str]:
             kind = "imports the reference model" if reference and not inside_engines else "imports a private name"
             found.append(f"{relative.as_posix()}:{node.lineno}: {kind}: {ast.unparse(node)}")
     return found
+
+
+QUICKSTART = f"{PACKAGE}.quickstart"
+MAIN = f"{PACKAGE}.__main__"
+
+
+def imports(source: str, relative: Path) -> list[tuple[int, str, bool]]:
+    """Each module of the package the source of the module at ``relative`` imports, by its absolute
+    name, with the line and whether the import is at module level: ``from <module> import <name>``
+    counts as an import of ``<module>`` and of ``<module>.<name>``."""
+    module = module_name(relative)
+    is_package = relative.name == "__init__.py"
+    tree = ast.parse(source, str(relative))
+    top = {id(node) for node in tree.body}
+    found = []
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Import):
+            names = [alias.name for alias in node.names]
+        elif isinstance(node, ast.ImportFrom):
+            source_module = absolute(module, is_package, node.level, node.module)
+            names = [source_module, *(f"{source_module}.{alias.name}" for alias in node.names)]
+        else:
+            continue
+        found += [(node.lineno, name, id(node) in top) for name in names if in_package(name)]
+    return found
+
+
+def test_quickstart_does_not_import_main_and_main_imports_quickstart_at_module_level():
+    path = SOURCES / "quickstart.py"
+    of_quickstart = imports(path.read_text("utf-8"), path.relative_to(ROOT))
+    assert [entry for entry in of_quickstart if entry[1] == MAIN] == []
+    path = SOURCES / "__main__.py"
+    of_main = [entry for entry in imports(path.read_text("utf-8"), path.relative_to(ROOT)) if entry[1] == QUICKSTART]
+    assert of_main and all(at_top for _, _, at_top in of_main), of_main
+
+
+QUICKSTART_PATH = Path("degelmann/deltarecon/quickstart.py")
+
+
+@pytest.mark.parametrize("source", [
+    "from .__main__ import main",
+    "from . import __main__",
+    "from degelmann.deltarecon.__main__ import DEFAULT_ENGINE",
+    "import degelmann.deltarecon.__main__",
+    "def step():\n    from .__main__ import main",
+])
+def test_the_checker_finds_an_import_of_main(source):
+    found = imports(f"import os\n\n{source}\n", QUICKSTART_PATH)
+    assert MAIN in [name for _, name, _ in found], found
+
+
+def test_the_checker_tells_a_function_level_import():
+    found = imports("from . import run\n\ndef command():\n    from . import quickstart\n",
+                    Path("degelmann/deltarecon/__main__.py"))
+    assert (4, QUICKSTART, False) in found and (1, f"{PACKAGE}.run", True) in found, found
 
 
 def test_the_tests_name_the_clone_and_its_variable_as_the_reference_model_does():

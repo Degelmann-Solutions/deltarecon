@@ -165,7 +165,7 @@ class ToyEngine:
 
     # --- release identities ----------------------------------------------------------------
 
-    def describe(self, stage, label, revision, options, repositories, input_revision=None):
+    def describe(self, stage, label, revision: str, options, repositories, input_revision: str | None = None):
         if options:
             raise UsageError(f"the toy engine takes no engine option, not {sorted(options)[0]!r}")
         if revision not in self._ids(repositories):
@@ -178,7 +178,7 @@ class ToyEngine:
     def input_revision(self, release):
         return self._revision(release, "input_data")
 
-    def state_release(self, base, revision, hold, repositories):
+    def state_release(self, base, revision: str | None, hold, repositories):
         ids = self._ids(repositories)
         recorded = {kind: self._revision(base, kind, ids) for kind in KINDS}
         if revision is None:

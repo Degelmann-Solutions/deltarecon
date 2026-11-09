@@ -406,7 +406,7 @@ def missed(changes: list[tuple[list[str], list[str]]], contributions: list[dict]
 
 
 def search(older_record: Path | str, newer_record: Path | str, output: Path | str, engine: Engine,
-           repositories: Path | None = None, tolerance: Path | str | None = None, quantities=(),
+           repositories: Path | str | None = None, tolerance: Path | str | None = None, quantities=(),
            periods: str | None = None, walk: Path | str | None = None, reuse: bool = False,
            target_only: bool = False) -> SearchResult:
     """Search the history between two recorded runs and write the search result into ``output``.

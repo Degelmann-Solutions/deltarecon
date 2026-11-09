@@ -257,7 +257,7 @@ def reproduction(result: dict, folder: Path) -> str:
     return "reproduced_exactly"
 
 
-def replay(record_path: Path, engine: Engine, repositories: Path | None = None,
+def replay(record_path: Path, engine: Engine, repositories: Path | str | None = None,
            tolerance: Path | str | None = None) -> ReplayResult:
     """Repeat the run a run record describes and state whether it is reproduced.
 
