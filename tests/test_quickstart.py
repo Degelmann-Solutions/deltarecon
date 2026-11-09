@@ -18,7 +18,7 @@ import pytest
 
 from degelmann.deltarecon import quickstart as demo
 from degelmann.deltarecon.__main__ import main
-from degelmann.deltarecon.run import CLONE_NAME, REPOSITORIES_VARIABLE
+from degelmann.deltarecon.engines.reference_model import CLONE_NAME, REPOSITORIES_VARIABLE
 
 from conftest import ROOT
 from tools import quick_start_steps

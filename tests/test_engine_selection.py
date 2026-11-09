@@ -214,6 +214,38 @@ def test_a_class_that_cannot_take_the_worker_count_is_a_usage_error(world, engin
     sys.modules.pop("stub_engine_plain", None)
 
 
+def test_without_the_option_the_engine_names_the_repositories_folder(world, engines, monkeypatch, capsys):
+    """The core asks the engine for the folder: an engine whose default is ``world`` runs from a working
+    directory that does not hold the release, where the stub's own default finds nothing."""
+    (engines / "stub_engine_world.py").write_text(textwrap.dedent(f"""\
+        from pathlib import Path
+
+        from conftest import StubEngine
+
+
+        class Engine(StubEngine):
+            def __init__(self, workers=None):
+                super().__init__()
+
+            def repositories_folder(self, given):
+                return Path(given) if given is not None else Path({str(world)!r})
+        """), "utf-8")
+    monkeypatch.delitem(sys.modules, "stub_engine_world", raising=False)
+    path = store(world, stub_request(world))
+    elsewhere = world / "elsewhere"
+    elsewhere.mkdir()
+    monkeypatch.chdir(elsewhere)
+    assert command_line.main(["run", str(path), "--engine", "stub_engine_a:Engine", "--engine-path",
+                              str(engines)]) == 1
+    assert stored(world / "run" / "response.json")["outcome"] == "rejected"
+    capsys.readouterr()
+    other = store(world, stub_request(world), "again")
+    assert command_line.main(["run", str(other), "--engine", "stub_engine_world:Engine", "--engine-path",
+                              str(engines)]) == 0
+    assert stored(world / "again" / "response.json")["outcome"] == "succeeded"
+    sys.modules.pop("stub_engine_world", None)
+
+
 @pytest.mark.parametrize("command", ["request", "run", "replay", "regression", "derive", "walk", "search"])
 def test_every_command_that_uses_an_engine_takes_the_options(command, capsys):
     with pytest.raises(SystemExit):

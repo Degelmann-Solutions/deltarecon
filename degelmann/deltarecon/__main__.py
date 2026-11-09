@@ -113,7 +113,7 @@ each step, shows its commands as they run from that folder, with every path rela
 Enter (not with ``--no-pause``), and summarises the outcome from the files the step wrote. A
 command gets ``--repositories``, with the clone folder relative to the demo folder, only when the
 demo is given ``--repositories`` or ``DELTARECON_REPOSITORIES`` names a relative folder; otherwise
-each command finds the clone itself. The search uses the tolerance profile
+the reference model of each command finds the clone itself. The search uses the tolerance profile
 ``tolerance-bruttobeitrag.json``: the nearest ``profiles/tolerance-bruttobeitrag.json`` in the
 working directory or one of its parents, else the wheel's copy when installed, else ``profiles/`` of
 the checkout; the regression compares exactly.
@@ -151,7 +151,9 @@ describes the release of ``--revision`` with its engine options and that input r
 form of the ``tolerance`` member of a compare request. There is no default profile.
 
 No command overwrites an existing file, and none writes into the clone or uses the network.
-The clone is read from ``delib-history`` in the folder ``--repositories DIR`` names, else in the
+``--repositories DIR`` names the folder that holds what the engine restores a release from; without
+it the engine looks the folder up itself (``Engine.repositories_folder``). The reference model reads
+the clone from ``delib-history`` in the folder ``--repositories DIR`` names, else in the
 folder the environment variable ``DELTARECON_REPOSITORIES`` names, else in the nearest folder
 ``repositories/`` that holds ``delib-history``, in the working directory or one of its parents, else
 in ``repositories/`` in the working directory, where a missing clone is reported. A relative folder is taken from the working
@@ -190,8 +192,7 @@ from .search import TARGET_ONLY, search
 from .walk import walk
 from .regression import read_regression_input, regression
 from .replay import replay
-from .run import (REPOSITORIES_FOLDER, REPOSITORIES_VARIABLE, UsageError, repositories_folder, run_request,
-                  write_request)
+from .run import UsageError, run_request, write_request
 from .signature import render_coverage, render_model_points, render_table
 from .workers import WORKERS_VARIABLE, whole_number
 
@@ -311,9 +312,9 @@ def engine_options(pairs) -> dict[str, str]:
 
 def command_request(args) -> int:
     options = engine_options(args.engine_option)
-    repositories = repositories_folder(args.repositories)
     # One worker: a request projects no point, so DELTARECON_WORKERS does not concern it.
     selected = engine(1)
+    repositories = selected.repositories_folder(args.repositories)
     try:  # the request names a release only if a run would accept it; nothing is written otherwise
         output = write_request(selected, Path(args.output), stage=args.stage, label=args.label,
                                revision=args.revision, options=options, run_id=args.run_id,
@@ -429,8 +430,8 @@ def command_regression(args) -> int:
         raise UsageError(f"{output} exists already; a regression run overwrites no file")
     # A key given twice is refused before the engine loads; the engine checks keys and values in describe.
     options = engine_options(args.engine_option)
-    repositories = repositories_folder(args.repositories)
     states = state_engine(args)
+    repositories = states.repositories_folder(args.repositories)
     try:
         recorded = read_regression_input(Path(args.run_record), states.stages)
     except Rejection as rejection:
@@ -715,10 +716,11 @@ def main(argv: list[str] | None = None) -> int:
 
     for command in (request, run, again, regress, history, stepper, halver, guided):
         command.add_argument("--repositories", metavar="DIR",
-                             help="folder that holds the clone of the reference model repository "
-                                  f"(default: the folder {REPOSITORIES_VARIABLE} names, else "
-                                  f"the nearest {REPOSITORIES_FOLDER}/ that holds the clone, in the working directory or "
-                                  "one of its parents)")
+                             help="folder that holds what the engine restores a release from; for the "
+                                  "reference model, the folder that holds the clone of the reference model "
+                                  "repository (default: the folder DELTARECON_REPOSITORIES names, else the nearest "
+                                  "repositories/ that holds the clone, in the working directory or one of its "
+                                  "parents)")
 
     args = parser.parse_args(argv)
     global selection

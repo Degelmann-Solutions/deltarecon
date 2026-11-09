@@ -32,8 +32,7 @@ from pathlib import Path
 from .compare import COMPARE_REQUEST, CompareResult, compare, compare_request_document, read_tolerance
 from .documents import artifact_reference, copy_files, document_bytes, write_document, write_new
 from .replay import RecordedRun, check_recorded_stage, read_recorded_run, refuse_target_only
-from .run import (RECORD_NAME, Engine, RunResult, UsageError, repositories_folder, run_request,
-                  run_request_document)
+from .run import RECORD_NAME, Engine, RunResult, UsageError, run_request, run_request_document
 
 RECORDED_FOLDER = "recorded"
 RUN_FOLDER = "run"
@@ -75,7 +74,7 @@ def regression(recorded: RecordedRun, release: dict, output: Path | str, engine:
     file; without it the comparison is exact.
     """
     output = Path(output).resolve()
-    repositories = repositories_folder(repositories)
+    repositories = engine.repositories_folder(repositories)
     if output.exists():
         raise UsageError(f"{output} exists already; a regression run overwrites no file")
     if recorded.request["changes"]["enabled"]:

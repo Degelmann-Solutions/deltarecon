@@ -35,7 +35,10 @@ or one of the input files it is read for.
 
 The repository URL says where the state comes from; the commit hash proves it. The engine
 reads the clone ``<repositories folder>/delib-history`` and never uses the network. It does
-not look at the remote of the clone.
+not look at the remote of the clone. The engine looks up the repositories folder itself
+(:func:`repositories_folder`): the given folder, else the one ``DELTARECON_REPOSITORIES`` names, else
+the nearest ``repositories/`` that holds the clone, in the working directory or one of its parents,
+else ``repositories/`` in the working directory.
 
 Computation paths
 -----------------
@@ -140,6 +143,7 @@ of the user or the system changes the result.
 from __future__ import annotations
 
 import importlib.util
+import os
 import platform
 import re
 import shutil
@@ -165,7 +169,7 @@ from .. import changes as changes_contract
 from ..compare import target_window
 from ..protocol import (LIABILITY_CASHFLOW, SCRATCH_PREFIX, History, ModelPointFailure, Rejection, Revision,
                         StageDeclaration, UsageError)
-from ..run import CLONE_NAME, from_worker_outcome, worker_outcome
+from ..run import from_worker_outcome, worker_outcome
 from ..workers import ordered_map, worker_count
 
 STAGE = "liability_cashflow"
@@ -178,6 +182,12 @@ STAGE_QUANTITIES = {
         "Kosten 2. Ordnung ohne Provisionen", "Provisionen", "Netto-Cashflow",
     ],
 }
+# The folder that holds the clone, below the working directory.
+REPOSITORIES_FOLDER = "repositories"
+# The environment variable that names that folder when no option does.
+REPOSITORIES_VARIABLE = "DELTARECON_REPOSITORIES"
+# The folder of the clone of the reference model repository below the repositories folder.
+CLONE_NAME = "delib-history"
 SOURCE = "git"
 REPOSITORY_URL = "https://github.com/Degelmann-Solutions/delib-history"
 PRODUCT_FOLDER = "risikolebensversicherung"
@@ -390,6 +400,34 @@ def _object(store, object_id: str) -> tuple[str, bytes] | None:
     except KeyError:
         return None
     return object_class(type_number).type_name.decode("ascii"), content
+
+
+def repositories_folder(repositories: Path | str | None) -> Path:
+    """The repositories folder: the given one, else the one ``DELTARECON_REPOSITORIES`` names, else
+    the nearest folder ``repositories/`` that holds the clone folder ``delib-history``, in the working
+    directory or one of its parents, else ``repositories/`` in the working directory (so a missing
+    clone is reported there). An empty variable counts as unset; a relative folder is taken from the
+    working directory."""
+    if repositories is not None:
+        return Path(repositories)
+    named = os.environ.get(REPOSITORIES_VARIABLE)
+    if named:
+        return Path(named)
+    here = Path.cwd()
+    for folder in (here, *here.parents):
+        if (folder / REPOSITORIES_FOLDER / CLONE_NAME).is_dir():
+            return folder / REPOSITORIES_FOLDER
+    return here / REPOSITORIES_FOLDER
+
+
+def nearest_from(folder: Path) -> Path | None:
+    """The folder ``repositories/`` holding the clone that a command started in ``folder`` finds upward
+    (from the resolved folder, as ``Path.cwd()`` gives it there), resolved; ``None`` when there is none."""
+    start = Path(folder).resolve()
+    for candidate in (start, *start.parents):
+        if (candidate / REPOSITORIES_FOLDER / CLONE_NAME).is_dir():
+            return (candidate / REPOSITORIES_FOLDER).resolve()
+    return None
 
 
 def find_clone(repositories: Path) -> Path:
@@ -973,6 +1011,32 @@ class ReferenceModel:
         # "Computation paths". The folder that holds them is created on first use.
         self._exports: dict[tuple[tuple[str, str], ...], Path] = {}
         self._export_folder: tempfile.TemporaryDirectory | None = None
+
+    def repositories_folder(self, given: Path | str | None) -> Path:
+        """The folder that holds the clone: see :func:`repositories_folder`."""
+        return repositories_folder(given)
+
+    @staticmethod
+    def demo_repositories(folder: Path, given: str | None) -> Path | None:
+        """The repositories folder the commands of the guided quick start are given, worked out from
+        the working directory before the demo changes into its folder ``folder``; ``None`` when no
+        command gets ``--repositories``. Not part of the engine protocol: the demo's own question to
+        the reference model.
+
+        The folder is the given one, or the one ``DELTARECON_REPOSITORIES`` names when it is relative,
+        or, when no folder ``repositories/`` holding the clone is found upward, ``repositories/`` in the
+        working directory (the folder :func:`repositories_folder` falls back to); and also the clone
+        folder found upward when the search upward from the resolved demo folder would find another
+        clone or none (``runs`` a symbolic link to a folder elsewhere, which may hold a
+        ``repositories/`` of its own). Otherwise ``None``, and each command finds the clone itself
+        (upward from the demo folder, or the absolute folder the variable names)."""
+        named = os.environ.get(REPOSITORIES_VARIABLE)
+        if given is None and named and Path(named).is_absolute():
+            return None
+        found = repositories_folder(given)
+        if given is None and not named and (found / CLONE_NAME).is_dir() and nearest_from(folder) == found.resolve():
+            return None
+        return found
 
     def _export_slot(self, files: dict[str, str]) -> tuple[tuple, Path | None, Path]:
         """The key of the product folder of ``files``, the package exported for it before (or

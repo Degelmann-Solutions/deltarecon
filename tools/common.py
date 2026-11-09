@@ -1,6 +1,7 @@
 """What every release tool shares: the checkout root, the pin of the quick-start search, the two
 exceptions that set the exit status, Git in this checkout, and the names the package shares with
-DeltaRecon itself (taken from ``degelmann.deltarecon``, so each has one source).
+DeltaRecon itself (taken from ``degelmann.deltarecon``, the clone's names from the reference model,
+so each has one source).
 """
 from __future__ import annotations
 
@@ -9,7 +10,7 @@ import subprocess
 from pathlib import Path
 
 from degelmann.deltarecon.documents import sha256_file
-from degelmann.deltarecon.run import CLONE_NAME, REPOSITORIES_VARIABLE
+from degelmann.deltarecon.engines.reference_model import CLONE_NAME, REPOSITORIES_VARIABLE
 
 __all__ = ["ROOT", "PIN", "REPOSITORY_URL", "CLONE_NAME", "REPOSITORIES_VARIABLE", "Failed", "Refused", "git_text",
            "engine_version", "sha256_file"]

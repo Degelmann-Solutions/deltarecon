@@ -15,8 +15,10 @@ always computes with the engine of ``delib-history``, whatever ``DELTARECON_ENGI
 ``DELTARECON_ENGINE_PATH`` name.
 
 The repositories folder is worked out from the working directory before the demo changes into its
-folder, as every command does it (``run.repositories_folder``). A command gets ``--repositories``,
-with that folder relative to the demo folder, when the demo is given ``--repositories``, when
+folder, as the reference model does it for every command: the demo asks the default engine class,
+which ``__main__.engine_class`` loads, through the reference model's own method
+``demo_repositories``. A command gets ``--repositories``, with that folder relative to the demo
+folder, when the demo is given ``--repositories``, when
 ``DELTARECON_REPOSITORIES`` names a relative folder, or when neither is given and no folder
 ``repositories/`` holding the clone was found in the working directory or a parent, so that the
 command reports the missing clone at ``repositories/`` in the working directory and not in the demo
@@ -55,8 +57,6 @@ import sys
 import textwrap
 from pathlib import Path
 from typing import Callable
-
-from .run import CLONE_NAME, REPOSITORIES_FOLDER, REPOSITORIES_VARIABLE, repositories_folder
 
 OLDER = "fa368575a66d97c94e96dffc62b273ec95511b12"  # release N on the fixed model
 NEWER = "887b7181d22550eda2fb52fa1a6bd77376d4eb2e"  # the state N+1, 32 revisions later
@@ -298,31 +298,17 @@ def relative_to(path: Path | str, start: Path | str) -> str:
 
 def clone_option(folder: Path, repositories: str | None) -> str | None:
     """The ``--repositories`` value of every command, relative to the demo folder ``folder``, worked out
-    from the working directory before the demo changes into ``folder``: from ``repositories`` when given,
-    else from ``DELTARECON_REPOSITORIES`` when it names a relative folder, else, when no folder
-    ``repositories/`` holding the clone is found upward, ``repositories/`` in the working directory (the
-    folder ``run.repositories_folder`` falls back to), and also the clone folder found upward when the
-    search upward from the resolved demo folder would find another clone or none (``runs`` a symbolic
-    link to a folder elsewhere, which may hold a ``repositories/`` of its own). Otherwise
-    ``None``, and each command finds the clone itself (upward from the demo folder, or the absolute
-    folder the variable names)."""
-    named = os.environ.get(REPOSITORIES_VARIABLE)
-    if repositories is None and named and Path(named).is_absolute():
-        return None
-    found = repositories_folder(repositories)
-    if repositories is None and not named and (found / CLONE_NAME).is_dir() and nearest_from(folder) == found.resolve():
-        return None
-    return relative_to(found, folder)
+    from the working directory before the demo changes into ``folder``: the folder the reference model
+    names for the demo (``ReferenceModel.demo_repositories``), from ``repositories`` when given, else
+    from ``DELTARECON_REPOSITORIES`` when it names a relative folder, else, when no folder
+    ``repositories/`` holding the clone is found upward, ``repositories/`` in the working directory, and
+    also the clone folder found upward when the search upward from the resolved demo folder would find
+    another clone or none. Otherwise ``None``, and each command finds the clone itself (upward from the
+    demo folder, or the absolute folder the variable names)."""
+    from .__main__ import DEFAULT_ENGINE, engine_class
 
-
-def nearest_from(folder: Path) -> Path | None:
-    """The folder ``repositories/`` holding the clone that a command started in ``folder`` finds upward
-    (from the resolved folder, as ``Path.cwd()`` gives it there), resolved; ``None`` when there is none."""
-    start = Path(folder).resolve()
-    for candidate in (start, *start.parents):
-        if (candidate / REPOSITORIES_FOLDER / CLONE_NAME).is_dir():
-            return (candidate / REPOSITORIES_FOLDER).resolve()
-    return None
+    found = engine_class(DEFAULT_ENGINE).demo_repositories(folder, repositories)
+    return None if found is None else relative_to(found, folder)
 
 
 def quoted(argument: str) -> str:

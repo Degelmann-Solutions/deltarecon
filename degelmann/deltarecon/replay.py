@@ -45,7 +45,7 @@ from .documents import (CHANGES_SCHEMA, CONTRACT_VERSION, RECORD_SCHEMA, RUN_REQ
                         parse_document, read_document, same_release, write_document)
 from .export import check_export
 from .run import (RECORD_NAME, WITHOUT_DOMAIN_REFERENCE, Engine, StageDeclaration, UsageError,
-                  repositories_folder, run_record, run_request)
+                  run_record, run_request)
 
 # The contract versions of the run records a replay repeats; a 1.0 record is not replayed.
 REPLAY_VERSIONS = ("2.0", "3.0", "3.1", "3.2")
@@ -264,7 +264,7 @@ def replay(record_path: Path, engine: Engine, repositories: Path | None = None,
     ``tolerance`` names a tolerance file; without it the comparison is exact.
     """
     record_path = Path(record_path).resolve()
-    repositories = repositories_folder(repositories)
+    repositories = engine.repositories_folder(repositories)
     folder = record_path.parent
     if not record_path.is_file():
         raise UsageError(f"no run record at {record_path}")

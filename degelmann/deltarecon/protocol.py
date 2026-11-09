@@ -148,6 +148,11 @@ class Engine(Protocol):
     options it is given, and checks it through :meth:`resolve` before anything is written.
     ``regression`` describes its release with :meth:`describe`, given the input revision
     :meth:`input_revision` reads from the release identity of the recorded run.
+
+    Every command that reads a release asks :meth:`repositories_folder` for the folder that holds
+    what the engine restores a release from, given ``--repositories`` or the library argument, and
+    passes the folder it returns to the other operations. The core looks up no folder itself, so
+    each engine finds its own history.
     """
 
     # Each stage the engine supports, with its declaration: the domain reference the engine names
@@ -163,6 +168,14 @@ class Engine(Protocol):
     # The kinds the engine can hold at the release of a request while revisions are enabled,
     # each with the classes of the paths that carry it, for example ``input_data``: ``data``.
     holdable: Mapping[str, frozenset[str]]
+
+    def repositories_folder(self, given: Path | str | None) -> Path:
+        """The folder that holds what the engine restores a release from.
+
+        ``given`` is the folder ``--repositories`` or the library argument names, ``None`` when
+        absent; without it the engine takes its own default. Nothing is read beyond the lookup,
+        and the folder need not exist.
+        """
 
     def resolve(self, stage: str, release: dict, repositories: Path) -> None:
         """Check that the release identity names a state of the stage ``stage`` the engine can restore.

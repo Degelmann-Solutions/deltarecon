@@ -38,12 +38,14 @@ from degelmann.deltarecon.documents import (CONTRACT_VERSION, RECORD_SCHEMA, RUN
                                             document_bytes, schema_errors, sha256_file)
 from degelmann.deltarecon.protocol import LIABILITY_CASHFLOW, DomainReference, StageDeclaration, UsageError
 from degelmann.deltarecon.regression import read_regression_input, regression
-from degelmann.deltarecon.run import (REPOSITORIES_VARIABLE, History, ModelPointFailure, Revision, from_worker_outcome,
-                                      run_request, worker_outcome)
+from degelmann.deltarecon.run import History, ModelPointFailure, Revision, from_worker_outcome, run_request, worker_outcome
 
 ROOT = Path(__file__).resolve().parent.parent
 REPOSITORIES = ROOT / "repositories"
 CLONE_NAME = "delib-history"
+# The variable of the reference model's repositories folder, named here and not imported, so that
+# loading the stub engines loads no reference model (tests/test_engine_selection.py).
+REPOSITORIES_VARIABLE = "DELTARECON_REPOSITORIES"
 CLONE = REPOSITORIES / CLONE_NAME
 REPOSITORY_URL = "https://github.com/Degelmann-Solutions/delib-history"
 RELEASE_N = "b64334e09613c45a7a12468dfddc0d9ec47819bb"  # the first commit of delib-history
@@ -403,6 +405,10 @@ class StubEngine:
         self.opened = 0
         self.received = []  # the enabled changes of the last call of ``open``
         self.stages_received = []  # ("resolve" or "open", stage) of every call, in order
+
+    def repositories_folder(self, given):
+        """The given folder, else ``repositories/`` relative to the working directory."""
+        return Path(given) if given is not None else Path("repositories")
 
     def history(self, older, newer, repositories):
         """The part of ``line`` after the folder of ``older`` up to the folder of ``newer``."""

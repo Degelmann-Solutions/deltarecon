@@ -36,7 +36,6 @@ from __future__ import annotations
 
 import json
 import math
-import os
 import re
 import tempfile
 from contextlib import contextmanager
@@ -48,8 +47,8 @@ from typing import Mapping, Sequence
 from . import changes as changes_contract
 from .documents import (CHANGES_SCHEMA, CONTRACT_VERSION, RECORD_SCHEMA, RUN_REQUEST, RUN_SCHEMA,
                         Rejection, artifact_reference, check_artifact, check_schema, check_version,
-                        document_bytes, new_record_id, parse_document, read_document, schema_errors,
-                        sha256_file, validator, write_document, write_new)
+                        document_bytes, key_order, new_record_id, parse_document, read_document, schema_errors,
+                        sha256_file, typed_key, validator, write_document, write_new)
 from .export import write_export
 # Re-exported: other modules and the tests import these names from here.
 from .protocol import (LIABILITY_CASHFLOW, SCRATCH_PREFIX, DomainReference, Engine, History,  # noqa: F401
@@ -58,12 +57,6 @@ from .protocol import (LIABILITY_CASHFLOW, SCRATCH_PREFIX, DomainReference, Engi
 RESPONSE_NAME = "response.json"
 EXPORT_NAME = "results.csv"
 RECORD_NAME = "run-record.json"
-# The folder that holds what an engine restores a release from, below the working directory.
-REPOSITORIES_FOLDER = "repositories"
-# The environment variable that names that folder when no option does.
-REPOSITORIES_VARIABLE = "DELTARECON_REPOSITORIES"
-# The folder of the clone of the reference model repository below the repositories folder.
-CLONE_NAME = "delib-history"
 # The contract versions whose run responses have no member ``domain_reference``: a run written under
 # one of them, as the tests write genuine earlier documents, names no domain reference.
 WITHOUT_DOMAIN_REFERENCE = ("1.0", "2.0", "3.0", "3.1")
@@ -168,24 +161,6 @@ def check_parameters(parameters: list[dict]) -> None:
                             "state holds a value that is not a finite number.")
 
 
-def _key_order(key: list):
-    # Numbers numerically, strings by code point; a column holds one of the two.
-    return [(0, element, "") if not isinstance(element, str) else (1, 0, element) for element in key]
-
-
-def _typed_key(key: list) -> tuple:
-    # Equality as the parameter model states it: numbers as binary64 values, and a
-    # number, a string, and a boolean are never equal.
-    def typed(element):
-        if isinstance(element, (bool, str)):
-            return (type(element).__name__, element)
-        try:
-            return ("number", float(element))
-        except OverflowError:
-            return ("number", element)
-    return tuple(typed(element) for element in key)
-
-
 class _EngineError(Exception):
     """An exception an engine call raised. The run ends with the outcome ``error``."""
 
@@ -279,12 +254,12 @@ def read_inventory(session: Session) -> list[dict]:
         if any(len(row["key"]) != len(parameter["key_columns"])
                or len(row["values"]) != len(parameter["value_columns"]) for row in rows):
             errors = [f"{parameter['name']}: a row does not hold one element per column"]
-        elif len({_typed_key(row["key"]) for row in rows}) != len(rows):
+        elif len({typed_key(row["key"]) for row in rows}) != len(rows):
             errors = [f"{parameter['name']}: two rows have the same key"]
     if errors:
         raise RuntimeError(f"the engine returns a parameter inventory the record does not allow: {errors[0]}")
     check_parameters(inventory)
-    ordered = [{**parameter, "rows": sorted(parameter["rows"], key=lambda row: _key_order(row["key"]))}
+    ordered = [{**parameter, "rows": sorted(parameter["rows"], key=lambda row: key_order(row["key"]))}
                if parameter["type"] == "keyed_table" else parameter for parameter in inventory]
     return sorted(ordered, key=lambda parameter: parameter["name"])
 
@@ -506,28 +481,10 @@ def check_target(session: Session, target: dict) -> None:
         raise Rejection("target_not_supported", "The engine cannot compute a target-only run.")
 
 
-def repositories_folder(repositories: Path | str | None) -> Path:
-    """The repositories folder: the given one, else the one ``DELTARECON_REPOSITORIES`` names, else
-    the nearest folder ``repositories/`` that holds the clone folder ``delib-history``, in the working
-    directory or one of its parents, else ``repositories/`` in the working directory (so a missing
-    clone is reported there). An empty variable counts as unset; a relative folder is taken from the
-    working directory."""
-    if repositories is not None:
-        return Path(repositories)
-    named = os.environ.get(REPOSITORIES_VARIABLE)
-    if named:
-        return Path(named)
-    here = Path.cwd()
-    for folder in (here, *here.parents):
-        if (folder / REPOSITORIES_FOLDER / CLONE_NAME).is_dir():
-            return folder / REPOSITORIES_FOLDER
-    return here / REPOSITORIES_FOLDER
-
-
 def run_request(request_path: Path, engine: Engine, repositories: Path | None = None) -> RunResult:
     """Run the request stored at ``request_path`` and write the documents of the run beside it."""
     request_path = Path(request_path).resolve()
-    repositories = repositories_folder(repositories)
+    repositories = engine.repositories_folder(repositories)
     folder = request_path.parent
     if not request_path.is_file():
         raise UsageError(f"no request at {request_path}")

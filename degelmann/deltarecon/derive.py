@@ -26,7 +26,7 @@ from pathlib import Path
 from . import changes as changes_contract
 from .documents import CHANGES_SCHEMA, CONTRACT_VERSION, Rejection, write_document
 from .replay import RecordedRun, read_recorded_run, refuse_target_only
-from .run import Engine, History, UsageError, repositories_folder
+from .run import Engine, History, UsageError
 
 REVISION = "revision"
 CLASS_ORDER = ("data", "parameter", "code")
@@ -111,7 +111,7 @@ def derive(older_record: Path | str, newer_record: Path | str, output: Path | st
            repositories: Path | None = None) -> DeriveResult:
     """Derive the change manifest between two recorded runs and write it to ``output``."""
     output = Path(output).resolve()
-    repositories = repositories_folder(repositories)
+    repositories = engine.repositories_folder(repositories)
     if output.exists():
         raise UsageError(f"{output} exists already; no file is overwritten")
     if not output.parent.is_dir():

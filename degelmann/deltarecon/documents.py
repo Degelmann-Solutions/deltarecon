@@ -229,6 +229,28 @@ def same_release(left: dict, right: dict) -> bool:
             == {_reference_key(r) for r in right["references"]})
 
 
+# --- keys of keyed tables -----------------------------------------------------------
+
+
+def key_order(key: list):
+    """The sort key of a row key: numbers numerically, strings by code point; a column holds one
+    of the two."""
+    return [(0, element, "") if not isinstance(element, str) else (1, 0, element) for element in key]
+
+
+def typed_key(key: list) -> tuple:
+    """A row key under equality as the parameter model states it: numbers as binary64 values, and
+    a number, a string, and a boolean are never equal."""
+    def typed(element):
+        if isinstance(element, (bool, str)):
+            return (type(element).__name__, element)
+        try:
+            return ("number", float(element))
+        except OverflowError:
+            return ("number", element)
+    return tuple(typed(element) for element in key)
+
+
 # --- writing ------------------------------------------------------------------------
 
 
