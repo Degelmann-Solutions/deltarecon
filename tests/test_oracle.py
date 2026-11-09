@@ -16,9 +16,10 @@ export path under Python 3.14.9, and the two ends of the new chain in place of r
 on all 350 model points, and is skipped unless it is asked for: ``DELTARECON_ORACLE=1``. Besides the
 renewed hashes it checks every signature table against the three archives. Against the 3.1 and the 3.0
 archive each table, with its contract version set back to ``3.1`` or ``3.0``, hashes to the archived
-digest: 3.1 and 3.3 change no value and no period of a signature table. The 2.0 tables were built
-under 2.0, which paired values by policy month; the present tables carry projection periods. So each table is rebuilt in policy months from the deviation file of
-its step: every row's period gets back the first exported period of its model point in the step's left
+digest: no version after 3.0 changes a value or a period of a signature table. The 2.0 tables were
+built under 2.0, which paired values by policy month; the present tables carry projection periods. So
+each table is rebuilt in policy months from the deviation file of its step: every row's period gets
+back the first exported period of its model point in the step's left
 state export, the table is derived again from the rows, and its contract version is set back to the
 archived ``2.0``. The rebuilt table hashes to the archived digest: the tables are the archived ones,
 field for field, apart from ``contract_version`` and the period numbering. The rebuild assumes that
