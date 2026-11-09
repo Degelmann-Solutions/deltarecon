@@ -17,12 +17,13 @@ from pathlib import Path
 import pytest
 
 from degelmann.deltarecon.__main__ import main
+from degelmann.deltarecon.derive import derive
 from degelmann.deltarecon.documents import (RECORD_SCHEMA, RUN_SCHEMA, Rejection, document_bytes, read_document,
                                   schema_errors, sha256_file)
 from degelmann.deltarecon.protocol import DomainReference, StageDeclaration
 from degelmann.deltarecon.regression import read_regression_input, regression
 from degelmann.deltarecon.replay import read_recorded_run, replay
-from degelmann.deltarecon.run import UsageError, run_request
+from degelmann.deltarecon.run import History, UsageError, run_request
 from degelmann.deltarecon.search import search
 from degelmann.deltarecon.walk import exact_sums, held_kinds, walk, written
 
@@ -491,6 +492,31 @@ def test_a_regression_of_a_record_the_core_cannot_compare_writes_nothing(world, 
         regression(read_recorded_run(older, engine.stages), {"label": "x", "references": []}, world / "out",
                    engine, repositories=world)
     assert caught.value.code == "unsupported_stage" and not (world / "out").exists()
+
+
+class BadSource(WalkStub):
+    """The stub engine with a main line whose history names a source that is not a lower-case identifier."""
+
+    def history(self, older, newer, repositories):
+        history = super().history(older, newer, repositories)
+        return History("Toy", history.older, history.newer, history.revisions)
+
+
+@pytest.mark.parametrize("procedure", ["derive", "walk", "search"])
+def test_a_history_source_that_is_not_a_lower_case_identifier_stops_before_a_state_runs(linear, procedure):
+    """Contract 3.3: the core refuses an engine's history source that is not a lower-case identifier when it
+    builds the manifest, so nothing runs and nothing is written, instead of a schema fault at the end."""
+    world, older, newer = linear
+    engine = BadSource()
+    before = folder_hashes(world)
+    with pytest.raises(RuntimeError, match="history source that is not a lower-case identifier: 'Toy'"):
+        if procedure == "derive":
+            derive(older, newer, world / "changes.json", engine, repositories=world)
+        elif procedure == "walk":
+            run_walk(world, older, newer, engine)
+        else:
+            search(older, newer, world / "search", engine, repositories=world)
+    assert engine.opened == 0 and folder_hashes(world) == before
 
 
 def test_a_record_the_core_cannot_compare_is_refused_before_the_stage_mismatch(world):

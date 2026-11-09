@@ -19,7 +19,8 @@ import pytest
 from degelmann.deltarecon import changes as changes_contract
 from degelmann.deltarecon.__main__ import main
 from degelmann.deltarecon.derive import build_manifest, derive, remainder
-from degelmann.deltarecon.documents import CHANGES_SCHEMA, Rejection, document_bytes, read_document, schema_errors, sha256_file
+from degelmann.deltarecon.documents import (CHANGES_SCHEMA, CONTRACT_VERSION, Rejection, document_bytes, read_document,
+                                            schema_errors, sha256_file)
 from degelmann.deltarecon.replay import replay
 from degelmann.deltarecon.protocol import StageDeclaration
 from degelmann.deltarecon.run import History, Revision, UsageError
@@ -80,7 +81,7 @@ def test_linear_history_gives_one_chained_change_per_revision(world):
     assert list(manifest) == ["document", "contract_version", "stage", "manifest_id", "base_release",
                               "history", "changes"]
     assert (manifest["document"], manifest["contract_version"], manifest["stage"]) == (
-        "change_manifest", "3.2", "liability_cashflow")
+        "change_manifest", CONTRACT_VERSION, "liability_cashflow")
     assert manifest["manifest_id"] == "history-r0-r3" and manifest["base_release"] == "N"
     assert manifest["history"] == {"source": "git", "from": "r0", "to": "r3",
                                    "determines": ["input_data", "release_folder"], "remainder": []}
@@ -223,6 +224,23 @@ def test_remainder_ignores_the_determined_kinds_and_the_order_of_the_references(
 def test_a_history_the_contract_does_not_allow_writes_no_manifest(history, message):
     with pytest.raises(RuntimeError, match=message):
         build_manifest(history, "liability_cashflow", "N", frozenset(), [])
+
+
+@pytest.mark.parametrize("source", ["Toy", "Tape", "toy-folders", "", "1git", " git", "git\n", None, 7, b"git"])
+def test_a_history_source_that_is_not_a_lower_case_identifier_writes_no_manifest(source):
+    with pytest.raises(RuntimeError, match="the engine returns a history source that is not a lower-case "
+                                           "identifier"):
+        build_manifest(History(source, "a", "b", (Revision("b", "", frozenset()),)), "liability_cashflow", "N",
+                       frozenset(), [])
+
+
+@pytest.mark.parametrize("source", ["git", "toy_folders", "a", "x9_"])
+def test_a_history_source_of_a_lower_case_identifier_is_named_by_the_manifest(source):
+    manifest = build_manifest(History(source, "a", "b", (Revision("b", "", frozenset()),)), "liability_cashflow",
+                              "N", frozenset(), [])
+    assert manifest["history"]["source"] == source
+    assert [change["realisation"]["source"] for change in manifest["changes"]] == [source]
+    assert not schema_errors(manifest, CHANGES_SCHEMA)
 
 
 def derive_command(monkeypatch, world: Path, older, newer, output, engine=HistoryStub) -> int:

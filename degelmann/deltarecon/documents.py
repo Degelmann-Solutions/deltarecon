@@ -4,10 +4,10 @@ Reading follows the order of ``contracts/v3/README.md``: the JSON profile, the c
 version, and then the schema. Every broken rule raises a :class:`Rejection` that carries
 the diagnostic of the contract.
 
-The tool writes contract version 3.2 and reads 1.0, 2.0, 3.0, 3.1, and 3.2. A document is
+The tool writes contract version 3.3 and reads 1.0, 2.0, 3.0, 3.1, 3.2, and 3.3. A document is
 checked against the schemas of its own version: a 1.0 document against ``contracts/v1/schemas``,
-a 2.0 document against ``contracts/v2/schemas``, a 3.0, 3.1, or 3.2 document against
-``contracts/v3/schemas``, which accept the three minor versions of 3.
+a 2.0 document against ``contracts/v2/schemas``, a 3.0, 3.1, 3.2, or 3.3 document against
+``contracts/v3/schemas``, which accept the four minor versions of 3.
 
 The pack is read from ``contracts/`` at the root of a checkout. A wheel carries a copy of it,
 made at build time, as ``degelmann/deltarecon/contracts`` beside this module; an installed
@@ -27,13 +27,13 @@ from referencing import Registry, Resource
 
 from .protocol import Rejection  # re-exported: the core and the tests import it from here
 
-CONTRACT_VERSION = "3.2"
+CONTRACT_VERSION = "3.3"
 PACKAGED_CONTRACTS = Path(__file__).resolve().parent / "contracts"
 CONTRACTS = PACKAGED_CONTRACTS if PACKAGED_CONTRACTS.is_dir() else Path(__file__).resolve().parents[2] / "contracts"
 # The versions a reader accepts, each with the schemas of its pack.
 SCHEMA_FOLDERS = {"1.0": CONTRACTS / "v1" / "schemas", "2.0": CONTRACTS / "v2" / "schemas",
                   "3.0": CONTRACTS / "v3" / "schemas", "3.1": CONTRACTS / "v3" / "schemas",
-                  "3.2": CONTRACTS / "v3" / "schemas"}
+                  "3.2": CONTRACTS / "v3" / "schemas", "3.3": CONTRACTS / "v3" / "schemas"}
 SCHEMA_NAMES = ["common", "run", "changes", "compare", "localise", "run-record"]
 
 RUN_SCHEMA = "run.schema.json"

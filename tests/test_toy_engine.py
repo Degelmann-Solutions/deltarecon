@@ -3,7 +3,8 @@ module alone, whose history is a folder and not a Git repository.
 
 Each stage runs through ``request``, ``run``, ``regression``, ``compare``, and ``search`` on the
 command line, with the engine loaded through ``--engine`` and ``--engine-path`` and its default
-repositories folder, the history beside the module.
+repositories folder, the history beside the module; ``derive`` and ``walk`` show that every manifest
+names the history source ``toy_folders``.
 """
 from __future__ import annotations
 
@@ -19,9 +20,9 @@ import pytest
 
 from degelmann.deltarecon.__main__ import ENGINE_PATH_VARIABLE, ENGINE_VARIABLE, main
 from degelmann.deltarecon.compare import compare_request_document
-from degelmann.deltarecon.documents import artifact_reference, document_bytes
+from degelmann.deltarecon.documents import CHANGES_SCHEMA, artifact_reference, document_bytes, schema_errors
 
-from conftest import ROOT, folder_hashes, stored
+from conftest import ROOT, assert_documents_valid, folder_hashes, stored
 
 TOY = ROOT / "examples" / "toy_engine"
 ENGINE = ["--engine", "toy_engine:ToyEngine", "--engine-path", "examples/toy_engine"]
@@ -167,12 +168,80 @@ def test_an_enabled_revision_the_history_does_not_hold_does_not_apply(toy):
     engine = engine_class("toy_engine:ToyEngine", "examples/toy_engine")()
     repositories = engine.repositories_folder(None)
     release = engine.describe("toy_premium", "N", "r1", {}, repositories)
-    enabled = [{"id": change_id, "realisation": {"type": "revision", "source": "git", "revision": revision}}
+    enabled = [{"id": change_id, "realisation": {"type": "revision", "source": "toy_folders", "revision": revision}}
                for change_id, revision in (("c1", "r2"), ("c2", "r9"), ("c3", "r4"))]
     with pytest.raises(Rejection) as raised:
         with engine.open("toy_premium", release, enabled, None, repositories):
             pass
     assert (raised.value.code, raised.value.change_ids) == ("invalid_manifest", ["c2"])
+
+
+def recorded_ends(folder: Path, stage: str) -> tuple[Path, Path]:
+    """The run records of r1 and r5 of ``stage``, run through ``main``."""
+    for revision in ("r1", "r5"):
+        request = folder / revision / "request.json"
+        assert main(["request", "--revision", revision, "--stage", stage, "--label", revision,
+                     "--run-id", f"run-{revision}", "--output", str(request), *ENGINE]) == 0
+        assert main(["run", str(request), *ENGINE]) == 0
+    return folder / "r1" / "run-record.json", folder / "r5" / "run-record.json"
+
+
+@pytest.mark.parametrize("stage", list(TARGETS))
+def test_derive_walk_and_search_name_the_history_source_toy_folders(toy, tmp_path, stage):
+    """Contract 3.3: the toy history is of the source ``toy_folders``, whose main line is the order of
+    ``history/log.json``; the derived manifest, the manifests of the walk folder, and the manifest of the
+    search name it in ``history`` and in every realisation."""
+    folder = tmp_path / stage
+    older, newer = recorded_ends(folder, stage)
+    assert main(["derive", str(older), str(newer), "--output", str(folder / "changes.json"), *ENGINE]) == 0
+    assert main(["walk", str(older), str(newer), "--output", str(folder / "walk"), *ENGINE]) == 0
+    assert main(["search", str(older), str(newer), "--quantity", TARGETS[stage][0], "--output",
+                 str(folder / "search"), *ENGINE]) == 0
+    search = stored(folder / "search" / "search.result.json")
+    manifests = [folder / "changes.json", folder / "walk" / "changes.json",
+                 *(folder / "walk").glob("state-*/changes.json"), folder / "search" / search["manifest"]["path"]]
+    assert len(manifests) > 4
+    # The main line of the source is the order of the log, oldest first: the changes after r1 up to r5.
+    line = [entry["id"] for entry in json.loads((TOY / "history" / "log.json").read_text("utf-8"))]
+    for path in manifests:
+        manifest = stored(path)
+        assert manifest["contract_version"] == "3.3", path
+        assert manifest["history"]["source"] == "toy_folders", path
+        assert {change["realisation"]["source"] for change in manifest["changes"]} == {"toy_folders"}, path
+        assert [change["id"] for change in manifest["changes"]] == line[line.index("r1") + 1:line.index("r5") + 1]
+    assert (folder / "changes.json").read_bytes() == (folder / "walk" / "changes.json").read_bytes()
+
+
+def test_a_revision_of_another_history_source_is_rejected_and_nothing_runs(toy, tmp_path, capsys):
+    """The toy engine realises revisions of ``toy_folders`` only: a manifest of ``git`` revisions is rejected
+    with ``unsupported_realisation``, naming every enabled change of that source in manifest order."""
+    folder = tmp_path / "foreign"
+    folder.mkdir()
+    ids = ["r2", "r3"]
+    manifest = {
+        "document": "change_manifest", "contract_version": "3.3", "stage": "toy_premium",
+        "manifest_id": "history-r1-r3", "base_release": "r1",
+        "history": {"source": "git", "from": "r1", "to": "r3",
+                    "determines": ["code_state", "input_data", "parameter_set"], "remainder": []},
+        "changes": [{"id": revision, "class": ["code"], "description": revision, "prerequisites": ids[:index],
+                     "conflicts": [], "realisation": {"type": "revision", "source": "git", "revision": revision}}
+                    for index, revision in enumerate(ids)]}
+    assert not schema_errors(manifest, CHANGES_SCHEMA)
+    (folder / "changes.json").write_bytes(document_bytes(manifest))
+    request = folder / "request.json"
+    assert main(["request", "--revision", "r1", "--stage", "toy_premium", "--label", "r1", "--run-id", "run-foreign",
+                 "--output", str(request), "--enable", *ids, "--manifest", str(folder / "changes.json"),
+                 *ENGINE]) == 0
+    capsys.readouterr()
+    assert main(["run", str(request), *ENGINE]) == 1
+    assert "unsupported_realisation" in capsys.readouterr().out
+    response = stored(folder / "response.json")
+    (diagnostic,) = response["diagnostics"]
+    assert response["outcome"] == "rejected"
+    assert (diagnostic["code"], diagnostic["change_ids"]) == ("unsupported_realisation", ids)
+    assert_documents_valid(folder)
+    assert not (folder / "results.csv").exists()
+    assert stored(folder / "run-record.json")["parameters"] == []
 
 
 def test_the_toy_engine_imports_the_protocol_module_alone():

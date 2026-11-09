@@ -72,8 +72,9 @@
       }
     },
     "history_source": {
-      "description": "The kind of history. Version 3 defines git.",
-      "const": "git"
+      "description": "The kind of history: a lower-case identifier. The pack defines git, whose main line follows first parents; an engine that names another source defines the main line of its history.",
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9_]*$"
     },
     "reference_kind": {
       "type": "string",

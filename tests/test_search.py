@@ -308,7 +308,7 @@ def test_only_a_proper_subset_of_the_quantities_or_a_period_range_narrows_the_ta
     assert all(c["quantity"] == CASH for c in every_contribution(result))
 
 
-@pytest.mark.parametrize("version", ["1.0", "2.0", "3.0"])
+@pytest.mark.parametrize("version", ["1.0", "2.0", "3.0", "3.1", "3.2"])
 def test_a_walk_folder_written_under_an_earlier_version_is_a_reference(cancel, version):
     world, older, newer = cancel
     with written_under(version):
@@ -320,14 +320,14 @@ def test_a_walk_folder_written_under_an_earlier_version_is_a_reference(cancel, v
     run_walk(world, older, newer, WalkStub(CANCEL), output="walk-2")
     result = run_search(world, older, newer, WalkStub(CANCEL), walk=walked).result
     again = run_search(world, older, newer, WalkStub(CANCEL), output="search-2", walk=world / "walk-2").result
-    assert result["contract_version"] == "3.2"
+    assert result["contract_version"] == "3.3"
     assert result["missed"] == again["missed"] == [{"revision": "c1", "quantity": CASH},
                                                    {"revision": "c2", "quantity": CASH}]
     # The copy of the walk keeps its bytes and its version.
     assert (world / "search" / "walk" / "walk.result.json").read_bytes() == (walked / "walk.result.json").read_bytes()
 
 
-@pytest.mark.parametrize("version", ["1.0", "2.0", "3.0"])
+@pytest.mark.parametrize("version", ["1.0", "2.0", "3.0", "3.1", "3.2"])
 def test_an_earlier_walk_folder_whose_manifest_differs_otherwise_is_refused(cancel, version):
     world, older, newer = cancel
     with written_under(version):

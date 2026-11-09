@@ -126,7 +126,9 @@ class Revision:
 class History:
     """The history between two release identities."""
 
-    source: str                # the kind of history, for example ``git``
+    # The kind of history, a lower-case identifier: ``git``, whose main line follows first parents,
+    # or a source the engine names, whose main line it defines.
+    source: str
     older: str                 # the identifier of the older revision
     newer: str                 # the identifier of the newer revision
     revisions: tuple[Revision, ...]  # the main line after ``older`` up to ``newer``, oldest first
@@ -232,6 +234,11 @@ class Engine(Protocol):
         enabled revision. ``hold`` names the kinds of release reference it then takes from
         ``release`` instead of from that revision; each is a kind of ``holdable``.
 
+        The engine realises revisions of its own history source only: an enabled change of the
+        type ``revision`` whose ``source`` is not the engine's is a change it cannot realise,
+        and it raises a :class:`Rejection` with ``unsupported_realisation`` before it restores
+        anything (rule 11 of ``contracts/v3/changes.md``).
+
         Raises a :class:`Rejection` with ``invalid_manifest`` when a change does not apply.
         Any other exception, here or from a call of the session other than ``project``,
         ends the run with the outcome ``error``.
@@ -240,6 +247,8 @@ class Engine(Protocol):
     def history(self, older: dict, newer: dict, repositories: Path) -> History:
         """The history between the revisions two release identities name.
 
+        ``source`` of the result is a lower-case identifier: ``git``, whose main line is the
+        chain of first parents, or a source the engine names, whose main line it defines.
         Which references of an identity name its revision is the engine's matter; it reads
         no reference that a revision does not fix and does not check its own version. The
         result lists every revision on the main line after the older one, up to and

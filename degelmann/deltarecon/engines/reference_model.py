@@ -1127,6 +1127,12 @@ class ReferenceModel:
     @contextmanager
     def open(self, stage: str, release: dict, enabled: list[dict], manifest_dir: Path | None,
              repositories: Path, hold=frozenset()):
+        # A revision of another history source is a change this engine cannot realise (rule 11).
+        foreign = [c["id"] for c in enabled
+                   if c["realisation"]["type"] == changes_contract.REVISION and c["realisation"]["source"] != SOURCE]
+        if foreign:
+            raise Rejection("unsupported_realisation", f"The change {foreign[0]} is a revision of another history "
+                            f"source than {SOURCE}, which the reference model cannot realise.", change_ids=foreign)
         clone, files = self._locate(release, repositories)
         path = release_path(release)
         revisions = [c["realisation"]["revision"] for c in enabled

@@ -12,10 +12,13 @@ which equal the README lines, in process; its twin runs the guided quick start `
 Both are skipped unless they are asked for:
 ``DELTARECON_QUICK_START=1``. The pinned hashes are never rewritten to make a test pass.
 
-The pin was renewed once, in the commit that introduces contract version 3.2: the search folder of the
+The pin was renewed twice. In the commit that introduces contract version 3.2: the search folder of the
 quick start written under 3.1 (pin ``8fb7c40c...`` of ``search.result.json``), normalised by dropping
 ``domain_reference``, setting ``contract_version``, and masking the ``sha256`` values, equals the folder
-written under 3.2 (pin ``745ebe65...``); every export and deviation file kept its bytes.
+written under 3.2 (pin ``745ebe65...``); every export and deviation file kept its bytes. In the commit that
+introduces contract version 3.3: the folder written under 3.2, normalised by setting ``contract_version``
+and masking the ``sha256`` values, equals the folder written under 3.3 (pin ``6e1acd24...``); every
+export and deviation file kept its bytes.
 """
 from __future__ import annotations
 
@@ -34,8 +37,9 @@ from degelmann.deltarecon.documents import sha256_file
 from conftest import CLONE, NEWER, REPOSITORIES, ROOT, artifacts, require_clone
 from tools import quick_start_steps
 
-# Contract version 3.2: search.result.json 745ebe65... renews the 3.1 pin 8fb7c40c...; the documents differ in
-# contract_version, the member domain_reference of the responses, and the hashes of the documents they reference.
+# Contract version 3.3: search.result.json 6e1acd24... renews the 3.2 pin 745ebe65...; the documents differ in
+# contract_version and the hashes of the documents they reference. That pin renewed the 3.1 pin 8fb7c40c...,
+# whose documents differed from it also in the member domain_reference of the responses.
 PIN = ROOT / "measurements" / "quick-start-search.SHA256SUMS"
 SEARCH_RESULT = "search.result.json"
 PIN_LINE = re.compile(r"([0-9a-f]{64})  ((?:[A-Za-z0-9_.-]+/)*[A-Za-z0-9_.-]+)")

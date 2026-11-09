@@ -7,9 +7,10 @@ and :mod:`degelmann.deltarecon.protocol`, nothing else of DeltaRecon. Select it 
 
 The values are trivial on purpose; ``DOMAIN.md`` beside this module says what they mean.
 
-Its history is a folder, not a Git repository: ``history/log.json`` lists the revisions, oldest
-first, and that order is the main line. Each revision ``<id>`` has a folder ``history/<id>/``
-with three files, each of one class of the changes contract:
+Its history is a folder, not a Git repository, of the history source ``toy_folders``:
+``history/log.json`` lists the revisions, oldest first, and that order is the main line. Each
+revision ``<id>`` has a folder ``history/<id>/`` with three files, each of one class of the changes
+contract:
 
 - ``points.csv`` (``id,sum_insured,premium,term``), class ``data``
 - ``parameters.csv`` (``name,value``, the one row ``rate``), class ``parameter``
@@ -41,9 +42,9 @@ FILES = {"code_state": ("rules.json", "code"), "parameter_set": ("parameters.csv
 KINDS = tuple(FILES)  # the order of the references of a release identity
 # The factor of the expected claims under each claims rule.
 CLAIMS_FACTOR = {"plain": 1.0, "loaded": 1.05}
-# Version 3 of the changes contract defines the history source ``git`` alone, so the toy history,
-# a folder, reports that source; it has the same shape: a main line of revisions, oldest first.
-HISTORY_SOURCE = "git"
+# The history source of the toy engine, a name of its own (contract 3.3): a folder whose main line
+# is the order of ``history/log.json``, oldest first. The engine realises revisions of it alone.
+HISTORY_SOURCE = "toy_folders"
 
 PREMIUM = "toy_premium"
 CLAIMS = "toy_claims"
@@ -205,7 +206,16 @@ class ToyEngine:
     @contextmanager
     def open(self, stage, release, enabled, manifest_dir, repositories, hold=frozenset()):
         """The files of the release, or of the last enabled revision with ``points.csv`` of the
-        release when ``input_data`` is held, copied to a scratch folder."""
+        release when ``input_data`` is held, copied to a scratch folder.
+
+        A revision of another history source than ``toy_folders`` is rejected with
+        ``unsupported_realisation`` before anything else is checked."""
+        foreign = [change["id"] for change in enabled
+                   if change["realisation"]["type"] == "revision" and change["realisation"]["source"] != HISTORY_SOURCE]
+        if foreign:
+            raise Rejection("unsupported_realisation", f"The change {foreign[0]} is a revision of another history "
+                            f"source than {HISTORY_SOURCE}, which the toy engine cannot realise.",
+                            change_ids=foreign)
         files = self._files(release, repositories)
         revisions = [change["realisation"]["revision"] for change in enabled]
         if revisions:

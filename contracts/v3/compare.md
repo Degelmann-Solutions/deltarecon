@@ -17,7 +17,7 @@ or the recorded one. The output is the [compare result](#compare-result), the
 ```json
 {
   "document": "compare_request",
-  "contract_version": "3.2",
+  "contract_version": "3.3",
   "stage": "liability_cashflow",
   "compare_id": "compare-n-full-vs-subset-changes",
   "left": {
@@ -99,7 +99,7 @@ file, no coverage lists, and no parameter diff.
 ```json
 {
   "document": "compare_result",
-  "contract_version": "3.2",
+  "contract_version": "3.3",
   "stage": "liability_cashflow",
   "compare_id": "compare-unit-mismatch",
   "outcome": "incompatible",
@@ -257,7 +257,7 @@ only.
 ```json
 {
   "document": "compare_result",
-  "contract_version": "3.2",
+  "contract_version": "3.3",
   "stage": "liability_cashflow",
   "compare_id": "compare-n-full-vs-subset-changes",
   "outcome": "compared",
@@ -361,7 +361,7 @@ comparison without deviation.
 ```json
 {
   "document": "signature_table",
-  "contract_version": "3.2",
+  "contract_version": "3.3",
   "stage": "liability_cashflow",
   "compare_id": "compare-n-full-vs-subset-changes",
   "left": { "run_id": "run-n-full", "release_label": "N" },
@@ -555,7 +555,9 @@ side, reports no deviation.
   under 2.0, 3.0, or 3.1 the two responses may differ in `contract_version` and
   `domain_reference` only: the member `domain_reference` is removed from the
   repeated response and the recorded version is set in it, with its members in
-  their order, before the bytes are compared.
+  their order, before the bytes are compared. For a run recorded under 3.2 they
+  may differ in `contract_version` only: the recorded version is set in the
+  repeated response before the bytes are compared.
 - The repeated run uses the release identity that the run record holds, and
   the enabled changes and the selection of the request that the record lists.
 

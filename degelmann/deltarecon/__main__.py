@@ -38,9 +38,10 @@ and the repeated run, and writes ``replay-compare.request.json``,
 ``replay-compare.result.json``, ``replay-compare.deviations.csv`` when the runs are
 compared, and ``replay-record.json``. A recorded run with the outcome ``error`` is
 repeated and its response compared byte for byte, apart from ``contract_version`` and
-``domain_reference`` for a run recorded under 2.0, 3.0, or 3.1; nothing else is compared. The record
-must name one of the present engine versions, and the replay repeats the run on the computation path
-it names. A run record written under contract version 2.0, 3.0, 3.1, or 3.2 is replayed; one written
+``domain_reference`` for a run recorded under 2.0, 3.0, or 3.1 and apart from ``contract_version`` for
+one recorded under 3.2; nothing else is compared. The record must name one of the present engine
+versions, and the replay repeats the run on the computation path it names. A run record written under
+contract version 2.0, 3.0, 3.1, 3.2, or 3.3 is replayed; one written
 under 1.0 is rejected with ``unsupported_version``.
 
 ``compare`` compares the two runs a compare request names and writes

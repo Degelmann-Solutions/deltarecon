@@ -15,3 +15,10 @@ model.
 
 - `expected_claims` (unit `EUR`, outgo positive) in period `t`: `S·q·(1−q)^t·f`.
   The factor `f` is 1 under the claims rule `plain` and 1.05 under `loaded`.
+
+## History source `toy_folders`
+
+The history of the toy engine is a folder, not a Git repository; its manifests and realisations
+name the source `toy_folders`. Its main line is the order of the revisions in `history/log.json`,
+oldest first: a revision follows the one listed before it. The engine realises revisions of this
+source only.
