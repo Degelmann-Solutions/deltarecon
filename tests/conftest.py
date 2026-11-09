@@ -36,7 +36,7 @@ from degelmann.deltarecon import changes as changes_contract
 from degelmann.deltarecon.__main__ import main
 from degelmann.deltarecon.documents import (CONTRACT_VERSION, RECORD_SCHEMA, RUN_REQUEST, RUN_SCHEMA, Rejection,
                                             document_bytes, schema_errors, sha256_file)
-from degelmann.deltarecon.protocol import LIABILITY_CASHFLOW, DomainReference, StageDeclaration
+from degelmann.deltarecon.protocol import LIABILITY_CASHFLOW, DomainReference, StageDeclaration, UsageError
 from degelmann.deltarecon.regression import read_regression_input, regression
 from degelmann.deltarecon.run import (REPOSITORIES_VARIABLE, History, ModelPointFailure, Revision, from_worker_outcome,
                                       run_request, worker_outcome)
@@ -442,6 +442,20 @@ class StubEngine:
             raise Rejection("unknown_reference", "The references do not name the release state.")
         return folder
 
+    def describe(self, stage, label, revision, options, repositories, input_revision=None):
+        """The identity of the folder ``revision`` below ``repositories``, with ``points.csv`` of
+        the folder ``input_revision`` when it is given. The stub takes no option."""
+        self.stages_received.append(("describe", stage))
+        if options:
+            raise UsageError(f"the stub engine takes no engine option {sorted(options)[0]!r}")
+        folder = Path(repositories) / revision if revision else None
+        if folder is None or not folder.is_dir():
+            raise Rejection("unknown_reference", f"There is no release folder {revision!r}.")
+        moved = self.references(folder, revision)
+        if input_revision is not None:
+            moved[1:] = self.references(Path(repositories) / input_revision, input_revision)[1:]
+        return {"label": label, "references": moved}
+
     def resolve(self, stage, release, repositories):
         self.stages_received.append(("resolve", stage))
         self._folder(release, repositories)
@@ -667,7 +681,7 @@ def model_request(monkeypatch, folder: Path, *ids: str, revision: str = START,
     arguments = ["request", "--revision", revision, "--repositories", repositories, "--label", "N",
                  "--run-id", run_id, "--output", folder / "request.json"]
     if path is not None:
-        arguments += ["--path", path]
+        arguments += ["--engine-option", f"path={path}"]
     if ids:
         arguments += ["--subset", *ids]
     assert cli(monkeypatch, *arguments) == 0

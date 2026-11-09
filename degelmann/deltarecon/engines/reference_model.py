@@ -230,6 +230,25 @@ def engine_version(path: str = DEFAULT_PATH) -> str:
             f"Python {platform.python_version()}")
 
 
+PATH_OPTION = "path"  # the one engine option: the computation path, one of PATHS
+
+
+def path_option(options) -> str:
+    """The computation path the engine options name: the value of ``path``, ``export`` without it.
+
+    Raises :class:`UsageError` for another key or a value that is not one of :data:`PATHS`.
+    """
+    unknown = sorted(key for key in options if key != PATH_OPTION)
+    if unknown:
+        raise UsageError(f"the reference model takes no engine option {unknown[0]!r}; its one option is "
+                         f"{PATH_OPTION}={'|'.join(PATHS)}")
+    path = options.get(PATH_OPTION, DEFAULT_PATH)
+    if path not in PATHS:
+        raise UsageError(f"the reference model has no computation path {path!r}; "
+                         f"{PATH_OPTION} is one of {', '.join(PATHS)}")
+    return path
+
+
 def path_of(version: str) -> str:
     """The computation path an ``engine_version`` value names, of this or of any other engine.
 
@@ -1001,6 +1020,17 @@ class ReferenceModel:
             state, input_revision = revision, (input_revision if "input_data" in hold else revision)
         return {"label": base["label"],
                 "references": release_references(state, input_revision, release_path(base))}
+
+    def describe(self, stage: str, label: str, revision: str, options, repositories: Path,
+                 input_revision: str | None = None) -> dict:
+        """The release identity of the commit ``revision`` names in the clone, on the path ``options`` names.
+
+        ``revision`` is read as :func:`resolve_revision` reads it; ``input_revision`` is a full
+        hash, used as given. The options are checked before the clone is read.
+        """
+        path = path_option(options)
+        commit = resolve_revision(revision, repositories)
+        return {"label": label, "references": release_references(commit, input_revision, path)}
 
     def resolve(self, stage: str, release: dict, repositories: Path) -> None:
         # One stage: the run admits only a stage of ``stages``, so ``stage`` selects nothing here.
