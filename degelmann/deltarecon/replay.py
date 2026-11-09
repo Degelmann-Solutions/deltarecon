@@ -6,7 +6,7 @@ record, and compares the recorded run, as the left side, with the repeated run, 
 right side, through the compare procedure of ``contracts/v3/compare.md``. Without a
 tolerance profile the comparison is exact.
 
-- The replay repeats runs recorded under contract version 2.0, 3.0, 3.1, or 3.2. A run record written
+- The replay repeats runs recorded under contract version 2.0, 3.0, 3.1, 3.2, or 3.3. A run record written
   under 1.0 is read by ``regression``, ``derive``, ``walk``, and ``search``, but it is not
   replayed: the replay rejects it with ``unsupported_version`` (``contracts/v3/README.md``,
   "Version compatibility").
@@ -23,7 +23,8 @@ tolerance profile the comparison is exact.
 - A recorded run with the outcome ``error`` has no export. It is repeated, nothing is
   compared, and it is ``reproduced_exactly`` when the new response is byte for byte the
   recorded one, else ``not_reproduced``; for a run recorded under 2.0, 3.0, or 3.1 apart from
-  ``contract_version`` and ``domain_reference``. The replay record lists the new response only.
+  ``contract_version`` and ``domain_reference``, under 3.2 apart from ``contract_version``. The
+  replay record lists the new response only.
 - A record whose response names another domain reference than the engine declares for its
   stage is refused with ``domain_reference_mismatch``, and one of a stage other than
   ``liability_cashflow`` whose response names none with ``unsupported_stage``.
@@ -45,10 +46,10 @@ from .documents import (CHANGES_SCHEMA, CONTRACT_VERSION, RECORD_SCHEMA, RUN_REQ
                         parse_document, read_document, same_release, write_document)
 from .export import check_export
 from .run import (RECORD_NAME, WITHOUT_DOMAIN_REFERENCE, Engine, StageDeclaration, UsageError,
-                  repositories_folder, run_record, run_request)
+                  run_record, run_request)
 
 # The contract versions of the run records a replay repeats; a 1.0 record is not replayed.
-REPLAY_VERSIONS = ("2.0", "3.0", "3.1", "3.2")
+REPLAY_VERSIONS = ("2.0", "3.0", "3.1", "3.2", "3.3")
 REPLAY_FOLDER = "replay"
 REPLAY_RECORD_NAME = "replay-record.json"
 REPLAY_COMPARE_REQUEST_NAME = "replay-compare.request.json"
@@ -257,14 +258,14 @@ def reproduction(result: dict, folder: Path) -> str:
     return "reproduced_exactly"
 
 
-def replay(record_path: Path, engine: Engine, repositories: Path | None = None,
+def replay(record_path: Path, engine: Engine, repositories: Path | str | None = None,
            tolerance: Path | str | None = None) -> ReplayResult:
     """Repeat the run a run record describes and state whether it is reproduced.
 
     ``tolerance`` names a tolerance file; without it the comparison is exact.
     """
     record_path = Path(record_path).resolve()
-    repositories = repositories_folder(repositories)
+    repositories = engine.repositories_folder(repositories)
     folder = record_path.parent
     if not record_path.is_file():
         raise UsageError(f"no run record at {record_path}")
@@ -361,7 +362,8 @@ def _replay_of_an_error(recorded: RecordedRun, result, replay_record_path: Path)
     The repeated response must equal the recorded one byte for byte. For a run recorded under 2.0,
     3.0, or 3.1 the two may differ in ``contract_version`` and ``domain_reference`` only: the member
     ``domain_reference`` is removed from the repeated response and the recorded version is set in it,
-    its members in their order, before the bytes are compared.
+    its members in their order, before the bytes are compared. For a run recorded under 3.2 they may
+    differ in ``contract_version`` only.
     """
     folder = recorded.folder
     repeated = result.response_path.read_bytes()

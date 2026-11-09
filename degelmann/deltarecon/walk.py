@@ -63,7 +63,7 @@ from .documents import (CONTRACT_VERSION, RECORD_SCHEMA, RUN_SCHEMA, SCHEMA_FOLD
                         check_artifact, copy_files, document_bytes, parse_document, read_document, sha256_file,
                         write_document, write_new)
 from .replay import RecordedRun, check_recorded_stage, check_response
-from .run import Engine, RunResult, UsageError, repositories_folder, run_record, run_request, run_request_document
+from .run import Engine, RunResult, UsageError, run_record, run_request, run_request_document
 
 LOCALISE_SCHEMA = "localise.schema.json"
 MANIFEST_NAME = "changes.json"
@@ -550,10 +550,10 @@ def flags(result: dict, deviations: list[dict], names: list[str]) -> list[bool]:
 
 
 def walk(older_record: Path | str, newer_record: Path | str, output: Path | str, engine: Engine,
-         repositories: Path | None = None, tolerance: Path | str | None = None) -> WalkResult:
+         repositories: Path | str | None = None, tolerance: Path | str | None = None) -> WalkResult:
     """Walk every state between two recorded runs and write the walk result into ``output``."""
     output = Path(output).resolve()
-    repositories = repositories_folder(repositories)
+    repositories = engine.repositories_folder(repositories)
     if output.exists():
         raise UsageError(f"{output} exists already; a walk overwrites no file")
     prepared = prepare(older_record, newer_record, engine, repositories, tolerance)

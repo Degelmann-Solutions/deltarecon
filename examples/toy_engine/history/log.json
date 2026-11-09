@@ -1,0 +1,22 @@
+[
+  {
+    "id": "r1",
+    "message": "The base: three model points, the rate 0.01, plain claims"
+  },
+  {
+    "id": "r2",
+    "message": "Raise the rate to 0.012"
+  },
+  {
+    "id": "r3",
+    "message": "Comment the claims rule"
+  },
+  {
+    "id": "r4",
+    "message": "Add the model point TOY-004"
+  },
+  {
+    "id": "r5",
+    "message": "Load the expected claims by 5 percent"
+  }
+]

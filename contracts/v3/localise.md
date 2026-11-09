@@ -179,7 +179,7 @@ not run or is not reproduced, these are all of them.
 ```json
 {
   "document": "walk_result",
-  "contract_version": "3.2",
+  "contract_version": "3.3",
   "stage": "liability_cashflow",
   "walk_id": "walk-run-n-full-run-n1-full",
   "manifest": { "path": "changes.json", "sha256": "…" },
@@ -398,7 +398,8 @@ Before anything runs, the search reads the walk folder under the
   another tolerance profile, other held kinds, or a manifest that differs, byte
   for byte, from the one the search derives again, apart from a
   `contract_version` the reader reads (a walk folder written under 1.0, 2.0,
-  3.0, or 3.1 holds the manifest with `1.0`, `2.0`, `3.0`, or `3.1`), or when it fails the
+  3.0, 3.1, or 3.2 holds the manifest with `1.0`, `2.0`, `3.0`, `3.1`, or
+  `3.2`), or when it fails the
   [environment rule](#same-environment).
 
 A refused search writes nothing.
@@ -540,7 +541,7 @@ A search has the findings of a walk, with these meanings, and one of its own:
 ```json
 {
   "document": "search_result",
-  "contract_version": "3.2",
+  "contract_version": "3.3",
   "stage": "liability_cashflow",
   "search_id": "search-run-n-full-run-n1-full",
   "walk": { "walk_id": "walk-run-n-full-run-n1-full", "result": { "path": "walk/walk.result.json", "sha256": "…" } },

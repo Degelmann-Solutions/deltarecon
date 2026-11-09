@@ -8,15 +8,18 @@ Inside it, ``release-n/`` holds the run of release N, ``regression/`` the regres
 search. Step 1 is ``request`` and ``run``; steps 2 to 4 are ``regression``, ``derive`` and
 ``search``. Before each step the demo explains it, shows its commands and waits for Enter (not with
 ``--no-pause``); after it, it summarises the outcome from the files the step wrote. Each command
-runs in this process through ``__main__.main`` with its output captured, so it makes every check of
-the single command; the argv run is the argv shown, with every path relative to the demo folder, and
-``--engine`` with the reference model added at its end, which the demo does not show: the demo
+runs in this process through the command function the demo is given (``__main__.main``, which
+``__main__`` passes) with its output captured, so it makes every check of the single command; the
+argv run is the argv shown, with every path relative to the demo folder, and ``--engine`` with the
+reference model added at its end, which the demo does not show: the demo
 always computes with the engine of ``delib-history``, whatever ``DELTARECON_ENGINE`` and
 ``DELTARECON_ENGINE_PATH`` name.
 
 The repositories folder is worked out from the working directory before the demo changes into its
-folder, as every command does it (``run.repositories_folder``). A command gets ``--repositories``,
-with that folder relative to the demo folder, when the demo is given ``--repositories``, when
+folder, as the reference model does it for every command: the demo asks the default engine class,
+which ``engine_selection.engine_class`` loads, through the reference model's own method
+``demo_repositories``. A command gets ``--repositories``, with that folder relative to the demo
+folder, when the demo is given ``--repositories``, when
 ``DELTARECON_REPOSITORIES`` names a relative folder, or when neither is given and no folder
 ``repositories/`` holding the clone was found in the working directory or a parent, so that the
 command reports the missing clone at ``repositories/`` in the working directory and not in the demo
@@ -56,7 +59,7 @@ import textwrap
 from pathlib import Path
 from typing import Callable
 
-from .run import CLONE_NAME, REPOSITORIES_FOLDER, REPOSITORIES_VARIABLE, repositories_folder
+from .engine_selection import DEFAULT_ENGINE, engine_class
 
 OLDER = "fa368575a66d97c94e96dffc62b273ec95511b12"  # release N on the fixed model
 NEWER = "887b7181d22550eda2fb52fa1a6bd77376d4eb2e"  # the state N+1, 32 revisions later
@@ -298,31 +301,15 @@ def relative_to(path: Path | str, start: Path | str) -> str:
 
 def clone_option(folder: Path, repositories: str | None) -> str | None:
     """The ``--repositories`` value of every command, relative to the demo folder ``folder``, worked out
-    from the working directory before the demo changes into ``folder``: from ``repositories`` when given,
-    else from ``DELTARECON_REPOSITORIES`` when it names a relative folder, else, when no folder
-    ``repositories/`` holding the clone is found upward, ``repositories/`` in the working directory (the
-    folder ``run.repositories_folder`` falls back to), and also the clone folder found upward when the
-    search upward from the resolved demo folder would find another clone or none (``runs`` a symbolic
-    link to a folder elsewhere, which may hold a ``repositories/`` of its own). Otherwise
-    ``None``, and each command finds the clone itself (upward from the demo folder, or the absolute
-    folder the variable names)."""
-    named = os.environ.get(REPOSITORIES_VARIABLE)
-    if repositories is None and named and Path(named).is_absolute():
-        return None
-    found = repositories_folder(repositories)
-    if repositories is None and not named and (found / CLONE_NAME).is_dir() and nearest_from(folder) == found.resolve():
-        return None
-    return relative_to(found, folder)
-
-
-def nearest_from(folder: Path) -> Path | None:
-    """The folder ``repositories/`` holding the clone that a command started in ``folder`` finds upward
-    (from the resolved folder, as ``Path.cwd()`` gives it there), resolved; ``None`` when there is none."""
-    start = Path(folder).resolve()
-    for candidate in (start, *start.parents):
-        if (candidate / REPOSITORIES_FOLDER / CLONE_NAME).is_dir():
-            return (candidate / REPOSITORIES_FOLDER).resolve()
-    return None
+    from the working directory before the demo changes into ``folder``: the folder the reference model
+    names for the demo (``ReferenceModel.demo_repositories``), from ``repositories`` when given, else
+    from ``DELTARECON_REPOSITORIES`` when it names a relative folder, else, when no folder
+    ``repositories/`` holding the clone is found upward, ``repositories/`` in the working directory, and
+    also the clone folder found upward when the search upward from the resolved demo folder would find
+    another clone or none. Otherwise ``None``, and each command finds the clone itself (upward from the
+    demo folder, or the absolute folder the variable names)."""
+    found = engine_class(DEFAULT_ENGINE).demo_repositories(folder, repositories)
+    return None if found is None else relative_to(found, folder)
 
 
 def quoted(argument: str) -> str:
@@ -360,19 +347,18 @@ def table(header: tuple[str, ...], rows: list[tuple[str, ...]], right: set[int] 
             for entry in [header, *rows]]
 
 
-def main_step(argv: list[str]) -> tuple[int, str]:
-    """Run one command through ``__main__.main`` in this process: its exit status and its output.
+def main_step(argv: list[str], *, command: Callable[[list[str]], int]) -> tuple[int, str]:
+    """Run one command through ``command``, the command function (``__main__.main``), in this process:
+    its exit status and its output.
 
     The command runs with ``--engine`` and the reference model added, so the demo always computes
     with the engine of ``delib-history``; given ``--engine``, a command reads neither
     ``DELTARECON_ENGINE`` nor ``DELTARECON_ENGINE_PATH``.
     """
-    from .__main__ import DEFAULT_ENGINE, main
-
     output = io.StringIO()
     with contextlib.redirect_stdout(output), contextlib.redirect_stderr(output):
         try:
-            status = main([*argv, "--engine", DEFAULT_ENGINE])
+            status = command([*argv, "--engine", DEFAULT_ENGINE])
         except SystemExit as exit_:  # a usage error of argparse
             status = exit_.code if isinstance(exit_.code, int) else 2
     return status, output.getvalue()
@@ -412,9 +398,10 @@ def compared_runs() -> bool:
 
 def quickstart(lang: str, pause: bool = True, repositories: str | None = None,
                step: Callable[[list[str]], tuple[int, str]] | None = None, ask: Callable = input,
-               now: datetime.datetime | None = None) -> int:
-    """Run the guided quick start; the exit status."""
-    step = step or main_step
+               now: datetime.datetime | None = None, *, command: Callable[[list[str]], int]) -> int:
+    """Run the guided quick start with the command function ``command`` (``__main__.main``); the exit
+    status. ``step`` runs one command, by default :func:`main_step` with ``command``."""
+    step = step or (lambda argv: main_step(argv, command=command))
     texts = TEXTS[lang]
     now = now or datetime.datetime.now(datetime.timezone.utc)
     folder = RUNS / f"quickstart-{now:%Y%m%dT%H%M%SZ}"

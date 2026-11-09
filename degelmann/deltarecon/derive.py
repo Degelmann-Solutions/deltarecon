@@ -20,16 +20,19 @@ and which class a touched path has are the engine's answers.
 """
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass, field
 from pathlib import Path
 
 from . import changes as changes_contract
 from .documents import CHANGES_SCHEMA, CONTRACT_VERSION, Rejection, write_document
 from .replay import RecordedRun, read_recorded_run, refuse_target_only
-from .run import Engine, History, UsageError, repositories_folder
+from .run import Engine, History, UsageError
 
 REVISION = "revision"
 CLASS_ORDER = ("data", "parameter", "code")
+# The source of a history: a lower-case identifier, as ``history_source`` of the changes schema.
+HISTORY_SOURCE = re.compile(r"[a-z][a-z0-9_]*")
 
 
 @dataclass
@@ -82,6 +85,9 @@ def description(message: str, revision: str) -> str:
 
 def build_manifest(history: History, stage: str, base_release: str, determines, rest: list[dict]) -> dict:
     """The manifest of a history: one change per revision, chained by one prerequisite each."""
+    if not isinstance(history.source, str) or not HISTORY_SOURCE.fullmatch(history.source):
+        raise RuntimeError(f"the engine returns a history source that is not a lower-case identifier: "
+                           f"{history.source!r}")
     ids = [revision.id for revision in history.revisions]
     if ids and (ids[-1] != history.newer or history.older in ids) or (not ids and history.older != history.newer):
         raise RuntimeError("the engine returns a history that does not lead from the older to the newer revision")
@@ -108,10 +114,10 @@ def build_manifest(history: History, stage: str, base_release: str, determines, 
 
 
 def derive(older_record: Path | str, newer_record: Path | str, output: Path | str, engine: Engine,
-           repositories: Path | None = None) -> DeriveResult:
+           repositories: Path | str | None = None) -> DeriveResult:
     """Derive the change manifest between two recorded runs and write it to ``output``."""
     output = Path(output).resolve()
-    repositories = repositories_folder(repositories)
+    repositories = engine.repositories_folder(repositories)
     if output.exists():
         raise UsageError(f"{output} exists already; no file is overwritten")
     if not output.parent.is_dir():

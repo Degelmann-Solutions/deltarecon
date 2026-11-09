@@ -56,7 +56,7 @@ from .documents import (CONTRACT_VERSION, RUN_SCHEMA, Rejection, artifact_refere
 from .export import write_export
 from .replay import check_response
 from .run import (EXPORT_NAME, RECORD_NAME as STATE_RECORD_NAME, RESPONSE_NAME, Engine, RunResult, UsageError,
-                  repositories_folder, written_values)
+                  written_values)
 from .walk import (LOCALISE_SCHEMA, MANIFEST_NAME, NEWER, OLDER, REQUEST_NAME, RESULT_NAME as WALK_RESULT_NAME,
                    Prepared, States, WalkFolder, as_checked, compare_in_memory, flags, new_folder, prepare,
                    read_walk_folder)
@@ -406,7 +406,7 @@ def missed(changes: list[tuple[list[str], list[str]]], contributions: list[dict]
 
 
 def search(older_record: Path | str, newer_record: Path | str, output: Path | str, engine: Engine,
-           repositories: Path | None = None, tolerance: Path | str | None = None, quantities=(),
+           repositories: Path | str | None = None, tolerance: Path | str | None = None, quantities=(),
            periods: str | None = None, walk: Path | str | None = None, reuse: bool = False,
            target_only: bool = False) -> SearchResult:
     """Search the history between two recorded runs and write the search result into ``output``.
@@ -415,7 +415,7 @@ def search(older_record: Path | str, newer_record: Path | str, output: Path | st
     if reuse and walk is None:
         raise UsageError("the switch reuse_walk takes the states from a walk folder and needs a walk folder")
     output = Path(output).resolve()
-    repositories = repositories_folder(repositories)
+    repositories = engine.repositories_folder(repositories)
     if output.exists():
         raise UsageError(f"{output} exists already; a search overwrites no file")
     prepared = prepare(older_record, newer_record, engine, repositories, tolerance, procedure="search")

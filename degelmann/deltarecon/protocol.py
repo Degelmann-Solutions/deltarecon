@@ -126,7 +126,9 @@ class Revision:
 class History:
     """The history between two release identities."""
 
-    source: str                # the kind of history, for example ``git``
+    # The kind of history, a lower-case identifier: ``git``, whose main line follows first parents,
+    # or a source the engine names, whose main line it defines.
+    source: str
     older: str                 # the identifier of the older revision
     newer: str                 # the identifier of the newer revision
     revisions: tuple[Revision, ...]  # the main line after ``older`` up to ``newer``, oldest first
@@ -146,6 +148,13 @@ class Engine(Protocol):
 
     ``request`` writes the release identity :meth:`describe` gives for the revision and the engine
     options it is given, and checks it through :meth:`resolve` before anything is written.
+    ``regression`` describes its release with :meth:`describe`, given the input revision
+    :meth:`input_revision` reads from the release identity of the recorded run.
+
+    Every command that reads a release asks :meth:`repositories_folder` for the folder that holds
+    what the engine restores a release from, given ``--repositories`` or the library argument, and
+    passes the folder it returns to the other operations. The core looks up no folder itself, so
+    each engine finds its own history.
     """
 
     # Each stage the engine supports, with its declaration: the domain reference the engine names
@@ -161,6 +170,14 @@ class Engine(Protocol):
     # The kinds the engine can hold at the release of a request while revisions are enabled,
     # each with the classes of the paths that carry it, for example ``input_data``: ``data``.
     holdable: Mapping[str, frozenset[str]]
+
+    def repositories_folder(self, given: Path | str | None) -> Path:
+        """The folder that holds what the engine restores a release from.
+
+        ``given`` is the folder ``--repositories`` or the library argument names, ``None`` when
+        absent; without it the engine takes its own default. Nothing is read beyond the lookup,
+        and the folder need not exist.
+        """
 
     def resolve(self, stage: str, release: dict, repositories: Path) -> None:
         """Check that the release identity names a state of the stage ``stage`` the engine can restore.
@@ -191,6 +208,15 @@ class Engine(Protocol):
         :class:`Rejection` with ``unknown_reference`` when ``revision`` names nothing.
         """
 
+    def input_revision(self, release: dict) -> str:
+        """The identifier of the revision the recorded release identity ``release`` takes its input data from.
+
+        ``release`` is a recorded release identity of any engine version or computation path.
+        The result is the identifier in the form :meth:`describe` takes for ``input_revision``.
+        Nothing is restored and nothing is written. Raises a :class:`Rejection` with
+        ``unknown_reference`` when ``release`` names no state the engine can read.
+        """
+
     def open(self, stage: str, release: dict, enabled: list[dict], manifest_dir: Path | None,
              repositories: Path, hold: frozenset[str] = frozenset()) -> ContextManager[Session]:
         """Restore the release state of the stage ``stage``, apply the enabled changes, and open it for reading.
@@ -208,6 +234,11 @@ class Engine(Protocol):
         enabled revision. ``hold`` names the kinds of release reference it then takes from
         ``release`` instead of from that revision; each is a kind of ``holdable``.
 
+        The engine realises revisions of its own history source only: an enabled change of the
+        type ``revision`` whose ``source`` is not the engine's is a change it cannot realise,
+        and it raises a :class:`Rejection` with ``unsupported_realisation`` before it restores
+        anything (rule 11 of ``contracts/v3/changes.md``).
+
         Raises a :class:`Rejection` with ``invalid_manifest`` when a change does not apply.
         Any other exception, here or from a call of the session other than ``project``,
         ends the run with the outcome ``error``.
@@ -216,6 +247,8 @@ class Engine(Protocol):
     def history(self, older: dict, newer: dict, repositories: Path) -> History:
         """The history between the revisions two release identities name.
 
+        ``source`` of the result is a lower-case identifier: ``git``, whose main line is the
+        chain of first parents, or a source the engine names, whose main line it defines.
         Which references of an identity name its revision is the engine's matter; it reads
         no reference that a revision does not fix and does not check its own version. The
         result lists every revision on the main line after the older one, up to and

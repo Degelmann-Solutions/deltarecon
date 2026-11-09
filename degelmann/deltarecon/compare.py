@@ -51,10 +51,11 @@ from pathlib import Path
 
 from .documents import (CONTRACT_VERSION, RECORD_SCHEMA, RUN_SCHEMA, Rejection, artifact_reference,
                         check_artifact, check_document, check_schema, check_version, parse_document,
-                        read_document, schema_errors, strict_json_text, write_document, write_new)
+                        key_order, read_document, schema_errors, strict_json_text, typed_key, write_document,
+                        write_new)
 from .export import check_export, deviation_bytes, format_number, read_deviations
 from .protocol import LIABILITY_CASHFLOW
-from .run import UsageError, _key_order, _typed_key, run_record
+from .run import UsageError, run_record
 from .signature import signature_table
 
 COMPARE_SCHEMA = "compare.schema.json"
@@ -257,23 +258,23 @@ def check_inventory(parameters: list[dict]) -> None:
                or len(row["values"]) != len(parameter["value_columns"]) for row in rows):
             raise Rejection("invalid_inventory", f"A row of the table {parameter['name']} does not "
                             "hold one element per column.")
-        if len({_typed_key(row["key"]) for row in rows}) != len(rows):
+        if len({typed_key(row["key"]) for row in rows}) != len(rows):
             raise Rejection("invalid_inventory", f"Two rows of the table {parameter['name']} have the same key.")
 
 
 def _table_rows(old: dict, new: dict) -> list[dict]:
-    left = {_typed_key(row["key"]): row for row in old["rows"]}
-    right = {_typed_key(row["key"]): row for row in new["rows"]}
+    left = {typed_key(row["key"]): row for row in old["rows"]}
+    right = {typed_key(row["key"]): row for row in new["rows"]}
     entries = []
     for key in set(left) | set(right):
         if key not in left:
             entries.append({"key": right[key]["key"], "change": "added", "new": right[key]["values"]})
         elif key not in right:
             entries.append({"key": left[key]["key"], "change": "removed", "old": left[key]["values"]})
-        elif _typed_key(left[key]["values"]) != _typed_key(right[key]["values"]):
+        elif typed_key(left[key]["values"]) != typed_key(right[key]["values"]):
             entries.append({"key": left[key]["key"], "change": "changed",
                             "old": left[key]["values"], "new": right[key]["values"]})
-    return sorted(entries, key=lambda entry: _key_order(entry["key"]))
+    return sorted(entries, key=lambda entry: key_order(entry["key"]))
 
 
 def parameter_diff(left: list[dict], right: list[dict]) -> list[dict]:
@@ -287,7 +288,7 @@ def parameter_diff(left: list[dict], right: list[dict]) -> list[dict]:
         elif name not in new:
             diff.append({"name": name, "change": "removed", "old": old[name]})
         elif old[name]["type"] == new[name]["type"] == "scalar":
-            if _typed_key([old[name]["value"]]) != _typed_key([new[name]["value"]]):
+            if typed_key([old[name]["value"]]) != typed_key([new[name]["value"]]):
                 diff.append({"name": name, "change": "changed", "type": "scalar",
                              "old": old[name]["value"], "new": new[name]["value"]})
         elif (old[name]["type"] == new[name]["type"] == "keyed_table"

@@ -38,9 +38,10 @@ and the repeated run, and writes ``replay-compare.request.json``,
 ``replay-compare.result.json``, ``replay-compare.deviations.csv`` when the runs are
 compared, and ``replay-record.json``. A recorded run with the outcome ``error`` is
 repeated and its response compared byte for byte, apart from ``contract_version`` and
-``domain_reference`` for a run recorded under 2.0, 3.0, or 3.1; nothing else is compared. The record
-must name one of the present engine versions, and the replay repeats the run on the computation path
-it names. A run record written under contract version 2.0, 3.0, 3.1, or 3.2 is replayed; one written
+``domain_reference`` for a run recorded under 2.0, 3.0, or 3.1 and apart from ``contract_version`` for
+one recorded under 3.2; nothing else is compared. The record must name one of the present engine
+versions, and the replay repeats the run on the computation path it names. A run record written under
+contract version 2.0, 3.0, 3.1, 3.2, or 3.3 is replayed; one written
 under 1.0 is rejected with ``unsupported_version``.
 
 ``compare`` compares the two runs a compare request names and writes
@@ -49,11 +50,12 @@ under 1.0 is rejected with ``unsupported_version``.
 when the release identities of both runs can be read. A request that is not readable as a
 compare request writes nothing.
 
-``regression`` runs the commit ``--revision`` names on the input data and the selection of
+``regression`` runs the revision ``--revision`` names, as the engine reads it (for the reference
+model a commit), on the input data and the selection of
 a recorded run, compares the recorded run with the new one, and prints "no deviation above
 tolerance" or the deviating model points and the signature table. It writes everything
-into the new folder ``--output``. ``--engine-option path=export|modelx`` chooses the
-computation path the engine version names, export by default. The recorded run may come
+into the new folder ``--output``. For the reference model, ``--engine-option path=export|modelx``
+chooses the computation path the engine version names, export by default. The recorded run may come
 from another engine version; the new run uses the present engine on that path, and the output names both versions.
 The record of a target-only run is rejected with ``target_only_record``, and nothing runs.
 
@@ -112,7 +114,7 @@ each step, shows its commands as they run from that folder, with every path rela
 Enter (not with ``--no-pause``), and summarises the outcome from the files the step wrote. A
 command gets ``--repositories``, with the clone folder relative to the demo folder, only when the
 demo is given ``--repositories`` or ``DELTARECON_REPOSITORIES`` names a relative folder; otherwise
-each command finds the clone itself. The search uses the tolerance profile
+the reference model of each command finds the clone itself. The search uses the tolerance profile
 ``tolerance-bruttobeitrag.json``: the nearest ``profiles/tolerance-bruttobeitrag.json`` in the
 working directory or one of its parents, else the wheel's copy when installed, else ``profiles/`` of
 the checkout; the regression compares exactly.
@@ -142,14 +144,17 @@ another domain reference than the engine declares for its stage with ``domain_re
 and a record written before contract version 3.2, whose response names no domain reference, of a
 stage other than ``liability_cashflow`` with ``unsupported_stage``. ``compare`` takes the stage, the
 domain reference, and the quantities from the two responses and checks that they agree.
-``regression`` still reads the release from the clone of the reference model repository.
+``regression`` asks the engine for the input revision of the recorded release identity, then
+describes the release of ``--revision`` with its engine options and that input revision.
 
 ``compare`` takes its tolerance profile from the request. ``replay``, ``regression``,
 ``walk``, and ``search`` compare exactly unless ``--tolerance FILE`` names a tolerance profile: a JSON file in the
 form of the ``tolerance`` member of a compare request. There is no default profile.
 
 No command overwrites an existing file, and none writes into the clone or uses the network.
-The clone is read from ``delib-history`` in the folder ``--repositories DIR`` names, else in the
+``--repositories DIR`` names the folder that holds what the engine restores a release from; without
+it the engine looks the folder up itself (``Engine.repositories_folder``). The reference model reads
+the clone from ``delib-history`` in the folder ``--repositories DIR`` names, else in the
 folder the environment variable ``DELTARECON_REPOSITORIES`` names, else in the nearest folder
 ``repositories/`` that holds ``delib-history``, in the working directory or one of its parents, else
 in ``repositories/`` in the working directory, where a missing clone is reported. A relative folder is taken from the working
@@ -175,81 +180,28 @@ or the history of the clone is cut off.
 from __future__ import annotations
 
 import argparse
-import importlib
 import inspect
 import os
 import sys
 from pathlib import Path
 
+from . import quickstart
 from .documents import Rejection
 from .compare import CompareResult, compare
 from .derive import derive
+from .engine_selection import DEFAULT_ENGINE, ENGINE_PATH_VARIABLE, ENGINE_VARIABLE, engine_class
 from .search import TARGET_ONLY, search
 from .walk import walk
 from .regression import read_regression_input, regression
 from .replay import replay
-from .run import (REPOSITORIES_FOLDER, REPOSITORIES_VARIABLE, UsageError, repositories_folder, run_request,
-                  write_request)
+from .run import UsageError, run_request, write_request
 from .signature import render_coverage, render_model_points, render_table
 from .workers import WORKERS_VARIABLE, whole_number
 
 
-# The engine class a command loads: ``--engine <module>:<class>``, else this variable, else
-# the reference model. ``--engine-path`` names a folder that is put on the import path first;
-# the path variable does so only when no ``--engine`` is given (for the engine the engine
-# variable names, or the reference model), so ``--engine`` alone decides the engine. An empty variable counts as unset.
-ENGINE_VARIABLE = "DELTARECON_ENGINE"
-ENGINE_PATH_VARIABLE = "DELTARECON_ENGINE_PATH"
-DEFAULT_ENGINE = "degelmann.deltarecon.engines.reference_model:ReferenceModel"
-
 # The ``--engine`` and ``--engine-path`` of the command ``main`` runs, ``None`` where it is not
 # given; ``main`` sets them before it dispatches and resets them afterwards.
 selection: tuple[str | None, str | None] = (None, None)
-
-
-def engine_class(spec: str | None = None, path: str | None = None):
-    """The engine class a selection names, imported on use, so that parsing the command line
-    and a command without an engine load no engine module.
-
-    ``path``, else ``DELTARECON_ENGINE_PATH`` when ``spec`` is not given (the engine then comes
-    from ``DELTARECON_ENGINE`` or is the reference model), is put on the import path first.
-
-    Raises :class:`UsageError` when the folder is not a folder, the selection is not of the form
-    ``<module>:<class>`` with an absolute module name, the module is not found or its import raises
-    :class:`ImportError`, or the module has no such attribute or it is not a class.
-    """
-    if path is None and spec is None:  # without --engine: the path variable belongs to the engine variable or the default
-        path = os.environ.get(ENGINE_PATH_VARIABLE) or None
-    if path is not None:
-        folder = Path(path).resolve() if path else None
-        if folder is None or not folder.is_dir():
-            raise UsageError(f"the engine path {path!r} is not a folder")
-        if str(folder) in sys.path:
-            sys.path.remove(str(folder))
-        sys.path.insert(0, str(folder))
-        importlib.invalidate_caches()
-    if spec is None:
-        spec = os.environ.get(ENGINE_VARIABLE) or DEFAULT_ENGINE
-    module_name, colon, class_name = spec.partition(":")
-    if not colon or not module_name or not class_name or module_name.startswith("."):
-        raise UsageError(f"the engine {spec!r} is not of the form <module>:<class> with an absolute module name")
-    try:
-        module = importlib.import_module(module_name)
-    except ImportError as error:
-        raise UsageError(f"the engine {spec!r} cannot be loaded: the module {module_name!r} "
-                         f"cannot be imported ({error})") from None
-    try:
-        cls = getattr(module, class_name)
-    except AttributeError:
-        raise UsageError(f"the engine {spec!r} cannot be loaded: the module {module_name!r} "
-                         f"has no {class_name!r}") from None
-    if not isinstance(cls, type):
-        raise UsageError(f"the engine {spec!r} cannot be loaded: {class_name!r} of the module "
-                         f"{module_name!r} is not a class")
-    if getattr(cls, "_is_protocol", False) or inspect.isabstract(cls):
-        raise UsageError(f"the engine {spec!r} cannot be loaded: {class_name!r} is a protocol or an "
-                         "abstract class, which cannot be called")
-    return cls
 
 
 def engine(workers: int | None = None):
@@ -309,9 +261,9 @@ def engine_options(pairs) -> dict[str, str]:
 
 def command_request(args) -> int:
     options = engine_options(args.engine_option)
-    repositories = repositories_folder(args.repositories)
     # One worker: a request projects no point, so DELTARECON_WORKERS does not concern it.
     selected = engine(1)
+    repositories = selected.repositories_folder(args.repositories)
     try:  # the request names a release only if a run would accept it; nothing is written otherwise
         output = write_request(selected, Path(args.output), stage=args.stage, label=args.label,
                                revision=args.revision, options=options, run_id=args.run_id,
@@ -422,16 +374,13 @@ def command_compare(args) -> int:
 
 
 def command_regression(args) -> int:
-    from .engines import reference_model
-
     output = Path(args.output).resolve()
     if output.exists():
         raise UsageError(f"{output} exists already; a regression run overwrites no file")
-    # Read before anything is written; until regression reads the release through the protocol, the
-    # options are those of the reference model.
-    path = reference_model.path_option(engine_options(args.engine_option))
-    repositories = repositories_folder(args.repositories)
+    # A key given twice is refused before the engine loads; the engine checks keys and values in describe.
+    options = engine_options(args.engine_option)
     states = state_engine(args)
+    repositories = states.repositories_folder(args.repositories)
     try:
         recorded = read_regression_input(Path(args.run_record), states.stages)
     except Rejection as rejection:
@@ -439,17 +388,17 @@ def command_regression(args) -> int:
         print_diagnostic(rejection.diagnostic())
         return 1
     try:
-        # The newer commit is the state; the input data stays that of the recorded run. The
+        # The newer revision is the state; the input data stays that of the recorded run. The
         # recorded run may come from another engine version or path; the new run uses this
-        # engine on the path --engine-option path=... names.
-        _, input_revision = reference_model.recorded_identity(recorded.record["releases"][0])
-        revision = reference_model.resolve_revision(args.revision, repositories)
+        # engine with the engine options of the command line. Nothing is written.
+        input_revision = states.input_revision(recorded.record["releases"][0])
+        described = states.describe(recorded.request["stage"], args.label, args.revision, options,
+                                    repositories, input_revision)
     except Rejection as rejection:  # nothing is written
         print("regression: rejected")
         print_diagnostic(rejection.diagnostic())
         return 1
-    release = {"label": args.label,
-               "references": reference_model.release_references(revision, input_revision, path)}
+    release = {"label": args.label, "references": described["references"]}
     result = regression(recorded, release, output, states, repositories, args.tolerance)
     if result.comparison is None:
         print(f"regression: the run of the revision has the outcome {result.run.outcome}; nothing is compared")
@@ -597,9 +546,8 @@ def command_search(args) -> int:
 
 
 def command_quickstart(args) -> int:
-    from . import quickstart  # loaded on use, as the engine is
-
-    return quickstart.quickstart(args.lang or quickstart.system_language(), not args.no_pause, args.repositories)
+    return quickstart.quickstart(args.lang or quickstart.system_language(), not args.no_pause, args.repositories,
+                                 command=main)
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -637,9 +585,10 @@ def main(argv: list[str] | None = None) -> int:
 
     regress = commands.add_parser("regression", help="check a recorded run against a newer revision")
     regress.add_argument("run_record", help="the record of a succeeded full run without enabled changes")
-    regress.add_argument("--revision", required=True, metavar="COMMIT",
-                         help="the newer release: a commit of the clone, named by a full or abbreviated hash, "
-                              "a branch, a tag, or HEAD (no suffix such as HEAD~1)")
+    regress.add_argument("--revision", required=True, metavar="REVISION",
+                         help="the newer release, a name the engine reads; for the reference model a commit "
+                              "of the clone of its repository, named by a full or abbreviated hash, a branch, "
+                              "a tag, or HEAD (no suffix such as HEAD~1)")
     regress.add_argument("--output", required=True, help="the folder to write; it must not exist")
     regress.add_argument("--label", default="regression",
                          help="label of the release that is run (default: regression)")
@@ -715,10 +664,11 @@ def main(argv: list[str] | None = None) -> int:
 
     for command in (request, run, again, regress, history, stepper, halver, guided):
         command.add_argument("--repositories", metavar="DIR",
-                             help="folder that holds the clone of the reference model repository "
-                                  f"(default: the folder {REPOSITORIES_VARIABLE} names, else "
-                                  f"the nearest {REPOSITORIES_FOLDER}/ that holds the clone, in the working directory or "
-                                  "one of its parents)")
+                             help="folder that holds what the engine restores a release from; for the "
+                                  "reference model, the folder that holds the clone of the reference model "
+                                  "repository (default: the folder DELTARECON_REPOSITORIES names, else the nearest "
+                                  "repositories/ that holds the clone, in the working directory or one of its "
+                                  "parents)")
 
     args = parser.parse_args(argv)
     global selection

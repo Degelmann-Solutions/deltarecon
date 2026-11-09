@@ -1,5 +1,5 @@
-"""Contract versions: the tool writes 3.2 and reads 1.0, 2.0, 3.0, 3.1, and 3.2 (``contracts/v3/README.md``,
-"Version compatibility").
+"""Contract versions: the tool writes 3.3 and reads 1.0, 2.0, 3.0, 3.1, 3.2, and 3.3
+(``contracts/v3/README.md``, "Version compatibility").
 
 Genuine documents of an earlier version are written by the tool itself under
 :func:`conftest.written_under`, so their hashes agree. Each version row of the I/O matrices of the plans
@@ -7,8 +7,9 @@ of the stories "Fix the search contribution invariant and release the next contr
 "Open the next contract version and archive the oracle" (2.0) has a test here, and so has the row
 "Reading old documents" of the plan of the story "Refuse a target-only run record as the input of a
 comparison" (3.0), and the rows "3.1 record vs 3.2 run", "Old documents", and "Replay of a 3.1 error record"
-of the plan of the story "Contract 3.2: stages an engine declares" (3.1); the rows of the search are in
-``test_search.py``.
+of the plan of the story "Contract 3.2: stages an engine declares" (3.1), and the rows "Old documents",
+"3.2 error record", and "Unsupported version" of the plan of the story "Contract 3.3: the source of a
+history" (3.2); the rows of the search are in ``test_search.py``.
 """
 from __future__ import annotations
 
@@ -19,6 +20,7 @@ from degelmann.deltarecon.derive import derive
 from degelmann.deltarecon.documents import (CHANGES_SCHEMA, CONTRACT_VERSION, RECORD_SCHEMA, RUN_REQUEST, Rejection,
                                             check_version, document_bytes, read_document, schema_errors, validator)
 from degelmann.deltarecon.replay import read_recorded_run, replay
+from degelmann.deltarecon.run import WITHOUT_DOMAIN_REFERENCE
 from degelmann.deltarecon.search import search
 from degelmann.deltarecon.walk import walk
 
@@ -26,12 +28,12 @@ from conftest import (CANCEL, CASH, LINE, POINTS_B, StubEngine, StubSession, Wal
                       compare_request, folder_hashes, record, run_side, run_stub, stored, stub_regression,
                       stub_release, stub_request, written_under)
 
-# The earlier versions the tool reads; each is read against the schemas of its own pack, 3.0 and 3.1
-# against those of ``contracts/v3``, which also read 3.2.
-EARLIER = ["1.0", "2.0", "3.0", "3.1"]
+# The earlier versions the tool reads; each is read against the schemas of its own pack, 3.0, 3.1, and
+# 3.2 against those of ``contracts/v3``, which also read 3.3.
+EARLIER = ["1.0", "2.0", "3.0", "3.1", "3.2"]
 # The earlier versions whose pack has schemas of its own.
 EARLIER_PACKS = ["1.0", "2.0"]
-WRITTEN = "3.2"
+WRITTEN = "3.3"
 
 
 def versions(folder) -> set[str]:
@@ -46,18 +48,19 @@ def recorded_under(world, version: str, folder: str = "run"):
         result, _ = run_stub(world, stub_request(world, contract_version=version), folder=folder)
     assert result.outcome == "succeeded"
     assert versions(world / folder) == {version}
-    assert "domain_reference" not in stored(result.response_path)  # the member is written under 3.2 only
+    # The member is written from 3.2 on.
+    assert ("domain_reference" in stored(result.response_path)) == (version not in WITHOUT_DOMAIN_REFERENCE)
     return result
 
 
-def test_the_tool_writes_3_2_and_reads_1_0_2_0_3_0_3_1_and_3_2():
+def test_the_tool_writes_3_3_and_reads_1_0_2_0_3_0_3_1_3_2_and_3_3():
     assert CONTRACT_VERSION == WRITTEN
-    for version in ("1.0", "2.0", "3.0", "3.1", "3.2"):
+    for version in ("1.0", "2.0", "3.0", "3.1", "3.2", "3.3"):
         check_version({"contract_version": version})
     check_version({})  # a missing version is a schema fault, found by the schema
 
 
-@pytest.mark.parametrize("version", ["4.0", "3.3", "2.1", "1.1", "3", "1", 3.2, 3.1, 3.0, 1.0, ["3.2"],
+@pytest.mark.parametrize("version", ["4.0", "3.4", "2.1", "1.1", "3", "1", 3.3, 3.2, 3.1, 3.0, 1.0, ["3.3"],
                                      {"major": 3}])
 def test_another_version_is_rejected_before_the_schema(world, version):
     with pytest.raises(Rejection) as caught:
@@ -73,7 +76,7 @@ def test_a_record_of_another_version_is_rejected(world, version):
     result = recorded_under(world, version)
     path = result.record_path
     record = stored(path)
-    record["contract_version"] = "3.3" if version.startswith("3.") else version[0] + ".1"
+    record["contract_version"] = "3.4" if version.startswith("3.") else version[0] + ".1"
     path.write_bytes(document_bytes(record))
     with pytest.raises(Rejection) as caught:
         read_recorded_run(path, StubEngine().stages)
@@ -84,7 +87,7 @@ def test_a_record_of_another_version_is_rejected(world, version):
 
 
 @pytest.mark.parametrize("version", EARLIER)
-def test_an_earlier_run_request_is_accepted_and_answered_under_3_2(world, version):
+def test_an_earlier_run_request_is_accepted_and_answered_under_3_3(world, version):
     result, _ = run_stub(world, stub_request(world, contract_version=version))
     assert result.outcome == "succeeded"
     folder = world / "run"
@@ -97,11 +100,11 @@ def test_an_earlier_run_request_is_accepted_and_answered_under_3_2(world, versio
 @pytest.mark.parametrize("version", EARLIER_PACKS)
 def test_a_schema_fault_of_an_earlier_request_is_reported_against_its_own_schema(world, version):
     request = stub_request(world, contract_version=version, priority="high")
-    # The fault the reader names is that of the schema of its version; the 3.2 schema also refuses
+    # The fault the reader names is that of the schema of its version; the 3.3 schema also refuses
     # the version.
     under_own = sorted(e.message for e in validator(RUN_REQUEST, version).iter_errors(request))
-    under_3_2 = sorted(e.message for e in validator(RUN_REQUEST, WRITTEN).iter_errors(request))
-    assert len(under_own) == 1 and "priority" in under_own[0] and len(under_3_2) > len(under_own)
+    under_3_3 = sorted(e.message for e in validator(RUN_REQUEST, WRITTEN).iter_errors(request))
+    assert len(under_own) == 1 and "priority" in under_own[0] and len(under_3_3) > len(under_own)
     assert schema_errors(request, RUN_REQUEST) == [f"(document): {under_own[0]}"]
     result, _ = run_stub(world, request)
     assert result.outcome == "rejected"
@@ -111,10 +114,10 @@ def test_a_schema_fault_of_an_earlier_request_is_reported_against_its_own_schema
     assert result.response["contract_version"] == WRITTEN
 
 
-def test_the_3_0_3_1_and_3_2_documents_share_the_schemas_of_the_pack(world):
-    """A 3.0 document is read against the schemas of ``contracts/v3``, which accept 3.0, 3.1, and 3.2:
+def test_the_3_0_to_3_3_documents_share_the_schemas_of_the_pack(world):
+    """A 3.0 document is read against the schemas of ``contracts/v3``, which accept 3.0, 3.1, 3.2, and 3.3:
     its schema fault is its own, not the version."""
-    for version in ("3.0", "3.1", "3.2"):
+    for version in ("3.0", "3.1", "3.2", "3.3"):
         assert not schema_errors(stub_request(world, contract_version=version), RUN_REQUEST)
     request = stub_request(world, contract_version="3.0", priority="high")
     (fault,) = schema_errors(request, RUN_REQUEST)
@@ -126,7 +129,7 @@ def test_the_3_0_3_1_and_3_2_documents_share_the_schemas_of_the_pack(world):
 
 
 @pytest.mark.parametrize("version", EARLIER)
-def test_an_earlier_compare_request_is_accepted_and_answered_under_3_2(world, version):
+def test_an_earlier_compare_request_is_accepted_and_answered_under_3_3(world, version):
     run_side(world, "left")
     run_side(world, "right", points=POINTS_B)
     compared = compare(compare_request(world, contract_version=version))
@@ -199,7 +202,7 @@ def test_earlier_records_are_read_by_a_search_checked_against_their_walk(world, 
     assert read_document(world / "search" / "search.run-record.json", RECORD_SCHEMA)["contract_version"] == WRITTEN
 
 
-# --- replay: 2.0, 3.0, 3.1, and 3.2, not 1.0 -----------------------------------------------
+# --- replay: 2.0, 3.0, 3.1, 3.2, and 3.3, not 1.0 ------------------------------------------
 
 
 def test_the_replay_rejects_a_1_0_record_and_writes_nothing(world):
@@ -211,7 +214,7 @@ def test_the_replay_rejects_a_1_0_record_and_writes_nothing(world):
     assert folder_hashes(world / "run") == before
 
 
-@pytest.mark.parametrize("version", ["2.0", "3.0", "3.1"])
+@pytest.mark.parametrize("version", ["2.0", "3.0", "3.1", "3.2"])
 def test_the_replay_repeats_an_earlier_record(world, version):
     result = recorded_under(world, version)
     assert replay(result.record_path, StubEngine(), repositories=world).outcome == "reproduced_exactly"
@@ -219,7 +222,7 @@ def test_the_replay_repeats_an_earlier_record(world, version):
 
 
 @pytest.mark.parametrize("version", EARLIER)
-def test_the_replay_repeats_a_3_2_record_of_an_earlier_request(world, version):
+def test_the_replay_repeats_a_3_3_record_of_an_earlier_request(world, version):
     result, _ = run_stub(world, stub_request(world, contract_version=version))
     assert stored(result.record_path)["contract_version"] == WRITTEN
     assert replay(result.record_path, StubEngine(), repositories=world).outcome == "reproduced_exactly"
@@ -237,7 +240,7 @@ def recorded_error_under(world, version: str):
 @pytest.mark.parametrize("version", ["2.0", "3.0", "3.1"])
 def test_the_replay_reproduces_an_earlier_error_record_whose_response_differs_in_the_version_and_reference_only(
         world, version):
-    """The repeated response, written under 3.2, names the domain reference after the stage; without it and
+    """The repeated response, written under 3.3, names the domain reference after the stage; without it and
     with the recorded version, its members in their order, it is the recorded response byte for byte."""
     result = recorded_error_under(world, version)
     assert "domain_reference" not in stored(result.response_path)
@@ -251,14 +254,27 @@ def test_the_replay_reproduces_an_earlier_error_record_whose_response_differs_in
     assert document_bytes({**earlier, "contract_version": version}) == (world / "run" / "response.json").read_bytes()
 
 
-def test_the_replay_of_a_3_2_error_record_compares_the_bytes_as_they_are(world):
+def test_the_replay_of_a_3_2_error_record_whose_response_differs_in_the_version_only(world):
+    """A 3.2 response names the domain reference as a 3.3 one does: with the recorded version set, the repeated
+    response is the recorded one byte for byte."""
+    result = recorded_error_under(world, "3.2")
+    assert stored(result.response_path)["domain_reference"] == {"id": "liability_cashflow", "version": "3"}
+    done = replay(result.record_path, StubEngine(), repositories=world)
+    assert done.outcome == "reproduced_exactly"
+    repeated = stored(world / "run" / "replay" / "response.json")
+    assert repeated["contract_version"] == WRITTEN
+    assert (world / "run" / "replay" / "response.json").read_bytes() != result.response_path.read_bytes()
+    assert document_bytes({**repeated, "contract_version": "3.2"}) == result.response_path.read_bytes()
+
+
+def test_the_replay_of_a_3_3_error_record_compares_the_bytes_as_they_are(world):
     result = recorded_error_under(world, WRITTEN)
     assert stored(result.response_path)["domain_reference"] == {"id": "liability_cashflow", "version": "3"}
     assert replay(result.record_path, StubEngine(), repositories=world).outcome == "reproduced_exactly"
     assert (world / "run" / "replay" / "response.json").read_bytes() == result.response_path.read_bytes()
 
 
-@pytest.mark.parametrize("version", ["2.0", "3.0", "3.1"])
+@pytest.mark.parametrize("version", ["2.0", "3.0", "3.1", "3.2"])
 def test_the_replay_does_not_reproduce_an_earlier_error_record_whose_response_differs_otherwise(world, monkeypatch,
                                                                                                version):
     result = recorded_error_under(world, version)

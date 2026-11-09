@@ -128,30 +128,30 @@ Reader rules:
 
 ## Version compatibility
 
-The contract version is the string `3.2`: a major and a minor number.
+The contract version is the string `3.3`: a major and a minor number.
 
 - A minor version adds optional members, new diagnostic codes, or new registered
   names. It removes and redefines nothing.
 - A major version may change anything.
 - A reader accepts exactly the versions it implements. It rejects every other
   version with `unsupported_version` and does not guess. It checks the version
-  before it applies a schema. The schemas in this pack accept `3.0`, `3.1`, and
-  `3.2`, and they are closed: a member they do not name is an error.
+  before it applies a schema. The schemas in this pack accept `3.0`, `3.1`,
+  `3.2`, and `3.3`, and they are closed: a member they do not name is an error.
 - The path of this pack, `contracts/v3/`, names the major version. Version 1.0
   stays published unchanged under [`contracts/v1/`](../v1/README.md), and
   version 2.0 under [`contracts/v2/`](../v2/README.md).
 
-Reader rule for documents of versions 1.0, 2.0, 3.0, and 3.1:
+Reader rule for documents of versions 1.0, 2.0, 3.0, 3.1, and 3.2:
 
-- A reader of version 3.2 also reads documents of versions 1.0, 2.0, 3.0, and
-  3.1. It checks each document against the schemas of its own version: a 1.0
-  document against the schemas under [`../v1/schemas/`](../v1/schemas/), a 2.0
-  document against the schemas under [`../v2/schemas/`](../v2/schemas/), a 3.0,
-  3.1, or 3.2 document against the schemas of this pack. A schema fault in a
-  1.0 or 2.0 document is a fault against the schema of its version.
-- A run request and a compare request of version 1.0, 2.0, 3.0, or 3.1 are
-  accepted. Every document a 3.2 writer produces in answer, and every other
-  document it writes, carries `3.2`.
+- A reader of version 3.3 also reads documents of versions 1.0, 2.0, 3.0, 3.1,
+  and 3.2. It checks each document against the schemas of its own version: a
+  1.0 document against the schemas under [`../v1/schemas/`](../v1/schemas/), a
+  2.0 document against the schemas under [`../v2/schemas/`](../v2/schemas/), a
+  3.0, 3.1, 3.2, or 3.3 document against the schemas of this pack. A schema
+  fault in a 1.0 or 2.0 document is a fault against the schema of its version.
+- A run request and a compare request of version 1.0, 2.0, 3.0, 3.1, or 3.2
+  are accepted. Every document a 3.3 writer produces in answer, and every other
+  document it writes, carries `3.3`.
 - A run response of version 1.0, 2.0, 3.0, or 3.1 has no member
   `domain_reference`. A reader reads one of the stage `liability_cashflow` as
   naming `{ "id": "liability_cashflow", "version": "3" }`, the domain reference
@@ -159,18 +159,56 @@ Reader rule for documents of versions 1.0, 2.0, 3.0, and 3.1:
   1.0. One of any other stage names no domain reference: a comparison, a
   replay, a walk, a search, and a regression refuse it with
   `unsupported_stage`, before a state runs.
-- A run record of version 1.0, 2.0, 3.0, or 3.1, with the documents it lists,
-  serves as input to every procedure that reads recorded runs, except the
-  replay: a replay repeats only runs recorded under 2.0, 3.0, 3.1, or 3.2 and
-  rejects a 1.0 run record with `unsupported_version`. For a run recorded under
-  2.0, 3.0, or 3.1 with the outcome `error`, the recorded and the repeated
-  response may differ in `contract_version` and `domain_reference` only, see
+- A run record of version 1.0, 2.0, 3.0, 3.1, or 3.2, with the documents it
+  lists, serves as input to every procedure that reads recorded runs, except
+  the replay: a replay repeats only runs recorded under 2.0, 3.0, 3.1, 3.2, or
+  3.3 and rejects a 1.0 run record with `unsupported_version`. For a run
+  recorded with the outcome `error`, the recorded and the repeated response may
+  differ in these members only: under 2.0, 3.0, or 3.1 in `contract_version`
+  and `domain_reference`; under 3.2 in `contract_version` only; see
   [compare.md](compare.md#replay-criterion).
-- A walk folder written under 1.0, 2.0, 3.0, or 3.1 is a reference for a search
-  when it passes the reader rules of a walk folder, see
+- A walk folder written under 1.0, 2.0, 3.0, 3.1, or 3.2 is a reference for a
+  search when it passes the reader rules of a walk folder, see
   [localise.md](localise.md#reader-rules-of-a-walk-folder); its change
   manifests may differ from the manifest derived again in `contract_version`
   only.
+
+### Changes from 3.2
+
+Version 3.3 is a minor version. It opens the history source of the revision
+profile the way 3.2 opened the stage table:
+
+- `source`, in a realisation of the type `revision` and in the member `history`
+  of a derived manifest, is a lower-case identifier: a lower-case letter, then
+  lower-case letters, digits, and underscores, as a stage identifier. Under 3.2
+  it was `git` alone. See [changes.md](changes.md#revision-profile).
+- The pack defines `git`: its main line is the chain of first parents, and a
+  merged branch is one change. An engine that names another source defines that
+  source and the main line of its history, which a derived manifest follows,
+  see [changes.md](changes.md#derived-manifest). The pack keeps no list of
+  further sources.
+- `source` is a descriptive statement for a reader without the engine: it says
+  how the identifiers of `from`, `to`, and `revision` are read and which
+  main-line rule applied. Only the engine interprets it; the core checks only
+  that a manifest names one source throughout.
+- An engine realises revisions of its own source only. An enabled revision
+  whose `source` is not the engine's is a change the engine cannot realise: the
+  engine rejects the request with `unsupported_realisation` by rule 11 of
+  [changes.md](changes.md#combination-rules), and nothing runs. No diagnostic
+  code is added.
+- `common.schema.json`: `contract_version` is `3.0`, `3.1`, `3.2`, or `3.3`.
+  `changes.schema.json`: `history_source` is the lower-case-identifier pattern.
+  One pattern holds for every version 3 document: a 3.0, 3.1, or 3.2 document
+  that names another source than `git` is not refused by the schema, but a
+  writer of these versions writes only `git`. No other schema changes.
+
+Nothing else changes: no member is added, no diagnostic code is added, the
+compare result and the signature table are unchanged. A 3.3 reader reads every
+document written under 3.2 as before. The replay of a run recorded under 3.2 with the outcome `error`
+writes its repeated response under 3.3; the two responses may differ in
+`contract_version` only. The examples of this pack carry `3.0` and stay valid.
+A reader of 3.2 rejects a 3.3 document with `unsupported_version`, since a
+reader accepts exactly the versions it implements.
 
 ### Changes from 3.1
 
@@ -657,7 +695,7 @@ in [examples/index.json](examples/index.json) as `matrix_rows`.
 | `deviation-file` | A deviation file with a row that does not deviate by the tolerance rule (equal values or a difference within tolerance), a quantity the result does not declare, or a repeated coordinate | Reject with the diagnostic of the rule. | [compare.md](compare.md#deviation-file) |
 | `parameter-diff` | Parameter added, removed, or changed | One typed entry per parameter with the old and the new value. | [compare.md](compare.md#parameter-diff) |
 | `signature-table` | A compare result with the outcome `compared` | One row per stage and quantity that deviates, in quantity order, derived from the result and its deviation file alone. The same result and file give the same table; without deviation the table has no row. | [compare.md](compare.md#signature-table) |
-| `change-combination` | Enabled changes with an unmet prerequisite or a conflict; a set of revisions that is no prefix; a change of the type `revision` in a manifest without `history`; a held kind the engine cannot hold | Reject the combination, or the manifest with `schema_violation`. | [changes.md](changes.md#combination-rules), [changes.md](changes.md#revision-profile) |
+| `change-combination` | Enabled changes with an unmet prerequisite or a conflict; a set of revisions that is no prefix; a change of the type `revision` in a manifest without `history`; a held kind the engine cannot hold; an enabled revision whose source is not the engine's | Reject the combination, or the manifest with `schema_violation`; a revision of a foreign source with `unsupported_realisation`. | [changes.md](changes.md#combination-rules), [changes.md](changes.md#revision-profile) |
 | `walk` | Two recorded results of one selection whose revisions lie on one main line | Every state from the older to the newer revision runs; state 0 and state n are checked against the two results; per revision and quantity the walk result states whether it contributes, the signed and the absolute sum of the differences, and the signature row. A state that does not run is a finding and its revisions are carried by the next state that runs. The signed sums add up to the difference of state n and state 0. Different selections give `selection_mismatch`, references that do not fit the history `reference_mismatch`, the record of a target-only run `target_only_record`, and nothing runs. | [localise.md](localise.md#walk) |
 | `search` | Two recorded results as for a walk, a target of quantities and periods, and optionally a walk folder of the same two records | State 0 and state n run and are checked as the ends of a walk; the history is halved for the target, and only the states needed run. An interval whose ends agree on the target is not divided; an interval of one revision that differs is a contribution in the shape of a walk step; an interval that differs while neither half does gives `interval_not_resolved`. The result states the intervals judged, the contributions, and the runs of both arms with the runs saved; checked against a walk, it names the contributions it missed. A walk that does not attribute every revision gives `walk_not_attributed`, one that does not fit `walk_mismatch`, also one with a state whose request names a target, the record of a target-only run `target_only_record`, and nothing runs. Contributions that cancel within one interval are not seen. | [localise.md](localise.md#search) |
 | `derived-manifest` | Two results whose release identities name two revisions of one history | One change per revision on the main line after the older revision, in history order, each with the change before it as its only prerequisite; the references no revision fixes and that differ are named as the remainder. The same two results give the same manifest. Revisions that are not on one main line give `unrelated_revisions`, the record of a target-only run `target_only_record`, and no manifest. | [changes.md](changes.md#derived-manifest) |

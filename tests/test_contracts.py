@@ -234,7 +234,13 @@ MANIFEST_SHAPES = {
     "revision-with-a-further-member": (lambda: realised(derived_manifest(), note="x"), False),
     "revision-without-source": (lambda: realised(derived_manifest(), source=None), False),
     "revision-without-revision": (lambda: realised(derived_manifest(), revision=None), False),
-    "revision-of-another-source": (lambda: realised(derived_manifest(), source="tape"), False),
+    # Since 3.3 the source is a lower-case identifier: git, or a source an engine names.
+    "revision-of-another-source": (lambda: realised(derived_manifest(), source="tape"), True),
+    "revision-of-the-toy-source": (lambda: realised(derived_manifest(), source="toy_folders"), True),
+    "revision-source-capitalised": (lambda: realised(derived_manifest(), source="Tape"), False),
+    "revision-source-with-a-hyphen": (lambda: realised(derived_manifest(), source="toy-folders"), False),
+    "revision-source-empty": (lambda: realised(derived_manifest(), source=""), False),
+    "revision-source-with-a-leading-digit": (lambda: realised(derived_manifest(), source="1git"), False),
     "engine-declared-type": (
         lambda: first_change(authored_manifest(), realisation={"type": "engine_switch", "switch": "RC-1"}), True),
     # A derived manifest.
@@ -257,7 +263,12 @@ MANIFEST_SHAPES = {
     "history-without-remainder": (lambda: with_history(derived_manifest(), remainder=None), False),
     "history-without-from": (lambda: with_history(derived_manifest(), **{"from": None}), False),
     "history-with-a-further-member": (lambda: with_history(derived_manifest(), derived_at="2026-10-13"), False),
-    "history-of-another-source": (lambda: with_history(derived_manifest(), source="tape"), False),
+    "history-of-another-source": (lambda: with_history(derived_manifest(), source="tape"), True),
+    "history-of-the-toy-source": (lambda: with_history(derived_manifest(), source="toy_folders"), True),
+    "history-source-capitalised": (lambda: with_history(derived_manifest(), source="Tape"), False),
+    "history-source-with-a-hyphen": (lambda: with_history(derived_manifest(), source="toy-folders"), False),
+    "history-source-empty": (lambda: with_history(derived_manifest(), source=""), False),
+    "history-source-with-a-leading-digit": (lambda: with_history(derived_manifest(), source="1git"), False),
     "history-determines-a-kind-twice": (
         lambda: with_history(derived_manifest(), determines=["code_state", "code_state"]), False),
     "history-determines-nothing": (lambda: with_history(derived_manifest(), determines=[]), True),
@@ -540,7 +551,6 @@ def test_readme_states_the_changes_from_3_1():
                   "Rule 4 of [compare.md]", "same quantity names in the same order", "Rule 7 of [run.md]",
                   "is no longer rejected by a comparison", "carry no domain reference"):
         assert named in section, named
-    assert "The contract version is the string `3.2`" in readme
     # The stage table is open, the pair is reserved, and the domain text states its pair.
     assert "| any other identifier an engine declares | the domain reference the engine names for it |" in readme
     assert "The pair `liability_cashflow`, `3` is reserved" in readme
@@ -549,6 +559,23 @@ def test_readme_states_the_changes_from_3_1():
     compare_text = (PACK / "compare.md").read_text("utf-8")
     assert "4. Both responses declare the same quantity names in the same order." in compare_text
     assert "`incompatible` with\n   `domain_reference_mismatch`." in compare_text
+
+
+def test_readme_states_the_changes_from_3_2():
+    """Contract 3.3: the source rule, git and its main line, the engine's main line, nothing else."""
+    readme = (PACK / "README.md").read_text("utf-8")
+    assert readme.index("### Changes from 3.2") < readme.index("### Changes from 3.1")
+    section = readme.split("### Changes from 3.2")[1].split("### Changes from 3.1")[0]
+    for named in ("is a lower-case identifier", "The pack defines `git`", "the chain of first parents",
+                  "An engine that names another source defines that\n  source and the main line of its history",
+                  "descriptive statement", "`unsupported_realisation`", "No diagnostic\n  code is added",
+                  "Nothing else changes", "`contract_version` only"):
+        assert named in section, named
+    assert "The contract version is the string `3.3`" in readme
+    assert "an enabled revision whose source is not the engine's" in readme  # the matrix row change-combination
+    changes_text = (PACK / "changes.md").read_text("utf-8")
+    assert "The pack defines\n  `git`, whose main line is the chain of first parents" in changes_text
+    assert "A writer of 3.0, 3.1,\n  or 3.2 writes only `git`." in changes_text
 
 
 def test_the_examples_name_no_domain_reference():
@@ -697,12 +724,12 @@ def test_each_version_has_its_own_schemas():
         for other in versions:
             if other != version:
                 assert list(validator("run.schema.json", other).iter_errors(request)), (version, other)
-    # Versions 3.1 and 3.2 are minor versions of the pack of 3.0: its schemas read all three, the earlier
-    # packs none.
-    for minor in ("3.1", "3.2"):
+    # Versions 3.1, 3.2, and 3.3 are minor versions of the pack of 3.0: its schemas read all four, the
+    # earlier packs none.
+    for minor in ("3.1", "3.2", "3.3"):
         request = {**strict_json(ROOT / "contracts" / "v3" / "examples" / "reference" / "full-run.request.json"),
                    "contract_version": minor}
-        for reader in ("3.0", "3.1", "3.2"):
+        for reader in ("3.0", "3.1", "3.2", "3.3"):
             assert not list(validator("run.schema.json", reader).iter_errors(request)), (minor, reader)
         for other in ("1.0", "2.0"):
             assert list(validator("run.schema.json", other).iter_errors(request)), (minor, other)

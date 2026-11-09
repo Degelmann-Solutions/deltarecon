@@ -12,7 +12,7 @@ Schemas: [schemas/run.schema.json](schemas/run.schema.json) and
 ```json
 {
   "document": "run_request",
-  "contract_version": "3.2",
+  "contract_version": "3.3",
   "stage": "liability_cashflow",
   "run_id": "run-n-subset-changes",
   "release": { "label": "N", "references": [ { "kind": "engine_version", "value": "engine build 2026.09" } ] },
@@ -41,7 +41,7 @@ are is the engine's declaration in the response, see rule 7. A request with
 `target` asks for the target alone, see [Target-only run](#target-only-run).
 
 Schema assertions: all members above but `changes.hold` and `target` are
-present; `contract_version` is `3.0`, `3.1`, or `3.2`;
+present; `contract_version` is `3.0`, `3.1`, `3.2`, or `3.3`;
 the references are not empty; the enabled ids are distinct; the manifest is
 present when a change is enabled; `changes.hold`, when present, names at least
 one kind and no kind twice; `target`, when present, names at least one quantity
@@ -155,7 +155,7 @@ A response with the outcome `succeeded`:
 ```json
 {
   "document": "run_response",
-  "contract_version": "3.2",
+  "contract_version": "3.3",
   "stage": "liability_cashflow",
   "domain_reference": { "id": "liability_cashflow", "version": "3" },
   "run_id": "run-n-subset-changes",
@@ -266,7 +266,7 @@ If the engine cannot calculate a selected model point, the run has failed:
 ```json
 {
   "document": "run_response",
-  "contract_version": "3.2",
+  "contract_version": "3.3",
   "stage": "liability_cashflow",
   "domain_reference": { "id": "liability_cashflow", "version": "3" },
   "run_id": "run-failed-run",
@@ -296,7 +296,7 @@ request names, the run ends with the outcome `error`:
 ```json
 {
   "document": "run_response",
-  "contract_version": "3.2",
+  "contract_version": "3.3",
   "stage": "liability_cashflow",
   "domain_reference": { "id": "liability_cashflow", "version": "3" },
   "run_id": "run-n-full",
@@ -338,7 +338,7 @@ If the engine does not accept a request, it answers with the outcome `rejected`:
 ```json
 {
   "document": "run_response",
-  "contract_version": "3.2",
+  "contract_version": "3.3",
   "stage": "liability_cashflow",
   "domain_reference": { "id": "liability_cashflow", "version": "3" },
   "run_id": "run-unknown-model-point",
@@ -369,7 +369,7 @@ envelope for every deterministic procedure, not only for a stage run:
 ```json
 {
   "document": "run_record",
-  "contract_version": "3.2",
+  "contract_version": "3.3",
   "stage": "liability_cashflow",
   "record_id": "record-6f1c2d3e-4a5b-4c6d-8e7f-0a1b2c3d4e5f",
   "procedure": { "type": "run" },

@@ -29,8 +29,8 @@ no revision. The archived walk result is not compared, because it holds the
 hashes of the 2.0 responses and the revisions. The pinned hashes are never rewritten to make a test
 pass.
 
-The tool writes contract version 3.2; the oracle stays on 3.1 until entry 10 of the epic "Engine protocol
-without gaps" archives it and renews it under 3.2. Until then the reproduction writes under 3.1
+The tool writes contract version 3.3; the oracle stays on 3.1 until entry 10 of the epic "Engine protocol
+without gaps" archives it and renews it under 3.3. Until then the reproduction writes under 3.1
 (:func:`conftest.written_under`), the version the oracle was published in.
 """
 from __future__ import annotations
@@ -216,7 +216,7 @@ def test_reference_walk_reproduces_every_published_hash(monkeypatch, tmp_path):
     monkeypatch.chdir(ROOT)
     records = []
     walk = tmp_path / "oracle-walk"
-    with written_under(PUBLISHED_VERSION):  # the oracle stays on 3.1 until entry 10 renews it under 3.2
+    with written_under(PUBLISHED_VERSION):  # the oracle stays on 3.1 until entry 10 renews it under 3.3
         for name, (run_id, _, _) in sorted(REQUESTS.items()):
             request = tmp_path / run_id / "request.json"
             request.parent.mkdir()

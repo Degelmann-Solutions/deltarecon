@@ -10,7 +10,7 @@ from pathlib import Path
 import pytest
 
 from degelmann.deltarecon.__main__ import main
-from degelmann.deltarecon.run import CLONE_NAME, REPOSITORIES_VARIABLE, repositories_folder
+from degelmann.deltarecon.engines.reference_model import CLONE_NAME, REPOSITORIES_VARIABLE, repositories_folder
 
 from conftest import REPOSITORIES, START
 

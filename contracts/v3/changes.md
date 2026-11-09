@@ -13,7 +13,7 @@ A change manifest lists the changes that can be applied on top of one base relea
 ```json
 {
   "document": "change_manifest",
-  "contract_version": "3.2",
+  "contract_version": "3.3",
   "stage": "liability_cashflow",
   "manifest_id": "changes-n-to-n1",
   "base_release": "N",
@@ -194,9 +194,21 @@ state. The engine restores the state after that revision itself.
 { "type": "revision", "source": "git", "revision": "9f2c41d07b6e5a3c8d1f0e2b4a6c8e0f1a3b5c7d" }
 ```
 
-- `source` names the kind of history. Version 3 defines `git`.
+- `source` names the kind of history: a lower-case identifier (a lower-case
+  letter, then lower-case letters, digits, and underscores). The pack defines
+  `git`, whose main line is the chain of first parents, see
+  [Derived manifest](#derived-manifest). An engine that names another source
+  defines that source and the main line of its history. A writer of 3.0, 3.1,
+  or 3.2 writes only `git`.
+- `source` is a descriptive statement for a reader without the engine: it says
+  how the identifiers of `revision`, and of `from` and `to` in `history`, are
+  read and which main-line rule applied. Only the engine interprets it; the
+  core checks only that a manifest names one source throughout.
 - `revision` is the full identifier of the revision in that history. It is
   opaque to every reader but the engine.
+- An engine realises revisions of its own source only. An enabled revision
+  whose `source` is not the engine's is a change the engine cannot realise:
+  it rejects with `unsupported_realisation` by rule 11.
 - A change of this type stands only in a manifest with `history`, see
   [Derived manifest](#derived-manifest). There each change names the change
   before it as its only prerequisite, so by rule 8 a change of this type is
@@ -239,7 +251,7 @@ a record is refused with `target_only_record`, and no manifest is derived.
 ```json
 {
   "document": "change_manifest",
-  "contract_version": "3.2",
+  "contract_version": "3.3",
   "stage": "liability_cashflow",
   "manifest_id": "history-41ab…-9f2c…",
   "base_release": "N",
@@ -266,6 +278,7 @@ revision after `41ab…` up to `9f2c…`. `changes` is empty only when `from` an
 
 The changes:
 
+- The main line is that of the source of `history`.
 - The older revision must lie on the main line of the newer one. Otherwise the
   manifest cannot be derived and the reader reports `unrelated_revisions`. This
   also holds when the two revisions are given in the wrong order.
@@ -277,6 +290,8 @@ The changes:
   analysis cannot separate the revisions inside it. A revision that is an
   ancestor of the newer one only through a merged branch does not lie on its
   main line.
+- In a history of another source the engine that names it defines the main
+  line.
 - Each change names the change before it as its only prerequisite; the first
   names none. `conflicts` is empty. By rule 8 the enabled set of a run is then a
   prefix of the manifest.
@@ -307,7 +322,7 @@ The member `history`:
 
 | Member | Meaning |
 |---|---|
-| `source` | The kind of history, as in the revision profile. |
+| `source` | The kind of history, as in the revision profile: `git`, or a source the engine names and whose main line it defines. |
 | `from` | The identifier of the older revision. |
 | `to` | The identifier of the newer revision. |
 | `determines` | The kinds of release reference a revision fixes, ordered by name. The engine declares them. References of other kinds come from the caller and stay the same for every state. |

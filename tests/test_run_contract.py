@@ -24,8 +24,8 @@ import pytest
 
 from degelmann.deltarecon import changes as changes_contract
 from degelmann.deltarecon.__main__ import main
-from degelmann.deltarecon.documents import (CHANGES_SCHEMA, RECORD_SCHEMA, RUN_REQUEST, RUN_SCHEMA, Rejection,
-                                  document_bytes, read_document, schema_errors, sha256_file)
+from degelmann.deltarecon.documents import (CHANGES_SCHEMA, CONTRACT_VERSION, RECORD_SCHEMA, RUN_REQUEST, RUN_SCHEMA,
+                                  Rejection, document_bytes, read_document, schema_errors, sha256_file)
 from degelmann.deltarecon.export import (check_export, export_bytes, export_errors, format_number,
                                is_profile_number, read_export)
 from degelmann.deltarecon.compare import COMPARE_SCHEMA
@@ -43,7 +43,7 @@ from conftest import (CLONE, CLONE_NAME, EXACT, LAPSE_TABLE, MODEL_CODE, NEW_BUS
                       model_request, without_volatile, written_under)
 
 CORE_MODULES = ["errors", "documents", "export", "changes", "run", "compare", "signature", "replay", "regression",
-                "derive", "walk", "search", "workers", "__main__"]
+                "derive", "walk", "search", "workers", "engine_selection", "quickstart", "__main__"]
 POINTS_PLUS_E = POINTS + "MP-E,0,1,7\n"
 
 
@@ -63,7 +63,7 @@ def test_full_run_exports_every_model_point_and_writes_the_record(world):
         stored(folder / "request.json")
     for member in ("stage", "run_id", "release", "changes", "selection"):
         assert response[member] == request[member]
-    assert response["contract_version"] == record["contract_version"] == "3.2"
+    assert response["contract_version"] == record["contract_version"] == "3.3"
     assert response["time_basis"] == {"id": "policy_month"}
     assert response["model_points"] == [
         {"model_point_id": "MP-A", "first_period": 12, "last_period": 13},
@@ -157,7 +157,7 @@ def test_bad_request_is_rejected_with_the_response_alone(world, case, code):
     response = stored(folder / "response.json")
     assert not schema_errors(response, RUN_SCHEMA)
     assert [d["code"] for d in response["diagnostics"]] == [code]
-    assert response["contract_version"] == "3.2"
+    assert response["contract_version"] == "3.3"
     # Stage and run id are repeated where they can be read.
     readable = case not in {"not-json", "non-finite", "too-large", "not-an-object", "byte-order-mark",
                             "duplicate-member", "lone-surrogate"}
@@ -1029,7 +1029,7 @@ def test_replay_of_an_unchanged_run_is_reproduced_exactly(world, with_changes):
     record = stored(folder / "replay-record.json")
     assert not schema_errors(record, RECORD_SCHEMA)
     assert record["procedure"] == {"type": "replay"} and record["outcome"] == "reproduced_exactly"
-    assert record["stage"] == "liability_cashflow" and record["contract_version"] == "3.2"
+    assert record["stage"] == "liability_cashflow" and record["contract_version"] == "3.3"
     # Every execution has its own record id: the replay, the repeated run, and the recorded run.
     repeated = stored(folder / "replay" / "run-record.json")
     assert RECORD_ID.fullmatch(record["record_id"]) and RECORD_ID.fullmatch(repeated["record_id"])
@@ -2307,6 +2307,39 @@ def test_an_enabled_revision_the_clone_does_not_hold_ends_with_the_outcome_error
     assert record["parameters"] == [] and clone_state() == state
 
 
+def test_a_revision_of_a_foreign_history_source_is_rejected_by_the_reference_model(monkeypatch, tmp_path, capsys):
+    """Contract 3.3: the reference model realises revisions of ``git`` only. A manifest of the source
+    ``toy_folders`` is rejected with ``unsupported_realisation`` before the state is restored, naming every
+    enabled change of that source in manifest order; nothing runs."""
+    folder = tmp_path / "run"
+    folder.mkdir()
+    first, second = "t1", "t2"
+    manifest = {
+        "document": "change_manifest", "contract_version": "3.3", "stage": "liability_cashflow",
+        "manifest_id": f"history-t0-{second}", "base_release": "N",
+        "history": {"source": "toy_folders", "from": "t0", "to": second,
+                    "determines": ["code_state", "input_data", "parameter_set"], "remainder": []},
+        "changes": [{"id": revision, "class": ["parameter"], "description": f"The toy revision {revision}.",
+                     "prerequisites": prerequisites, "conflicts": [],
+                     "realisation": {"type": "revision", "source": "toy_folders", "revision": revision}}
+                    for revision, prerequisites in ((first, []), (second, [first]))]}
+    assert not schema_errors(manifest, CHANGES_SCHEMA)
+    (folder / "changes.json").write_bytes(document_bytes(manifest))
+    assert cli(monkeypatch, "request", "--revision", START, "--repositories", REPOSITORIES, "--label", "N",
+               "--run-id", "run-foreign", "--output", folder / "request.json", "--subset", NEW_BUSINESS,
+               "--enable", first, second, "--manifest", folder / "changes.json") == 0
+    state = clone_state()
+    assert cli(monkeypatch, "run", folder / "request.json", "--repositories", REPOSITORIES) == 1
+    assert "unsupported_realisation" in capsys.readouterr().out
+    response = stored(folder / "response.json")
+    (diagnostic,) = response["diagnostics"]
+    assert response["outcome"] == "rejected"
+    assert diagnostic["code"] == "unsupported_realisation" and diagnostic["change_ids"] == [first, second]
+    assert_documents_valid(folder)
+    assert not (folder / "results.csv").exists()
+    assert stored(folder / "run-record.json")["parameters"] == [] and clone_state() == state
+
+
 def test_changes_over_a_revision_and_replay_without_the_clone(monkeypatch, tmp_path, capsys):
     in_force = in_force_id()
     base_folder, folder = tmp_path / "base", tmp_path / "run"
@@ -2417,6 +2450,23 @@ def test_regression_command_without_a_clone_is_rejected_and_writes_nothing(
         else:
             assert f"The clone at {repositories / CLONE_NAME} cannot be read: NotGitRepository: " in printed.out
         assert printed.err == "" and not output.exists()
+    assert folder_hashes(recorded_subset) == before
+
+
+def test_regression_command_against_a_partial_clone_names_the_extension_and_writes_nothing(
+        monkeypatch, tmp_path, capsys, recorded_subset):
+    repositories, clone = throwaway(tmp_path)
+    git(clone, "config", "core.repositoryformatversion", "1")
+    git(clone, "config", "extensions.partialclone", "origin")
+    before = folder_hashes(recorded_subset)
+    capsys.readouterr()
+    output = tmp_path / "out"
+    assert regress(monkeypatch, recorded_subset, START, repositories, output) == 1
+    printed = capsys.readouterr()
+    assert printed.out.startswith("regression: rejected\ndiagnostic: unknown_reference: ")
+    assert "UnsupportedExtension: partialclone" in printed.out
+    assert "git clone" not in printed.out
+    assert printed.err == "" and not output.exists()
     assert folder_hashes(recorded_subset) == before
 
 
@@ -2605,11 +2655,12 @@ def test_full_changed_case_on_all_model_points_of_release_n(monkeypatch, tmp_pat
     # table is the one that main wrote before the deviations left the result (story 9).
     assert compared["deviations"]["path"] == "compare.deviations.csv"
     assert (out / "compare.result.json").stat().st_size < 64 * 1024
-    # Contract version 3.2: the 3.1 table b39e4206... with "contract_version": "3.2", byte for byte (a
-    # signature table carries no domain reference); that table was the 3.0 table 5ddfe219... with "3.1", that
-    # the 2.0 table 7ba6c115... with "3.0", and that the table of 1.0 (4fc28fbd...) with "2.0".
+    # Contract version 3.3: the 3.2 table b0cc7b29... with "contract_version": "3.3", byte for byte; that table
+    # was the 3.1 table b39e4206... with "3.2" (a signature table carries no domain reference), that the 3.0
+    # table 5ddfe219... with "3.1", that the 2.0 table 7ba6c115... with "3.0", and that the table of 1.0
+    # (4fc28fbd...) with "2.0".
     assert sha256_file(out / "signature-table.json") == \
-        "b0cc7b29166f3e405a4f4b332daa997c842a8d76f1fa61f3d913d6f16f3775e0"
+        "f09908c163c1aa2cc199fe68500a4ef64a282223feafe7290cc3445edc54f9bd"
     assert len(stored(recorded / "response.json")["model_points"]) == 350
     # Exactly the new business deviates: no in-force point lies in policy year 1.
     lines = text(POINT_TABLE).splitlines()
@@ -2701,23 +2752,30 @@ def test_the_path_option_is_no_longer_taken(monkeypatch, tmp_path, capsys):
     (("--engine-option", "path=export", "--engine-option", "path=modelx"), "the engine option 'path' is given twice"),
 ])
 def test_regression_command_refuses_an_option_the_engine_does_not_take(monkeypatch, tmp_path, capsys, options,
-                                                                       message):
+                                                                       message, recorded_subset):
+    # A valid record: the engine checks its options in describe, after the record is read.
+    before = folder_hashes(recorded_subset)
     out = tmp_path / "out"
-    assert cli(monkeypatch, "regression", tmp_path / "run-record.json", "--revision", START,
+    assert cli(monkeypatch, "regression", recorded_subset / "run-record.json", "--revision", START,
                "--repositories", REPOSITORIES, "--output", out, *options) == 2
     printed = capsys.readouterr()
     assert printed.out == "" and printed.err.startswith("error: ") and message in printed.err
-    assert not out.exists()
+    assert not out.exists() and folder_hashes(recorded_subset) == before
 
 
 def test_request_command_writes_the_bytes_of_the_baseline_on_the_path_modelx(monkeypatch, tmp_path):
     """The expected file was written by ``request --path modelx`` before the engine described the
-    release; its engine version is replaced by the present one, every other byte is compared."""
+    release; its engine version is replaced by the present one, and its contract version (3.2) by the one
+    the tool writes now, ``CONTRACT_VERSION``. Every other byte is compared."""
     from degelmann.deltarecon.engines.reference_model import engine_version
     expected = (ROOT / "tests" / "data" / "request-path-modelx.json").read_bytes()
     recorded = re.search(rb'"value": "(modelx [^"]*)"', expected).group(1)
     assert expected.count(recorded) == 1
     expected = expected.replace(recorded, engine_version("modelx").encode("utf-8"))
+    version = re.search(rb'\n  "contract_version": "([0-9.]+)",\n', expected).group(1)
+    assert expected.count(b'"contract_version": "' + version + b'"') == 1
+    expected = expected.replace(b'"contract_version": "' + version + b'"',
+                                b'"contract_version": "' + CONTRACT_VERSION.encode("utf-8") + b'"')
     output = tmp_path / "run" / "request.json"
     assert cli(monkeypatch, "request", "--revision", START, "--label", "N", "--run-id", "run-n-modelx",
                "--subset", "RLV-000001", "--repositories", REPOSITORIES, "--engine-option", "path=modelx",
@@ -2736,6 +2794,11 @@ def test_request_command_rejects_a_stage_the_engine_does_not_declare(monkeypatch
 def test_request_command_holds_no_reference_to_the_reference_model():
     from degelmann.deltarecon.__main__ import command_request
     assert "reference_model" not in inspect.getsource(command_request)
+
+
+def test_regression_command_holds_no_reference_to_the_reference_model():
+    from degelmann.deltarecon.__main__ import command_regression
+    assert "reference_model" not in inspect.getsource(command_regression)
 
 
 def test_the_reference_model_describes_a_release_with_the_input_data_as_given(monkeypatch):
