@@ -388,7 +388,8 @@ class StubEngine:
 
     The release folder is the revision of the stub: ``line`` is its main line. A change of
     the type ``revision`` names another folder; the state after it is that folder, with
-    ``points.csv`` of the release folder of the request when ``input_data`` is held.
+    ``points.csv`` of the release folder of the request when ``input_data`` is held. The input
+    revision a recorded identity holds is its ``input_data`` value, the hash of ``points.csv``.
     """
 
     # The names of StubSession, under the domain reference of the pack.
@@ -443,8 +444,8 @@ class StubEngine:
         return folder
 
     def describe(self, stage, label, revision, options, repositories, input_revision=None):
-        """The identity of the folder ``revision`` below ``repositories``, with ``points.csv`` of
-        the folder ``input_revision`` when it is given. The stub takes no option."""
+        """The identity of the folder ``revision`` below ``repositories``, with the ``input_data``
+        value ``input_revision`` when it is given, taken as given. The stub takes no option."""
         self.stages_received.append(("describe", stage))
         if options:
             raise UsageError(f"the stub engine takes no engine option {sorted(options)[0]!r}")
@@ -453,8 +454,15 @@ class StubEngine:
             raise Rejection("unknown_reference", f"There is no release folder {revision!r}.")
         moved = self.references(folder, revision)
         if input_revision is not None:
-            moved[1:] = self.references(Path(repositories) / input_revision, input_revision)[1:]
+            moved[1:] = [{"kind": "input_data", "value": input_revision}]
         return {"label": label, "references": moved}
+
+    def input_revision(self, release):
+        """The ``input_data`` value of a recorded identity; nothing is restored."""
+        values = [r["value"] for r in release["references"] if r["kind"] == "input_data"]
+        if len(values) != 1:
+            raise Rejection("unknown_reference", "The release identity holds no single input_data reference.")
+        return values[0]
 
     def resolve(self, stage, release, repositories):
         self.stages_received.append(("resolve", stage))

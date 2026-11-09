@@ -1032,6 +1032,10 @@ class ReferenceModel:
         commit = resolve_revision(revision, repositories)
         return {"label": label, "references": release_references(commit, input_revision, path)}
 
+    def input_revision(self, release: dict) -> str:
+        """The input-data revision of a recorded identity of any engine version, see :func:`recorded_identity`."""
+        return recorded_identity(release)[1]
+
     def resolve(self, stage: str, release: dict, repositories: Path) -> None:
         # One stage: the run admits only a stage of ``stages``, so ``stage`` selects nothing here.
         self._locate(release, repositories)

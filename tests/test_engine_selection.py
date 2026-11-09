@@ -335,6 +335,65 @@ def test_a_request_through_another_engine_loads_no_reference_model(world, tmp_pa
     assert not (world / "option").exists()
 
 
+# --- regression through the protocol ----------------------------------------------------------
+
+def test_a_regression_through_another_engine_loads_no_reference_model(world, tmp_path):
+    """In a fresh process, ``request``, ``run``, and ``regression --revision rel`` of each stage of the
+    stub with two stages: each regression finds no deviation, without modelx or the reference model."""
+    folder = tmp_path / "fresh-engines"
+    folder.mkdir()
+    (folder / f"{TWO_STAGES}.py").write_text(TWO_STAGES_MODULE, "utf-8")
+    script = textwrap.dedent(f"""\
+        import json, sys
+        sys.path.insert(0, {str(ROOT / "tests")!r})
+        from degelmann.deltarecon.__main__ import main
+        world = {str(world)!r}
+        engine = ["--repositories", world, "--engine", "{TWO_STAGES}:Engine", "--engine-path", {str(folder)!r}]
+        statuses = []
+        for stage in ("liability_cashflow", "other_stage"):
+            statuses.append([
+                main(["request", "--revision", "rel", "--label", "N", "--run-id", f"run-{{stage}}", "--stage", stage,
+                      "--output", f"{{world}}/{{stage}}/request.json", *engine]),
+                main(["run", f"{{world}}/{{stage}}/request.json", *engine]),
+                main(["regression", f"{{world}}/{{stage}}/run-record.json", "--revision", "rel",
+                      "--output", f"{{world}}/{{stage}}-regression", *engine])])
+        print(json.dumps([statuses, "modelx" in sys.modules, {REFERENCE_MODULE!r} in sys.modules]))
+        """)
+    done = subprocess.run([sys.executable, "-c", script], capture_output=True, text=True, cwd=ROOT, check=True)
+    assert json.loads(done.stdout.strip().splitlines()[-1]) == [[[0, 0, 0], [0, 0, 0]], False, False]
+    assert done.stdout.count("regression: no deviation above tolerance") == 2
+    for stage in ("liability_cashflow", "other_stage"):
+        regressed = stored(world / f"{stage}-regression" / "run" / "request.json")
+        assert regressed["stage"] == stage
+        assert regressed["release"]["label"] == "regression"
+        assert regressed["release"]["references"] == stored(world / stage / "request.json")["release"]["references"]
+
+
+def test_a_regression_with_an_engine_option_given_twice_is_refused_before_the_engine_loads(tmp_path, monkeypatch,
+                                                                                          capsys):
+    output = tmp_path / "out"
+    assert cli(monkeypatch, "regression", tmp_path / "run-record.json", "--revision", "rel", "--output", output,
+               "--engine", "no_such_module:Engine", "--engine-option", "a=1", "--engine-option", "a=2") == 2
+    printed = capsys.readouterr()
+    assert printed.err.startswith("error: ") and "given twice" in printed.err
+    assert "no_such_module" not in printed.err
+    assert not output.exists()
+
+
+def test_a_regression_of_a_revision_the_engine_does_not_hold_is_rejected(world, two_stages, monkeypatch,
+                                                                        capsys):
+    engine = ["--repositories", world, "--engine", f"{TWO_STAGES}:Engine", "--engine-path", two_stages]
+    assert cli(monkeypatch, "request", "--revision", "rel", "--label", "N", "--run-id", "run-x",
+               "--stage", "other_stage", "--output", world / "recorded" / "request.json", *engine) == 0
+    assert cli(monkeypatch, "run", world / "recorded" / "request.json", *engine) == 0
+    capsys.readouterr()
+    output = world / "nosuch-regression"
+    assert cli(monkeypatch, "regression", world / "recorded" / "run-record.json", "--revision", "nosuch",
+               "--output", output, *engine) == 1
+    assert capsys.readouterr().out.startswith("regression: rejected\ndiagnostic: unknown_reference: ")
+    assert not output.exists()
+
+
 # --- lazy loading ------------------------------------------------------------------------
 
 

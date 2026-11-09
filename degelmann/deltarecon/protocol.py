@@ -146,6 +146,8 @@ class Engine(Protocol):
 
     ``request`` writes the release identity :meth:`describe` gives for the revision and the engine
     options it is given, and checks it through :meth:`resolve` before anything is written.
+    ``regression`` describes its release with :meth:`describe`, given the input revision
+    :meth:`input_revision` reads from the release identity of the recorded run.
     """
 
     # Each stage the engine supports, with its declaration: the domain reference the engine names
@@ -189,6 +191,15 @@ class Engine(Protocol):
         Nothing is restored and nothing is written. Raises a :class:`UsageError` for an option
         the engine does not take, a key or a value, before it reads the revision, and a
         :class:`Rejection` with ``unknown_reference`` when ``revision`` names nothing.
+        """
+
+    def input_revision(self, release: dict) -> str:
+        """The identifier of the revision the recorded release identity ``release`` takes its input data from.
+
+        ``release`` is a recorded release identity of any engine version or computation path.
+        The result is the identifier in the form :meth:`describe` takes for ``input_revision``.
+        Nothing is restored and nothing is written. Raises a :class:`Rejection` with
+        ``unknown_reference`` when ``release`` names no state the engine can read.
         """
 
     def open(self, stage: str, release: dict, enabled: list[dict], manifest_dir: Path | None,

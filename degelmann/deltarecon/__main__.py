@@ -49,11 +49,12 @@ under 1.0 is rejected with ``unsupported_version``.
 when the release identities of both runs can be read. A request that is not readable as a
 compare request writes nothing.
 
-``regression`` runs the commit ``--revision`` names on the input data and the selection of
+``regression`` runs the revision ``--revision`` names, as the engine reads it (for the reference
+model a commit), on the input data and the selection of
 a recorded run, compares the recorded run with the new one, and prints "no deviation above
 tolerance" or the deviating model points and the signature table. It writes everything
-into the new folder ``--output``. ``--engine-option path=export|modelx`` chooses the
-computation path the engine version names, export by default. The recorded run may come
+into the new folder ``--output``. For the reference model, ``--engine-option path=export|modelx``
+chooses the computation path the engine version names, export by default. The recorded run may come
 from another engine version; the new run uses the present engine on that path, and the output names both versions.
 The record of a target-only run is rejected with ``target_only_record``, and nothing runs.
 
@@ -142,7 +143,8 @@ another domain reference than the engine declares for its stage with ``domain_re
 and a record written before contract version 3.2, whose response names no domain reference, of a
 stage other than ``liability_cashflow`` with ``unsupported_stage``. ``compare`` takes the stage, the
 domain reference, and the quantities from the two responses and checks that they agree.
-``regression`` still reads the release from the clone of the reference model repository.
+``regression`` asks the engine for the input revision of the recorded release identity, then
+describes the release of ``--revision`` with its engine options and that input revision.
 
 ``compare`` takes its tolerance profile from the request. ``replay``, ``regression``,
 ``walk``, and ``search`` compare exactly unless ``--tolerance FILE`` names a tolerance profile: a JSON file in the
@@ -422,14 +424,11 @@ def command_compare(args) -> int:
 
 
 def command_regression(args) -> int:
-    from .engines import reference_model
-
     output = Path(args.output).resolve()
     if output.exists():
         raise UsageError(f"{output} exists already; a regression run overwrites no file")
-    # Read before anything is written; until regression reads the release through the protocol, the
-    # options are those of the reference model.
-    path = reference_model.path_option(engine_options(args.engine_option))
+    # A key given twice is refused before the engine loads; the engine checks keys and values in describe.
+    options = engine_options(args.engine_option)
     repositories = repositories_folder(args.repositories)
     states = state_engine(args)
     try:
@@ -439,17 +438,17 @@ def command_regression(args) -> int:
         print_diagnostic(rejection.diagnostic())
         return 1
     try:
-        # The newer commit is the state; the input data stays that of the recorded run. The
+        # The newer revision is the state; the input data stays that of the recorded run. The
         # recorded run may come from another engine version or path; the new run uses this
-        # engine on the path --engine-option path=... names.
-        _, input_revision = reference_model.recorded_identity(recorded.record["releases"][0])
-        revision = reference_model.resolve_revision(args.revision, repositories)
+        # engine with the engine options of the command line. Nothing is written.
+        input_revision = states.input_revision(recorded.record["releases"][0])
+        described = states.describe(recorded.request["stage"], args.label, args.revision, options,
+                                    repositories, input_revision)
     except Rejection as rejection:  # nothing is written
         print("regression: rejected")
         print_diagnostic(rejection.diagnostic())
         return 1
-    release = {"label": args.label,
-               "references": reference_model.release_references(revision, input_revision, path)}
+    release = {"label": args.label, "references": described["references"]}
     result = regression(recorded, release, output, states, repositories, args.tolerance)
     if result.comparison is None:
         print(f"regression: the run of the revision has the outcome {result.run.outcome}; nothing is compared")
@@ -637,9 +636,10 @@ def main(argv: list[str] | None = None) -> int:
 
     regress = commands.add_parser("regression", help="check a recorded run against a newer revision")
     regress.add_argument("run_record", help="the record of a succeeded full run without enabled changes")
-    regress.add_argument("--revision", required=True, metavar="COMMIT",
-                         help="the newer release: a commit of the clone, named by a full or abbreviated hash, "
-                              "a branch, a tag, or HEAD (no suffix such as HEAD~1)")
+    regress.add_argument("--revision", required=True, metavar="REVISION",
+                         help="the newer release, a name the engine reads; for the reference model a commit "
+                              "of the clone of its repository, named by a full or abbreviated hash, a branch, "
+                              "a tag, or HEAD (no suffix such as HEAD~1)")
     regress.add_argument("--output", required=True, help="the folder to write; it must not exist")
     regress.add_argument("--label", default="regression",
                          help="label of the release that is run (default: regression)")

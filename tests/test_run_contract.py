@@ -2420,6 +2420,23 @@ def test_regression_command_without_a_clone_is_rejected_and_writes_nothing(
     assert folder_hashes(recorded_subset) == before
 
 
+def test_regression_command_against_a_partial_clone_names_the_extension_and_writes_nothing(
+        monkeypatch, tmp_path, capsys, recorded_subset):
+    repositories, clone = throwaway(tmp_path)
+    git(clone, "config", "core.repositoryformatversion", "1")
+    git(clone, "config", "extensions.partialclone", "origin")
+    before = folder_hashes(recorded_subset)
+    capsys.readouterr()
+    output = tmp_path / "out"
+    assert regress(monkeypatch, recorded_subset, START, repositories, output) == 1
+    printed = capsys.readouterr()
+    assert printed.out.startswith("regression: rejected\ndiagnostic: unknown_reference: ")
+    assert "UnsupportedExtension: partialclone" in printed.out
+    assert "git clone" not in printed.out
+    assert printed.err == "" and not output.exists()
+    assert folder_hashes(recorded_subset) == before
+
+
 def test_regression_against_a_commit_that_changes_no_model_file_shows_no_deviation(
         monkeypatch, tmp_path, capsys, recorded_subset):
     repositories, clone = throwaway(tmp_path)
@@ -2701,13 +2718,15 @@ def test_the_path_option_is_no_longer_taken(monkeypatch, tmp_path, capsys):
     (("--engine-option", "path=export", "--engine-option", "path=modelx"), "the engine option 'path' is given twice"),
 ])
 def test_regression_command_refuses_an_option_the_engine_does_not_take(monkeypatch, tmp_path, capsys, options,
-                                                                       message):
+                                                                       message, recorded_subset):
+    # A valid record: the engine checks its options in describe, after the record is read.
+    before = folder_hashes(recorded_subset)
     out = tmp_path / "out"
-    assert cli(monkeypatch, "regression", tmp_path / "run-record.json", "--revision", START,
+    assert cli(monkeypatch, "regression", recorded_subset / "run-record.json", "--revision", START,
                "--repositories", REPOSITORIES, "--output", out, *options) == 2
     printed = capsys.readouterr()
     assert printed.out == "" and printed.err.startswith("error: ") and message in printed.err
-    assert not out.exists()
+    assert not out.exists() and folder_hashes(recorded_subset) == before
 
 
 def test_request_command_writes_the_bytes_of_the_baseline_on_the_path_modelx(monkeypatch, tmp_path):
@@ -2736,6 +2755,11 @@ def test_request_command_rejects_a_stage_the_engine_does_not_declare(monkeypatch
 def test_request_command_holds_no_reference_to_the_reference_model():
     from degelmann.deltarecon.__main__ import command_request
     assert "reference_model" not in inspect.getsource(command_request)
+
+
+def test_regression_command_holds_no_reference_to_the_reference_model():
+    from degelmann.deltarecon.__main__ import command_regression
+    assert "reference_model" not in inspect.getsource(command_regression)
 
 
 def test_the_reference_model_describes_a_release_with_the_input_data_as_given(monkeypatch):
