@@ -176,6 +176,15 @@ def test_open_work_refuses_each_other_folder_form_with_the_prefix(work):
         helpers.open_work(work, NO_POWERSHELL)
 
 
+def test_step_line_reads_the_line_of_its_label_only():
+    pattern = helpers.step_line("toy engine: toy_claims")
+    found = pattern.fullmatch("build_package: toy engine: toy_claims: run-r5 exit 2 (expected 0) in 12.5 s")
+    assert found.groups() == ("run-r5", "2", "0", "12.5")
+    assert pattern.fullmatch("build_package: toy engine: toy_premium: run-r5 exit 0 (expected 0) in 1.0 s") is None
+    assert pattern.fullmatch("build_package: toy engine: toy_claims: step run-r5") is None
+    assert helpers.step_line("chain").fullmatch("build_package: chain: search exit 0 (expected 0) in 3 s")
+
+
 def test_lines_of_keeps_the_non_empty_lines_stripped():
     assert helpers.lines_of(" one \r\n\r\n  \ntwo\n") == ["one", "two"]
     assert helpers.lines_of("") == [] and helpers.lines_of(None) == []

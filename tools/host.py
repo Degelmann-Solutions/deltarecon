@@ -6,6 +6,8 @@ single-quoted literals (``literal``). A host work folder must be an absolute loc
 (``require_host_folder``); WSL paths, UNC paths, other drives and relative paths raise ``Refused`` of
 ``tools/common.py``. ``compare`` checks a search folder against the pin
 ``measurements/quick-start-search.SHA256SUMS`` with ``sha256sum -c``, run from WSL inside that folder.
+``stream`` runs a script with its output echoed as it comes and collected; ``step_line`` reads the
+line a host script prints for each step it ran.
 """
 from __future__ import annotations
 
@@ -13,6 +15,7 @@ import base64
 import re
 import shutil
 import subprocess
+import sys
 from pathlib import Path
 
 from tools.common import PIN, Refused
@@ -105,6 +108,28 @@ def step(name: str, command: str) -> str:
             f"if ($LASTEXITCODE -ne 0) {{ [Console]::Error.WriteLine("
             f"{literal('windows_host: the host step ' + name + ' failed with exit status ')} + $LASTEXITCODE); "
             f"exit 1 }}\n")
+
+
+def stream(argv: list[str], **options) -> subprocess.CompletedProcess:
+    """A runner for ``powershell``: every output line (stdout and stderr merged) is
+    echoed to this process as it comes and collected into ``stdout`` of the result."""
+    process = subprocess.Popen(argv, stdin=options.get("stdin"), stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+                               text=True, encoding="utf-8", errors="replace")
+    lines = []
+    for line in process.stdout:
+        sys.stdout.write(line)
+        sys.stdout.flush()
+        lines.append(line.rstrip("\r\n"))
+    process.stdout.close()
+    return subprocess.CompletedProcess(argv, process.wait(), stdout="\n".join(lines))
+
+
+def step_line(label: str) -> re.Pattern:
+    """The line ``build_package: <label>: <step> exit <code> (expected <expect>) in <seconds> s`` a
+    host script prints after each step: the groups are the step, the exit status, the expected one and
+    the seconds."""
+    return re.compile(rf"build_package: {re.escape(label)}: (\S+) exit (-?\d+) \(expected (-?\d+)\) "
+                      r"in ([0-9]+(?:\.[0-9]+)?) s")
 
 
 def lines_of(text: str | None) -> list[str]:

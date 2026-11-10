@@ -72,6 +72,7 @@ if __package__ in (None, ""):
     sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from tools import host  # noqa: E402
+from tools.host import stream  # noqa: E402
 from tools.common import REPOSITORIES_VARIABLE, ROOT, Refused, engine_version, git_text, sha256_file  # noqa: E402
 from tools.python_runtime import project  # noqa: E402
 from tools.quick_start_steps import RUNS, STATES, STEPS, expand, rewrite  # noqa: E402
@@ -85,7 +86,7 @@ DEFAULT_BASELINE = ROOT / "measurements" / "baseline.json"
 WINDOWS_PARENT = "C:\\tmp\\deltarecon-measure"
 WINDOWS_PEAK_COVERS = "nothing: memory is not measured on the Windows host"
 # The lines of the host chain script of tools/check_windows.py that carry the host's seconds.
-STEP_LINE = re.compile(r"build_package: chain: (\S+) exit (-?\d+) \(expected (-?\d+)\) in ([0-9]+(?:\.[0-9]+)?) s")
+STEP_LINE = host.step_line("chain")
 UNPACK_LINE = re.compile(r"build_package: host: unpacked in ([0-9]+(?:\.[0-9]+)?) s")
 # What the packaged Python prints on the host: the platform, then the processor count. No double
 # quote, which PowerShell 5.1 drops from a native argument.
@@ -174,20 +175,6 @@ def beside(value: str) -> dict:
     if not separator or not name or number is None or not math.isfinite(number) or number < 0:
         raise argparse.ArgumentTypeError(f"expected NAME=SECONDS with a non-negative number of seconds: {value!r}")
     return {"name": name, "seconds": number}
-
-
-def stream(argv: list[str], **options) -> subprocess.CompletedProcess:
-    """A runner for ``host.powershell``: every output line (stdout and stderr merged) is
-    echoed to this process as it comes and collected into ``stdout`` of the result."""
-    process = subprocess.Popen(argv, stdin=options.get("stdin"), stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
-                               text=True, encoding="utf-8", errors="replace")
-    lines = []
-    for line in process.stdout:
-        sys.stdout.write(line)
-        sys.stdout.flush()
-        lines.append(line.rstrip("\r\n"))
-    process.stdout.close()
-    return subprocess.CompletedProcess(argv, process.wait(), stdout="\n".join(lines))
 
 
 def host_seconds(text: str) -> tuple[dict[str, float], float | None]:

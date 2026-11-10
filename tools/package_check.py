@@ -1,13 +1,16 @@
 """The parts the check of a Linux and of a Windows archive share: the probe and lister scripts, the
 environment of the check (the caller's, with ``PATH`` an empty folder), the quick-start chain
 through the launcher, the comparison of the installed distributions with ``uv.lock``, the
-comparison of the guided demo with the pin, the search of the archive for traces of this machine,
-and the report of the five claims. Needs ``packaging`` of the development environment.
+comparison of the guided demo with the pin, the toy engine walkthrough (its Git-tracked files,
+the commands of a stage, the compare request, the check of the search result, and the fold of the
+exit statuses into the five ``toy engine`` claims), the search of the archive for traces of this
+machine, and the report of the ten claims. Needs ``packaging`` of the development environment.
 """
 from __future__ import annotations
 
 import json
 import os
+import shutil
 import subprocess
 import tarfile
 import zipfile
@@ -17,8 +20,11 @@ from packaging.requirements import Requirement
 from packaging.utils import canonicalize_name
 from packaging.version import Version
 
+from degelmann.deltarecon.compare import compare_request_document
+from degelmann.deltarecon.documents import artifact_reference, document_bytes
+
 from tools import host
-from tools.assembly import PROFILES, run
+from tools.assembly import PROFILES, run, tracked_files
 from tools.common import CLONE_NAME, ROOT, Failed
 from tools.targets import LAUNCHER
 
@@ -35,6 +41,24 @@ TRACES_CLAIM = "no build-machine traces"
 # The reflogs of a clone name the builder and the folder it was cloned from; a package holds none.
 REFLOGS = f"{CLONE_NAME}/.git/logs"
 ALTERNATES = f"{CLONE_NAME}/.git/objects/info/alternates"
+# The toy engine of ``examples/toy_engine``, run from the unpacked package without a rebuild.
+TOY_FOLDER = "examples/toy_engine"
+TOY_ENGINE = "toy_engine:ToyEngine"
+# The quantity each stage is searched on, and the revisions that change it between r1 and r5
+# (``TARGETS`` of ``tests/test_toy_engine.py``).
+TOY_STAGES = {"toy_premium": ("premium", frozenset({"r2", "r4"})),
+              "toy_claims": ("expected_claims", frozenset({"r2", "r4", "r5"}))}
+TOY_REVISIONS = ("r1", "r5")
+# The steps of one stage and the exit status of each (``STATUSES`` of ``tests/test_toy_engine.py``):
+# request and run of r1 and r5, a regression and a comparison that find deviations, and a search
+# whose two ends are reproduced.
+TOY_STEPS = ("request-r1", "run-r1", "request-r5", "run-r5", "regression", "compare", "search")
+TOY_STATUSES = (0, 0, 0, 0, 1, 1, 0)
+SEARCH_STATUS = TOY_STATUSES[TOY_STEPS.index("search")]
+# The steps that run after the compare request is written.
+TOY_LATER = ("compare", "search")
+TOY_COMMANDS = ("request", "run", "regression", "compare", "search")
+TOY_CLAIMS = {command: f"toy engine: {command}" for command in TOY_COMMANDS}
 
 
 def expected_packages(exported: str, markers: dict[str, str], version: str) -> list[tuple[str, str]]:
@@ -155,6 +179,127 @@ def chain_commands(package: Path | PureWindowsPath, runs: Path | PureWindowsPath
                      for argument in rewrite(step["argv"][3:], runs)]
         commands.append((name, [str(package / launcher), *arguments], step["expect"]))
     return commands
+
+
+def copy_toy_engine(destination: Path, root: Path = ROOT) -> list[str]:
+    """Copy the files of ``examples/toy_engine/`` that Git tracks in ``root`` to the same paths below
+    ``destination`` (``toy_engine.py``, ``DOMAIN.md``, ``history/``); ``__pycache__`` and other
+    untracked files stay behind. The paths copied, relative to ``destination``."""
+    copied = []
+    for name in tracked_files(TOY_FOLDER, root=root):
+        source = root / name
+        if not source.is_file():
+            raise Failed(f"the tracked file {name} is missing from {root}")
+        inside = PurePosixPath(name).relative_to(TOY_FOLDER)
+        target = destination / inside
+        target.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(source, target)
+        copied.append(inside.as_posix())
+    return copied
+
+
+def toy_command(step: str) -> str:
+    """The command of a toy step: ``request-r1`` is of ``request``."""
+    return step.split("-")[0]
+
+
+def toy_commands(package: Path | PureWindowsPath, folder: Path | PureWindowsPath, stage: str,
+                 engine_path: Path | PureWindowsPath, launcher: str = LAUNCHER) -> list[tuple[str, list[str], int]]:
+    """The steps of ``stage`` through the launcher named ``launcher``: name, command, expected exit
+    status. Each writes below ``folder``; the toy engine is loaded from ``engine_path`` and finds its
+    history beside its module, so no ``--repositories`` is given. ``compare`` loads no engine and reads
+    ``<folder>/compare.request.json``, which ``write_toy_compare_request`` writes before it. With
+    ``PureWindowsPath`` folders the paths are Windows paths."""
+    engine = ["--engine", TOY_ENGINE, "--engine-path", str(engine_path)]
+    arguments = {}
+    for revision in TOY_REVISIONS:
+        request = str(folder / revision / "request.json")
+        arguments[f"request-{revision}"] = ["request", "--revision", revision, "--stage", stage, "--label", revision,
+                                            "--run-id", f"run-{revision}", "--output", request, *engine]
+        arguments[f"run-{revision}"] = ["run", request, *engine]
+    arguments["regression"] = ["regression", str(folder / "r1" / "run-record.json"), "--revision", "r5",
+                               "--output", str(folder / "regression"), *engine]
+    arguments["compare"] = ["compare", str(folder / "compare.request.json")]
+    arguments["search"] = ["search", str(folder / "r1" / "run-record.json"), str(folder / "r5" / "run-record.json"),
+                           "--quantity", TOY_STAGES[stage][0], "--output", str(folder / "search"), *engine]
+    return [(step, [str(package / launcher), *arguments[step]], expect)
+            for step, expect in zip(TOY_STEPS, TOY_STATUSES, strict=True)]
+
+
+def write_toy_compare_request(folder: Path, stage: str) -> Path:
+    """Write ``<folder>/compare.request.json``, the comparison of the runs of r1 and r5 of ``stage``
+    (their responses and run records), as ``tests/test_toy_engine.py`` writes it."""
+    older, newer = ((artifact_reference(folder, folder / revision / "response.json"),
+                     artifact_reference(folder, folder / revision / "run-record.json")) for revision in TOY_REVISIONS)
+    path = folder / "compare.request.json"
+    path.write_bytes(document_bytes(compare_request_document(stage, f"compare-{stage}", older, newer,
+                                                             {"per_quantity": {}})))
+    return path
+
+
+def check_toy_search(folder: Path, stage: str) -> bool:
+    """Whether ``<folder>/search/search.result.json`` has both ends ``reproduced`` and finds exactly
+    the expected contributing revisions of ``stage``; each difference is printed."""
+    path = folder / "search" / "search.result.json"
+    try:
+        result = json.loads(path.read_text("utf-8"))
+        ends = {end: result["ends"][end]["outcome"] for end in ("zero", "n")}
+        contributing = {revision for entry in result["contributions"] for revision in entry["revisions"]
+                        if any(c["contributes"] for c in entry["contributions"])}
+    except (OSError, ValueError, KeyError, TypeError) as error:
+        print(f"build_package: toy engine: {stage}: the search result {path} cannot be read ({error})")
+        return False
+    expected = set(TOY_STAGES[stage][1])
+    holds = True
+    if set(ends.values()) != {"reproduced"}:
+        print(f"build_package: toy engine: {stage}: search ends {ends['zero']} and {ends['n']}, expected reproduced")
+        holds = False
+    if contributing != expected:
+        print(f"build_package: toy engine: {stage}: contributing revisions {', '.join(sorted(contributing)) or 'none'}, "
+              f"expected {', '.join(sorted(expected))}")
+        holds = False
+    print(f"build_package: toy engine: {stage}: search ends {ends['zero']} and {ends['n']}; contributing "
+          f"{', '.join(sorted(contributing)) or 'none'}")
+    return holds
+
+
+def toy_claims(codes: dict[str, dict[str, int]], searched: dict[str, bool]) -> dict[str, bool]:
+    """The five ``toy engine`` claims from the exit status of each step that ran, by stage and step
+    (a step missing was skipped), and whether the search result of each stage holds: a claim holds
+    when every step of its command, both stages, exited as expected (the search with its result)."""
+    holds: dict[str, bool] = dict.fromkeys(TOY_COMMANDS, True)
+    for stage in TOY_STAGES:
+        ran = codes.get(stage, {})
+        skipped = [step for step in TOY_STEPS if step not in ran]
+        if skipped:
+            print(f"build_package: toy engine: {stage}: skipped {', '.join(skipped)}")
+        for step, expect in zip(TOY_STEPS, TOY_STATUSES, strict=True):
+            if ran.get(step) != expect:
+                holds[toy_command(step)] = False
+        if not searched.get(stage, False):
+            holds["search"] = False
+    return {TOY_CLAIMS[command]: holds[command] for command in TOY_COMMANDS}
+
+
+def toy_walkthrough(stages: Path, commands_of, run_steps) -> dict[str, bool]:
+    """Run each toy stage and return the five claims. ``commands_of(stage)`` gives the steps of
+    ``toy_commands``; ``run_steps(stage, steps)`` runs them in order, stops at the first exit status
+    other than the expected one, and returns the exit status of each step that ran. The compare request
+    is written into ``stages/<stage>`` (a folder of this machine) after the earlier steps all hold;
+    otherwise the compare and the search are skipped."""
+    codes, searched = {}, {}
+    for stage in TOY_STAGES:
+        folder = stages / stage
+        commands = commands_of(stage)
+        earlier = [command for command in commands if command[0] not in TOY_LATER]
+        ran = dict(run_steps(stage, earlier))
+        if all(ran.get(step) == expect for step, _, expect in earlier):
+            write_toy_compare_request(folder, stage)
+            ran.update(run_steps(stage, [command for command in commands if command[0] in TOY_LATER]))
+        codes[stage] = ran
+        searched[stage] = ran.get("search") == SEARCH_STATUS and check_toy_search(folder, stage)
+    return toy_claims(codes, searched)
+
 
 def demo_folders(package: Path) -> set[Path]:
     """The folders ``runs/quickstart-*`` in ``package``."""

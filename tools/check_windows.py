@@ -7,7 +7,11 @@ sequence it shares with the Windows mode of ``tools/measure_quick_start.py``.
 user's environment stays), and runs the chosen quick-start steps through ``deltarecon.cmd``,
 printing each step with its exit status and the seconds of the host's stopwatch. ``check_windows`` then lists the installed distributions, imports a probe module
 from a user-named folder and runs the guided demo, each as a host script; the pin and the lock are
-compared from WSL. Needs ``packaging`` of the development environment.
+compared from WSL. Last it runs the toy engine walkthrough: the Git-tracked files of
+``examples/toy_engine/`` are copied from WSL to ``<work>\\toy-engine``, and each stage runs as two host
+scripts (``toy_host_script``), the request, run and regression steps, then, once WSL has written the
+compare request, the compare and the search; the exit status of each step is read from the lines the
+host prints. Needs ``packaging`` of the development environment.
 """
 from __future__ import annotations
 
@@ -21,7 +25,8 @@ from pathlib import Path, PureWindowsPath
 from tools import host
 from tools.common import engine_version
 from tools.package_check import (LIST_DISTRIBUTIONS, PROBE_IMPORT, PROBE_MODULE, PROBE_SOURCE, chain_commands,
-                                 compare_demo, compare_lock, demo_folders, distributions, locked_packages)
+                                 compare_demo, compare_lock, copy_toy_engine, demo_folders, distributions,
+                                 locked_packages, toy_commands, toy_walkthrough)
 from tools.quick_start_steps import STEPS, rewrite
 from tools.targets import PYTHON_FLAGS, TARGETS, WINDOWS_STARTER, WINDOWS_TARGET, package_name
 
@@ -30,7 +35,7 @@ LISTER_SCRIPT = "list_distributions.py"
 PROBE_SCRIPT = "probe_import.py"
 DEMO_SCRIPT = "demo.cmd"
 # The PowerShell expression of the seconds a ``$watch`` stopwatch has run, as ``0.0`` with a decimal
-# point; ``STEP_LINE`` and ``UNPACK_LINE`` of ``tools/measure_quick_start.py`` read it.
+# point; ``host.step_line`` and ``UNPACK_LINE`` of ``tools/measure_quick_start.py`` read it.
 WATCH_SECONDS = "$watch.Elapsed.TotalSeconds.ToString('0.0', [Globalization.CultureInfo]::InvariantCulture)"
 
 
@@ -44,6 +49,66 @@ def host_environment(work: str) -> str:
     as for the Linux check."""
     return (f"Set-Location -LiteralPath {host.literal(work)}\n"
             f"$env:PATH = {host.literal(work + '\\empty-path')}\n")
+
+
+def host_step_lines(label: str, step: str, command: list[str], expect: int) -> list[str]:
+    """The host lines of one step: announce it, run ``command`` on the host's stopwatch, print
+    ``build_package: <label>: <step> exit <code> (expected <expect>) in <seconds> s`` (``host.step_line``
+    reads it), and stop the script with exit status 1 when the exit status is not ``expect``."""
+    literal = host.literal
+    call = "& " + " ".join(literal(argument) for argument in command)
+    return [
+        _say(f"build_package: {label}: step {step}"),
+        "$watch = [System.Diagnostics.Stopwatch]::StartNew()\n",
+        f"{call}\n",
+        "$code = $LASTEXITCODE\n",
+        f"[Console]::Out.WriteLine({literal('build_package: ' + label + ': ' + step + ' exit ')} + $code + "
+        f"{literal(f' (expected {expect}) in ')} + {WATCH_SECONDS} + ' s')\n",
+        f"if ($code -ne {expect}) {{ [Console]::Error.WriteLine("
+        f"{literal('build_package: ' + label + ': step ' + step + ' exit ')} + $code + "
+        f"{literal(f', expected {expect}')}); exit 1 }}\n",
+    ]
+
+
+def toy_label(stage: str) -> str:
+    """The label of the step lines of a toy stage: ``toy engine: <stage>``."""
+    return f"toy engine: {stage}"
+
+
+def toy_host_script(work: str, stage: str, commands: list[tuple[str, list[str], int]]) -> str:
+    """A host script of the toy engine walkthrough: the environment of the chain (``host_environment``),
+    then each step of ``commands`` with the label ``toy_label(stage)``, stopping at the first exit
+    status other than the expected one."""
+    work = host.require_host_folder(work)
+    lines = [host_environment(work)]
+    for step, command, expect in commands:
+        lines += host_step_lines(toy_label(stage), step, command, expect)
+    return "".join(lines)
+
+
+def host_codes(text: str | None, label: str) -> dict[str, int]:
+    """The exit status of each step a host script with ``label`` printed in ``text``."""
+    pattern = host.step_line(label)
+    return {found.group(1): int(found.group(2)) for line in host.lines_of(text) if (found := pattern.fullmatch(line))}
+
+
+def check_toy_engine(work: str, package: PureWindowsPath, executable: str, runner=host.stream) -> dict[str, bool]:
+    """The toy engine walkthrough on the host: copy the Git-tracked toy files from WSL to
+    ``<work>\\toy-engine``, run each stage below ``<work>\\toy\\<stage>`` as two host scripts with the
+    output passing through, and return the five ``toy engine`` claims."""
+    host_work = PureWindowsPath(work)
+    engine = host_work / "toy-engine"
+    copied = copy_toy_engine(Path(host.wsl_path(str(engine))))
+    print(f"build_package: toy engine: {len(copied)} tracked files copied to {engine}", flush=True)
+    launcher = TARGETS[WINDOWS_TARGET]["launcher"][0]
+
+    def run_steps(stage: str, steps: list[tuple[str, list[str], int]]) -> dict[str, int]:
+        done = host.powershell(toy_host_script(work, stage, steps), runner=runner, executable=executable)
+        return host_codes(done.stdout, toy_label(stage))
+
+    return toy_walkthrough(Path(host.wsl_path(str(host_work / "toy"))),
+                           lambda stage: toy_commands(package, host_work / "toy" / stage, stage, engine, launcher),
+                           run_steps)
 
 
 def windows_chain_script(work: str, archive: str, name: str, commands: list[tuple[str, list[str], int]]) -> str:
@@ -74,18 +139,7 @@ def windows_chain_script(work: str, archive: str, name: str, commands: list[tupl
         _say(f"build_package: chain: PATH={work}\\empty-path, no uv, no git, cwd={work}"),
     ]
     for step, command, expect in commands:
-        call = "& " + " ".join(literal(argument) for argument in command)
-        lines += [
-            _say(f"build_package: chain: step {step}"),
-            "$watch = [System.Diagnostics.Stopwatch]::StartNew()\n",
-            f"{call}\n",
-            "$code = $LASTEXITCODE\n",
-            f"[Console]::Out.WriteLine({literal('build_package: chain: ' + step + ' exit ')} + $code + "
-            f"{literal(f' (expected {expect}) in ')} + {WATCH_SECONDS} + ' s')\n",
-            f"if ($code -ne {expect}) {{ [Console]::Error.WriteLine("
-            f"{literal('build_package: step ' + step + ' exit ')} + $code + {literal(f', expected {expect}')}); "
-            f"exit 1 }}\n",
-        ]
+        lines += host_step_lines("chain", step, command, expect)
     return "".join(lines)
 
 
@@ -214,10 +268,13 @@ def check_windows(archive: Path, work: str | None, version: str) -> dict[str, bo
     ran = host.powershell(windows_demo_host_script(work, demo), executable=executable)
     guided = compare_demo(ran.returncode, before, demo_folders(package_wsl))
 
+    toy = check_toy_engine(work, package, executable)
+
     print(f"build_package: the work folder {work} is left on the host")
     return {
         "chain and pin": chain and code == 0,
         "installed packages equal uv.lock": lock,
         "import from a user-named folder": inside,
         "guided demo and pin": guided,
+        **toy,
     }

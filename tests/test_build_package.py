@@ -8,6 +8,7 @@ injected fetcher; the only commands started are ``/bin/sh`` and local ``git``. N
 """
 from __future__ import annotations
 
+import base64
 import hashlib
 import io
 import json
@@ -842,15 +843,285 @@ def test_a_trace_fails_the_check_and_the_other_claims_still_run(tmp_path, monkey
     def check_linux(archive, work, target, version):
         ran.append(archive)
         return {"chain and pin": True, "installed packages equal uv.lock": True,
-                "import from a user-named folder": True, "guided demo and pin": True}
+                "import from a user-named folder": True, "guided demo and pin": True,
+                **dict.fromkeys(TOY_CLAIM_NAMES, True)}
 
     monkeypatch.setattr(tool, "check_linux", check_linux)
     assert tool.main(["check", str(archive)]) == 1
     out = capsys.readouterr().out
     assert ran == [archive]
     assert "build_package: chain and pin: OK" in out and "build_package: guided demo and pin: OK" in out
+    assert "build_package: toy engine: search: OK" in out
+    assert len([line for line in out.splitlines() if line.endswith((": OK", ": FAILED"))]) == 10
     assert "build_package: traces: deltarecon-0.1.2-x/delib-history/.git/logs/HEAD: the reflogs" in out
     assert out.rstrip().endswith("build_package: no build-machine traces: FAILED")
     (tmp_path / "clean").mkdir()
     clean = write_archive(tmp_path / "clean" / archive.name, CLEAN_MEMBERS)
     assert tool.main(["check", str(clean)]) == 0
+
+
+# The toy engine walkthrough of the package check.
+
+def test_the_toy_table_is_that_of_the_toy_engine_test():
+    from test_toy_engine import ENGINE, STATUSES, TARGETS
+
+    assert package_check.TOY_STAGES == TARGETS
+    assert list(package_check.TOY_STATUSES) == STATUSES
+    assert ENGINE[:2] == ["--engine", package_check.TOY_ENGINE] and ENGINE[3] == package_check.TOY_FOLDER
+
+
+def test_the_toy_commands_of_a_stage_run_the_launcher(tmp_path):
+    package, folder, engine = tmp_path / "package", tmp_path / "toy" / "toy_claims", tmp_path / "toy-engine"
+    commands = package_check.toy_commands(package, folder, "toy_claims", engine)
+    assert [(step, expect) for step, _, expect in commands] == list(zip(package_check.TOY_STEPS,
+                                                                         package_check.TOY_STATUSES))
+    by_step = {step: command for step, command, _ in commands}
+    assert all(command[0] == str(package / "deltarecon") for command in by_step.values())
+    toy = ["--engine", "toy_engine:ToyEngine", "--engine-path", str(engine)]
+    assert by_step["request-r1"][1:] == ["request", "--revision", "r1", "--stage", "toy_claims", "--label", "r1",
+                                         "--run-id", "run-r1", "--output", str(folder / "r1" / "request.json"), *toy]
+    assert by_step["run-r5"][1:] == ["run", str(folder / "r5" / "request.json"), *toy]
+    assert by_step["regression"][1:] == ["regression", str(folder / "r1" / "run-record.json"), "--revision", "r5",
+                                         "--output", str(folder / "regression"), *toy]
+    # compare loads no engine; no command names --repositories.
+    assert by_step["compare"][1:] == ["compare", str(folder / "compare.request.json")]
+    assert by_step["search"][1:] == ["search", str(folder / "r1" / "run-record.json"),
+                                     str(folder / "r5" / "run-record.json"), "--quantity", "expected_claims",
+                                     "--output", str(folder / "search"), *toy]
+    assert not any("--repositories" in command for command in by_step.values())
+
+
+def test_the_toy_commands_on_windows_paths():
+    work = PureWindowsPath("C:\\tmp\\check")
+    package = work / "package" / "deltarecon-0.1.0-x86_64-pc-windows-msvc"
+    commands = package_check.toy_commands(package, work / "toy" / "toy_premium", "toy_premium", work / "toy-engine",
+                                          "deltarecon.cmd")
+    by_step = {step: command for step, command, _ in commands}
+    for command in by_step.values():
+        assert command[0] == f"{package}\\deltarecon.cmd"
+        assert not any("/" in argument for argument in command if argument.startswith("C:"))
+    assert by_step["request-r1"][-1] == "C:\\tmp\\check\\toy-engine"
+    assert by_step["compare"][-1] == "C:\\tmp\\check\\toy\\toy_premium\\compare.request.json"
+    assert by_step["search"][by_step["search"].index("--quantity") + 1] == "premium"
+
+
+def test_only_tracked_toy_files_are_copied(tmp_path):
+    checkout = tmp_path / "checkout"
+    toy = checkout / "examples" / "toy_engine"
+    (toy / "history" / "r1").mkdir(parents=True)
+    git(checkout, "init", "--quiet")
+    (toy / "toy_engine.py").write_text("", "utf-8")
+    (toy / "history" / "r1" / "rules.json").write_text("{}", "utf-8")
+    git(checkout, "add", ".")
+    (toy / "__pycache__").mkdir()
+    (toy / "__pycache__" / "toy_engine.cpython-313.pyc").write_bytes(b"x")  # untracked
+    destination = tmp_path / "work" / "toy-engine"
+    assert package_check.copy_toy_engine(destination, root=checkout) == ["history/r1/rules.json", "toy_engine.py"]
+    assert sorted(p.relative_to(destination).as_posix() for p in destination.rglob("*") if p.is_file()) == [
+        "history/r1/rules.json", "toy_engine.py"]
+
+
+def test_the_toy_engine_of_this_checkout_is_copied_without_pycache(tmp_path):
+    copied = package_check.copy_toy_engine(tmp_path / "toy-engine")
+    assert "toy_engine.py" in copied and "history/log.json" in copied
+    assert not any("__pycache__" in name for name in copied)
+
+
+ALL_RAN = dict(zip(package_check.TOY_STEPS, package_check.TOY_STATUSES))
+TOY_CLAIM_NAMES = ["toy engine: request", "toy engine: run", "toy engine: regression", "toy engine: compare",
+                   "toy engine: search"]
+
+
+def test_the_toy_claims_hold_when_every_step_exits_as_expected():
+    codes = {stage: dict(ALL_RAN) for stage in package_check.TOY_STAGES}
+    claims = package_check.toy_claims(codes, dict.fromkeys(package_check.TOY_STAGES, True))
+    assert list(claims) == TOY_CLAIM_NAMES and all(claims.values())
+
+
+def test_a_failing_toy_step_fails_its_claim_and_those_of_the_skipped_steps(capsys):
+    failed = {"request-r1": 0, "run-r1": 2}
+    codes = {"toy_premium": dict(ALL_RAN), "toy_claims": failed}
+    claims = package_check.toy_claims(codes, {"toy_premium": True, "toy_claims": False})
+    assert claims == {"toy engine: request": False, "toy engine: run": False, "toy engine: regression": False,
+                      "toy engine: compare": False, "toy engine: search": False}
+    assert ("build_package: toy engine: toy_claims: skipped request-r5, run-r5, regression, compare, search"
+            in capsys.readouterr().out)
+    # A failing compare alone fails the compare claim and, skipped after it, the search.
+    codes = {"toy_premium": dict(ALL_RAN), "toy_claims": {**ALL_RAN, "compare": 2}}
+    del codes["toy_claims"]["search"]
+    claims = package_check.toy_claims(codes, {"toy_premium": True, "toy_claims": False})
+    assert [name for name, holds in claims.items() if not holds] == ["toy engine: compare", "toy engine: search"]
+    # A search that exits 0 but whose result does not hold fails the search claim alone.
+    codes = {stage: dict(ALL_RAN) for stage in package_check.TOY_STAGES}
+    claims = package_check.toy_claims(codes, {"toy_premium": True, "toy_claims": False})
+    assert [name for name, holds in claims.items() if not holds] == ["toy engine: search"]
+
+
+def search_result(folder: Path, ends=("reproduced", "reproduced"), revisions=("r2", "r4")) -> None:
+    (folder / "search").mkdir(parents=True)
+    result = {"ends": {"zero": {"outcome": ends[0]}, "n": {"outcome": ends[1]}},
+              "contributions": [{"revisions": [revision], "contributions": [{"contributes": revision in revisions}]}
+                                for revision in ("r2", "r3", "r4", "r5")]}
+    (folder / "search" / "search.result.json").write_text(json.dumps(result), "utf-8")
+
+
+@pytest.mark.parametrize("case, ends, revisions, holds, printed", [
+    ("good", ("reproduced", "reproduced"), ("r2", "r4"), True, "contributing r2, r4"),
+    ("end", ("reproduced", "not_reproduced"), ("r2", "r4"), False, "search ends reproduced and not_reproduced, "
+                                                                   "expected reproduced"),
+    ("revisions", ("reproduced", "reproduced"), ("r2", "r4", "r5"), False,
+     "contributing revisions r2, r4, r5, expected r2, r4"),
+])
+def test_the_toy_search_result_is_checked(tmp_path, capsys, case, ends, revisions, holds, printed):
+    search_result(tmp_path, ends, revisions)
+    assert package_check.check_toy_search(tmp_path, "toy_premium") is holds
+    assert printed in capsys.readouterr().out
+
+
+def test_a_missing_toy_search_result_does_not_hold(tmp_path, capsys):
+    assert package_check.check_toy_search(tmp_path, "toy_claims") is False
+    assert "cannot be read" in capsys.readouterr().out
+
+
+def test_the_toy_compare_request_names_both_runs(tmp_path):
+    for revision in ("r1", "r5"):
+        (tmp_path / revision).mkdir()
+        for name in ("response.json", "run-record.json"):
+            (tmp_path / revision / name).write_text(f"{revision} {name}", "utf-8")
+    request = json.loads(package_check.write_toy_compare_request(tmp_path, "toy_claims").read_text("utf-8"))
+    assert request["document"] == "compare_request" and request["stage"] == "toy_claims"
+    assert request["compare_id"] == "compare-toy_claims" and request["tolerance"] == {"per_quantity": {}}
+    assert request["left"]["response"] == {"path": "r1/response.json",
+                                           "sha256": common.sha256_file(tmp_path / "r1" / "response.json")}
+    assert request["right"]["run_record"]["path"] == "r5/run-record.json"
+
+
+def test_the_toy_walkthrough_skips_the_compare_after_a_failed_step(tmp_path):
+    ran = []
+
+    def run_steps(stage, steps):
+        ran.append((stage, [step for step, _, _ in steps]))
+        return {"request-r1": 0, "run-r1": 2} if stage == "toy_premium" else dict(
+            (step, expect) for step, _, expect in steps)
+
+    def commands_of(stage):
+        return package_check.toy_commands(tmp_path / "package", tmp_path / "toy" / stage, stage, tmp_path / "engine")
+
+    for revision in ("r1", "r5"):
+        (tmp_path / "toy" / "toy_claims" / revision).mkdir(parents=True)
+        for name in ("response.json", "run-record.json"):
+            (tmp_path / "toy" / "toy_claims" / revision / name).write_text("{}", "utf-8")
+    search_result(tmp_path / "toy" / "toy_claims", revisions=("r2", "r4", "r5"))
+    claims = package_check.toy_walkthrough(tmp_path / "toy", commands_of, run_steps)
+    earlier = ["request-r1", "run-r1", "request-r5", "run-r5", "regression"]
+    assert ran == [("toy_premium", earlier), ("toy_claims", earlier), ("toy_claims", ["compare", "search"])]
+    assert not (tmp_path / "toy" / "toy_premium" / "compare.request.json").exists()
+    assert (tmp_path / "toy" / "toy_claims" / "compare.request.json").is_file()
+    assert not any(claims.values())
+
+
+# A launcher that runs the DeltaRecon of this checkout's environment, for the toy walkthrough of the
+# Linux check; ``FAIL_STEP`` makes it exit 2 for one command.
+DEV_LAUNCHER = """#!/bin/sh
+if [ "$1" = "{fail}" ]; then exit 2; fi
+exec "{python}" -m degelmann.deltarecon "$@"
+"""
+
+
+@pytest.mark.parametrize("fail", ["", "regression"], ids=["all good", "regression exits 2"])
+def test_the_linux_toy_walkthrough_runs_both_stages(tmp_path, capsys, monkeypatch, fail):
+    # The caller's engine variables reach the commands and must not decide the engine.
+    monkeypatch.setenv("DELTARECON_ENGINE", "no_such_module:NoEngine")
+    monkeypatch.setenv("DELTARECON_ENGINE_PATH", str(tmp_path / "no-such-folder"))
+    package, work, empty = tmp_path / "package", tmp_path / "work", tmp_path / "empty"
+    for folder in (package, work, empty):
+        folder.mkdir()
+    launcher = package / targets.LAUNCHER
+    launcher.write_text(DEV_LAUNCHER.format(fail=fail, python=sys.executable), "utf-8")
+    launcher.chmod(0o755)
+    claims = check_linux.check_toy_engine(package, work, empty)
+    captured = capsys.readouterr()
+    assert list(claims) == TOY_CLAIM_NAMES
+    tracked = assembly.tracked_files(package_check.TOY_FOLDER)
+    assert sorted(f"{package_check.TOY_FOLDER}/{p.relative_to(work / 'toy-engine').as_posix()}"
+                  for p in (work / "toy-engine").rglob("*") if p.is_file() and "__pycache__" not in p.parts) == tracked
+    if not fail:
+        assert all(claims.values()), captured.out + captured.err
+        assert "build_package: toy engine: toy_claims: search ends reproduced and reproduced; contributing r2, r4, r5" \
+            in captured.out
+        assert sorted(p.name for p in (work / "logs").iterdir()) == sorted(
+            f"toy-{stage}-{step}.log" for stage in package_check.TOY_STAGES for step in package_check.TOY_STEPS)
+    else:
+        assert claims == {"toy engine: request": True, "toy engine: run": True, "toy engine: regression": False,
+                          "toy engine: compare": False, "toy engine: search": False}
+        assert f"the step regression failed; log: {work / 'logs' / 'toy-toy_premium-regression.log'}" in captured.err
+
+
+def test_the_windows_toy_host_script_runs_each_step_and_stops_on_an_unexpected_status():
+    work = "C:\\tmp\\w"
+    package = PureWindowsPath(work) / "package" / "deltarecon-0.1.0-x86_64-pc-windows-msvc"
+    commands = package_check.toy_commands(package, PureWindowsPath(work) / "toy" / "toy_premium", "toy_premium",
+                                          PureWindowsPath(work) / "toy-engine", "deltarecon.cmd")
+    script = check_windows.toy_host_script(work, "toy_premium", commands)
+    assert script.startswith(check_windows.host_environment(work))
+    position = 0
+    for step, command, expect in commands:
+        call = "& " + " ".join(host.literal(argument) for argument in command)
+        assert script.index(call) > position
+        position = script.index(call)
+        assert script[position:].split("\n")[1:4] == [
+            "$code = $LASTEXITCODE",
+            f"[Console]::Out.WriteLine('build_package: toy engine: toy_premium: {step} exit ' + $code + "
+            f"' (expected {expect}) in ' + {check_windows.WATCH_SECONDS} + ' s')",
+            f"if ($code -ne {expect}) {{ [Console]::Error.WriteLine('build_package: toy engine: toy_premium: step "
+            f"{step} exit ' + $code + ', expected {expect}'); exit 1 }}"]
+        assert f"'build_package: toy engine: toy_premium: {step} exit '" in script
+    assert "--repositories" not in script and "Remove-Item" not in script
+    with pytest.raises(host.Refused):
+        check_windows.toy_host_script("/mnt/c/tmp/w", "toy_premium", commands)
+
+
+def test_the_host_codes_are_read_from_the_step_lines():
+    text = ("build_package: toy engine: toy_claims: step request-r1\r\n"
+            "build_package: toy engine: toy_claims: request-r1 exit 0 (expected 0) in 1.2 s\r\n"
+            "build_package: toy engine: toy_premium: run-r1 exit 0 (expected 0) in 1.2 s\n"
+            "  build_package: toy engine: toy_claims: run-r1 exit -1 (expected 0) in 0.5 s  \n"
+            "build_package: chain: regression exit 1 (expected 1) in 3.0 s\n")
+    assert check_windows.host_codes(text, "toy engine: toy_claims") == {"request-r1": 0, "run-r1": -1}
+    assert check_windows.host_codes(None, "toy engine: toy_claims") == {}
+
+
+def test_the_windows_toy_walkthrough_writes_the_compare_request_between_the_host_scripts(tmp_path, monkeypatch,
+                                                                                        capsys):
+    """Each stage runs as two host scripts; the compare request is written from WSL between them, into
+    the host folder reached through ``host.wsl_path``."""
+    work = "C:\\tmp\\w"
+    monkeypatch.setattr(host, "wsl_path", lambda windows: str(tmp_path / PureWindowsPath(windows).relative_to("C:\\")))
+    scripts = []
+
+    def runner(argv, **options):
+        script = base64.b64decode(argv[4]).decode("utf-16-le")
+        stage = "toy_premium" if "toy engine: toy_premium: " in script else "toy_claims"
+        folder = tmp_path / "tmp" / "w" / "toy" / stage
+        steps = [step for step in package_check.TOY_STEPS if f"toy engine: {stage}: {step} exit '" in script]
+        scripts.append((stage, steps, (folder / "compare.request.json").exists()))
+        for revision in ("r1", "r5"):
+            (folder / revision).mkdir(parents=True, exist_ok=True)
+            for name in ("response.json", "run-record.json"):
+                (folder / revision / name).write_text("{}", "utf-8")
+        if "search" in steps:
+            search_result(folder, revisions=sorted(package_check.TOY_STAGES[stage][1]))
+        lines = [f"build_package: toy engine: {stage}: {step} exit {ALL_RAN[step]} (expected {ALL_RAN[step]}) in 0.1 s"
+                 for step in steps]
+        return subprocess.CompletedProcess(argv, 0, stdout="\n".join(lines))
+
+    package = PureWindowsPath(work) / "package" / "deltarecon-0.1.0-x86_64-pc-windows-msvc"
+    claims = check_windows.check_toy_engine(work, package, "/host/powershell.exe", runner=runner)
+    assert all(claims.values()) and list(claims) == TOY_CLAIM_NAMES
+    earlier = ["request-r1", "run-r1", "request-r5", "run-r5", "regression"]
+    assert scripts == [("toy_premium", earlier, False), ("toy_premium", ["compare", "search"], True),
+                       ("toy_claims", earlier, False), ("toy_claims", ["compare", "search"], True)]
+    assert (tmp_path / "tmp" / "w" / "toy-engine" / "toy_engine.py").is_file()
+    count = len(assembly.tracked_files(package_check.TOY_FOLDER))
+    copied = f"build_package: toy engine: {count} tracked files copied to C:\\tmp\\w\\toy-engine"
+    assert copied in capsys.readouterr().out
