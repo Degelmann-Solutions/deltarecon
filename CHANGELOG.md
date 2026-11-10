@@ -4,6 +4,15 @@ Every published release of DeltaRecon has an entry here, newest first: its tag a
 
 The SHA-256 values are those of `SHA256SUMS` in the release folder `dist/release-v<version>/` that the release was uploaded from; after each upload the archives were downloaded again and matched those values. The commit of `delib-history` is read from the clone inside both archives.
 
+## 0.2.0 — published 2026-11-10
+
+- Tag `v0.2.0`, commit `cafb5a702752e926d4cf2bcca25789fe6e40ce4b`
+- `delib-history` in the packages: `6a3ca53281ac353963412214cd2b54187facb728`
+- `deltarecon-0.2.0-x86_64-pc-windows-msvc.zip` SHA-256 `c44f65968205506fa44af7639b399cd97b96a2fe175ff4ad6cbb2fdd5be4bc4d`
+- `deltarecon-0.2.0-x86_64-unknown-linux-gnu.tar.gz` SHA-256 `67d083492770c63db4e264464b73528c51883a7c8b1885ac09f8777b70f1501f`
+- Release page: published.
+- Changes: an engine other than the reference model connects through the protocol module `degelmann/deltarecon/protocol.py` alone and is selected with `--engine <module>:<class>` and `--engine-path <folder>` (or `DELTARECON_ENGINE` and `DELTARECON_ENGINE_PATH`), without a rebuild of the package; engine options are given as `--engine-option key=value`, which replaces `--path` of the reference model. The tool writes contract version 3.3: an engine declares its stages, their quantities and its domain reference (3.2), and names the history source of its revisions (3.3). The toy engine in `examples/toy_engine/`, with two stages and a revision history that is not a Git repository, shows the protocol, and the package check runs it from both unpacked packages. The oracle is renewed under contract 3.3, the 3.1 oracle archived unchanged in `oracle/archive/2026-10-28/`.
+
 ## 0.1.4 — published 2026-11-04
 
 - Tag `v0.1.4`, commit `887584dbf90c2220e108b8fb4e911f7903def02c`
