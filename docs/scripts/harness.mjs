@@ -63,8 +63,10 @@ export async function loadRelease() {
 }
 
 /**
- * The 20 pages of the register, each with what a check compares against:
- * language, address, counterpart, names and neighbours on the path.
+ * The pages of the register, each with what a check compares against:
+ * language, address, counterpart, names and neighbours on the path. Title and
+ * stage line are written out here from the register's data, not taken from
+ * the functions the pages render with, so a changed format fails a check.
  */
 export async function loadPages() {
   const site = await loadRegister();
@@ -81,8 +83,10 @@ export async function loadPages() {
         address: `${BASE}${site.pagePath(page, lang)}`,
         counterpart: `${BASE}${site.pagePath(page, other)}`,
         otherLang: other,
-        title: site.pageTitle(page, lang),
-        stageLine: site.stageLine(page, lang),
+        title: `${page.name[lang]} – ${site.texts[lang].documentation}`,
+        stageLine: stage
+          ? `${site.texts[lang].stage} ${stage.number} · ${stage.name[lang]}`
+          : site.texts[lang].helpKind,
         stageName: stage?.name[lang],
         previous: previous && {
           name: `${site.texts[lang].previous}: ${previous.name[lang]}`,

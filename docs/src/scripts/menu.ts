@@ -7,7 +7,8 @@
 // Open: the chapter tree fills the screen under the top bar, the content and
 // the footer are out of the page and inert, focus is on the close button and
 // Tab stays inside. Escape and the close button close the menu and return
-// focus to the menu button.
+// focus to the menu button. The button in view says whether the menu is open:
+// the menu button while it is closed, the close button while it is open.
 
 const root = document.documentElement;
 const link = document.querySelector<HTMLAnchorElement>('[data-menu-link]');
@@ -26,6 +27,7 @@ if (link && menuButton && closeButton && header && tree) {
   const setOpen = (open: boolean): void => {
     root.dataset.menu = open ? 'open' : 'closed';
     menuButton.setAttribute('aria-expanded', String(open));
+    closeButton.setAttribute('aria-expanded', String(open));
     behind.forEach((element) => {
       element.inert = open;
     });
@@ -40,8 +42,9 @@ if (link && menuButton && closeButton && header && tree) {
 
   const close = (returnFocus: boolean): void => {
     setOpen(false);
+    // Focus first and without scrolling, so the position before the menu holds.
+    if (returnFocus) menuButton.focus({ preventScroll: true });
     window.scrollTo(0, scrollPosition);
-    if (returnFocus) menuButton.focus();
   };
 
   /** What takes focus in the open menu, in order: top bar, then tree. */
@@ -56,8 +59,11 @@ if (link && menuButton && closeButton && header && tree) {
   document.addEventListener('keydown', (event) => {
     if (!isOpen()) return;
     if (event.key === 'Escape') {
-      // Escape in the search field belongs to the search.
-      if (event.target instanceof Element && event.target.closest('[data-search]')) return;
+      // Escape in the search field belongs to the search; on a hit under the
+      // field it closes the menu like anywhere else.
+      if (event.target instanceof HTMLInputElement && event.target.closest('[data-search]')) {
+        return;
+      }
       close(true);
       return;
     }
@@ -77,8 +83,21 @@ if (link && menuButton && closeButton && header && tree) {
   });
 
   // From the tree breakpoint up the tree is a column; an open menu ends.
+  // Both buttons leave the page there, so focus that was in the menu's top
+  // bar or tree moves to the current page of the tree.
   column.addEventListener('change', () => {
-    if (column.matches && isOpen()) close(false);
+    if (!column.matches || !isOpen()) return;
+    close(false);
+    const active = document.activeElement;
+    if (!(active instanceof HTMLElement) || active.getClientRects().length === 0) {
+      tree.querySelector<HTMLElement>('a[aria-current="page"]')?.focus({ preventScroll: true });
+    }
+  });
+
+  // A page that the browser restores from its back/forward cache comes back
+  // as it was left; a menu left open by following a link is closed.
+  window.addEventListener('pageshow', (event) => {
+    if (event.persisted && isOpen()) close(false);
   });
 
   link.hidden = true;

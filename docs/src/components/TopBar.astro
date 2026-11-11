@@ -44,8 +44,15 @@ const button =
     <span class="menu-glyph" aria-hidden="true"></span>
     <span class="max-tablet:sr-only">{t.menu}</span>
   </button>
-  <button class={`${button} menu-closed:hidden`} type="button" data-menu-close hidden>
-    {t.close}
+  <button
+    class={`${button} menu-closed:hidden`}
+    type="button"
+    aria-expanded="false"
+    aria-controls="chapters"
+    data-menu-close
+    hidden
+  >
+    <span class="max-[23rem]:sr-only">{t.close}</span>
     <span aria-hidden="true">✕</span>
   </button>
 

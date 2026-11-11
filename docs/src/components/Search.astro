@@ -88,12 +88,19 @@ const { lang } = Astro.props;
     panel.className =
       'search-panel absolute top-full right-0 left-0 z-10 mt-1 min-w-60 rounded-sm border border-navy bg-bg p-2 text-nav';
     panel.append(status, hits);
+    // The box is clipped while it has nothing to show (global.css). It stays
+    // in the page, so the status is announced when its text arrives.
+    const show = (): void => {
+      panel.toggleAttribute('data-empty', !status.textContent && hits.children.length === 0);
+    };
+    show();
 
     container.append(label, field, panel);
 
     const unavailable = (): void => {
       status.textContent = container.dataset.unavailable ?? '';
       status.dataset.searchStatus = 'unavailable';
+      show();
     };
 
     loadIndex().then(() => {
@@ -125,6 +132,7 @@ const { lang } = Astro.props;
         status.dataset.searchStatus = 'ready';
         // The term the list answers; the site check waits on it.
         hits.dataset.searchResults = term;
+        show();
       } catch {
         unavailable();
       }

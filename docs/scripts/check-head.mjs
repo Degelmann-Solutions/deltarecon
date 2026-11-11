@@ -145,16 +145,39 @@ try {
   const context = await browser.newContext({ javaScriptEnabled: false });
   const page = await context.newPage();
   const seen = { titles: new Set(), descriptions: new Set() };
+  // The anchors of the content of each page, by address.
+  const anchors = new Map();
   for (const entry of pages) {
-    const response = await page.goto(`${origin}${entry.address}`);
-    if (response?.status() !== 200) {
-      failures.push(`${entry.address}: status ${response?.status()}, expected 200`);
-      continue;
+    // An error on one page is a failure of that page; the others still run.
+    try {
+      const response = await page.goto(`${origin}${entry.address}`);
+      if (response?.status() !== 200) {
+        failures.push(`${entry.address}: status ${response?.status()}, expected 200`);
+        continue;
+      }
+      checkHead(entry, await readHead(page), seen);
+      anchors.set(
+        entry.address,
+        await page.$$eval('main [id]', (elements) => elements.map((element) => element.id).sort()),
+      );
+    } catch (error) {
+      failures.push(`${entry.address}: ${error.stack ?? error.message}`);
     }
-    checkHead(entry, await readHead(page), seen);
+  }
+  // The language switch keeps the anchor, so a page and its counterpart hold
+  // the same anchors.
+  for (const entry of pages) {
+    const own = anchors.get(entry.address);
+    const other = anchors.get(entry.counterpart);
+    if (!own || !other) continue;
+    const missing = own.filter((id) => !other.includes(id));
+    expect(
+      missing.length === 0,
+      `${entry.address}: anchors missing on the counterpart ${entry.counterpart}: ${missing.join(', ')}`,
+    );
   }
 } catch (error) {
-  failures.push(error.message);
+  failures.push(error.stack ?? error.message);
 } finally {
   await browser?.close();
   stop();

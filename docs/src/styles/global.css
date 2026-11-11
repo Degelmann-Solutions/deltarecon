@@ -249,10 +249,18 @@
     white-space: nowrap;
   }
 
-  /* The box under the search field holds the status text and the hits. It is
-     in the page only while it has something to show. Its look is provisional;
-     the search story of the epic owns the search result list. */
-  .search-panel:not(:has(li, [data-search-status]:not(:empty))) {
-    display: none;
+  /* The box under the search field holds the status text and the hits.
+     Search.astro marks it `data-empty` while it has nothing to show; it is
+     then clipped, not removed, so its status is announced when the text
+     arrives. Its look is provisional; the search story of the epic owns the
+     search result list. */
+  .search-panel[data-empty] {
+    width: 1px;
+    min-width: 0;
+    height: 1px;
+    padding: 0;
+    border: 0;
+    overflow: hidden;
+    clip-path: inset(50%);
   }
 }

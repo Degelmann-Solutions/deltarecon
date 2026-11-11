@@ -4,7 +4,8 @@
 // reports, and asserts for every page of the page register:
 //   - language, release number, link to the counterpart;
 //   - the same with JavaScript off, and that no search field is in the page;
-//   - no request leaves the local origin;
+//   - no request leaves the local origin, and every file the page loads
+//     (typeface, logo, script) is served;
 // and for the start page of each language:
 //   - the search finds a word of its own language and not one of the other;
 //   - a missing search index leaves the page readable and shows a status.
@@ -30,6 +31,15 @@ async function open(browser, origin, entry, { javaScript = true, blockIndex = fa
     const url = new URL(request.url());
     if (!['http:', 'https:', 'ws:', 'wss:'].includes(url.protocol)) return;
     expect(url.origin === origin, `${name}: request to a third party: ${request.url()}`);
+  });
+  page.on('response', (answer) => {
+    // The missing index is the case under test there.
+    if (blockIndex && new URL(answer.url()).pathname.includes('/pagefind/')) return;
+    expect(answer.status() < 400, `${name}: ${answer.url()} answered ${answer.status()}`);
+  });
+  page.on('requestfailed', (request) => {
+    if (blockIndex && new URL(request.url()).pathname.includes('/pagefind/')) return;
+    failures.push(`${name}: ${request.url()} failed: ${request.failure()?.errorText}`);
   });
   if (blockIndex) {
     await page.route('**/pagefind/**', (route) => route.fulfill({ status: 404, body: 'Not found' }));
@@ -147,10 +157,15 @@ try {
   const origin = await reported;
   browser = await chromium.launch();
   for (const entry of pages) {
-    await checkEntry(browser, origin, entry);
+    // An error on one page is a failure of that page; the others still run.
+    try {
+      await checkEntry(browser, origin, entry);
+    } catch (error) {
+      failures.push(`${entry.address}: ${error.stack ?? error.message}`);
+    }
   }
 } catch (error) {
-  failures.push(error.message);
+  failures.push(error.stack ?? error.message);
 } finally {
   await browser?.close();
   stop();

@@ -8,18 +8,23 @@
 //   - keyboard: the skip link is the first stop, visible on focus, and leads
 //     to main; Tab reaches every control in reading order, each with a
 //     visible focus ring;
-//   - the language switch leads to the counterpart and keeps the anchor.
+//   - the language switch leads to the counterpart and keeps the anchor, the
+//     one the page was loaded with and one set afterwards.
 // Phone (390 px), for every page:
 //   - the top bar holds menu button, logo and language switch only;
 //   - no sideways scrolling, also at 320 px; axe with the menu closed and open;
-//   - the menu: tree on the full screen, focus on the close button, the page
-//     behind inert, Tab stays inside, Escape and the close button close it and
-//     return focus to the menu button; search field and release badge inside.
+//   - the menu: tree on the full screen, focus on the close button, which
+//     says "open", the page behind inert and the skip link out of the page,
+//     Tab stays inside, Escape and the close button close it and return focus
+//     to the menu button; search field and release badge inside; at 320 px
+//     its top bar is one row.
 // Phone, JavaScript off, for every page:
 //   - the menu button is a link that jumps to the chapter tree at the end of
 //     the page; the language switch opens the counterpart without the anchor.
 // Between (900 px), for the start page of each language: axe, the menu, no
-// sideways scrolling (also at 600 px).
+// sideways scrolling (also at 600 px); an open menu ends when the window
+// reaches the tree breakpoint, with focus in the page; the search field moves
+// between top bar and menu at the phone breakpoint.
 //
 // Writes a desktop (1280 px), a between (900 px), a phone and an open-menu
 // screenshot of the start page of each language to screenshots/ (not under
@@ -36,8 +41,11 @@ const WCAG = ['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'wcag22aa'];
 const DESKTOP = { width: 1280, height: 800 };
 const BETWEEN = { width: 900, height: 800 };
 const PHONE = { width: 390, height: 844 };
-// An anchor as a step has it; the same in both languages.
-const ANCHOR = '#step-3';
+// Two anchors every page has in both languages.
+const ANCHOR = '#main';
+const LATER_ANCHOR = '#chapters';
+// A word that only the start page of that language holds (check-site.mjs).
+const ownWords = { de: 'Baustelle', en: 'scaffold' };
 // The focus ring on light grounds: 2 px in teal-text.
 const RING = 'rgb(23, 121, 130)';
 
@@ -55,6 +63,15 @@ async function open(browser, origin, entry, viewport, { javaScript = true, ancho
     await page.waitForSelector('html[data-menu]');
   }
   return { context, page };
+}
+
+/**
+ * Waits until the page has answered a new window width; the scripts hear of
+ * it after the resize. A state that never comes is left to the expectation
+ * that follows.
+ */
+async function settle(page, state) {
+  await page.waitForFunction(state, undefined, { timeout: 3_000 }).catch(() => {});
 }
 
 async function checkAxe(page, name) {
@@ -181,6 +198,7 @@ async function checkFrame(page, name, entry) {
     expect((await stage.count()) === 0, `${name}: a stage is marked, but the page has none`);
   }
   const stageLine = (await page.locator('[data-stage-line]').innerText()).trim();
+  expect(entry.stageLine !== '', `${name}: the register gives no stage line`);
   expect(stageLine === entry.stageLine, `${name}: stage line is "${stageLine}", expected "${entry.stageLine}"`);
 
   // Page links: which exist, their names, their sides.
@@ -278,7 +296,7 @@ async function checkLanguageSwitch(page, name, entry, origin, anchor) {
 }
 
 /** The menu below the tree breakpoint. */
-async function checkMenu(page, name, { phone, screenshot }) {
+async function checkMenu(page, name, { phone, screenshot, hitWord }) {
   const button = page.locator('button[data-menu-button]');
   const close = page.locator('button[data-menu-close]');
   const tree = page.locator('#chapters');
@@ -288,6 +306,8 @@ async function checkMenu(page, name, { phone, screenshot }) {
       inert: [...document.querySelectorAll('main, body > footer')].every((part) => part.inert),
       active: [...document.querySelectorAll('main, body > footer')].some((part) => part.inert),
       expanded: document.querySelector('[data-menu-button]')?.getAttribute('aria-expanded'),
+      closeExpanded: document.querySelector('[data-menu-close]')?.getAttribute('aria-expanded'),
+      skipLink: document.querySelector('.skip-link').getClientRects().length > 0,
     }));
 
   expect(
@@ -304,6 +324,11 @@ async function checkMenu(page, name, { phone, screenshot }) {
   );
   expect(opened.inert, `${name}: open menu: content and footer are not inert`);
   expect(opened.expanded === 'true', `${name}: open menu: the menu button does not say "open"`);
+  expect(
+    opened.closeExpanded === 'true' && (await close.getAttribute('aria-controls')) === 'chapters',
+    `${name}: open menu: the close button, the one in view, does not say "open"`,
+  );
+  expect(!opened.skipLink, `${name}: open menu: the skip link is still in the page`);
   expect((await focused(page))?.isCloseButton, `${name}: open menu: focus is not on the close button`);
   const cover = await page.evaluate(() => {
     const header = document.querySelector('body > header').getBoundingClientRect();
@@ -366,6 +391,26 @@ async function checkMenu(page, name, { phone, screenshot }) {
     await close.focus();
   }
 
+  // Escape on a search hit closes the menu like anywhere else.
+  if (phone && hitWord) {
+    await field.fill(hitWord);
+    const hit = page.locator(`#chapters [data-search-results="${hitWord}"] a`).first();
+    try {
+      await hit.waitFor({ state: 'visible', timeout: 10_000 });
+      await hit.focus();
+      await page.keyboard.press('Escape');
+      expect(
+        !(await tree.isVisible()) && (await focused(page))?.isMenuButton,
+        `${name}: open menu: Escape on a search hit does not close the menu`,
+      );
+    } catch (error) {
+      failures.push(`${name}: open menu: the search gave no hit for "${hitWord}": ${error.message}`);
+    }
+    if (!(await tree.isVisible())) await button.click();
+    await field.fill('');
+    await close.focus();
+  }
+
   // Escape, then the close button: both close and return focus.
   for (const [way, act] of [
     ['Escape', () => page.keyboard.press('Escape')],
@@ -377,7 +422,11 @@ async function checkMenu(page, name, { phone, screenshot }) {
       !(await tree.isVisible()) && (await main.isVisible()) && !closed.active,
       `${name}: ${way} does not close the menu`,
     );
-    expect(closed.expanded === 'false', `${name}: after ${way} the menu button still says "open"`);
+    expect(
+      closed.expanded === 'false' && closed.closeExpanded === 'false',
+      `${name}: after ${way} a button still says "open"`,
+    );
+    expect(closed.skipLink, `${name}: after ${way} the skip link is not back in the page`);
     expect((await focused(page))?.isMenuButton, `${name}: ${way} does not return focus to the menu button`);
     if (way === 'Escape') await button.click();
   }
@@ -404,8 +453,28 @@ async function checkEntry(browser, origin, entry) {
     await checkSkipLink(page, name);
     await page.goto(`${origin}${entry.address}`, { waitUntil: 'networkidle' });
     await checkTabOrder(page, name);
-    await page.goto(`${origin}${entry.address}${ANCHOR}`, { waitUntil: 'networkidle' });
-    await checkLanguageSwitch(page, name, entry, origin, ANCHOR);
+    await context.close();
+  }
+
+  // Desktop, loaded with an anchor: the language switch keeps it, and the one
+  // set afterwards.
+  {
+    const name = at(DESKTOP.width);
+    const { context, page } = await open(browser, origin, entry, DESKTOP, { anchor: ANCHOR });
+    const target = () => page.locator('a[data-counterpart]:visible').getAttribute('href');
+    expect(
+      (await target()) === `${entry.counterpart}${ANCHOR}`,
+      `${name}: loaded with ${ANCHOR}, the language switch leads to ${await target()}`,
+    );
+    await page.evaluate((anchor) => {
+      window.location.hash = anchor;
+    }, LATER_ANCHOR);
+    await page.waitForFunction(
+      (anchor) => document.querySelector('a[data-counterpart]')?.getAttribute('href')?.endsWith(anchor),
+      LATER_ANCHOR,
+      { timeout: 5_000 },
+    ).catch(() => {});
+    await checkLanguageSwitch(page, name, entry, origin, LATER_ANCHOR);
     await context.close();
   }
 
@@ -428,9 +497,26 @@ async function checkEntry(browser, origin, entry) {
     await checkNoSidewaysScroll(page, name);
     await checkAxe(page, name);
     if (entry.isRoot) await page.screenshot({ path: shot('phone'), fullPage: true });
-    await checkMenu(page, name, { phone: true, screenshot: shot('menu') });
+    await checkMenu(page, name, {
+      phone: true,
+      screenshot: shot('menu'),
+      hitWord: entry.isRoot ? ownWords[entry.lang] : undefined,
+    });
     await page.setViewportSize({ width: 320, height: 640 });
     await checkNoSidewaysScroll(page, at(320));
+    // The open menu at 320 px: its top bar is one row.
+    await page.locator('button[data-menu-button]').click();
+    const bar = await page.evaluate(() => ({
+      height: document.querySelector('body > header').getBoundingClientRect().height,
+      closeName: document.querySelector('[data-menu-close]').textContent.replace(/\s+/g, ' ').trim(),
+    }));
+    expect(bar.height <= 57, `${at(320, ', open menu')}: the top bar is ${bar.height} px high, not one row`);
+    expect(
+      bar.closeName.startsWith(entry.texts.close),
+      `${at(320, ', open menu')}: the close button is not named "${entry.texts.close}"`,
+    );
+    await checkNoSidewaysScroll(page, at(320, ', open menu'));
+    await page.keyboard.press('Escape');
     await context.close();
   }
 
@@ -485,8 +571,46 @@ async function checkEntry(browser, origin, entry) {
     await checkAxe(page, name);
     await page.screenshot({ path: shot('between'), fullPage: true });
     await checkMenu(page, name, { phone: false });
+
+    // An open menu ends when the window reaches the tree breakpoint.
+    await page.locator('button[data-menu-button]').click();
+    await page.setViewportSize(DESKTOP);
+    await settle(page, () => document.documentElement.dataset.menu === 'closed');
+    const widened = await page.evaluate(() => ({
+      menu: document.documentElement.dataset.menu,
+      inert: [...document.querySelectorAll('main, body > footer')].some((part) => part.inert),
+    }));
+    expect(
+      widened.menu === 'closed' && !widened.inert && (await page.locator('main').isVisible()),
+      `${name}: an open menu stays open at ${DESKTOP.width} px`,
+    );
+    expect(
+      (await focused(page)) !== null,
+      `${name}: focus is lost when an open menu ends at ${DESKTOP.width} px`,
+    );
+
     await page.setViewportSize({ width: 600, height: 800 });
+    await settle(page, () => document.querySelector('body > header input[type="search"]') !== null);
     await checkNoSidewaysScroll(page, at(600));
+    // The search field moves into the menu below the phone breakpoint, and back.
+    const inBar = page.locator('body > header input[type="search"]');
+    const inMenu = page.locator('#chapters input[type="search"]');
+    expect(
+      (await inBar.count()) === 1 && (await inMenu.count()) === 0,
+      `${at(600)}: the search field is not in the top bar`,
+    );
+    await page.setViewportSize(PHONE);
+    await settle(page, () => document.querySelector('#chapters input[type="search"]') !== null);
+    expect(
+      (await inBar.count()) === 0 && (await inMenu.count()) === 1,
+      `${name}: narrowed to ${PHONE.width} px, the search field is not in the menu`,
+    );
+    await page.setViewportSize(BETWEEN);
+    await settle(page, () => document.querySelector('body > header input[type="search"]') !== null);
+    expect(
+      (await inBar.count()) === 1 && (await inMenu.count()) === 0,
+      `${name}: widened again, the search field is not back in the top bar`,
+    );
     await context.close();
   }
 }
@@ -498,7 +622,12 @@ try {
   await mkdir(shots, { recursive: true });
   browser = await chromium.launch();
   for (const entry of pages) {
-    await checkEntry(browser, origin, entry);
+    // An error on one page is a failure of that page; the others still run.
+    try {
+      await checkEntry(browser, origin, entry);
+    } catch (error) {
+      failures.push(`${entry.address}: ${error.stack ?? error.message}`);
+    }
   }
 } catch (error) {
   failures.push(error.stack ?? error.message);

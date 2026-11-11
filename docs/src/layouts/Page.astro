@@ -52,7 +52,7 @@ if (Astro.url.pathname.replace(/\/?$/, '/') !== address) {
     <Head lang={lang} page={page} description={description} />
   </head>
   <body class="flex min-h-screen flex-col">
-    <a class="skip-link" href="#main">{texts[lang].skipLink}</a>
+    <a class="skip-link menu-open:hidden" href="#main">{texts[lang].skipLink}</a>
     <TopBar lang={lang} page={page} />
     <div class="flex flex-1 flex-col tree:grid tree:grid-cols-[288px_minmax(0,1fr)]">
       <ChapterTree lang={lang} page={page} steps={steps} />
