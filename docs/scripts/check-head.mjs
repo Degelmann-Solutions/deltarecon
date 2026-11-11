@@ -165,7 +165,9 @@ try {
     }
   }
   // The language switch keeps the anchor, so a page and its counterpart hold
-  // the same anchors.
+  // the same anchors. The stubs have none in their content; the check takes
+  // effect with the first page that has. A heading gets its anchor from its
+  // text, which differs by language, so such a page sets its anchors itself.
   for (const entry of pages) {
     const own = anchors.get(entry.address);
     const other = anchors.get(entry.counterpart);

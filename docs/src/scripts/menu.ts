@@ -97,7 +97,13 @@ if (link && menuButton && closeButton && header && tree) {
   // A page that the browser restores from its back/forward cache comes back
   // as it was left; a menu left open by following a link is closed.
   window.addEventListener('pageshow', (event) => {
-    if (event.persisted && isOpen()) close(false);
+    if (!event.persisted || !isOpen()) return;
+    close(false);
+    // The link that was followed is in the tree, which is out of the page now.
+    const active = document.activeElement;
+    if (!(active instanceof HTMLElement) || active.getClientRects().length === 0) {
+      menuButton.focus({ preventScroll: true });
+    }
   });
 
   link.hidden = true;

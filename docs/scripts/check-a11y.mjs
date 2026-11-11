@@ -508,14 +508,14 @@ async function checkEntry(browser, origin, entry) {
     await page.locator('button[data-menu-button]').click();
     const bar = await page.evaluate(() => ({
       height: document.querySelector('body > header').getBoundingClientRect().height,
-      closeName: document.querySelector('[data-menu-close]').textContent.replace(/\s+/g, ' ').trim(),
     }));
     expect(bar.height <= 57, `${at(320, ', open menu')}: the top bar is ${bar.height} px high, not one row`);
     expect(
-      bar.closeName.startsWith(entry.texts.close),
+      (await page.getByRole('button', { name: entry.texts.close, exact: true }).count()) === 1,
       `${at(320, ', open menu')}: the close button is not named "${entry.texts.close}"`,
     );
     await checkNoSidewaysScroll(page, at(320, ', open menu'));
+    await checkAxe(page, at(320, ', open menu'));
     await page.keyboard.press('Escape');
     await context.close();
   }
