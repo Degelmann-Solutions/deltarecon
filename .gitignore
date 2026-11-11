@@ -248,3 +248,4 @@ Thumbs.db
 # Documentation site (docs/)
 node_modules/
 .astro/
+/docs/screenshots/

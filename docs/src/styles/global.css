@@ -1,1 +1,258 @@
 @import "tailwindcss";
+
+/*
+ * Self-hosted typeface, copied from the company website (rsms/inter v4.1,
+ * JetBrains/JetBrainsMono v2.304; licences in public/fonts/). The addresses
+ * carry the base of the site (astro.config.mjs, `base`).
+ */
+@font-face {
+  font-family: "Inter";
+  src: url("/deltarecon/docs/fonts/InterVariable.woff2") format("woff2");
+  font-weight: 100 900;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Inter";
+  src: url("/deltarecon/docs/fonts/InterVariable-Italic.woff2") format("woff2");
+  font-weight: 100 900;
+  font-style: italic;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "JetBrains Mono";
+  src: url("/deltarecon/docs/fonts/JetBrainsMono-Regular.woff2") format("woff2");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+/*
+ * The design tokens of DESIGN.md (frontmatter: colors, typography, rounded,
+ * spacing). Type sizes are in rem (16 px = 1 rem), so that the reader's
+ * browser setting applies. `static` keeps every token in the stylesheet as a
+ * custom property, also one that no utility class uses yet.
+ */
+@theme static {
+  --color-*: initial;
+  --color-navy: #1e2547;
+  --color-teal: #65c2cb;
+  --color-teal-text: #177982;
+  --color-text-secondary: #3a4060;
+  --color-bg: #ffffff;
+  --color-bg-subtle: #f5f7fa;
+  --color-border: #e5e8ed;
+  --color-text-on-dark: #ffffff;
+  --color-error: #b3261e;
+
+  --font-*: initial;
+  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, monospace;
+
+  --radius-*: initial;
+  --radius-none: 0px;
+  --radius-sm: 2px;
+  --radius-full: 9999px;
+
+  /* phone-breakpoint (600 px) and tree-breakpoint (1280 px). `tablet:` holds
+     from the phone breakpoint up, `tree:` from the tree breakpoint up. */
+  --breakpoint-*: initial;
+  --breakpoint-tablet: 37.5rem;
+  --breakpoint-tree: 80rem;
+
+  --text-*: initial;
+  --text-page-title: 2.125rem;
+  --text-page-title--line-height: 1.2;
+  --text-page-title--font-weight: 700;
+  --text-page-title--letter-spacing: -0.02em;
+  --text-page-title-phone: 1.75rem;
+  --text-page-title-phone--line-height: 1.2;
+  --text-page-title-phone--font-weight: 700;
+  --text-page-title-phone--letter-spacing: -0.02em;
+  --text-lead: 1.125rem;
+  --text-lead--line-height: 1.55;
+  --text-lead-phone: 1.0625rem;
+  --text-lead-phone--line-height: 1.55;
+  --text-section-heading: 1.5rem;
+  --text-section-heading--line-height: 1.3;
+  --text-section-heading--font-weight: 600;
+  --text-section-heading-phone: 1.375rem;
+  --text-section-heading-phone--line-height: 1.3;
+  --text-section-heading-phone--font-weight: 600;
+  --text-sub-heading: 1.125rem;
+  --text-sub-heading--line-height: 1.4;
+  --text-sub-heading--font-weight: 600;
+  --text-step-title: 1.375rem;
+  --text-step-title--line-height: 1.35;
+  --text-step-title--font-weight: 600;
+  --text-step-title-phone: 1.25rem;
+  --text-step-title-phone--line-height: 1.35;
+  --text-step-title-phone--font-weight: 600;
+  --text-callout-title: 1rem;
+  --text-callout-title--line-height: 1.4;
+  --text-callout-title--font-weight: 600;
+  --text-body: 1rem;
+  --text-body--line-height: 1.55;
+  --text-body-small: 0.9375rem;
+  --text-body-small--line-height: 1.55;
+  --text-nav: 0.875rem;
+  --text-nav--line-height: 1.4;
+  --text-nav-stage: 0.8125rem;
+  --text-nav-stage--line-height: 1.35;
+  --text-nav-stage--font-weight: 600;
+  --text-table: 0.875rem;
+  --text-table--line-height: 1.45;
+  --text-caption: 0.8125rem;
+  --text-caption--line-height: 1.5;
+  --text-label: 0.75rem;
+  --text-label--letter-spacing: 0.025em;
+  --text-label-small: 0.6875rem;
+  --text-label-small--letter-spacing: 0.025em;
+  --text-code: 0.8125rem;
+  --text-code--line-height: 1.6;
+  --text-code-phone: 0.75rem;
+  --text-code-phone--line-height: 1.6;
+  --text-code-inline: 0.875em;
+
+  --spacing-topbar-height: 56px;
+  --spacing-tree-width: 288px;
+  --spacing-content-max: 992px;
+  --spacing-text-max: 720px;
+  --spacing-content-pad-x: 48px;
+  --spacing-content-pad-top: 36px;
+  --spacing-content-pad-bottom: 72px;
+  --spacing-content-pad-x-phone: 12px;
+  --spacing-content-pad-top-phone: 24px;
+  --spacing-content-pad-bottom-phone: 48px;
+  --spacing-step-indent: 64px;
+  --spacing-step-indent-phone: 38px;
+  --spacing-step-gap: 32px;
+  --spacing-step-gap-phone: 24px;
+  --spacing-step-pad: 40px;
+  --spacing-step-pad-phone: 26px;
+  --spacing-card-pad-x: 28px;
+  --spacing-card-pad-x-phone: 14px;
+  --spacing-card-columns-gap: 36px;
+  --spacing-card-columns-gap-phone: 20px;
+  --spacing-figure-column: 264px;
+  --spacing-figure-pad: 16px;
+  --spacing-callout-pad-y: 20px;
+  --spacing-callout-pad-x: 24px;
+  --spacing-callout-pad-phone: 16px;
+  --spacing-section-gap: 56px;
+  --spacing-section-gap-phone: 40px;
+  --spacing-block-max: 820px;
+  --spacing-search-field-width: 240px;
+}
+
+/*
+ * The states of the menu. menu.ts sets `data-menu` on <html> once it runs:
+ * "closed" or "open". Without JavaScript the attribute is absent, and the
+ * chapter tree stands at the end of the page.
+ */
+@custom-variant menu-closed (html[data-menu="closed"] &);
+@custom-variant menu-open (html[data-menu="open"] &);
+
+@layer base {
+  html {
+    -webkit-text-size-adjust: 100%;
+  }
+
+  body {
+    background: var(--color-bg);
+    color: var(--color-navy);
+    font-family: var(--font-sans);
+    font-size: var(--text-body);
+    line-height: var(--text-body--line-height);
+    -webkit-font-smoothing: antialiased;
+  }
+
+  /* Focus ring on light grounds. Never removed without a replacement. */
+  :focus-visible {
+    outline: 2px solid var(--color-teal-text);
+    outline-offset: 2px;
+  }
+
+  /* Inline code: breaks anywhere when a line is too short for it. */
+  :not(pre) > code {
+    font-family: var(--font-mono);
+    font-size: var(--text-code-inline);
+    font-variant-ligatures: none;
+    background: var(--color-bg-subtle);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-sm);
+    padding: 1px 5px;
+    overflow-wrap: anywhere;
+  }
+}
+
+@layer components {
+  /* Inline link: every link that stands beside other text. A visited link
+     looks like an unvisited one; hover and pressed look alike. */
+  .inline-link,
+  .prose-links a {
+    color: var(--color-teal-text);
+    text-decoration-line: underline;
+    text-decoration-thickness: 1px;
+    text-underline-offset: 3px;
+  }
+
+  .inline-link:hover,
+  .inline-link:active,
+  .prose-links a:hover,
+  .prose-links a:active {
+    color: var(--color-navy);
+  }
+
+  /* A link without underline (chapter tree, page links, language switch,
+     product-page link) gets the underline of the inline link on hover.
+     `.nav-link-text` marks the part of a boxed link that gets it. */
+  .nav-link:hover,
+  .nav-link:active,
+  .nav-link-box:hover .nav-link-text,
+  .nav-link-box:active .nav-link-text {
+    text-decoration-line: underline;
+    text-decoration-thickness: 1px;
+    text-underline-offset: 3px;
+  }
+
+  /* Menu button and close button. */
+  .frame-button:hover,
+  .frame-button:active {
+    background: var(--color-bg-subtle);
+  }
+
+  /* Skip link: in the page before the top bar, visible only with focus. */
+  .skip-link {
+    position: absolute;
+    left: 8px;
+    top: 8px;
+    z-index: 50;
+    padding: 8px 12px;
+    background: var(--color-bg);
+    color: var(--color-navy);
+    border: 1px solid var(--color-navy);
+    border-radius: var(--radius-sm);
+    font-size: var(--text-nav);
+    line-height: var(--text-nav--line-height);
+  }
+
+  .skip-link:not(:focus) {
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    border: 0;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+
+  /* The box under the search field holds the status text and the hits. It is
+     in the page only while it has something to show. Its look is provisional;
+     the search story of the epic owns the search result list. */
+  .search-panel:not(:has(li, [data-search-status]:not(:empty))) {
+    display: none;
+  }
+}

@@ -1,0 +1,98 @@
+---
+// The top bar: menu button (below the tree breakpoint), logo, product title,
+// release badge, search field, product-page link, language switch. On the
+// phone it keeps menu button, logo and language switch. While the menu is
+// open it is the menu's own top bar: close button, logo, language switch.
+// Where the parts do not fit into one row, the bar wraps; it has no fixed
+// height.
+//
+// The delivered page holds a link to the chapter tree in the place of the
+// menu button; menu.ts swaps it for the two real buttons.
+import LanguageSwitch from './LanguageSwitch.astro';
+import Search from './Search.astro';
+import { company, outside, texts, type Lang, type Page } from '../site';
+import { tag } from '../release';
+
+interface Props {
+  lang: Lang;
+  page: Page;
+}
+
+const { lang, page } = Astro.props;
+const t = texts[lang];
+const base = import.meta.env.BASE_URL.replace(/\/?$/, '/');
+
+const button =
+  'frame-button inline-flex min-h-9 items-center gap-2 rounded-sm border border-navy px-2 text-[0.875rem] font-medium text-navy tablet:px-2.5 tree:hidden';
+---
+
+<header
+  class="flex min-h-topbar-height flex-wrap items-center gap-x-2.5 gap-y-1 border-b border-border bg-bg px-3 py-1.5 tablet:gap-x-3.5 tablet:px-5"
+>
+  <a class={button} href="#chapters" data-menu-link>
+    <span class="menu-glyph" aria-hidden="true"></span>
+    <span class="max-tablet:sr-only">{t.menu}</span>
+  </a>
+  <button
+    class={`${button} menu-open:hidden`}
+    type="button"
+    aria-expanded="false"
+    aria-controls="chapters"
+    data-menu-button
+    hidden
+  >
+    <span class="menu-glyph" aria-hidden="true"></span>
+    <span class="max-tablet:sr-only">{t.menu}</span>
+  </button>
+  <button class={`${button} menu-closed:hidden`} type="button" data-menu-close hidden>
+    {t.close}
+    <span aria-hidden="true">✕</span>
+  </button>
+
+  <a class="inline-flex min-h-6 flex-none items-center" href={outside.company} hreflang="de">
+    <img class="h-[22px] w-[133px]" src={`${base}logo.svg`} alt={company} width="133" height="22" />
+  </a>
+  <span
+    class="border-l border-border pl-3.5 text-[0.875rem] font-semibold whitespace-nowrap max-tablet:hidden menu-open:hidden"
+  >
+    {t.documentation}
+  </span>
+  <span
+    class="rounded-sm border border-border px-1.5 py-px font-mono text-label text-text-secondary max-tablet:hidden menu-open:hidden"
+    data-release
+    translate="no">{tag}</span
+  >
+  <Search lang={lang} />
+
+  <div class="ml-auto flex items-center gap-2.5 tablet:gap-3.5">
+    <a
+      class="nav-link inline-flex min-h-6 items-center text-[0.8125rem] font-medium whitespace-nowrap text-teal-text max-tablet:hidden menu-open:hidden"
+      href={outside.productPage}
+      hreflang="de"
+    >
+      <span aria-hidden="true">←&nbsp;</span>{t.productPage}
+    </a>
+    <LanguageSwitch lang={lang} page={page} />
+  </div>
+</header>
+
+<style>
+  /* Three lines, drawn as borders so that they survive a contrast theme. */
+  .menu-glyph {
+    position: relative;
+    display: block;
+    width: 16px;
+    height: 10px;
+    border-top: 1.5px solid currentColor;
+    border-bottom: 1.5px solid currentColor;
+  }
+
+  .menu-glyph::after {
+    content: "";
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: 2.75px;
+    border-top: 1.5px solid currentColor;
+  }
+</style>

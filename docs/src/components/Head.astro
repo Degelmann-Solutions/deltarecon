@@ -1,0 +1,93 @@
+---
+// The head data of a page: title, description, canonical address, the two
+// language versions, Open Graph data and one block of structured data. Names
+// and addresses come from the page register; the description is the page's
+// own. It mirrors the head of the company website (BaseLayout.astro there).
+import {
+  company,
+  languages,
+  locales,
+  otherLanguage,
+  outside,
+  pageAddress,
+  pageTitle,
+  pages,
+  product,
+  texts,
+  type Lang,
+  type Page,
+} from '../site';
+import { version } from '../release';
+
+interface Props {
+  lang: Lang;
+  page: Page;
+  description: string;
+}
+
+const { lang, page, description } = Astro.props;
+const base = import.meta.env.BASE_URL.replace(/\/?$/, '/');
+const absolute = (address: string): string => new URL(address, Astro.site).href;
+
+const title = pageTitle(page, lang);
+const canonical = new URL(Astro.url.pathname, Astro.site).href;
+
+const jsonLd = {
+  '@context': 'https://schema.org',
+  '@type': 'WebPage',
+  name: page.name[lang],
+  description,
+  url: canonical,
+  inLanguage: lang,
+  isPartOf: {
+    '@type': 'WebSite',
+    name: texts[lang].documentation,
+    url: absolute(pageAddress(pages[0], lang)),
+    inLanguage: lang,
+  },
+  about: {
+    '@type': 'SoftwareApplication',
+    name: product,
+    applicationCategory: 'BusinessApplication',
+    operatingSystem: 'Windows, Linux',
+    softwareVersion: version,
+    url: outside.productPage,
+  },
+  publisher: { '@type': 'Organization', name: company, url: outside.company },
+};
+---
+
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>{title}</title>
+<meta name="description" content={description} />
+<link rel="canonical" href={canonical} />
+{
+  languages.map((language) => (
+    <link rel="alternate" hreflang={language} href={absolute(pageAddress(page, language))} />
+  ))
+}
+<link rel="icon" href={`${base}favicon.svg`} type="image/svg+xml" />
+<link
+  rel="preload"
+  href={`${base}fonts/InterVariable.woff2`}
+  as="font"
+  type="font/woff2"
+  crossorigin
+/>
+
+<meta property="og:title" content={title} />
+<meta property="og:description" content={description} />
+<meta property="og:url" content={canonical} />
+<meta property="og:type" content="website" />
+<meta property="og:site_name" content={texts[lang].documentation} />
+<meta property="og:locale" content={locales[lang]} />
+<meta property="og:locale:alternate" content={locales[otherLanguage(lang)]} />
+<meta property="og:image" content={outside.previewImage} />
+<meta name="twitter:card" content="summary_large_image" />
+
+<script
+  is:inline
+  type="application/ld+json"
+  set:html={JSON.stringify(jsonLd).replace(/</g, '\\u003c')}
+/>

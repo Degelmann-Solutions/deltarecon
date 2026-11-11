@@ -1,0 +1,61 @@
+---
+// Previous and next page on the path, as two boxes side by side. Each keeps
+// its side: the first page has only the next link, the last page only the
+// previous one. A link is named "Previous: page name" or "Next: page name";
+// the arrows are decoration.
+import { nextPage, pageAddress, previousPage, texts, type Lang, type Page } from '../site';
+
+interface Props {
+  lang: Lang;
+  page: Page;
+}
+
+const { lang, page } = Astro.props;
+const t = texts[lang];
+const previous = previousPage(page);
+const next = nextPage(page);
+
+const box = 'nav-link-box block rounded-sm border px-5 py-4';
+const label = 'block text-caption text-text-secondary';
+const name = 'nav-link-text mt-0.5 block text-[1rem] font-semibold text-teal-text';
+---
+
+<nav
+  class="mt-12 grid max-w-block-max grid-cols-1 gap-4 tablet:mt-16 tablet:grid-cols-2"
+  aria-label={t.pageLinks}
+  data-page-links
+  data-pagefind-ignore
+>
+  {
+    previous && (
+      <a
+        class:list={[box, 'border-border']}
+        href={pageAddress(previous, lang)}
+        rel="prev"
+        aria-label={`${t.previous}: ${previous.name[lang]}`}
+      >
+        <span class={label}>{t.previous}</span>
+        <span class={name}>
+          <span aria-hidden="true">←&nbsp;</span>
+          {previous.name[lang]}
+        </span>
+      </a>
+    )
+  }
+  {
+    next && (
+      <a
+        class:list={[box, 'border-navy tablet:col-start-2 tablet:text-right']}
+        href={pageAddress(next, lang)}
+        rel="next"
+        aria-label={`${t.next}: ${next.name[lang]}`}
+      >
+        <span class={label}>{t.next}</span>
+        <span class={name}>
+          {next.name[lang]}
+          <span aria-hidden="true">&nbsp;→</span>
+        </span>
+      </a>
+    )
+  }
+</nav>

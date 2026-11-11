@@ -18,10 +18,10 @@ Run them in `docs/`. Node 20 and npm are required.
 | `npm ci` | Installs the pinned dependencies from `package-lock.json`. |
 | `npm run local` | Builds the site with its search index and serves it. When port 4321 is free, the pages are at `http://localhost:4321/deltarecon/docs/de/` and `/en/`; otherwise the server takes the next free port. The command prints the address it serves on. |
 | `npm run build` | Builds the site to `dist/` and writes the search index to `dist/pagefind/`. |
-| `npm run check` | Builds the site, then checks both pages in Chromium (`scripts/check-site.mjs`): language, release number, link to the counterpart, reading with JavaScript off, the search per language, a missing search index, and that no request leaves the local origin. |
+| `npm run check` | Builds the site, then runs the three checks below in Chromium. Every page entry runs it. |
 | `npx astro check` | Type-checks the project. |
 
-The check needs the Chromium of Playwright. On a machine without it:
+The checks need the Chromium of Playwright. On a machine without it:
 
 ```
 npx playwright install chromium
@@ -29,6 +29,73 @@ npx playwright install chromium
 
 The search works only on a built site (`npm run local`), because Pagefind
 indexes the build output.
+
+## Checks
+
+`npm run check` runs three scripts one after the other. Each starts
+`astro preview` on a port of its own (`scripts/harness.mjs`), reads the page
+register, and names every failed expectation with its page.
+
+| Script | What it asserts |
+|---|---|
+| `scripts/check-site.mjs` | For every page: language, release number, link to the counterpart, reading with JavaScript off (no search field), and that no request leaves the local origin. For the start page of each language: the search per language and a missing search index. |
+| `scripts/check-head.mjs` | The built pages are exactly the pages of the register. For every page: title "page name – DeltaRecon documentation", a description of its own, canonical address, `alternate` links for `de` and `en`, Open Graph title, description, address, type, locale and image, and one JSON-LD block that parses and names the page. Titles and descriptions are unique. |
+| `scripts/check-a11y.mjs` | For every page, at desktop and phone width, with the menu closed and open: axe reports no violation of the A and AA rules of WCAG 2.0 to 2.2. Keyboard: the skip link comes first and leads to main, Tab reaches every control in reading order, each with a visible focus ring. The menu below 1280 px: focus on the close button, the page behind inert, Tab stays inside, Escape and the close button return focus to the menu button. With JavaScript off the menu button is a link to the chapter tree at the end of the page. No page scrolls sideways at 1280, 390 and 320 px. For the start page of each language also at 900 px: axe, the menu, and no sideways scrolling at 900 and 600 px. |
+
+The accessibility check writes eight screenshots to `screenshots/` (not under
+version control): the start page of each language at desktop width, at 900 px,
+at phone width, and with the menu open. Lay them beside the mock of the Overview page
+when the frame changes.
+
+What no script checks: the looks on hover, a Windows contrast theme, a screen
+reader, and zoom to 400 %.
+
+## Page register
+
+`src/site.ts` is the register of the site: the four stages, the ten pages in
+path order with their name and address per language, the addresses outside
+the documentation, and the texts of the page frame in both languages. Chapter
+tree, page links, page head, language switch and head data read it. A page
+name stands there and in no other file; rename a page there.
+
+The frame is `src/layouts/Page.astro` with the parts under `src/components/`.
+The design tokens are the `@theme` block of `src/styles/global.css`.
+
+## Adding or writing a page
+
+A page is one file per language under `src/pages/de/` and `src/pages/en/`.
+Its frontmatter names the register entry; title, stage line, tree entry and
+page links follow from it.
+
+```
+---
+layout: ../../layouts/Page.astro
+lang: en
+page: quick-start
+lead: "One sentence under the title."
+description: "The description of the page for search engines and shared links."
+---
+```
+
+- The file stands at the address the register gives the page: `slug`
+  `quick-start` in `en` is `src/pages/en/quick-start.mdx`; an empty slug is
+  `index.mdx`. The build fails when file and register disagree.
+- `description` is the page's own and differs from every other page.
+- A step page lists its steps, and the chapter tree shows them under the
+  page: `steps: [{ anchor: step-1, title: "Download the package" }]`. The
+  anchor is the same in both languages.
+- A new page needs an entry in `pages` of `src/site.ts` (at its place on the
+  path) and both files. `npm run check` fails when a page of the register is
+  not built or a built page is not in the register.
+- Only the start pages hold the words "Baustelle" (German) and "scaffold"
+  (English); the search check looks for them. Whoever replaces the start
+  page's text gives `scripts/check-site.mjs` two other words.
+
+## Typeface and logo
+
+`public/fonts/` and `public/logo.svg`, `public/favicon.svg` are copies from
+the repository of the company website; the licence files of the typefaces
+stand beside them. A page requests nothing from another origin.
 
 ## Release number
 
