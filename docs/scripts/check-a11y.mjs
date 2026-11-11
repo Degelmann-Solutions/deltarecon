@@ -356,6 +356,7 @@ async function checkMenu(page, name, { phone, screenshot, hitWord }) {
     ['logo', 'body > header img'],
     ['language switch', 'body > header a[data-counterpart]'],
     ['product-page link', '#chapters nav > a'],
+    ['mark of DeltaRecon', '#chapters svg[data-product-mark][aria-hidden="true"]'],
   ]) {
     expect(await page.locator(selector).isVisible(), `${name}: open menu: no ${part}`);
   }
@@ -561,6 +562,7 @@ async function checkEntry(browser, origin, entry) {
     const { context, page } = await open(browser, origin, entry, BETWEEN);
     for (const [part, selector] of [
       ['menu button', 'body > header button[data-menu-button]'],
+      ['mark of DeltaRecon', 'body > header svg[data-product-mark][aria-hidden="true"]'],
       ['release badge', 'body > header [data-release]'],
       ['search field', 'body > header input'],
       ['product-page link', 'body > header a[href$="/deltarecon"]'],

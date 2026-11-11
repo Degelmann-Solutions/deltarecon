@@ -93,9 +93,14 @@ description: "The description of the page for search engines and shared links."
 
 ## Typeface and logo
 
-`public/fonts/` and `public/logo.svg`, `public/favicon.svg` are copies from
-the repository of the company website; the licence files of the typefaces
-stand beside them. A page requests nothing from another origin.
+`public/fonts/` and `public/logo.svg` are copies from the repository of the
+company website; the licence files of the typefaces
+stand beside them. The mark of DeltaRecon beside the product title,
+`src/components/ProductMark.astro`, is a copy of
+`src/assets/deltarecon/logo-signet.svg` of that repository; when the mark
+changes there, copy its paths here and into `public/favicon.svg`, the same
+mark on a navy disc. A page requests nothing from another
+origin.
 
 ## Release number
 

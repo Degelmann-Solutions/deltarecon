@@ -1,6 +1,7 @@
 ---
-// The top bar: menu button (below the tree breakpoint), logo, product title,
-// release badge, search field, product-page link, language switch. On the
+// The top bar: menu button (below the tree breakpoint), logo, product title
+// with the mark of DeltaRecon, release badge, search field, product-page
+// link, language switch. On the
 // phone it keeps menu button, logo and language switch. While the menu is
 // open it is the menu's own top bar: close button, logo, language switch.
 // Where the parts do not fit into one row, the bar wraps; it has no fixed
@@ -9,6 +10,7 @@
 // The delivered page holds a link to the chapter tree in the place of the
 // menu button; menu.ts swaps it for the two real buttons.
 import LanguageSwitch from './LanguageSwitch.astro';
+import ProductMark from './ProductMark.astro';
 import Search from './Search.astro';
 import { company, outside, texts, type Lang, type Page } from '../site';
 import { tag } from '../release';
@@ -60,8 +62,9 @@ const button =
     <img class="h-[22px] w-[133px]" src={`${base}logo.svg`} alt={company} width="133" height="22" />
   </a>
   <span
-    class="border-l border-border pl-3.5 text-[0.875rem] font-semibold whitespace-nowrap max-tablet:hidden menu-open:hidden"
+    class="inline-flex items-center gap-2 border-l border-border pl-3.5 text-[0.875rem] font-semibold whitespace-nowrap max-tablet:hidden menu-open:hidden"
   >
+    <ProductMark class="h-5 w-auto flex-none text-navy" />
     {t.documentation}
   </span>
   <span

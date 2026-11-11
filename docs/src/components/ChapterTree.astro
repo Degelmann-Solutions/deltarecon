@@ -6,6 +6,7 @@
 //
 // `steps` are the steps of the current page; the tree lists them under the
 // page as links, in the column only (the menu leaves them out).
+import ProductMark from './ProductMark.astro';
 import {
   outside,
   pageAddress,
@@ -47,7 +48,10 @@ const linkState = (entry: Page): string =>
     <div data-search-slot></div>
     <nav aria-label={t.chapters}>
       <div class="flex items-center justify-between gap-3">
-        <p class="font-mono text-label-small text-text-secondary uppercase">{t.treeHeading}</p>
+        <p class="flex items-center gap-2 font-mono text-label-small text-text-secondary uppercase">
+          <ProductMark class="h-5 w-auto flex-none text-navy tree:hidden" />
+          {t.treeHeading}
+        </p>
         <span
           class="rounded-sm border border-border px-1.5 py-px font-mono text-label text-text-secondary tablet:hidden"
           data-release
