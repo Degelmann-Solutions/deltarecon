@@ -1,0 +1,96 @@
+---
+// The root address of the documentation. A static page that offers both
+// languages, each link in its own language. The script in its head leads on
+// by the languages of the browser, in their order: the first that is German
+// or English decides; languages of which none is German or English lead to
+// English; where no language can be read, and without JavaScript, the page
+// stays. Nothing is remembered. An address under de/ or en/ is never
+// redirected: the script stands on this page only.
+//
+// Search engines list the language pages, not this one, and the search of
+// the site does not index it.
+import '../styles/global.css';
+import { company, languages, pageAddress, pages, texts } from '../site';
+
+const base = import.meta.env.BASE_URL.replace(/\/?$/, '/');
+const start = { de: pageAddress(pages[0], 'de'), en: pageAddress(pages[0], 'en') };
+const links = { de: 'Dokumentation auf Deutsch', en: 'Documentation in English' };
+---
+
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>{texts.en.documentation} · {texts.de.documentation}</title>
+    <meta name="robots" content="noindex" />
+    <script is:inline define:vars={{ start }}>
+      (function () {
+        var list = [];
+        try {
+          list = Array.from(navigator.languages || []);
+          if (list.length === 0 && navigator.language) list = [navigator.language];
+        } catch (error) {
+          list = [];
+        }
+        // No language readable: the page stays and offers both.
+        if (list.length === 0) return;
+        var target = 'en';
+        for (var index = 0; index < list.length; index += 1) {
+          var code = String(list[index]).toLowerCase().split('-')[0];
+          if (code === 'de' || code === 'en') {
+            target = code;
+            break;
+          }
+        }
+        // `replace`: the Back button does not return to this page.
+        window.location.replace(start[target]);
+      })();
+    </script>
+    <link rel="icon" href={`${base}favicon.svg`} type="image/svg+xml" />
+    <link
+      rel="preload"
+      href={`${base}fonts/InterVariable.woff2`}
+      as="font"
+      type="font/woff2"
+      crossorigin
+    />
+  </head>
+  <body class="flex min-h-screen flex-col">
+    <header class="flex min-h-topbar-height items-center border-b border-border bg-bg px-3 py-1.5 tablet:px-5">
+      <img class="h-[22px] w-[133px]" src={`${base}logo.svg`} alt={company} width="133" height="22" />
+    </header>
+    <main
+      class="mx-auto w-full max-w-text-max px-content-pad-x-phone pt-content-pad-top-phone pb-content-pad-bottom-phone tablet:px-content-pad-x tablet:pt-content-pad-top tablet:pb-content-pad-bottom"
+    >
+      <h1 class="text-page-title-phone text-balance tablet:text-page-title">
+        {
+          languages.map((language) => (
+            <span class="block" lang={language}>
+              {texts[language].documentation}
+            </span>
+          ))
+        }
+      </h1>
+      <ul class="mt-8 grid grid-cols-1 gap-4 tablet:grid-cols-2">
+        {
+          languages.map((language) => (
+            <li>
+              <a
+                class="nav-link-box block rounded-sm border border-navy px-5 py-4"
+                href={start[language]}
+                hreflang={language}
+                lang={language}
+                data-language-link={language}
+              >
+                <span class="nav-link-text block text-[1rem] font-semibold text-teal-text">
+                  {links[language]}
+                </span>
+              </a>
+            </li>
+          ))
+        }
+      </ul>
+    </main>
+  </body>
+</html>

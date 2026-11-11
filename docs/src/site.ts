@@ -109,6 +109,18 @@ export const pages: readonly Page[] = [
   },
 ];
 
+/**
+ * The page-not-found page. It stands outside the path and so not in `pages`:
+ * no stage line, no page links, no entry in the chapter tree, and neither
+ * search engines nor the search of the site list it.
+ */
+export const notFoundPage: Page = {
+  id: 'page-not-found',
+  stage: null,
+  name: { en: 'Page not found', de: 'Seite nicht gefunden' },
+  slug: { en: 'page-not-found', de: 'seite-nicht-gefunden' },
+};
+
 /** Addresses outside the documentation. They are links, never requests. */
 export const outside = {
   company: 'https://degelmann-solutions.de/',
@@ -205,6 +217,11 @@ export function findPage(id: string): Page {
     throw new Error(`No page "${id}" in the page register (src/site.ts).`);
   }
   return page;
+}
+
+/** Whether a page is one of the ten on the path. */
+export function onPath(page: Page): boolean {
+  return pages.includes(page);
 }
 
 export function stageOf(page: Page): Stage | undefined {

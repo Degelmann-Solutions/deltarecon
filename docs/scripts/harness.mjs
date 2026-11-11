@@ -105,6 +105,79 @@ export async function loadPages() {
   );
 }
 
+/**
+ * The three pages outside the path: the page-not-found page of each language
+ * and the root page, which offers both languages. Titles and link texts are
+ * written out here, as in `loadPages`.
+ */
+export async function loadOtherPages() {
+  const site = await loadRegister();
+  const start = (lang) => `${BASE}${site.pagePath(site.pages[0], lang)}`;
+  const overview = { de: 'Zum Überblick', en: 'To the Overview' };
+  const notFound = site.languages.map((lang) => {
+    const other = site.otherLanguage(lang);
+    return {
+      id: site.notFoundPage.id,
+      lang,
+      otherLang: other,
+      name: site.notFoundPage.name[lang],
+      otherName: site.notFoundPage.name[other],
+      address: `${BASE}${site.pagePath(site.notFoundPage, lang)}`,
+      counterpart: `${BASE}${site.pagePath(site.notFoundPage, other)}`,
+      title: `${site.notFoundPage.name[lang]} – ${site.texts[lang].documentation}`,
+      // The link of each block to the Overview of its language, own block first.
+      overviewLinks: [lang, other].map((language) => ({
+        lang: language,
+        name: overview[language],
+        address: start(language),
+      })),
+      isRoot: false,
+      texts: site.texts[lang],
+    };
+  });
+  const rootPage = {
+    address: BASE,
+    lang: 'en',
+    title: `${site.texts.en.documentation} · ${site.texts.de.documentation}`,
+    names: site.languages.map((lang) => ({ lang, name: site.texts[lang].documentation })),
+    links: [
+      { lang: 'de', name: 'Dokumentation auf Deutsch', address: start('de') },
+      { lang: 'en', name: 'Documentation in English', address: start('en') },
+    ],
+  };
+  return { notFound, rootPage };
+}
+
+/**
+ * The texts of the search, written out per language, so that a changed text
+ * fails a check. `engine` stands on several pages of each language: in the
+ * name of one page and in the text of another.
+ */
+export const searchTexts = {
+  de: {
+    label: 'Suche',
+    loading: 'Die Suche wird geladen …',
+    unavailable: 'Die Suche ist nicht verfügbar.',
+    noMatch: (term) => `Keine Treffer für „${term}“.`,
+    count: (number) => `${number} Treffer`,
+    // A word that only the start page holds; one that several pages hold;
+    // one that only the page-not-found page holds.
+    ownWord: 'Baustelle',
+    sharedWord: 'Engine',
+    notFoundWord: 'Tippfehler',
+  },
+  en: {
+    label: 'Search',
+    loading: 'The search is loading …',
+    unavailable: 'The search is not available.',
+    noMatch: (term) => `No matches for “${term}”.`,
+    count: (number) => (number === 1 ? '1 match' : `${number} matches`),
+    ownWord: 'scaffold',
+    sharedWord: 'engine',
+    notFoundWord: 'renamed',
+  },
+};
+
 /** Collects failed expectations; `report` prints them and ends the script. */
 export function expectations(script) {
   const failures = [];

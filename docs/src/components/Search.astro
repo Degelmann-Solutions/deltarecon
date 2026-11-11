@@ -1,38 +1,71 @@
 ---
 // Search of the pages of one language. The delivered page holds an empty
-// container only; the script below inserts the labelled field, so a page
-// read without JavaScript has no search field.
+// container only; the script below inserts the labelled field and the search
+// result list, so a page read without JavaScript has no search field.
 //
 // There is one field. From the phone breakpoint up it stands in the top bar,
 // where this component is placed; below it the script moves it into the menu
 // (the element marked `data-search-slot` in the chapter tree).
 //
+// The search result list is a box directly under the field: on top the status
+// line, then one hit per page with the page name as the link, the stage line
+// of that page and a one-line excerpt. In the top bar the box hangs from the
+// field and lies over the page; in the menu it stands in the flow and pushes
+// the chapter tree down. Its look is in global.css (`.search-panel`).
+//
 // Pagefind builds one index per <html lang>, and its script searches the
-// index of the language of the page it runs on.
+// index of the language of the page it runs on. The page name of a hit is the
+// level-1 heading of its page. Its stage line comes from the page register,
+// by the address of the hit; Pagefind would search a metadata value too, and
+// the stage line is not searched text.
+import { pageAddress, pages, stageLine } from '../site';
+
 interface Props {
   lang: 'de' | 'en';
 }
 
-// PLACEHOLDER TEXTS: provisional wording. The search story of the epic
-// (search result list, final texts) replaces both entries in both languages.
+// `{term}` stands for what the reader typed, `{count}` for the number of hits.
 const texts = {
-  de: { label: 'Suche', unavailable: 'Die Suche ist nicht verfügbar.' },
-  en: { label: 'Search', unavailable: 'The search is not available.' },
+  de: {
+    label: 'Suche',
+    loading: 'Die Suche wird geladen …',
+    unavailable: 'Die Suche ist nicht verfügbar.',
+    noMatch: 'Keine Treffer für „{term}“.',
+    one: '1 Treffer',
+    many: '{count} Treffer',
+  },
+  en: {
+    label: 'Search',
+    loading: 'The search is loading …',
+    unavailable: 'The search is not available.',
+    noMatch: 'No matches for “{term}”.',
+    one: '1 match',
+    many: '{count} matches',
+  },
 } as const;
 
 const { lang } = Astro.props;
+const t = texts[lang];
+const stages = Object.fromEntries(
+  pages.map((page) => [pageAddress(page, lang), stageLine(page, lang)]),
+);
 ---
 
 <div
   class="relative empty:hidden max-tablet:mb-5 tablet:ml-1.5 tablet:menu-open:hidden"
   data-search
-  data-label={texts[lang].label}
-  data-unavailable={texts[lang].unavailable}
+  data-label={t.label}
+  data-loading={t.loading}
+  data-unavailable={t.unavailable}
+  data-no-match={t.noMatch}
+  data-one={t.one}
+  data-many={t.many}
+  data-stages={JSON.stringify(stages)}
 />
 
 <script>
   interface Hit {
-    data(): Promise<{ url: string; meta: { title?: string } }>;
+    data(): Promise<{ url: string; excerpt: string; meta: { title?: string } }>;
   }
   interface Pagefind {
     options(options: { baseUrl: string }): Promise<void>;
@@ -41,6 +74,12 @@ const { lang } = Astro.props;
   }
 
   const base = import.meta.env.BASE_URL.replace(/\/?$/, '/');
+  // The phone breakpoint of the stylesheet (`--breakpoint-tablet`): from it
+  // up the field stands in the top bar.
+  const bar = window.matchMedia('(min-width: 37.5rem)');
+  // Words of an excerpt kept before its first matched word, so that the match
+  // stands in the one line the list shows.
+  const WORDS_BEFORE_MATCH = 3;
 
   // One load for all fields of the page. The index exists only after the
   // Pagefind run, so Vite must not resolve the import.
@@ -55,88 +94,203 @@ const { lang } = Astro.props;
     return index;
   }
 
+  /**
+   * The excerpt of a hit as one line: plain text with the matched words
+   * marked. Pagefind delivers HTML with <mark>; only its text and its marks
+   * are taken over.
+   */
+  function excerptLine(html: string): HTMLElement {
+    const line = document.createElement('p');
+    line.className = 'search-hit-excerpt';
+    const parts = [...new DOMParser().parseFromString(html, 'text/html').body.childNodes];
+    parts.forEach((part, position) => {
+      let text = part.textContent ?? '';
+      if (part.nodeName === 'MARK') {
+        const mark = document.createElement('mark');
+        mark.textContent = text;
+        line.append(mark);
+        return;
+      }
+      if (position === 0 && parts.length > 1) {
+        const words = text.trimStart().split(/\s+/);
+        if (words.length > WORDS_BEFORE_MATCH + 1) {
+          text = `… ${words.slice(-(WORDS_BEFORE_MATCH + 1)).join(' ')}`;
+        }
+      }
+      line.append(text);
+    });
+    return line;
+  }
+
   let fieldCount = 0;
 
   function setUp(container: HTMLElement): void {
     const id = `search-field-${++fieldCount}`;
+    const text = (name: string): string => container.dataset[name] ?? '';
+
+    // The stage line of each page of the language, by its address.
+    const stages: Record<string, string> = JSON.parse(container.dataset.stages ?? '{}');
 
     container.setAttribute('role', 'search');
 
     // The label names the field; the same word shows in the empty field.
     const label = document.createElement('label');
     label.htmlFor = id;
-    label.textContent = container.dataset.label ?? '';
+    label.textContent = text('label');
     label.className = 'sr-only';
 
     const field = document.createElement('input');
     field.type = 'search';
     field.id = id;
-    field.placeholder = container.dataset.label ?? '';
+    field.placeholder = text('label');
     field.className =
       'block min-h-11 w-full rounded-sm border border-navy bg-bg px-3 text-[1rem] leading-[1.4] text-navy placeholder:text-text-secondary placeholder:opacity-100 tablet:min-h-10 tablet:w-search-field-width tablet:px-2.5 tablet:text-nav';
 
+    // The status line is in the page before its text arrives, so that the
+    // text is announced. `loading` until the index has answered.
     const status = document.createElement('p');
     status.setAttribute('role', 'status');
+    status.className = 'search-status';
     status.dataset.searchStatus = 'loading';
 
     const hits = document.createElement('ul');
+    hits.className = 'search-hits';
     hits.dataset.searchResults = '';
 
-    // PROVISIONAL: a plain box under the field for the status text and the
-    // hits. The search story of the epic replaces it with the result list.
     const panel = document.createElement('div');
-    panel.className =
-      'search-panel absolute top-full right-0 left-0 z-10 mt-1 min-w-60 rounded-sm border border-navy bg-bg p-2 text-nav';
+    panel.className = 'search-panel';
     panel.append(status, hits);
-    // The box is clipped while it has nothing to show (global.css). It stays
-    // in the page, so the status is announced when its text arrives.
+    // A click in the list leaves focus where it is: the list never moves
+    // focus on its own, and a link still opens.
+    panel.addEventListener('mousedown', (event) => event.preventDefault());
+
+    // The list is clipped while it has nothing to show or is closed
+    // (global.css). It stays in the page, so the status is announced when its
+    // text arrives; the hits of a closed list take no focus.
+    let closed = false;
     const show = (): void => {
-      panel.toggleAttribute('data-empty', !status.textContent && hits.children.length === 0);
+      const nothing = !status.textContent && hits.children.length === 0;
+      panel.toggleAttribute('data-empty', nothing || closed);
+      hits.hidden = closed;
+      // In the top bar the list is never wider than the room right of the
+      // field's left edge, so the page does not scroll sideways.
+      const room = document.documentElement.clientWidth - container.getBoundingClientRect().left;
+      panel.style.maxWidth = bar.matches ? `${Math.max(room - 12, 0)}px` : '';
+    };
+    const open = (): void => {
+      closed = false;
+      show();
+    };
+    const close = (): void => {
+      closed = true;
+      show();
     };
     show();
 
     container.append(label, field, panel);
 
-    const unavailable = (): void => {
-      status.textContent = container.dataset.unavailable ?? '';
-      status.dataset.searchStatus = 'unavailable';
-      show();
+    const say = (message: string): void => {
+      hits.replaceChildren();
+      status.textContent = message;
     };
 
-    loadIndex().then(() => {
-      status.dataset.searchStatus = 'ready';
-    }, unavailable);
+    // The index answers, or not. A loaded index shows nothing before the
+    // reader types; a failed load says at once that the search is not
+    // available.
+    loadIndex().then(
+      () => {
+        status.dataset.searchStatus = 'ready';
+      },
+      () => {
+        status.dataset.searchStatus = 'unavailable';
+        say(text('unavailable'));
+        show();
+      },
+    );
 
     field.addEventListener('input', async () => {
       const term = field.value.trim();
+      closed = false;
+      if (!term) {
+        say('');
+        hits.dataset.searchResults = '';
+        show();
+        return;
+      }
+      if (status.dataset.searchStatus === 'loading') {
+        say(text('loading'));
+        show();
+      }
       try {
         const pagefind = await loadIndex();
         // null: a later keystroke has superseded this search.
-        const search = term ? await pagefind.debouncedSearch(term) : { results: [] };
+        const search = await pagefind.debouncedSearch(term);
         if (search === null) return;
         const found = await Promise.all(search.results.map((hit) => hit.data()));
         if (field.value.trim() !== term) return;
-        hits.replaceChildren(
+        // A search that answered ends an earlier "loading" or "not available".
+        status.dataset.searchStatus = 'ready';
+        if (found.length === 0) say(text('noMatch').replace('{term}', () => term));
+        else if (found.length === 1) say(text('one'));
+        else say(text('many').replace('{count}', String(found.length)));
+        hits.append(
           ...found.map((page) => {
             const link = document.createElement('a');
             link.href = page.url;
             link.textContent = page.meta.title ?? page.url;
-            link.className = 'inline-link inline-flex min-h-6 items-center';
+            link.className = 'search-hit-name nav-link';
             const item = document.createElement('li');
             item.append(link);
+            const stageLine = stages[page.url];
+            if (stageLine) {
+              const stage = document.createElement('p');
+              stage.className = 'search-hit-stage';
+              stage.textContent = stageLine;
+              item.append(stage);
+            }
+            item.append(excerptLine(page.excerpt));
             return item;
           }),
         );
-        // A search that answered ends an earlier "not available" status.
-        status.textContent = '';
-        status.dataset.searchStatus = 'ready';
-        // The term the list answers; the site check waits on it.
-        hits.dataset.searchResults = term;
-        show();
       } catch {
-        unavailable();
+        if (field.value.trim() !== term) return;
+        status.dataset.searchStatus = 'unavailable';
+        say(text('unavailable'));
       }
+      // The term the list answers; the checks wait on it.
+      hits.dataset.searchResults = term;
+      show();
     });
+
+    // Escape closes the open list; focus and the typed term stay in the field
+    // (the browser would empty a search field on Escape).
+    field.addEventListener('keydown', (event) => {
+      if (event.key !== 'Escape' || panel.hasAttribute('data-empty')) return;
+      event.preventDefault();
+      close();
+    });
+    // In the top bar, Escape on a hit closes the list and puts focus into the
+    // field. In the menu it closes the menu (menu.ts).
+    hits.addEventListener('keydown', (event) => {
+      if (event.key !== 'Escape' || !bar.matches) return;
+      event.preventDefault();
+      // Focusing the field opens the list, so it is closed afterwards.
+      field.focus();
+      close();
+    });
+    // Focusing the field with a term opens the list again.
+    field.addEventListener('focus', () => {
+      if (field.value.trim()) open();
+    });
+    // In the top bar the list lies over the page. When focus leaves the
+    // search, the list closes, so that it never covers the focused element.
+    // In the menu it stands in the flow and covers nothing.
+    container.addEventListener('focusout', (event) => {
+      const next = event.relatedTarget;
+      if (!bar.matches || (next instanceof Node && container.contains(next))) return;
+      close();
+    });
+    window.addEventListener('resize', show);
   }
 
   /** Puts the field into the menu below the phone breakpoint, else back. */
@@ -145,8 +299,6 @@ const { lang } = Astro.props;
     const home = container.parentElement;
     const after = container.nextElementSibling;
     if (!slot || !home) return;
-    // The phone breakpoint of the stylesheet (`--breakpoint-tablet`).
-    const bar = window.matchMedia('(min-width: 37.5rem)');
     const move = (): void => {
       if (bar.matches) home.insertBefore(container, after);
       else slot.append(container);
