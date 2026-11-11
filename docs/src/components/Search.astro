@@ -1,0 +1,113 @@
+---
+// Search of the pages of one language. The delivered page holds an empty
+// container only; the script below inserts the labelled field, so a page
+// read without JavaScript has no search field.
+//
+// Pagefind builds one index per <html lang>, and its script searches the
+// index of the language of the page it runs on.
+interface Props {
+  lang: 'de' | 'en';
+}
+
+// PLACEHOLDER TEXTS: provisional wording. The search story of the epic
+// (search result list, final texts) replaces both entries in both languages.
+const texts = {
+  de: { label: 'Suche', unavailable: 'Die Suche ist nicht verfügbar.' },
+  en: { label: 'Search', unavailable: 'The search is not available.' },
+} as const;
+
+const { lang } = Astro.props;
+---
+
+<div data-search data-label={texts[lang].label} data-unavailable={texts[lang].unavailable}></div>
+
+<script>
+  interface Hit {
+    data(): Promise<{ url: string; meta: { title?: string } }>;
+  }
+  interface Pagefind {
+    options(options: { baseUrl: string }): Promise<void>;
+    init(): Promise<void>;
+    debouncedSearch(term: string): Promise<{ results: Hit[] } | null>;
+  }
+
+  const base = import.meta.env.BASE_URL.replace(/\/?$/, '/');
+
+  // One load for all fields of the page. The index exists only after the
+  // Pagefind run, so Vite must not resolve the import.
+  let index: Promise<Pagefind> | undefined;
+  function loadIndex(): Promise<Pagefind> {
+    index ??= (async () => {
+      const pagefind: Pagefind = await import(/* @vite-ignore */ `${base}pagefind/pagefind.js`);
+      await pagefind.options({ baseUrl: base });
+      await pagefind.init();
+      return pagefind;
+    })();
+    return index;
+  }
+
+  let fieldCount = 0;
+
+  function setUp(container: HTMLElement): void {
+    const id = `search-field-${++fieldCount}`;
+
+    const label = document.createElement('label');
+    label.htmlFor = id;
+    label.textContent = container.dataset.label ?? '';
+
+    const field = document.createElement('input');
+    field.type = 'search';
+    field.id = id;
+    field.className = 'ml-2 border px-2 py-1';
+
+    const status = document.createElement('p');
+    status.setAttribute('role', 'status');
+    status.dataset.searchStatus = 'loading';
+
+    const hits = document.createElement('ul');
+    hits.dataset.searchResults = '';
+
+    container.append(label, field, status, hits);
+
+    const unavailable = (): void => {
+      status.textContent = container.dataset.unavailable ?? '';
+      status.dataset.searchStatus = 'unavailable';
+    };
+
+    loadIndex().then(() => {
+      status.dataset.searchStatus = 'ready';
+    }, unavailable);
+
+    field.addEventListener('input', async () => {
+      const term = field.value.trim();
+      try {
+        const pagefind = await loadIndex();
+        // null: a later keystroke has superseded this search.
+        const search = term ? await pagefind.debouncedSearch(term) : { results: [] };
+        if (search === null) return;
+        const found = await Promise.all(search.results.map((hit) => hit.data()));
+        if (field.value.trim() !== term) return;
+        hits.replaceChildren(
+          ...found.map((page) => {
+            const link = document.createElement('a');
+            link.href = page.url;
+            link.textContent = page.meta.title ?? page.url;
+            link.className = 'underline';
+            const item = document.createElement('li');
+            item.append(link);
+            return item;
+          }),
+        );
+        // A search that answered ends an earlier "not available" status.
+        status.textContent = '';
+        status.dataset.searchStatus = 'ready';
+        // The term the list answers; the site check waits on it.
+        hits.dataset.searchResults = term;
+      } catch {
+        unavailable();
+      }
+    });
+  }
+
+  document.querySelectorAll<HTMLElement>('[data-search]').forEach(setUp);
+</script>

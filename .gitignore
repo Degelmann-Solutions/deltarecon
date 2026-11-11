@@ -244,3 +244,7 @@ Thumbs.db
 
 # Local clones of the repositories a release identity names (the reference model delib-history)
 /repositories/
+
+# Documentation site (docs/)
+node_modules/
+.astro/

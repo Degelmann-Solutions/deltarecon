@@ -1,0 +1,23 @@
+{
+  "name": "deltarecon-docs",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "astro build && pagefind --site dist",
+    "local": "npm run build && astro preview",
+    "check": "npm run build && node scripts/check-site.mjs"
+  },
+  "dependencies": {
+    "@astrojs/mdx": "4.3.14",
+    "@tailwindcss/vite": "4.3.2",
+    "astro": "5.18.2",
+    "pagefind": "1.6.0",
+    "tailwindcss": "4.3.2"
+  },
+  "devDependencies": {
+    "@astrojs/check": "0.9.9",
+    "playwright": "1.61.1",
+    "typescript": "5.9.3"
+  }
+}
