@@ -1,0 +1,32 @@
+---
+// The footer: one row of four links to imprint, privacy, licence and
+// repository. Imprint and privacy are pages of the company website, which is
+// German.
+import { outside, texts, type Lang } from '../site';
+
+interface Props {
+  lang: Lang;
+}
+
+const { lang } = Astro.props;
+const t = texts[lang];
+const links = [
+  { name: t.imprint, href: outside.imprint, hreflang: 'de' },
+  { name: t.privacy, href: outside.privacy, hreflang: 'de' },
+  { name: t.licence, href: outside.licence, hreflang: 'en' },
+  { name: t.repository, href: outside.repository, hreflang: 'en' },
+];
+---
+
+<footer
+  class="flex flex-wrap gap-x-5 gap-y-2 border-t border-border bg-bg px-3 py-3.5 text-caption text-text-secondary tablet:px-5 menu-open:hidden"
+  data-behind-menu
+>
+  {
+    links.map((link) => (
+      <a class="inline-link inline-flex min-h-6 items-center" href={link.href} hreflang={link.hreflang}>
+        {link.name}
+      </a>
+    ))
+  }
+</footer>

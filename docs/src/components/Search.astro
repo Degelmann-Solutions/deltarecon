@@ -3,6 +3,10 @@
 // container only; the script below inserts the labelled field, so a page
 // read without JavaScript has no search field.
 //
+// There is one field. From the phone breakpoint up it stands in the top bar,
+// where this component is placed; below it the script moves it into the menu
+// (the element marked `data-search-slot` in the chapter tree).
+//
 // Pagefind builds one index per <html lang>, and its script searches the
 // index of the language of the page it runs on.
 interface Props {
@@ -19,7 +23,12 @@ const texts = {
 const { lang } = Astro.props;
 ---
 
-<div data-search data-label={texts[lang].label} data-unavailable={texts[lang].unavailable}></div>
+<div
+  class="relative empty:hidden max-tablet:mb-5 tablet:ml-1.5 tablet:menu-open:hidden"
+  data-search
+  data-label={texts[lang].label}
+  data-unavailable={texts[lang].unavailable}
+/>
 
 <script>
   interface Hit {
@@ -51,14 +60,20 @@ const { lang } = Astro.props;
   function setUp(container: HTMLElement): void {
     const id = `search-field-${++fieldCount}`;
 
+    container.setAttribute('role', 'search');
+
+    // The label names the field; the same word shows in the empty field.
     const label = document.createElement('label');
     label.htmlFor = id;
     label.textContent = container.dataset.label ?? '';
+    label.className = 'sr-only';
 
     const field = document.createElement('input');
     field.type = 'search';
     field.id = id;
-    field.className = 'ml-2 border px-2 py-1';
+    field.placeholder = container.dataset.label ?? '';
+    field.className =
+      'block min-h-11 w-full rounded-sm border border-navy bg-bg px-3 text-[1rem] leading-[1.4] text-navy placeholder:text-text-secondary placeholder:opacity-100 tablet:min-h-10 tablet:w-search-field-width tablet:px-2.5 tablet:text-nav';
 
     const status = document.createElement('p');
     status.setAttribute('role', 'status');
@@ -67,11 +82,25 @@ const { lang } = Astro.props;
     const hits = document.createElement('ul');
     hits.dataset.searchResults = '';
 
-    container.append(label, field, status, hits);
+    // PROVISIONAL: a plain box under the field for the status text and the
+    // hits. The search story of the epic replaces it with the result list.
+    const panel = document.createElement('div');
+    panel.className =
+      'search-panel absolute top-full right-0 left-0 z-10 mt-1 min-w-60 rounded-sm border border-navy bg-bg p-2 text-nav';
+    panel.append(status, hits);
+    // The box is clipped while it has nothing to show (global.css). It stays
+    // in the page, so the status is announced when its text arrives.
+    const show = (): void => {
+      panel.toggleAttribute('data-empty', !status.textContent && hits.children.length === 0);
+    };
+    show();
+
+    container.append(label, field, panel);
 
     const unavailable = (): void => {
       status.textContent = container.dataset.unavailable ?? '';
       status.dataset.searchStatus = 'unavailable';
+      show();
     };
 
     loadIndex().then(() => {
@@ -92,7 +121,7 @@ const { lang } = Astro.props;
             const link = document.createElement('a');
             link.href = page.url;
             link.textContent = page.meta.title ?? page.url;
-            link.className = 'underline';
+            link.className = 'inline-link inline-flex min-h-6 items-center';
             const item = document.createElement('li');
             item.append(link);
             return item;
@@ -103,11 +132,31 @@ const { lang } = Astro.props;
         status.dataset.searchStatus = 'ready';
         // The term the list answers; the site check waits on it.
         hits.dataset.searchResults = term;
+        show();
       } catch {
         unavailable();
       }
     });
   }
 
-  document.querySelectorAll<HTMLElement>('[data-search]').forEach(setUp);
+  /** Puts the field into the menu below the phone breakpoint, else back. */
+  function place(container: HTMLElement): void {
+    const slot = document.querySelector<HTMLElement>('[data-search-slot]');
+    const home = container.parentElement;
+    const after = container.nextElementSibling;
+    if (!slot || !home) return;
+    // The phone breakpoint of the stylesheet (`--breakpoint-tablet`).
+    const bar = window.matchMedia('(min-width: 37.5rem)');
+    const move = (): void => {
+      if (bar.matches) home.insertBefore(container, after);
+      else slot.append(container);
+    };
+    bar.addEventListener('change', move);
+    move();
+  }
+
+  document.querySelectorAll<HTMLElement>('[data-search]').forEach((container) => {
+    setUp(container);
+    place(container);
+  });
 </script>

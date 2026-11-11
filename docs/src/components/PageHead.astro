@@ -1,0 +1,20 @@
+---
+// The head of a page: the stage line, the title, the lead. The stage line
+// names the stage of the page; on the page below the four stages it names
+// the page kind.
+import { stageLine, type Lang, type Page } from '../site';
+
+interface Props {
+  lang: Lang;
+  page: Page;
+  lead: string;
+}
+
+const { lang, page, lead } = Astro.props;
+---
+
+<p class="text-caption text-text-secondary" data-stage-line>{stageLine(page, lang)}</p>
+<h1 class="mt-2.5 max-w-text-max text-page-title-phone text-balance tablet:text-page-title">
+  {page.name[lang]}
+</h1>
+<p class="mt-3.5 max-w-text-max text-lead-phone text-text-secondary tablet:text-lead">{lead}</p>

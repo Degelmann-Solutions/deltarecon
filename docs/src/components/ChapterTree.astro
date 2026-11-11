@@ -1,0 +1,152 @@
+---
+// The chapter tree: the four stages on a trace with their pages, then, after
+// a hairline, the page below the stages. It exists once in the page: as the
+// left column from the tree breakpoint up, as the menu below it, and at the
+// end of the page where no script runs.
+//
+// `steps` are the steps of the current page; the tree lists them under the
+// page as links, in the column only (the menu leaves them out).
+import ProductMark from './ProductMark.astro';
+import {
+  outside,
+  pageAddress,
+  pages,
+  pagesOf,
+  stages,
+  texts,
+  type Lang,
+  type Page,
+  type Step,
+} from '../site';
+import { tag } from '../release';
+
+interface Props {
+  lang: Lang;
+  page: Page;
+  steps?: Step[];
+}
+
+const { lang, page, steps = [] } = Astro.props;
+const t = texts[lang];
+const below = pages.filter((entry) => entry.stage === null);
+
+const link =
+  'nav-link block rounded-sm border px-2 py-1.5 text-[1rem] leading-[1.4] max-tree:flex max-tree:min-h-11 max-tree:items-center tree:text-nav';
+const linkState = (entry: Page): string =>
+  entry === page
+    ? 'border-border border-l-2 border-l-teal-text bg-bg font-semibold text-teal-text'
+    : 'border-transparent text-navy';
+---
+
+<div
+  id="chapters"
+  class="border-border bg-bg-subtle max-tree:order-last max-tree:border-t tree:border-r menu-closed:max-tree:hidden menu-open:flex-1 menu-open:border-t-0"
+>
+  <div
+    class="px-5 pt-6 pb-7 tree:sticky tree:top-0 tree:max-h-screen tree:overflow-y-auto tree:pt-7 tree:pb-8"
+  >
+    <div data-search-slot></div>
+    <nav aria-label={t.chapters}>
+      <div class="flex items-center justify-between gap-3">
+        <p class="flex items-center gap-2 font-mono text-label-small text-text-secondary uppercase">
+          <ProductMark class="h-5 w-auto flex-none text-navy tree:hidden" />
+          {t.treeHeading}
+        </p>
+        <span
+          class="rounded-sm border border-border px-1.5 py-px font-mono text-label text-text-secondary tablet:hidden"
+          data-release
+          translate="no">{tag}</span
+        >
+      </div>
+      <ol class="mt-[18px]">
+        {
+          stages.map((stage, index) => {
+            const current = stage.number === page.stage;
+            return (
+              <li
+                class:list={['relative pl-6', index < stages.length - 1 && 'pb-[22px]']}
+                data-current-stage={current ? '' : undefined}
+              >
+                {index < stages.length - 1 && (
+                  <span
+                    class="absolute top-1.5 -bottom-1.5 left-[3px] border-l-[1.5px] border-navy opacity-40"
+                    aria-hidden="true"
+                  />
+                )}
+                <span
+                  class:list={[
+                    'absolute h-0 w-0',
+                    current
+                      ? 'top-[3px] -left-0.5 border-[6px] border-teal-text'
+                      : 'top-[5px] left-0 border-4 border-navy',
+                  ]}
+                  aria-hidden="true"
+                />
+                <h2 class="text-nav-stage text-navy">
+                  <span
+                    class:list={[
+                      'block font-mono text-label-small font-normal uppercase',
+                      current ? 'text-teal-text' : 'text-text-secondary',
+                    ]}
+                  >
+                    {t.stage} {stage.number}
+                  </span>
+                  {stage.name[lang]}
+                </h2>
+                <ul class="mt-1.5">
+                  {pagesOf(stage).map((entry) => (
+                    <li>
+                      <a
+                        class:list={[link, '-ml-2', linkState(entry)]}
+                        href={pageAddress(entry, lang)}
+                        aria-current={entry === page ? 'page' : undefined}
+                      >
+                        {entry.name[lang]}
+                      </a>
+                      {entry === page && steps.length > 0 && (
+                        <ol
+                          class="mt-1.5 mb-1 list-decimal pl-5 text-[0.8125rem] leading-[1.4] text-text-secondary marker:font-mono marker:text-[0.6875rem] max-tree:hidden"
+                          aria-label={t.steps}
+                        >
+                          {steps.map((step) => (
+                            <li>
+                              <a class="nav-link block py-[3px]" href={`#${step.anchor}`}>
+                                {step.title}
+                              </a>
+                            </li>
+                          ))}
+                        </ol>
+                      )}
+                    </li>
+                  ))}
+                </ul>
+              </li>
+            );
+          })
+        }
+      </ol>
+      <ul class="mt-5 border-t border-border pt-3.5">
+        {
+          below.map((entry) => (
+            <li>
+              <a
+                class:list={[link, 'ml-4', linkState(entry)]}
+                href={pageAddress(entry, lang)}
+                aria-current={entry === page ? 'page' : undefined}
+              >
+                {entry.name[lang]}
+              </a>
+            </li>
+          ))
+        }
+      </ul>
+      <a
+        class="nav-link mt-5 inline-flex min-h-11 items-center font-medium text-teal-text tree:hidden"
+        href={outside.productPage}
+        hreflang="de"
+      >
+        <span aria-hidden="true">←&nbsp;</span>{t.productPage}
+      </a>
+    </nav>
+  </div>
+</div>

@@ -1,0 +1,76 @@
+---
+// The frame every page shares: skip link, top bar, chapter tree, the content
+// with page head and page links, footer. A page file names its register
+// entry, its language, its lead and its description in the frontmatter:
+//
+//   layout: ../../layouts/Page.astro
+//   lang: en
+//   page: quick-start
+//   lead: One sentence under the title.
+//   description: The description of the page in its head data.
+//   steps:                      (step pages only)
+//     - { anchor: step-1, title: Download the package }
+import '../styles/global.css';
+import ChapterTree from '../components/ChapterTree.astro';
+import Footer from '../components/Footer.astro';
+import Head from '../components/Head.astro';
+import PageHead from '../components/PageHead.astro';
+import PageLinks from '../components/PageLinks.astro';
+import TopBar from '../components/TopBar.astro';
+import { findPage, languages, pageAddress, texts, type Lang, type Step } from '../site';
+
+interface Props {
+  frontmatter: {
+    lang: Lang;
+    page: string;
+    lead: string;
+    description: string;
+    steps?: Step[];
+  };
+}
+
+const { lang, page: id, lead, description, steps = [] } = Astro.props.frontmatter;
+if (!languages.includes(lang)) {
+  throw new Error(`${Astro.url.pathname}: frontmatter "lang" must be "de" or "en".`);
+}
+const page = findPage(id);
+if (!lead || !description) {
+  throw new Error(`${Astro.url.pathname}: frontmatter needs "lead" and "description".`);
+}
+// A page file stands at the address the register gives its page.
+const address = pageAddress(page, lang);
+if (Astro.url.pathname.replace(/\/?$/, '/') !== address) {
+  throw new Error(
+    `${Astro.url.pathname}: the page register (src/site.ts) puts "${id}" (${lang}) at ${address}.`,
+  );
+}
+---
+
+<!doctype html>
+<html lang={lang}>
+  <head>
+    <Head lang={lang} page={page} description={description} />
+  </head>
+  <body class="flex min-h-screen flex-col">
+    <a class="skip-link menu-open:hidden" href="#main">{texts[lang].skipLink}</a>
+    <TopBar lang={lang} page={page} />
+    <div class="flex flex-1 flex-col tree:grid tree:grid-cols-[288px_minmax(0,1fr)]">
+      <ChapterTree lang={lang} page={page} steps={steps} />
+      <main
+        id="main"
+        class="mx-auto w-full max-w-content-max px-content-pad-x-phone pt-content-pad-top-phone pb-content-pad-bottom-phone tablet:px-content-pad-x tablet:pt-content-pad-top tablet:pb-content-pad-bottom tree:mx-0 menu-open:hidden"
+        data-behind-menu
+        data-pagefind-body
+      >
+        <PageHead lang={lang} page={page} lead={lead} />
+        <slot />
+        <PageLinks lang={lang} page={page} />
+      </main>
+    </div>
+    <Footer lang={lang} />
+    <script>
+      import '../scripts/menu.ts';
+      import '../scripts/language-switch.ts';
+    </script>
+  </body>
+</html>
