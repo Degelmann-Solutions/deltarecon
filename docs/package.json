@@ -6,7 +6,7 @@
   "scripts": {
     "build": "astro build && pagefind --site dist",
     "local": "npm run build && astro preview",
-    "check": "npm run build && node scripts/check-site.mjs && node scripts/check-head.mjs && node scripts/check-a11y.mjs"
+    "check": "npm run build && node scripts/check-site.mjs && node scripts/check-head.mjs && node scripts/check-a11y.mjs && node scripts/check-glossary.mjs"
   },
   "dependencies": {
     "@astrojs/mdx": "4.3.14",

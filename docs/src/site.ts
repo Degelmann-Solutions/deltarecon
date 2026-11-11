@@ -1,7 +1,10 @@
 // The page register of the documentation: the four stages, the ten pages in
-// path order with their names and addresses per language, and the texts of
-// the page frame. Chapter tree, page links, page head, language switch and
-// head data read it; a page name stands here and in no other file.
+// path order with their names and addresses per language, the texts of the
+// page frame and of the Glossary, and `languageOf`, the language of a page
+// address. Chapter tree, page links, page head, language switch and head
+// data read it, and so do the Glossary (components/Glossary.astro) and the
+// glossary link (components/Term.astro); a page name stands here and in no
+// other file.
 //
 // This file imports nothing, so that the check scripts can load it (see
 // scripts/harness.mjs).
@@ -150,6 +153,10 @@ export interface FrameTexts {
   privacy: string;
   licence: string;
   repository: string;
+  /** The Glossary: label of the letter index, tag of a linked entry, pages of a term. */
+  letters: string;
+  linkedTerm: string;
+  appearsIn: string;
 }
 
 export const texts: Record<Lang, FrameTexts> = {
@@ -172,6 +179,9 @@ export const texts: Record<Lang, FrameTexts> = {
     privacy: 'Privacy',
     licence: 'Licence',
     repository: 'Repository',
+    letters: 'Letters',
+    linkedTerm: 'Linked term',
+    appearsIn: 'Appears in',
   },
   de: {
     documentation: 'DeltaRecon-Dokumentation',
@@ -192,6 +202,9 @@ export const texts: Record<Lang, FrameTexts> = {
     privacy: 'Datenschutz',
     licence: 'Lizenz',
     repository: 'Repository',
+    letters: 'Buchstaben',
+    linkedTerm: 'Verlinkter Begriff',
+    appearsIn: 'Kommt vor in',
   },
 };
 
@@ -234,6 +247,12 @@ export function pagePath(page: Page, lang: Lang): string {
 /** Address of a page on the host, with the base of the site. */
 export function pageAddress(page: Page, lang: Lang): string {
   return `${import.meta.env.BASE_URL.replace(/\/?$/, '/')}${pagePath(page, lang)}`;
+}
+
+/** The language of a page address on the host, from its first part below the base. */
+export function languageOf(pathname: string): Lang | undefined {
+  const base = import.meta.env.BASE_URL.replace(/\/?$/, '/');
+  return languages.find((lang) => pathname.startsWith(`${base}${lang}/`));
 }
 
 /** The stage line of the page head: the stage, or the page kind. */

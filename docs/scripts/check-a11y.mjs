@@ -21,6 +21,10 @@
 // Phone, JavaScript off, for every page:
 //   - the menu button is a link that jumps to the chapter tree at the end of
 //     the page; the language switch opens the counterpart without the anchor.
+// The Glossary of each language, at desktop and phone width:
+//   - Tab reaches every letter of the letter index, each at least 32 × 32 px;
+//   - at an entry address, where the entry shows its linked state: axe, no
+//     sideways scrolling.
 // Between (900 px), for the start page of each language: axe, the menu, no
 // sideways scrolling (also at 600 px); an open menu ends when the window
 // reaches the tree breakpoint, with focus in the page; the search field moves
@@ -28,7 +32,8 @@
 //
 // Writes a desktop (1280 px), a between (900 px), a phone and an open-menu
 // screenshot of the start page of each language to screenshots/ (not under
-// version control).
+// version control), and of each Glossary a desktop and a phone screenshot,
+// plain and at an entry address.
 // Exits non-zero and names page and control of every failed expectation.
 import { mkdir } from 'node:fs/promises';
 import path from 'node:path';
@@ -46,6 +51,10 @@ const ANCHOR = '#main';
 const LATER_ANCHOR = '#chapters';
 // A word that only the start page of that language holds (check-site.mjs).
 const ownWords = { de: 'Baustelle', en: 'scaffold' };
+// The page of the Glossary in the page register, and the entry the mock of
+// the Glossary shows in its linked state.
+const GLOSSARY = 'glossary';
+const LINKED_ENTRY = 'not-resolved';
 // The focus ring on light grounds: 2 px in teal-text.
 const RING = 'rgb(23, 121, 130)';
 
@@ -117,6 +126,7 @@ function focused(page) {
         box.right <= window.innerWidth + 1,
       inMain: element.closest('main') !== null,
       inMenu: element.closest('header, #chapters') !== null,
+      inLetterIndex: element.closest('nav[data-letter-index]') !== null,
       isSkipLink: element.matches('a.skip-link[href="#main"]'),
       isMenuButton: element.matches('button[data-menu-button]'),
       isCloseButton: element.matches('button[data-menu-close]'),
@@ -250,9 +260,13 @@ async function checkSkipLink(page, name) {
   expect(next?.inMain, `${name}: after the skip link, Tab lands on ${next?.description}, outside main`);
 }
 
-/** Tab reaches every control in the order of the page, each with a ring. */
+/**
+ * Tab reaches every control in the order of the page, each with a ring.
+ * Returns how many letters of a letter index it reached.
+ */
 async function checkTabOrder(page, name) {
   const stops = await markStops(page);
+  let letters = 0;
   for (let index = 0; index < stops.length; index += 1) {
     await page.keyboard.press('Tab');
     const at = await focused(page);
@@ -260,15 +274,54 @@ async function checkTabOrder(page, name) {
       failures.push(
         `${name}: Tab ${index + 1} lands on ${at?.description ?? 'nothing'}, expected "${stops[index]}"`,
       );
-      return;
+      return letters;
     }
     expect(at.ring === RING, `${name}: ${at.description} has no focus ring (outline: ${at.outline})`);
     expect(
       at.width >= 24 && at.height >= 24,
       `${name}: ${at.description} is ${at.width} × ${at.height} px, below 24 × 24`,
     );
+    if (at.inLetterIndex) {
+      letters += 1;
+      expect(
+        at.width >= 32 && at.height >= 32,
+        `${name}: letter ${at.description} of the letter index is ${at.width} × ${at.height} px, below 32 × 32`,
+      );
+    }
     expect(at.inView, `${name}: ${at.description} is outside the window when it has focus`);
   }
+  return letters;
+}
+
+/**
+ * The Glossary at one width: Tab reaches every letter of the letter index;
+ * at an entry address the entry shows its linked state, a look of its own,
+ * so axe runs there too. Writes a screenshot of each.
+ */
+async function checkGlossary(browser, origin, entry, viewport, kind) {
+  const name = `${entry.address} (${viewport.width} px)`;
+  const { context, page } = await open(browser, origin, entry, viewport);
+  const index = await page.locator('main nav[data-letter-index] a').count();
+  const reached = await checkTabOrder(page, name);
+  expect(
+    index > 0 && reached === index,
+    `${name}: Tab reaches ${reached} of the ${index} letters of the letter index`,
+  );
+  await page.screenshot({ path: path.join(shots, `glossary-${kind}-${entry.lang}.png`), fullPage: true });
+
+  const linked = `${name}, at #${LINKED_ENTRY}`;
+  await page.goto(`${origin}${entry.address}#${LINKED_ENTRY}`, { waitUntil: 'networkidle' });
+  expect(
+    await page.locator(`#${LINKED_ENTRY}:target .glossary-linked`).isVisible(),
+    `${linked}: the entry does not show the tag of its linked state`,
+  );
+  await checkNoSidewaysScroll(page, linked);
+  await checkAxe(page, linked);
+  await page.screenshot({
+    path: path.join(shots, `glossary-${kind}-linked-${entry.lang}.png`),
+    fullPage: true,
+  });
+  await context.close();
 }
 
 /** The language switch leads to the counterpart; `anchor` is what it keeps. */
@@ -556,6 +609,12 @@ async function checkEntry(browser, origin, entry) {
     await context.close();
   }
 
+  // The Glossary: the letter index and the linked state.
+  if (entry.id === GLOSSARY) {
+    await checkGlossary(browser, origin, entry, DESKTOP, 'desktop');
+    await checkGlossary(browser, origin, entry, PHONE, 'phone');
+  }
+
   // Between phone and tree breakpoint: the start pages.
   if (entry.isRoot) {
     const name = at(BETWEEN.width);
@@ -638,4 +697,6 @@ try {
   stop();
 }
 
-report(`all ${pages.length} pages pass; screenshots of the start pages in screenshots/`);
+report(
+  `all ${pages.length} pages pass; screenshots of the start pages and the Glossaries in screenshots/`,
+);

@@ -18,7 +18,7 @@ Run them in `docs/`. Node 20 and npm are required.
 | `npm ci` | Installs the pinned dependencies from `package-lock.json`. |
 | `npm run local` | Builds the site with its search index and serves it. When port 4321 is free, the pages are at `http://localhost:4321/deltarecon/docs/de/` and `/en/`; otherwise the server takes the next free port. The command prints the address it serves on. |
 | `npm run build` | Builds the site to `dist/` and writes the search index to `dist/pagefind/`. |
-| `npm run check` | Builds the site, then runs the three checks below in Chromium. Every page entry runs it. |
+| `npm run check` | Builds the site, then runs the four checks below in Chromium. Every page entry runs it. |
 | `npx astro check` | Type-checks the project. |
 
 The checks need the Chromium of Playwright. On a machine without it:
@@ -32,20 +32,23 @@ indexes the build output.
 
 ## Checks
 
-`npm run check` runs three scripts one after the other. Each starts
+`npm run check` runs four scripts one after the other. Each starts
 `astro preview` on a port of its own (`scripts/harness.mjs`), reads the page
 register, and names every failed expectation with its page.
 
 | Script | What it asserts |
 |---|---|
 | `scripts/check-site.mjs` | For every page: language, release number, link to the counterpart, reading with JavaScript off (no search field), that no request leaves the local origin, and that every file a page loads (typeface, logo, script) is served. For the start page of each language: the search per language and a missing search index. |
-| `scripts/check-head.mjs` | The built pages are exactly the pages of the register. For every page: title "page name – DeltaRecon documentation", a description of its own, canonical address, `alternate` links for `de` and `en`, Open Graph title, description, address, type, locale and image, and one JSON-LD block that parses and names the page. Titles and descriptions are unique. A page and its counterpart hold the same anchors in their content; the stubs have none, so this takes effect with the first written page, which sets the anchors of its headings itself. |
-| `scripts/check-a11y.mjs` | For every page, at desktop and phone width, with the menu closed and open: axe reports no violation of the A and AA rules of WCAG 2.0 to 2.2. Keyboard: the skip link comes first and leads to main, Tab reaches every control in reading order, each with a visible focus ring. The menu below 1280 px: focus on the close button, which says that the menu is open, the page behind inert and the skip link out of the page, the top bar in one row at 320 px, Tab stays inside, Escape and the close button return focus to the menu button. The language switch keeps the anchor the page was loaded with and one set afterwards. With JavaScript off the menu button is a link to the chapter tree at the end of the page. No page scrolls sideways at 1280, 390 and 320 px. For the start page of each language also at 900 px: axe, the menu, no sideways scrolling at 900 and 600 px, an open menu that ends at 1280 px with focus kept in the page, and the search field moving between top bar and menu at 600 px. Axe does not run with JavaScript off or on the open search box. An error on one page is reported for that page; the others are still checked. |
+| `scripts/check-head.mjs` | The built pages are exactly the pages of the register. For every page: title "page name – DeltaRecon documentation", a description of its own, canonical address, `alternate` links for `de` and `en`, Open Graph title, description, address, type, locale and image, and one JSON-LD block that parses and names the page. Titles and descriptions are unique. A page and its counterpart hold the same anchors in their content; a written page sets the anchors of its headings itself. An anchor that belongs to one language, as a letter label of the Glossary, is marked `data-language-own` and left out. |
+| `scripts/check-a11y.mjs` | For every page, at desktop and phone width, with the menu closed and open: axe reports no violation of the A and AA rules of WCAG 2.0 to 2.2. Keyboard: the skip link comes first and leads to main, Tab reaches every control in reading order, each with a visible focus ring. The menu below 1280 px: focus on the close button, which says that the menu is open, the page behind inert and the skip link out of the page, the top bar in one row at 320 px, Tab stays inside, Escape and the close button return focus to the menu button. The language switch keeps the anchor the page was loaded with and one set afterwards. With JavaScript off the menu button is a link to the chapter tree at the end of the page. No page scrolls sideways at 1280, 390 and 320 px. For the start page of each language also at 900 px: axe, the menu, no sideways scrolling at 900 and 600 px, an open menu that ends at 1280 px with focus kept in the page, and the search field moving between top bar and menu at 600 px. Axe does not run with JavaScript off or on the open search box. For the Glossary of each language, at desktop and phone width: Tab reaches every letter of the letter index, each at least 32 × 32 px, and axe runs also at an entry address, where the entry shows its linked state. An error on one page is reported for that page; the others are still checked. |
+| `scripts/check-glossary.mjs` | First it proves itself on pages it sets itself (an unlinked term, a term linked twice, an exempt passage and more): each must fail or pass as expected. The glossary register: every entry has a term and an explanation in both languages. The Glossary of each language, with JavaScript on and off: the letter index, the entries in the alphabetical order of the language as a description list, each with term, counterpart, language code and `lang`; both Glossaries hold the same entries; at every entry address that entry and no other shows the linked state, which ends when the address changes. Every other page: the first occurrence of a term in the content is its glossary link, no entry is linked twice, and a glossary link leads to its entry on the Glossary of the page's language with a dotted underline. "Appears in" lists exactly the pages that link the term. |
 
-The accessibility check writes eight screenshots to `screenshots/` (not under
+The accessibility check writes sixteen screenshots to `screenshots/` (not under
 version control): the start page of each language at desktop width, at 900 px,
-at phone width, and with the menu open. Lay them beside the mock of the Overview page
-when the frame changes.
+at phone width, and with the menu open; and the Glossary of each language at
+desktop and phone width, plain and at an entry address. Lay them beside the
+mock of the Overview page when the frame changes, and beside the mock of the
+Glossary when the Glossary changes.
 
 What no script checks: the looks on hover, a Windows contrast theme, a screen
 reader, and zoom to 400 %.
@@ -54,7 +57,8 @@ reader, and zoom to 400 %.
 
 `src/site.ts` is the register of the site: the four stages, the ten pages in
 path order with their name and address per language, the addresses outside
-the documentation, and the texts of the page frame in both languages. Chapter
+the documentation, and the texts of the page frame and of the Glossary in both
+languages. Chapter
 tree, page links, page head, language switch and head data read it. A page
 name stands there and in no other file; rename a page there.
 
@@ -90,6 +94,43 @@ description: "The description of the page for search engines and shared links."
 - Only the start pages hold the words "Baustelle" (German) and "scaffold"
   (English); the search check looks for them. Whoever replaces the start
   page's text gives `scripts/check-site.mjs` two other words.
+
+## Glossary and glossary links
+
+`src/glossary.ts` is the glossary register: every entry with its anchor (the
+same in both languages) and, per language, its term, the word forms the check
+looks for, and its explanation. The Glossary page
+(`src/components/Glossary.astro`), the glossary link and the check read it. A
+term stands there and in no other file; an explanation may hold inline code
+and a word marked with its language.
+
+A page links a term at its first occurrence with the glossary link,
+`src/components/Term.astro`:
+
+```
+import Term from '../../components/Term.astro';
+
+A <Term id="deviation">deviation</Term> between two releases.
+```
+
+- `id` is the anchor of the entry. Without content the link prints the term
+  of the register (`<Term id="deviation" />`); with content it prints that
+  word form. The build fails on an unknown entry and names page and entry.
+- Only the first occurrence of a term on a page is a link. The check fails
+  when the first occurrence is plain text, and when an entry is linked twice.
+- The check looks for the term and the `forms` of its entry as whole words:
+  English without regard to case, German in the case as written. Add a
+  missing plural or case to `forms`.
+- What counts is the content after the page head, without the page links,
+  headings, `code`, `pre` and other links. The lead is plain text and cannot
+  hold a link. No glossary link belongs in a heading. Content that is not
+  shown counts like content that is: with JavaScript off it may be visible.
+- A word that equals a term and is not meant as it is marked as exempt:
+  `It <span data-no-term>records</span> which state is computed.`
+- The Glossary lists under "Appears in" the pages whose source holds a
+  `<Term>` for the entry; nothing is to be kept by hand.
+- A new entry needs term and explanation in both languages. The letters of
+  the Glossary follow from the terms.
 
 ## Typeface and logo
 
