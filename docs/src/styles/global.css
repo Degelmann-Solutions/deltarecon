@@ -145,6 +145,7 @@
   --spacing-section-gap-phone: 40px;
   --spacing-block-max: 820px;
   --spacing-search-field-width: 240px;
+  --spacing-search-list-width: 360px;
 }
 
 /*
@@ -309,6 +310,81 @@
     line-height: var(--text-nav--line-height);
   }
 
+  /* The search result list (Search.astro): a white box with the border of
+     the field, directly under it; the gap leaves room for the focus ring of
+     the field. Below the phone breakpoint, in the menu, it stands in the flow
+     at full width; from it up, in the top bar, it hangs from the field and
+     lies over the page, `search-list-width` wide. */
+  .search-panel {
+    margin-top: 4px;
+    background: var(--color-bg);
+    border: 1px solid var(--color-navy);
+    border-radius: var(--radius-sm);
+    color: var(--color-navy);
+  }
+
+  @media (min-width: 37.5rem) {
+    .search-panel {
+      position: absolute;
+      top: 100%;
+      left: 0;
+      z-index: 10;
+      width: var(--spacing-search-list-width);
+    }
+  }
+
+  .search-status {
+    padding: 8px 12px;
+    font-size: var(--text-caption);
+    line-height: var(--text-caption--line-height);
+    color: var(--color-text-secondary);
+  }
+
+  /* One hit per page, a hairline above each. */
+  .search-hits > li {
+    padding: 8px 12px 10px;
+    border-top: 1px solid var(--color-border);
+  }
+
+  /* The page name is the link: 16 px in the menu, 14 px in the top bar. */
+  .search-hit-name {
+    display: inline-flex;
+    align-items: center;
+    min-height: 24px;
+    font-size: 1rem;
+    line-height: 1.4;
+    font-weight: 600;
+    color: var(--color-navy);
+  }
+
+  @media (min-width: 37.5rem) {
+    .search-hit-name {
+      font-size: var(--text-nav);
+    }
+  }
+
+  .search-hit-stage {
+    font-size: var(--text-caption);
+    line-height: var(--text-caption--line-height);
+    color: var(--color-text-secondary);
+  }
+
+  /* One line, cut off with an ellipsis; the matched words in bold. */
+  .search-hit-excerpt {
+    margin-top: 2px;
+    overflow: hidden;
+    font-size: var(--text-caption);
+    line-height: var(--text-caption--line-height);
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .search-hit-excerpt mark {
+    background: none;
+    color: inherit;
+    font-weight: 700;
+  }
+
   .skip-link:not(:focus) {
     width: 1px;
     height: 1px;
@@ -320,16 +396,17 @@
   }
 }
 
-/* The box under the search field holds the status text and the hits.
-   Search.astro marks it `data-empty` while it has nothing to show; it is
-   then clipped, not removed, so its status is announced when the text
-   arrives. The rule stands outside the layers, so it wins over the utility
-   classes of the box. Its look is provisional; the search story of the epic
-   owns the search result list. */
+/* The look of the search result list stands in the components layer above.
+   `data-empty` marks the box while it has nothing to
+   show or is closed (Search.astro). It is then clipped, not removed, so its
+   status is announced when the text arrives. The rule stands outside the
+   layers, so it wins over every other rule of the box. */
 .search-panel[data-empty] {
+  position: absolute;
   width: 1px;
   min-width: 0;
   height: 1px;
+  margin: 0;
   padding: 0;
   border: 0;
   overflow: hidden;

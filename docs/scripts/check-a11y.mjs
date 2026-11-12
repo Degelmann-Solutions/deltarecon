@@ -30,16 +30,39 @@
 // reaches the tree breakpoint, with focus in the page; the search field moves
 // between top bar and menu at the phone breakpoint.
 //
-// Writes a desktop (1280 px), a between (900 px), a phone and an open-menu
-// screenshot of the start page of each language to screenshots/ (not under
-// version control), and of each Glossary a desktop and a phone screenshot,
-// plain and at an entry address.
+// The search result list, for the start page of each language: axe with the
+// list open, with hits and with no match, in the top bar (1280 px) and in the
+// menu on the phone; its place (under the field, 360 px wide in the top bar;
+// in the flow at full width in the menu, the tree below it); the hits follow
+// the field in tab order with a focus ring; the list closes when focus leaves
+// the search in the top bar; Escape in the field closes the list and leaves
+// the menu open; no sideways scrolling with the list open at 600 and 320 px.
+// The page-not-found page of each language: axe at desktop and phone width
+// and with the menu open, the frame without stage line, page links and
+// current page, the two blocks with their languages, skip link, tab order,
+// language switch, the menu, no sideways scrolling.
+// The root page, held by a browser that names no language: axe at desktop
+// and phone width, tab order, no sideways scrolling.
+//
+// Writes to screenshots/ (not under version control): a desktop (1280 px), a
+// between (900 px), a phone and an open-menu screenshot of the start page of
+// each language; the search result list in the top bar and in the menu, with
+// hits and with no match; the page-not-found page of each language and the
+// root page, each at desktop and phone width; of each Glossary a desktop and
+// a phone screenshot, plain and at an entry address.
 // Exits non-zero and names page and control of every failed expectation.
 import { mkdir } from 'node:fs/promises';
 import path from 'node:path';
 import axe from '@axe-core/playwright';
 import { chromium } from 'playwright';
-import { expectations, loadPages, root, startPreview } from './harness.mjs';
+import {
+  expectations,
+  loadOtherPages,
+  loadPages,
+  root,
+  searchTexts,
+  startPreview,
+} from './harness.mjs';
 
 const AxeBuilder = axe.AxeBuilder ?? axe.default ?? axe;
 const WCAG = ['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'wcag22aa'];
@@ -49,8 +72,10 @@ const PHONE = { width: 390, height: 844 };
 // Two anchors every page has in both languages.
 const ANCHOR = '#main';
 const LATER_ANCHOR = '#chapters';
-// A word that only the start page of that language holds (check-site.mjs).
-const ownWords = { de: 'Baustelle', en: 'scaffold' };
+// A word that only the start page of that language holds (harness.mjs).
+const ownWords = { de: searchTexts.de.ownWord, en: searchTexts.en.ownWord };
+// Navy, the border of the search field and of the search result list.
+const NAVY = 'rgb(30, 37, 71)';
 // The page of the Glossary in the page register, and the entry the mock of
 // the Glossary shows in its linked state.
 const GLOSSARY = 'glossary';
@@ -60,6 +85,7 @@ const RING = 'rgb(23, 121, 130)';
 
 const shots = path.join(root, 'screenshots');
 const pages = await loadPages();
+const { notFound, rootPage } = await loadOtherPages();
 const { failures, expect, report } = expectations('check-a11y');
 
 async function open(browser, origin, entry, viewport, { javaScript = true, anchor = '' } = {}) {
@@ -486,6 +512,331 @@ async function checkMenu(page, name, { phone, screenshot, hitWord }) {
   }
 }
 
+/** Types a term and waits until the list answers it. */
+async function searchFor(page, term) {
+  await page.locator('input[type="search"]').fill(term);
+  await page
+    .locator(`[data-search-results="${term}"]`)
+    .waitFor({ state: 'attached', timeout: 15_000 });
+}
+
+/** Where the search result list stands, and how it looks. */
+function listBox(page) {
+  return page.evaluate(() => {
+    const panel = document.querySelector('[data-search] .search-panel');
+    const field = document.querySelector('[data-search] input').getBoundingClientRect();
+    const box = panel.getBoundingClientRect();
+    const style = getComputedStyle(panel);
+    const tree = document.querySelector('#chapters nav').getBoundingClientRect();
+    return {
+      shown: !panel.hasAttribute('data-empty') && box.width > 1 && box.height > 1,
+      left: box.left - field.left,
+      gap: box.top - field.bottom,
+      width: box.width,
+      fieldWidth: field.width,
+      right: box.right,
+      window: document.documentElement.clientWidth,
+      treeBelow: tree.top >= box.bottom,
+      position: style.position,
+      background: style.backgroundColor,
+      border: `${style.borderTopStyle} ${style.borderTopWidth} ${style.borderTopColor}`,
+      status: panel.querySelector('[role="status"]').textContent.trim(),
+      hits: panel.querySelectorAll('li').length,
+      oneLine: [...panel.querySelectorAll('.search-hit-excerpt')].every(
+        (line) => line.getBoundingClientRect().height < 30,
+      ),
+      bold: [...panel.querySelectorAll('.search-hit-excerpt mark')].every(
+        (mark) => Number(getComputedStyle(mark).fontWeight) >= 600,
+      ),
+    };
+  });
+}
+
+/** The search result list on the start page of a language. */
+async function checkSearchList(browser, origin, entry) {
+  const texts = searchTexts[entry.lang];
+  const noMatchTerm = searchTexts[entry.otherLang].ownWord;
+  const shot = (kind) => path.join(shots, `search-list-${kind}-${entry.lang}.png`);
+
+  // In the top bar.
+  {
+    const name = `${entry.address} (${DESKTOP.width} px, search result list)`;
+    const { context, page } = await open(browser, origin, entry, DESKTOP);
+    await searchFor(page, texts.sharedWord);
+    const list = await listBox(page);
+    expect(list.shown && list.hits > 1, `${name}: the list is not open with several hits`);
+    expect(
+      list.position === 'absolute' &&
+        Math.abs(list.left) < 1 &&
+        list.gap >= 0 &&
+        list.gap <= 4 &&
+        Math.abs(list.width - 360) < 1,
+      `${name}: the list is not 360 px wide directly under the field (left ${list.left}, gap ${list.gap}, width ${list.width})`,
+    );
+    expect(
+      list.background === 'rgb(255, 255, 255)' && list.border === `solid 1px ${NAVY}`,
+      `${name}: the list is not a white box with a 1 px navy border (${list.background}, ${list.border})`,
+    );
+    expect(list.status === texts.count(list.hits), `${name}: status is "${list.status}"`);
+    expect(list.oneLine && list.bold, `${name}: an excerpt is not one line with its match in bold`);
+    await checkAxe(page, name);
+    await checkNoSidewaysScroll(page, name);
+    await page.screenshot({ path: shot('desktop') });
+
+    // The hits follow the field in tab order, each with a focus ring; focus
+    // does not move on its own.
+    const before = await focused(page);
+    expect(
+      before?.description.startsWith('<input>'),
+      `${name}: with the list open, focus is on ${before?.description}, not in the field`,
+    );
+    for (let index = 0; index < list.hits; index += 1) {
+      await page.keyboard.press('Tab');
+      const at = await focused(page);
+      const inList = await page.evaluate(
+        () => document.activeElement.closest('[data-search-results]') !== null,
+      );
+      expect(inList, `${name}: Tab ${index + 1} after the field lands on ${at?.description}, not on a hit`);
+      expect(at?.ring === RING, `${name}: hit ${at?.description} has no focus ring (outline: ${at?.outline})`);
+      expect(
+        at && at.width >= 24 && at.height >= 24 && at.inView,
+        `${name}: hit ${at?.description} is below 24 × 24 px or outside the window`,
+      );
+    }
+    // Focus leaves the search: the list closes and covers nothing.
+    await page.keyboard.press('Tab');
+    const after = await listBox(page);
+    expect(!after.shown, `${name}: the list stays open when focus leaves the search`);
+    expect(
+      (await focused(page))?.inView,
+      `${name}: the element after the search is outside the window when it has focus`,
+    );
+
+    // No match.
+    await searchFor(page, noMatchTerm);
+    const none = await listBox(page);
+    expect(
+      none.shown && none.hits === 0 && none.status === texts.noMatch(noMatchTerm),
+      `${name}: no match: status is "${none.status}" with ${none.hits} hits`,
+    );
+    await checkAxe(page, `${name}, no match`);
+    await page.screenshot({ path: shot('desktop-no-match') });
+
+    // At the phone breakpoint the list stays inside the window.
+    await page.setViewportSize({ width: 600, height: 800 });
+    await settle(page, () => document.querySelector('body > header input[type="search"]') !== null);
+    await searchFor(page, '');
+    await searchFor(page, texts.sharedWord);
+    const narrow = await listBox(page);
+    expect(
+      narrow.shown && narrow.right <= narrow.window,
+      `${name}: at 600 px the list ends at ${narrow.right} px in a window of ${narrow.window} px`,
+    );
+    await checkNoSidewaysScroll(page, `${entry.address} (600 px, search result list)`);
+    await context.close();
+  }
+
+  // In the menu on the phone.
+  {
+    const name = `${entry.address} (${PHONE.width} px, menu, search result list)`;
+    const { context, page } = await open(browser, origin, entry, PHONE);
+    const tree = page.locator('#chapters');
+    await page.locator('button[data-menu-button]').click();
+    await searchFor(page, texts.sharedWord);
+    const list = await listBox(page);
+    expect(list.shown && list.hits > 1, `${name}: the list is not open with several hits`);
+    expect(
+      list.position === 'static' &&
+        Math.abs(list.left) < 1 &&
+        list.gap >= 0 &&
+        list.gap <= 4 &&
+        Math.abs(list.width - list.fieldWidth) < 1,
+      `${name}: the list does not stand in the flow under the field at its width (left ${list.left}, gap ${list.gap}, width ${list.width} of ${list.fieldWidth})`,
+    );
+    expect(list.treeBelow, `${name}: the list does not push the chapter tree down`);
+    expect(
+      list.background === 'rgb(255, 255, 255)' && list.border === `solid 1px ${NAVY}`,
+      `${name}: the list is not a white box with a 1 px navy border (${list.background}, ${list.border})`,
+    );
+    expect(list.oneLine && list.bold, `${name}: an excerpt is not one line with its match in bold`);
+    await checkAxe(page, name);
+    await checkNoSidewaysScroll(page, name);
+    await page.screenshot({ path: shot('menu'), fullPage: true });
+
+    // Escape in the field: the list closes, the menu stays, focus stays.
+    await page.keyboard.press('Escape');
+    const escaped = await listBox(page);
+    expect(
+      !escaped.shown &&
+        (await tree.isVisible()) &&
+        (await page.locator('input[type="search"]').evaluate((input) => input === document.activeElement)) &&
+        (await page.locator('input[type="search"]').inputValue()) === texts.sharedWord,
+      `${name}: Escape in the field does not close the list alone, with focus and term kept`,
+    );
+
+    // No match.
+    await searchFor(page, noMatchTerm);
+    const none = await listBox(page);
+    expect(
+      none.shown && none.hits === 0 && none.status === texts.noMatch(noMatchTerm),
+      `${name}: no match: status is "${none.status}" with ${none.hits} hits`,
+    );
+    await checkAxe(page, `${name}, no match`);
+    await page.screenshot({ path: shot('menu-no-match'), fullPage: true });
+
+    // 320 px, the list open with hits and with no match.
+    await page.setViewportSize({ width: 320, height: 640 });
+    await checkNoSidewaysScroll(page, `${entry.address} (320 px, menu, search result list, no match)`);
+    await searchFor(page, texts.sharedWord);
+    expect((await listBox(page)).shown, `${name}: at 320 px the list is not open`);
+    await checkNoSidewaysScroll(page, `${entry.address} (320 px, menu, search result list)`);
+    await checkAxe(page, `${entry.address} (320 px, menu, search result list)`);
+    await context.close();
+  }
+}
+
+/** A page-not-found page: the frame without the marks of a page on the path. */
+async function checkNotFound(browser, origin, entry) {
+  const at = (width, note = '') => `${entry.address} (${width} px${note})`;
+  const shot = (kind) => path.join(shots, `not-found-${kind}-${entry.lang}.png`);
+
+  // Desktop.
+  {
+    const name = at(DESKTOP.width);
+    const { context, page } = await open(browser, origin, entry, DESKTOP);
+    expect((await page.title()) === entry.title, `${name}: title is "${await page.title()}"`);
+    for (const [part, selector] of [
+      ['top bar', 'body > header'],
+      ['chapter tree', '#chapters nav'],
+      ['search field', 'body > header input[type="search"]'],
+      ['footer', 'body > footer'],
+    ]) {
+      const found = page.locator(selector);
+      expect(
+        (await found.count()) === 1 && (await found.first().isVisible()),
+        `${name}: the ${part} is not in the page once and visible`,
+      );
+    }
+    expect(
+      (await page.locator('h1').count()) === 1 &&
+        (await page.locator('h1').innerText()).trim() === entry.name,
+      `${name}: the one level-1 heading is not "${entry.name}"`,
+    );
+    for (const [part, selector] of [
+      ['stage line', '[data-stage-line]'],
+      ['page links', 'nav[data-page-links]'],
+      ['current page in the tree', '#chapters a[aria-current="page"]'],
+      ['current stage in the tree', '#chapters [data-current-stage]'],
+    ]) {
+      expect((await page.locator(selector).count()) === 0, `${name}: the page has a ${part}`);
+    }
+    // Two blocks: the page's language first; the other carries its language.
+    const blocks = await page.evaluate(() =>
+      [...document.querySelectorAll('main [data-not-found-block]')].map((block) => ({
+        lang: block.closest('[lang]').getAttribute('lang'),
+        own: block.closest('[lang]') === document.documentElement,
+        heading: block.querySelector('h2')?.textContent.trim(),
+      })),
+    );
+    expect(
+      blocks.length === 2 &&
+        blocks[0].own &&
+        blocks[0].lang === entry.lang &&
+        !blocks[1].own &&
+        blocks[1].lang === entry.otherLang &&
+        blocks[1].heading === entry.otherName,
+      `${name}: not two blocks, "${entry.lang}" first and "${entry.otherLang}" marked with its language: ${JSON.stringify(blocks)}`,
+    );
+    for (const link of entry.overviewLinks) {
+      const found = page.locator('main').getByRole('link', { name: link.name, exact: true });
+      expect(
+        (await found.count()) === 1 && (await found.getAttribute('href')) === link.address,
+        `${name}: no link "${link.name}" to ${link.address}`,
+      );
+    }
+    await checkNoSidewaysScroll(page, name);
+    await checkAxe(page, name);
+    await page.screenshot({ path: shot('desktop'), fullPage: true });
+    await checkSkipLink(page, name);
+    await page.goto(`${origin}${entry.address}`, { waitUntil: 'networkidle' });
+    await checkTabOrder(page, name);
+    await page.goto(`${origin}${entry.address}`, { waitUntil: 'networkidle' });
+    await checkLanguageSwitch(page, name, entry, origin, '');
+    await context.close();
+  }
+
+  // Phone.
+  {
+    const name = at(PHONE.width);
+    const { context, page } = await open(browser, origin, entry, PHONE);
+    await checkNoSidewaysScroll(page, name);
+    await checkAxe(page, name);
+    await page.screenshot({ path: shot('phone'), fullPage: true });
+    await checkMenu(page, name, { phone: true });
+    await page.setViewportSize({ width: 320, height: 640 });
+    await checkNoSidewaysScroll(page, at(320));
+    await context.close();
+  }
+}
+
+/**
+ * The root page. A browser that names a language is led on, so the check
+ * uses one that names none: the page then stays, as the page says it does.
+ */
+async function checkRoot(browser, origin, entry) {
+  for (const [viewport, kind] of [
+    [DESKTOP, 'desktop'],
+    [PHONE, 'phone'],
+  ]) {
+    const name = `${entry.address} (${viewport.width} px)`;
+    const context = await browser.newContext({ viewport });
+    await context.addInitScript(() => {
+      const none = { get: () => undefined };
+      Object.defineProperty(Object.getPrototypeOf(navigator), 'languages', none);
+      Object.defineProperty(Object.getPrototypeOf(navigator), 'language', none);
+    });
+    const page = await context.newPage();
+    await page.goto(`${origin}${entry.address}`, { waitUntil: 'networkidle' });
+    expect(
+      page.url() === `${origin}${entry.address}`,
+      `${name}: a browser that names no language is led on to ${page.url()}`,
+    );
+    expect((await page.title()) === entry.title, `${name}: title is "${await page.title()}"`);
+    expect(
+      (await page.locator('header img').isVisible()) &&
+        (await page.locator('header img').getAttribute('alt')) !== '',
+      `${name}: no logo with a text alternative`,
+    );
+    expect((await page.locator('h1').count()) === 1, `${name}: not exactly one level-1 heading`);
+    for (const { lang, name: documentation } of entry.names) {
+      const found = page.locator(`h1 [lang="${lang}"]`);
+      expect(
+        (await found.count()) === 1 && (await found.innerText()).trim() === documentation,
+        `${name}: the heading does not name "${documentation}" marked as "${lang}"`,
+      );
+    }
+    for (const link of entry.links) {
+      const found = page.getByRole('link', { name: link.name, exact: true });
+      expect(
+        (await found.count()) === 1 &&
+          (await found.isVisible()) &&
+          (await found.getAttribute('href')) === link.address &&
+          (await found.getAttribute('lang')) === link.lang,
+        `${name}: no visible link "${link.name}" to ${link.address} that carries lang="${link.lang}"`,
+      );
+    }
+    await checkNoSidewaysScroll(page, name);
+    await checkAxe(page, name);
+    await page.screenshot({ path: path.join(shots, `root-${kind}.png`), fullPage: true });
+    await checkTabOrder(page, name);
+    if (viewport === PHONE) {
+      await page.setViewportSize({ width: 320, height: 640 });
+      await checkNoSidewaysScroll(page, `${entry.address} (320 px)`);
+    }
+    await context.close();
+  }
+}
+
 async function checkEntry(browser, origin, entry) {
   const at = (width, note = '') => `${entry.address} (${width} px${note})`;
   const shot = (kind) => (entry.isRoot ? path.join(shots, `${kind}-${entry.lang}.png`) : undefined);
@@ -674,6 +1025,9 @@ async function checkEntry(browser, origin, entry) {
     );
     await context.close();
   }
+
+  // The search result list: the start pages.
+  if (entry.isRoot) await checkSearchList(browser, origin, entry);
 }
 
 const { origin: reported, stop } = startPreview();
@@ -682,14 +1036,17 @@ try {
   const origin = await reported;
   await mkdir(shots, { recursive: true });
   browser = await chromium.launch();
-  for (const entry of pages) {
-    // An error on one page is a failure of that page; the others still run.
+  // An error on one page is a failure of that page; the others still run.
+  const each = async (entry, check) => {
     try {
-      await checkEntry(browser, origin, entry);
+      await check(browser, origin, entry);
     } catch (error) {
       failures.push(`${entry.address}: ${error.stack ?? error.message}`);
     }
-  }
+  };
+  for (const entry of pages) await each(entry, checkEntry);
+  for (const entry of notFound) await each(entry, checkNotFound);
+  await each(rootPage, checkRoot);
 } catch (error) {
   failures.push(error.stack ?? error.message);
 } finally {
@@ -698,5 +1055,5 @@ try {
 }
 
 report(
-  `all ${pages.length} pages pass; screenshots of the start pages and the Glossaries in screenshots/`,
+  `all ${pages.length} pages, the ${notFound.length} page-not-found pages, the root page and the search result list pass; screenshots in screenshots/`,
 );

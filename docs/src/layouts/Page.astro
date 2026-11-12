@@ -10,6 +10,10 @@
 //   description: The description of the page in its head data.
 //   steps:                      (step pages only)
 //     - { anchor: step-1, title: Download the package }
+//
+// The page-not-found page (NotFound.astro) uses the frame too. It stands
+// outside the path: no stage line, no page links, no current page in the
+// chapter tree, and it is kept out of the search index and of search engines.
 import '../styles/global.css';
 import ChapterTree from '../components/ChapterTree.astro';
 import Footer from '../components/Footer.astro';
@@ -17,7 +21,16 @@ import Head from '../components/Head.astro';
 import PageHead from '../components/PageHead.astro';
 import PageLinks from '../components/PageLinks.astro';
 import TopBar from '../components/TopBar.astro';
-import { findPage, languages, pageAddress, texts, type Lang, type Step } from '../site';
+import {
+  findPage,
+  languages,
+  notFoundPage,
+  onPath,
+  pageAddress,
+  texts,
+  type Lang,
+  type Step,
+} from '../site';
 
 interface Props {
   frontmatter: {
@@ -33,7 +46,7 @@ const { lang, page: id, lead, description, steps = [] } = Astro.props.frontmatte
 if (!languages.includes(lang)) {
   throw new Error(`${Astro.url.pathname}: frontmatter "lang" must be "de" or "en".`);
 }
-const page = findPage(id);
+const page = id === notFoundPage.id ? notFoundPage : findPage(id);
 if (!lead || !description) {
   throw new Error(`${Astro.url.pathname}: frontmatter needs "lead" and "description".`);
 }
@@ -60,11 +73,11 @@ if (Astro.url.pathname.replace(/\/?$/, '/') !== address) {
         id="main"
         class="mx-auto w-full max-w-content-max px-content-pad-x-phone pt-content-pad-top-phone pb-content-pad-bottom-phone tablet:px-content-pad-x tablet:pt-content-pad-top tablet:pb-content-pad-bottom tree:mx-0 menu-open:hidden"
         data-behind-menu
-        data-pagefind-body
+        data-pagefind-body={onPath(page) || undefined}
       >
         <PageHead lang={lang} page={page} lead={lead} />
         <slot />
-        <PageLinks lang={lang} page={page} />
+        {onPath(page) && <PageLinks lang={lang} page={page} />}
       </main>
     </div>
     <Footer lang={lang} />
