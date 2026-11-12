@@ -198,7 +198,7 @@ export const entries: readonly Entry[] = [
       term: 'Revision',
       forms: ['Revisionen'],
       explanation:
-        'Eine Änderung in der Geschichte des Modells. Jede Änderung ist eine Revision; der Stand N+1 des Quick Starts liegt 32 Revisionen nach Release N.',
+        'Eine Änderung in der Historie des Modells. Jede Änderung ist eine Revision; der Stand N+1 des Quick Starts liegt 32 Revisionen nach Release N.',
     },
   },
   {
@@ -207,13 +207,13 @@ export const entries: readonly Entry[] = [
       term: 'Tolerance profile',
       forms: ['tolerance profiles'],
       explanation:
-        'Sets how large a change must be to count as a deviation. Without one, DeltaRecon compares exactly: every deviation counts.',
+        'Sets for each quantity how far a value may lie above and below the value it is compared with before the difference counts as a deviation. Each of the two bounds has an absolute and a relative part, and the profile states where they come from. A quantity without an entry is compared exactly; without a tolerance profile that holds for every quantity.',
     },
     de: {
       term: 'Toleranzprofil',
       forms: ['Toleranzprofils', 'Toleranzprofile', 'Toleranzprofilen'],
       explanation:
-        'Legt fest, wie groß eine Änderung sein muss, um als Abweichung zu zählen. Ohne Toleranzprofil vergleicht DeltaRecon exakt: Jede Abweichung zählt.',
+        'Legt je Größe fest, wie weit ein Wert über und unter dem Vergleichswert liegen darf, bevor die Differenz als Abweichung zählt. Jede der beiden Schranken hat einen absoluten und einen relativen Anteil, und das Profil nennt ihre Herleitung. Eine Größe ohne Eintrag wird exakt verglichen; ohne Toleranzprofil gilt das für jede Größe.',
     },
   },
   {
