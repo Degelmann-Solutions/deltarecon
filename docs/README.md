@@ -47,8 +47,8 @@ axe and the check for sideways scrolling (`pageChecks`).
 | `scripts/check-site.mjs` | For every page and for the two page-not-found pages: language, release number, link to the counterpart, the four links of the footer, of which the two to GitHub open in a new tab and say so in hidden text, reading with JavaScript off (no search field), that no request leaves the local origin, and that every file a page loads (typeface, logo, script) is served. For the start page of each language, the search: nothing shown at the load; the hits of a word of the language with the number of matches, each hit with page name, stage line and an excerpt with the match marked; no hit and the no-match text for a word of the other language and for a word of the page-not-found page; an emptied field; Escape, which closes the list and keeps focus and term, in the field and on a hit; a slow search index, which shows the loading text once a term is typed; a missing search index, which puts the "not available" text into the page at the load and shows it with focus in the field and after a term is typed. For the page-not-found pages: the search finds the start page. For the root page: it stays with JavaScript off and offers both languages, and leads on with JavaScript. |
 | `scripts/check-head.mjs` | The built pages are exactly the pages of the register and the three pages outside the path. For every page of the register: title "page name – DeltaRecon documentation", a description of its own, canonical address, `alternate` links for `de` and `en`, Open Graph title, description, address, type, locale and image, and one JSON-LD block that parses and names the page. Titles and descriptions are unique. A page and its counterpart hold the same anchors in their content; a written page sets the anchors of its headings itself; the two Glossaries are the first pages whose anchors are compared. An anchor that belongs to one language, as a letter label of the Glossary, is marked `data-language-own` and left out. For the three pages outside the path: language, a title of its own, `noindex`, and no canonical address. The two `.htaccess` files of the build name the addresses the register gives the page-not-found pages. |
 | `scripts/check-a11y.mjs` | For every page, at desktop and phone width, with the menu closed and open: axe reports no violation of the A and AA rules of WCAG 2.0 to 2.2. Keyboard: the skip link comes first and leads to main, Tab reaches every control in reading order, each at least 24 × 24 px and with a visible focus ring, teal-text on light grounds and teal inside the navy terminal block of a step page; a control with `tabindex="-1"`, as the tab of a platform switch that is not selected, is no stop. The menu below 1280 px: focus on the close button, which says that the menu is open, the page behind inert and the skip link out of the page, the top bar in one row at 320 px, Tab stays inside, Escape and the close button return focus to the menu button. The language switch keeps the anchor the page was loaded with and one set afterwards. With JavaScript off the menu button is a link to the chapter tree at the end of the page. No page scrolls sideways at 1280, 390 and 320 px. For the start page of each language also at 900 px: axe, the menu, no sideways scrolling at 900 and 600 px, an open menu that ends at 1280 px with focus kept in the page, and the search field moving between top bar and menu at 600 px. For the start page of each language, the search result list: axe with the list open, with hits and with no match, in the top bar and in the menu on the phone; its place and look; the hits after the field in tab order, each with a focus ring; the list closed when focus leaves the search in the top bar; Escape in the field, which leaves the menu open; no sideways scrolling with the list open at 600 and 320 px. For the page-not-found pages: axe, the frame without stage line, page links and current page, the two blocks with their languages, skip link, tab order, language switch, menu. For the root page, in a browser that names no language: axe, tab order, no sideways scrolling. Axe does not run with JavaScript off. For the Glossary of each language, at desktop and phone width: Tab reaches every letter of the letter index, each at least 32 × 32 px, and axe runs also at an entry address, arrived at from the Quick start, where the entry shows its linked state and the link back to that page. An error on one page is reported for that page; the others are still checked. |
-| `scripts/check-glossary.mjs` | First it proves itself on pages it sets itself (an unlinked term, a term linked twice, an exempt passage and more): each must fail or pass as expected. The glossary register: every entry has a term and an explanation in both languages. The Glossary of each language, with JavaScript on and off: the letter index, the entries in the alphabetical order of the language as a description list, each with term, counterpart, language code and `lang`; both Glossaries hold the same entries; at every entry address that entry and no other shows the linked state, which ends when the address changes. Every other page: the first occurrence of a term in the content is its glossary link, no entry is linked twice, and a glossary link leads to its entry on the Glossary of the page's language with a dotted underline. "Appears in" lists exactly the pages that link the term. The way back: after a click on a glossary link of a page the entry holds the link "Back to the previous page", a click on it returns to that page, and the link goes when the address changes; opened directly or from the Glossary itself the entry holds none. |
-| `scripts/check-steps.mjs` | First the step list of the frontmatter (`stepFaults` in `src/site.ts`): a step without an anchor or a title and an anchor that stands twice are named. Then every step page, which is every page that holds step cards; what a page must show stands in `stepPages` and `words` at the top of the script, written out per language, and a step page without an entry there fails. Desktop: one card per step in order with counter, the tag "optional" on the optional steps only, pad, trace and a figure or flow diagram; the step title is a link to its step; the chapter tree lists the steps with the titles of the cards; an address with the anchor of a step opens with that step at the top of the window, without a highlight; the path end with its marker on the axis of the pads, the closing line and the page links. A link of the content to another site opens in a new tab with its hidden text. The platform switch, also the one without a command (a hairline under its active tab, no code block, no copy button): Windows on the first visit; a click on "Linux" changes every switch and every part of the page while the used switch keeps its place in the window and focus; arrow keys, Home and End; one tab stop per switch; the choice after a reload, on another page, and before the scripts of the page run; without storage it holds for the page and no error shows. The copy button: after the tabs and before the command; the clipboard holds the command without prompt and output; "Copied" for at least 2 s, announced, focus kept; a refused copy shows and announces the failure text. Every block that scrolls sideways takes focus and is a named region; the terminal block shows its ring inside. The result table and the bar figure, which shows the sums of the table. No transition and no animation in the content. Axe with Windows and with Linux chosen. Phone: one column, the figure below the text, the flow diagram as a stack, the result table as stacked records with its head row, code and terminal scrolling inside their block, tabs and copy button at least 40 px high, no text of a figure below 11 px, the step list left out of the menu, the scroll position kept when the menu opens and closes; an element that reaches beyond the window is named, also at 320 px. JavaScript off, at 1280 and 390 px: both platforms' parts visible, Windows first, each under its label; no tabs, no button, no copy button. |
+| `scripts/check-glossary.mjs` | First it proves itself on pages it sets itself (an unlinked term, a term linked twice, an exempt passage and more): each must fail or pass as expected. The glossary register: every entry has a term and an explanation in both languages. The Glossary of each language, with JavaScript on and off: the letter index, the entries in the alphabetical order of the language as a description list, each with term, counterpart, language code and `lang`; both Glossaries hold the same entries; at every entry address that entry and no other shows the linked state, which ends when the address changes. Every other page: the first occurrence of a term in the content is its glossary link, no entry is linked twice, and a glossary link leads to its entry on the Glossary of the page's language with a dotted underline. "Appears in" lists exactly the pages that link the term. The way back: after a click on a glossary link of a page the entry holds the link "Back to the previous page", a click on it returns to that page, the link is there again after going forward to the entry, and it goes when the address changes; opened directly, or with a Glossary of either language, another site or an address outside the documentation as the page before, the entry holds none. |
+| `scripts/check-steps.mjs` | First the step list of the frontmatter (`stepFaults` in `src/site.ts`): a step without an anchor or a title and an anchor that stands twice are named. Then every step page, which is every page that holds step cards; what a page must show stands in `stepPages` and `words` at the top of the script, written out per language, and a step page without an entry there fails. Desktop: one card per step in order with counter, the tag "optional" on the optional steps only, pad, trace and a figure or flow diagram; the step title is a link to its step; the chapter tree lists the steps with the titles of the cards; an address with the anchor of a step opens with that step at the top of the window, without a highlight; the path end with its marker on the axis of the pads, the closing line and the page links. A card with a part of one platform holds a platform switch. A link of the content to GitHub opens in a new tab with its hidden text, a link to another site is a plain link; the step of the download holds exactly one link to the page of the release on GitHub (`<repository>/releases/tag/v<version>`), named by its tag. The platform switch, also the one without a command (a hairline under its active tab, no code block, no copy button): Windows on the first visit; a click on "Linux" changes every switch and every part of the page while the used switch keeps its place in the window and focus; arrow keys, Home and End; one tab stop per switch; the choice after a reload, on another page, and before the scripts of the page run; without storage it holds for the page and no error shows. The copy button: after the tabs and before the command; the clipboard holds the command without prompt and output; "Copied" for at least 2 s, announced, focus kept; a refused copy shows and announces the failure text. Every block that scrolls sideways takes focus and is a named region; the terminal block shows its ring inside. The result table and the bar figure, which shows the sums of the table: the bar of the largest sum spans half the track, the others in proportion to their sums. No transition and no animation in the content. Axe with Windows and with Linux chosen. Phone: one column, the figure below the text, the flow diagram as a stack, the result table as stacked records with its head row, code and terminal scrolling inside their block, tabs and copy button at least 40 px high, no text of a figure below 11 px, the step list left out of the menu, the scroll position kept when the menu opens and closes; an element that reaches beyond the window is named, also at 320 px. JavaScript off, at 1280 and 390 px: both platforms' parts visible, Windows first, each under its label; no tabs, no button, no copy button. |
 
 `npm run check:apache` runs `scripts/check-apache.mjs` after the build. The
 preview server of the other checks knows no `.htaccess`, so this script
@@ -233,7 +233,7 @@ without a figure has one column. Text between blank lines is a paragraph.
 | Component | What it is |
 |---|---|
 | `Steps`, `StepCard` | The list and one card: pad, counter ("Step 2 of 6"), the word "optional", the title as a link to the step. |
-| `PlatformSwitch` | The command of a step for Windows and Linux (`windows`, `linux`: the command lines), with the sentences that hold for one platform in the slots `after-windows` and `after-linux`. A slot must not carry the name of a property. Without `windows` and `linux` it holds no command: the tabs stand above the sentences, without code block and copy button, and the Windows tab names no shell. |
+| `PlatformSwitch` | The command of a step for Windows and Linux (`windows`, `linux`: the command lines), with the sentences that hold for one platform in the slots `after-windows` and `after-linux`. A slot must not carry the name of a property. Without `windows` and `linux` it holds no command: the tabs stand above the sentences, without code block and copy button, and the Windows tab names no shell. The build fails for a switch with the command of one platform only, and for a switch without commands that lacks the sentences of a platform. |
 | `PlatformPart` | Content of one platform outside a switch (`os="windows"`): a sentence, a callout, a terminal block. Every sentence that holds for one platform only stands in a part or in a slot of a switch. Only in a card that holds a platform switch; a card with content of one platform and no command gets a `PlatformSwitch` without commands, or the reader cannot change the platform there. |
 | `CodeBlock` | A command that does not differ by platform. `PlatformSwitch` builds its own. |
 | `TerminalBlock` | A session: prompt, command, and output from a capture (`lines={session('windows', 'en')}`). |
@@ -256,13 +256,14 @@ never as a plain link:
 ```
 import OutsideLink from '../../components/OutsideLink.astro';
 
-Open the release <OutsideLink href={releasePage}>{tag}</OutsideLink> on GitHub.
+Open the release <OutsideLink href={releasePage} hreflang="en">{tag}</OutsideLink> on GitHub.
 ```
 
 It sets `target="_blank"` and `rel="noopener"` and adds the hidden text
-"(opens in a new tab)" in the page language (`newTab` in `texts`). The footer
-uses it for licence and repository. A link to the company website is a plain
-link.
+"(opens in a new tab)" in the page language (`newTab` in `texts`), which is
+kept out of the search index; `hreflang` names the language of the page it
+leads to. The footer uses it for licence and repository. A link to the
+company website is a plain link.
 
 **Platform.** The delivered page holds both platforms' parts one after the
 other, Windows first, each under its label; that is the page without
@@ -270,7 +271,8 @@ JavaScript. An inline script in the head (`src/layouts/Page.astro`) sets
 `data-platform` on `<html>`: Windows, or what the reader chose before
 (`localStorage`, key `deltarecon-docs-platform`). The stylesheet shows the
 parts of that platform; `src/scripts/platform.ts` turns the labels of each
-switch into tabs. `src/scripts/copy.ts` puts in the copy buttons; the
+switch into tabs, and applies the remembered choice again when the browser
+shows a page it kept (going back to it). `src/scripts/copy.ts` puts in the copy buttons; the
 delivered page has none.
 
 **Glossary terms.** Both platforms' parts count as content, shown or not:
@@ -280,7 +282,8 @@ names it (the Quick start does so before its flow diagram and its table).
 
 **A new step page** needs an entry in `stepPages` of
 `scripts/check-steps.mjs` (anchors, optional steps, the steps with a switch,
-the steps whose switch holds no command, the closing line per language).
+the steps whose switch holds no command, the step with the link to the page
+of the release where it has one, the closing line per language).
 
 ## Captures and the release check
 
@@ -315,9 +318,13 @@ number and the SHA-256 of both archives (from `SHA256SUMS` of the release):
 
 `npm run check:release` (`scripts/check-release.mjs`) is the proof that the
 page describes the release. It fails without `../dist/release-v<version>/`
-and without `--search`. Before any build it compares the capture files: the
+and without `--search`, and names a missing file of the release folder
+(`SHA256SUMS`, the release notes, a guide of a package), a missing pin, a
+`search.result.json` of another shape and a build that does not start.
+Before any build it compares the capture files: the
 Windows and the Linux file of a language line by line, with path separators
-and the time stamp of the demo folder set aside; the table of the search,
+and the time stamp of the demo folder set aside, and the one line more of the
+Windows file only where it is the line of `pause`; the table of the search,
 the counts above it and the "Not resolved" message of every file against the
 `search.result.json` of the search folder, whose SHA-256 must be the one
 `../measurements/quick-start-search.SHA256SUMS` names. A difference is named
@@ -341,7 +348,7 @@ both languages:
   per platform, exactly the entries of the unpacked package of the release
   folder, a folder with a closing slash;
 - output on the page stands in the capture of the language, the terminal
-  session line by line; table and bar figure show the revisions and sums of
+  session of each of the two platforms line by line; table and bar figure show the revisions and sums of
   `search.result.json`.
 
 Record commit, command and outcome of a run where the story or the epic asks
@@ -383,7 +390,10 @@ A <Term id="deviation">deviation</Term> between two releases.
   `<Term>` for the entry; nothing is to be kept by hand.
 - A reader who came to an entry from a page of the documentation finds a
   link "Back to the previous page" in it (`src/scripts/glossary-back.ts`,
-  text `backToPage` in `texts`). A click goes back in the history; the link
+  text `backToPage` in `texts`). A plain click goes back in the history
+  where the entry before is that page; otherwise, and with a modifier key or
+  another button, the link leads to the page by its address. A reader who
+  came from a Glossary, also by the language switch, gets no link. The link
   goes when the address changes. Without JavaScript it is not in the page.
 - A new entry needs term and explanation in both languages. The letters of
   the Glossary follow from the terms.

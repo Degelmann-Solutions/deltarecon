@@ -29,8 +29,10 @@
 //     in path order, and is absent where no page does.
 //   - the way back: after a click on a glossary link of a page the entry
 //     holds the link "Back to the previous page", and a click on it returns
-//     to that page; the link goes when the address changes; opened directly
-//     or from the Glossary itself the entry holds none;
+//     to that page; the link is there again after going forward to the
+//     entry and goes when the address changes; opened directly, or with a
+//     Glossary of either language, another site or an address outside the
+//     documentation as the page before, the entry holds none;
 //
 // What counts as content: the text of `main` after the page head, without
 // the page links, headings, `code`, `pre`, other links, and passages marked
@@ -549,7 +551,8 @@ try {
   }
   // The way back: a glossary link of a page leads to the entry, which then
   // holds a link back; a click on it returns to the page. Opened directly,
-  // and when the address changes, the entry holds no such link.
+  // from a Glossary or from outside the documentation, and when the address
+  // changes, the entry holds no such link.
   for (const lang of Object.keys(linkedOn)) {
     const from = pages.find((entry) => entry.lang === lang && !isGlossary(entry) && [...linkedOn[lang].values()].some((on) => on.includes(entry.address)));
     if (!from) {
@@ -582,6 +585,11 @@ try {
         // The link goes when the address changes.
         await page.goForward();
         await page.waitForURL(`${origin}${glossaryAddress[lang]}#${anchor}`);
+        await link.waitFor({ state: 'visible', timeout: 5_000 }).catch(() => {});
+        expect(
+          (await page.locator('[data-glossary-back]').count()) === 1,
+          `${name}: back on the entry by the history, it does not hold the one link back`,
+        );
         await page.evaluate(() => {
           window.location.hash = '#main';
         });
@@ -602,6 +610,41 @@ try {
       });
       await direct.reload({ waitUntil: 'networkidle' });
       expect((await direct.locator('[data-glossary-back]').count()) === 0, `${name}: arrived from the Glossary itself, the entry holds a link back`);
+      // What the page names as the page before decides. A page of the
+      // documentation gives the link; this also shows that the cases after it
+      // can fail. Another site, an address of this origin outside the
+      // documentation, and the Glossary of the other language give none.
+      const arrive = async (referer) => {
+        const arrived = await back.newPage();
+        await arrived.goto('about:blank');
+        await arrived.goto(`${origin}${glossaryAddress[lang]}#${anchor}`, { waitUntil: 'networkidle', referer });
+        const count = await arrived.locator('[data-glossary-back]').count();
+        await arrived.close();
+        return count;
+      };
+      expect(
+        (await arrive(`${origin}${from.address}`)) === 1,
+        `${name}: arrived with ${from.address} as the page before, the entry does not hold the one link back`,
+      );
+      const other = lang === 'de' ? 'en' : 'de';
+      for (const [way, referer] of [
+        ['another site', 'https://example.org/'],
+        ['an address of this origin outside the documentation', `${origin}/`],
+        ['the Glossary of the other language', `${origin}${glossaryAddress[other]}`],
+      ]) {
+        expect((await arrive(referer)) === 0, `${name}: arrived from ${way} (${referer}), the entry holds a link back`);
+      }
+      // The language switch keeps the anchor: from the entry on the other
+      // Glossary to this one, and no link back.
+      const switched = await back.newPage();
+      await switched.goto(`${origin}${glossaryAddress[other]}#${anchor}`, { waitUntil: 'networkidle' });
+      await switched.locator('a[data-counterpart]').click();
+      await switched.waitForURL(`${origin}${glossaryAddress[lang]}#${anchor}`);
+      await switched.waitForLoadState('networkidle');
+      expect(
+        (await switched.locator('[data-glossary-back]').count()) === 0,
+        `${name}: arrived by the language switch from ${glossaryAddress[other]}, the entry holds a link back`,
+      );
     } catch (error) {
       failures.push(`${name}: ${error.stack ?? error.message}`);
     }

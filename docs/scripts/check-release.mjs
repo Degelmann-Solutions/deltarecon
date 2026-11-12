@@ -14,8 +14,9 @@
 // First, without a build, the capture files (src/captures/v<version>/):
 //   - the four files are there; the Windows and the Linux capture of a
 //     language equal each other line by line once path separators and the
-//     time stamp of the demo folder are set aside (and the line the Windows
-//     starter prints at its end);
+//     time stamp of the demo folder are set aside, and the one line more
+//     that the Windows capture ends with, which must be the line of `pause`
+//     the Windows starter prints;
 //   - the table of the search in each file names the revisions and sums of
 //     `search.result.json`, in the number format of the language; the line
 //     above it names its counts of computations; the "Not resolved" message
@@ -39,9 +40,12 @@
 //   - output on the page stands in the capture of that language: the
 //     terminal session line by line, the lines of the summary list, the
 //     caption, head and rows of the result table, the "Not resolved"
-//     message; table and bar figure show the revisions and sums of
+//     message; the two terminal sessions are those of the two platforms;
+//     table and bar figure show the revisions and sums of
 //     `search.result.json`.
-// Exits non-zero and names what differs.
+// Exits non-zero and names what differs or what is missing: a file of the
+// release folder, the pin, a search result of another shape, a build that
+// does not start.
 import { spawnSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { existsSync } from 'node:fs';
@@ -59,6 +63,8 @@ const MARKERS = {
   en: { step: (number) => `Step ${number} of 4: `, notResolved: 'Not resolved:', locale: 'en-US' },
   de: { step: (number) => `Schritt ${number} von 4: `, notResolved: 'Nicht aufgelöst:', locale: 'de-DE' },
 };
+/** The line of `pause` the Windows starter ends with, as Windows prints it in English and in German. */
+const PAUSE = [/^Press any key to continue \. \. \. ?$/, /^Drücken Sie eine beliebige Taste \. \. \. ?$/];
 /** The quantity the search of the demo looks at. */
 const QUANTITY = 'Bruttobeitrag';
 
@@ -141,7 +147,15 @@ if (!existsSync(releaseFolder)) {
   failures.push(
     `${relative(releaseFolder)}: the folder of the release ${version} is missing; the check needs its release notes, SHA256SUMS and both unpacked packages`,
   );
+} else {
+  for (const file of ['SHA256SUMS', 'release-notes.md']) {
+    expect(
+      existsSync(path.join(releaseFolder, file)),
+      `${relative(path.join(releaseFolder, file))}: the file is missing in the folder of the release ${version}`,
+    );
+  }
 }
+expect(existsSync(pin), `${relative(pin)}: the pin of the search result is missing`);
 if (!searchFolder) {
   failures.push('no search folder: run `npm run check:release -- --search <folder search/ of a run of the demo>`');
 } else if (!existsSync(path.join(searchFolder, 'search.result.json'))) {
@@ -164,6 +178,11 @@ for (const platform of PLATFORMS) {
     Boolean(folders[platform]) && existsSync(path.join(releaseFolder, folders[platform])),
     `${relative(releaseFolder)}: the unpacked package of ${platform} is missing`,
   );
+  for (const guide of Object.values(GUIDES)) {
+    if (!folders[platform]) continue;
+    const file = path.join(releaseFolder, folders[platform], guide);
+    expect(existsSync(file), `${relative(file)}: the guide of the ${platform} package is missing`);
+  }
 }
 if (failures.length > 0) report('');
 
@@ -185,16 +204,29 @@ expect(
   digest === pinned,
   `${resultFile}: SHA-256 ${digest}, the pin ${relative(pin)} names ${pinned}`,
 );
-const result = JSON.parse(resultText.toString('utf8'));
 /** The revisions that deviate, with their sums, in the order of the result. */
-const contributions = result.contributions.flatMap((interval) => {
-  const sum = interval.contributions.find((entry) => entry.quantity === QUANTITY && entry.contributes)?.sum;
-  return sum === undefined ? [] : [{ revision: interval.revisions.at(-1).slice(0, 7), sum }];
-});
-const notResolved = result.findings
-  .filter((finding) => finding.code === 'interval_not_resolved')
-  .map((finding) => finding.revisions.map((revision) => revision.slice(0, 7)));
-const counts = [contributions.length, result.runs.search, result.runs.walk, result.runs.saved];
+let contributions;
+let notResolved;
+let counts;
+try {
+  const result = JSON.parse(resultText.toString('utf8'));
+  contributions = result.contributions.flatMap((interval) => {
+    const sum = interval.contributions.find((entry) => entry.quantity === QUANTITY && entry.contributes)?.sum;
+    return sum === undefined ? [] : [{ revision: interval.revisions.at(-1).slice(0, 7), sum }];
+  });
+  notResolved = result.findings
+    .filter((finding) => finding.code === 'interval_not_resolved')
+    .map((finding) => finding.revisions.map((revision) => revision.slice(0, 7)));
+  counts = [contributions.length, result.runs.search, result.runs.walk, result.runs.saved];
+  if (!contributions.every(({ sum }) => typeof sum === 'number') || !counts.every(Number.isInteger)) {
+    throw new Error('a sum or a count of computations is not a number');
+  }
+} catch (error) {
+  failures.push(
+    `${resultFile}: not a search result of the shape the check reads (contributions with revisions and sums, findings with revisions, runs.search, runs.walk, runs.saved): ${error.message}`,
+  );
+  report('');
+}
 expect(contributions.length > 0, `${resultFile}: no revision contributes to ${QUANTITY}`);
 const rowsOf = (lang) =>
   contributions.map(({ revision, sum }) => ({ revision, sum: printed(sum, lang) }));
@@ -223,8 +255,17 @@ if (failures.length > 0) report('');
 for (const lang of LANGUAGES) {
   const { windows, linux } = captures[lang];
   // The Windows starter ends with the line of `pause`, which is not output
-  // of the demo: one line more than the Linux capture.
-  const windowsLines = windows.lines.length === linux.lines.length + 1 ? windows.lines.slice(0, -1) : windows.lines;
+  // of the demo: one line more than the Linux capture. Only that line is
+  // set aside.
+  let windowsLines = windows.lines;
+  if (windows.lines.length === linux.lines.length + 1) {
+    const last = windows.lines.at(-1);
+    expect(
+      PAUSE.some((pause) => pause.test(last)),
+      `${windows.file}:${windows.lines.length}: the line the capture has more than ${linux.file} is "${last}", expected the line of \`pause\` the Windows starter ends with`,
+    );
+    windowsLines = windows.lines.slice(0, -1);
+  }
   expect(
     windowsLines.length === linux.lines.length,
     `${windows.file} has ${windows.lines.length} lines, ${linux.file} has ${linux.lines.length}; expected the same, or one more for the line the Windows starter ends with`,
@@ -298,6 +339,10 @@ if (failures.length > 0) report('');
 // ---- The built pages ----
 
 const build = spawnSync('npm', ['run', 'build'], { cwd: root, encoding: 'utf8' });
+if (build.error) {
+  failures.push(`the build could not be started (npm run build): ${build.error.message}`);
+  report('');
+}
 if (build.status !== 0) {
   failures.push(`the build failed:\n${build.stdout}\n${build.stderr}`);
   report('');
@@ -306,8 +351,8 @@ if (build.status !== 0) {
 const notes = commandsOfMarkdown(await read(path.join(releaseFolder, 'release-notes.md')));
 // The README of the release, which its notes point to: the file at the tag.
 const tagged = spawnSync('git', ['show', `v${version}:README.md`], { cwd: repository, encoding: 'utf8' });
-if (tagged.status !== 0) {
-  failures.push(`git show v${version}:README.md failed; the check reads the README of the release: ${tagged.stderr.trim()}`);
+if (tagged.error || tagged.status !== 0) {
+  failures.push(`git show v${version}:README.md failed; the check reads the README of the release: ${tagged.error?.message ?? tagged.stderr.trim()}`);
   report('');
 }
 const readme = commandsOfMarkdown(tagged.stdout).all;
@@ -453,7 +498,11 @@ try {
     }
 
     // The terminal sessions, line by line.
-    expect(shown.sessions.length === PLATFORMS.length, `${name}: not one terminal session per platform`);
+    const sessionsOf = shown.sessions.map((session) => session.platform);
+    expect(
+      sessionsOf.length === PLATFORMS.length && PLATFORMS.every((platform) => sessionsOf.includes(platform)),
+      `${name}: not one terminal session per platform; the sessions are those of [${sessionsOf}], expected [${PLATFORMS}]`,
+    );
     for (const session of shown.sessions) {
       const capture = captures[lang][session.platform];
       if (!capture) {

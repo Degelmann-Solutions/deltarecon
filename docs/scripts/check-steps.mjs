@@ -15,7 +15,12 @@
 //   - the cards: one per step in order, the counter "Step n of m", the tag
 //     "optional" on the optional steps only, the pad hidden from assistive
 //     technology, the trace on every card, a figure or a flow diagram in
-//     every card; the step title is a link to its step;
+//     every card; the step title is a link to its step; a card with a part
+//     of one platform holds a platform switch;
+//   - a link of the content to GitHub opens in a new tab and says so in
+//     hidden text, a link to another site is a plain link; the step of the
+//     download holds one link to the page of the release on GitHub, named by
+//     its tag;
 //   - the chapter tree lists the steps as links with the titles of the cards;
 //   - an address with the anchor of a step opens with that step at the top
 //     of the window, without a highlight;
@@ -34,7 +39,9 @@
 //   - every block that scrolls sideways takes focus and is a named region;
 //     the terminal block shows its ring inside;
 //   - the result table (caption, column headers, the revision as the header
-//     of its row) and the bar figure, which shows the sums of the table;
+//     of its row) and the bar figure, which shows the sums of the table:
+//     the bar of the largest sum spans half the track, the others in
+//     proportion to their sums;
 //   - nothing in the content moves: no transition, no animation;
 //   - axe with Windows and with Linux chosen; no sideways scrolling.
 // Phone (390 px): one column, the figure below the text, the flow diagram
@@ -61,6 +68,7 @@ import {
   expectations,
   loadPages,
   loadRegister,
+  loadRelease,
   pageChecks,
   root,
   startPreview,
@@ -72,10 +80,12 @@ const stepPages = {
     anchors: ['download', 'check', 'unpack', 'start', 'demo', 'result'],
     optional: ['check'],
     // The steps that hold a platform switch; those among them whose switch
-    // holds no command; and the step with a terminal block.
+    // holds no command (may be left out: none); the step with a terminal
+    // block; the step with the link to the page of the release.
     switches: ['download', 'check', 'unpack', 'start'],
     plain: ['download'],
     terminal: 'start',
+    release: 'download',
     table: 'result',
     closing: {
       en: 'With the table of step 6 on your screen, stage 1 is complete.',
@@ -123,6 +133,16 @@ const STORAGE_KEY = 'deltarecon-docs-platform';
 const shots = path.join(root, 'screenshots');
 const site = await loadRegister();
 const pages = await loadPages();
+/** The tag of the release and its page on GitHub, written out here. */
+const releaseTag = `v${await loadRelease()}`;
+const releaseAddress = `${site.outside.repository}/releases/tag/${releaseTag}`;
+/** A sum as the demo prints it, without its sign, as a number. */
+const amountOf = (sum, lang) =>
+  Number(
+    (lang === 'en' ? sum.replaceAll(',', '') : sum.replaceAll('.', '').replace(',', '.')).replace(/^[-+]/, ''),
+  );
+/** Whether a printed sum begins with a minus sign. */
+const isLowering = (sum) => sum.startsWith('-');
 const { failures, expect, report } = expectations('check-steps');
 const { checkAxe, checkNoSidewaysScroll } = pageChecks({ failures, expect });
 
@@ -222,6 +242,9 @@ async function checkCards(page, name, entry, expected) {
         trace: `${trace.borderLeftStyle} ${trace.borderLeftColor}`,
         figure: card.querySelector('[data-step-figure], [data-flow]') !== null,
         state: card.querySelector('input, [aria-checked], [data-state]') !== null,
+        // A part of one platform outside a switch, a file of one platform.
+        onePlatform: card.querySelector('[data-platform-only], [data-file-list] li[data-platform-part]') !== null,
+        switch: card.querySelector('[data-platform-switch]') !== null,
         ground: getComputedStyle(card.querySelector('.step-card')).backgroundColor,
       };
     }),
@@ -241,20 +264,40 @@ async function checkCards(page, name, entry, expected) {
     expect(card.trace === 'solid rgb(23, 121, 130)', `${at}: no trace in teal-text beside the card (${card.trace})`);
     expect(card.figure, `${at}: the card holds neither a step figure nor a flow diagram`);
     expect(!card.state, `${at}: the card carries a state mark`);
+    expect(
+      !card.onePlatform || card.switch,
+      `${at}: the card holds a part of one platform and no platform switch; the reader cannot change the platform there`,
+    );
   });
 
-  // A link to another site opens in a new tab and says so.
+  // A link to GitHub opens in a new tab and says so; a link to another
+  // site is a plain link.
   const outside = await page.evaluate(() =>
     [...document.querySelectorAll('main a[href^="http"]')].map((link) => ({
       href: link.getAttribute('href'),
+      host: new URL(link.href).hostname,
+      step: link.closest('[data-step]')?.id,
       newTab: link.target === '_blank' && link.rel === 'noopener',
-      hidden: link.querySelector('.sr-only')?.textContent.trim(),
+      hidden: link.querySelector('.sr-only')?.textContent.trim() ?? '',
+      text: link.textContent.trim().replace(/\s+/g, ' '),
     })),
   );
-  expect(
-    outside.length > 0 && outside.every((link) => link.newTab && link.hidden === `(${w.newTab})`),
-    `${name}: a link of the content to another site does not open in a new tab with the hidden text "(${w.newTab})": ${JSON.stringify(outside)}`,
-  );
+  for (const link of outside) {
+    expect(
+      link.host === 'github.com' ? link.newTab && link.hidden === `(${w.newTab})` : !link.newTab && link.hidden === '',
+      link.host === 'github.com'
+        ? `${name}: the link to ${link.href} does not open in a new tab with the hidden text "(${w.newTab})"`
+        : `${name}: the link to ${link.href}, which is not on GitHub, is not a plain link`,
+    );
+  }
+  // The page of the release: one link, in its step, named by the tag.
+  if (expected.release) {
+    const links = outside.filter((link) => link.step === expected.release && link.href === releaseAddress);
+    expect(
+      links.length === 1 && links[0].text.includes(releaseTag),
+      `${name}, step "${expected.release}": not exactly one link to ${releaseAddress} whose text names ${releaseTag}: ${JSON.stringify(outside.filter((link) => link.step === expected.release))}`,
+    );
+  }
 
   // The chapter tree lists the steps under the current page.
   const tree = await page.evaluate(
@@ -357,7 +400,7 @@ async function checkRegions(page, name, entry, expected, cards) {
 }
 
 /** The result table and the bar figure beside it. */
-async function checkTable(page, name, expected) {
+async function checkTable(page, name, entry, expected) {
   const table = await page.evaluate((anchor) => {
     const card = document.getElementById(anchor);
     const element = card?.querySelector('table[data-result-table]');
@@ -380,6 +423,7 @@ async function checkTable(page, name, expected) {
           value: row.querySelector('.bar-value').textContent.trim(),
           kind: bar.dataset.bar,
           width: box.width,
+          track: track.width,
           side: box.left + box.width / 2 < track.left + track.width / 2 ? 'left' : 'right',
           filled: Number.parseFloat(style.borderTopWidth) + Number.parseFloat(style.borderBottomWidth) >= box.height - 0.5,
           hidden: row.querySelector('.bar-track').getAttribute('aria-hidden') === 'true',
@@ -399,8 +443,31 @@ async function checkTable(page, name, expected) {
       table.bars.every((bar, index) => bar.revision === table.rows[index].header && bar.value === table.rows[index].sum),
     `${name}: the bar figure does not show the revisions and sums of the table: ${JSON.stringify(table.bars)}`,
   );
+  // The proportion: the bar of the largest sum spans half the track, and a
+  // bar above the least width is to it as its sum is to the largest.
+  const amounts = table.bars.map((bar) => amountOf(bar.value, entry.lang));
+  const largest = Math.max(...amounts);
+  const longest = table.bars[amounts.indexOf(largest)];
+  expect(
+    amounts.every((amount) => Number.isFinite(amount)),
+    `${name}: a value of the bar figure is not a sum: ${JSON.stringify(table.bars.map((bar) => bar.value))}`,
+  );
+  if (longest && largest > 0) {
+    expect(
+      Math.abs(longest.width - longest.track / 2) <= 1,
+      `${name}: the bar of ${longest.revision}, the largest sum, is ${longest.width} px wide, expected half the track of ${longest.track} px`,
+    );
+    table.bars.forEach((bar, index) => {
+      const wanted = (longest.width * amounts[index]) / largest;
+      expect(
+        // Below the least width of 8 px a bar is not drawn to scale.
+        (wanted <= 8 && bar.width <= 9) || Math.abs(bar.width - wanted) <= 1,
+        `${name}: the bar of ${bar.revision} (${bar.value}) is ${bar.width} px wide, expected ${wanted.toFixed(1)} px: its share of the longest bar (${longest.width} px for ${longest.value})`,
+      );
+    });
+  }
   for (const bar of table.bars) {
-    const lowers = bar.value.startsWith('-');
+    const lowers = isLowering(bar.value);
     expect(
       bar.hidden && bar.kind === (lowers ? 'lowers' : 'raises') && bar.filled === !lowers && bar.side === (lowers ? 'left' : 'right'),
       `${name}: the bar of ${bar.revision} (${bar.value}) is not ${lowers ? 'outlined, left of' : 'filled, right of'} the zero line`,
@@ -880,7 +947,7 @@ async function checkStepPage(browser, origin, entry, expected) {
     const { context, page, errors } = await open(browser, origin, entry, DESKTOP);
     cards = await checkCards(page, name, entry, expected);
     await checkRegions(page, name, entry, expected, cards);
-    await checkTable(page, name, expected);
+    await checkTable(page, name, entry, expected);
     await checkNoMotion(page, name);
     await checkNoSidewaysScroll(page, name);
     await checkAxe(page, `${name}, Windows`);
@@ -958,11 +1025,13 @@ try {
     }
   }
   for (const entry of found) {
-    const expected = stepPages[entry.id];
-    if (!expected) {
+    const listed = stepPages[entry.id];
+    if (!listed) {
       failures.push(`${entry.address}: a step page without an entry in stepPages (scripts/check-steps.mjs)`);
       continue;
     }
+    // An entry without `plain`: no switch of the page is without a command.
+    const expected = { plain: [], ...listed };
     // An error on one page is a failure of that page; the others still run.
     try {
       await checkStepPage(browser, origin, entry, expected);

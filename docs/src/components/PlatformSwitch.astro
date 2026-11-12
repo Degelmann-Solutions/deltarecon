@@ -9,7 +9,9 @@
 //
 // Without `windows` and `linux` the switch holds no command: no code block
 // and no copy button, the tabs stand above the sentences of the platform
-// and the Windows tab names no shell.
+// and the Windows tab names no shell. Such a switch needs both slots. The
+// build fails for a switch that names the command of one platform only, and
+// for a switch without commands that lacks the sentences of a platform.
 // A card with content of one platform (PlatformPart, a file list) needs a
 // switch, or the reader cannot get to the other platform there.
 //
@@ -29,6 +31,11 @@ interface Props {
 
 const { windows, linux } = Astro.props;
 const lines: Record<Platform, string[] | undefined> = { windows, linux };
+if (Boolean(windows) !== Boolean(linux)) {
+  throw new Error(
+    `${Astro.url.pathname}: a platform switch names the command of "${windows ? 'windows' : 'linux'}" only; it needs "windows" and "linux", or neither.`,
+  );
+}
 // A switch without commands: the tabs stand above the sentences alone.
 const plain = !windows && !linux;
 const lang = pageLanguage(Astro.url.pathname);
@@ -39,6 +46,12 @@ const after: Record<Platform, string> = { windows: '', linux: '' };
 for (const platform of platforms) {
   const slot = `after-${platform}`;
   if (Astro.slots.has(slot)) after[platform] = await Astro.slots.render(slot);
+  // The text is what counts: an empty element in the slot is no sentence.
+  if (plain && after[platform].replace(/<[^>]*>/g, '').trim() === '') {
+    throw new Error(
+      `${Astro.url.pathname}: a platform switch without commands lacks the text of the slot "${slot}".`,
+    );
+  }
 }
 ---
 

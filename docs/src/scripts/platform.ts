@@ -1,7 +1,8 @@
 // The platform switch. The delivered page holds, per switch, two labelled
 // parts one after the other, Windows then Linux. This script turns the
 // labels into tabs after the standard tabs pattern: real buttons, one tab
-// stop per switch, Left and Right arrow and Home and End move and select,
+// stop per switch, Left and Right arrow and Home and End move and select
+// (not with Alt, Ctrl, Meta or Shift held: those keys are the browser's),
 // the selected tab is announced, each tab names its panel.
 //
 // A choice applies to the whole page: it is the attribute `data-platform` of
@@ -10,7 +11,9 @@
 // The choice is remembered in the storage of the browser under one key. An
 // inline script in the head of the page (layouts/Page.astro) applies a
 // remembered choice before the page is first shown; where the storage is
-// not available, the choice holds for the page.
+// not available, the choice holds for the page. A page the browser kept and
+// shows again (going back to it) runs no script anew: it takes the
+// remembered choice when it is shown.
 
 type Platform = 'windows' | 'linux';
 
@@ -85,6 +88,8 @@ document.querySelectorAll<HTMLElement>('[data-platform-switch]').forEach((elemen
   }
 
   list.addEventListener('keydown', (event) => {
+    // With a modifier the key is the browser's (Alt and Left: back).
+    if (event.altKey || event.ctrlKey || event.metaKey || event.shiftKey) return;
     const at = order.indexOf(chosen());
     const to: Record<string, number> = {
       ArrowRight: (at + 1) % order.length,
@@ -104,6 +109,19 @@ document.querySelectorAll<HTMLElement>('[data-platform-switch]').forEach((elemen
 });
 
 mark();
+
+// A page shown again from the browser's store of kept pages: the reader may
+// have chosen another platform on a page since.
+window.addEventListener('pageshow', (event) => {
+  if (!event.persisted) return;
+  try {
+    const stored = window.localStorage.getItem(KEY);
+    if (stored === 'windows' || stored === 'linux') root.dataset.platform = stored;
+  } catch {
+    // No storage: the choice of the page holds.
+  }
+  mark();
+});
 
 // This file is a module of its own; its names are not global.
 export {};
