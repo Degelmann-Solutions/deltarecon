@@ -1,7 +1,9 @@
 ---
 // The head of a page: the stage line, the title, the lead. The stage line
 // names the stage of the page; on the page below the four stages it names
-// the page kind.
+// the page kind. The head is marked `data-page-head`: the glossary check
+// counts the content after it only, since the lead is plain text and cannot
+// hold a glossary link.
 import { stageLine, type Lang, type Page } from '../site';
 
 interface Props {
@@ -13,8 +15,10 @@ interface Props {
 const { lang, page, lead } = Astro.props;
 ---
 
-<p class="text-caption text-text-secondary" data-stage-line>{stageLine(page, lang)}</p>
-<h1 class="mt-2.5 max-w-text-max text-page-title-phone text-balance tablet:text-page-title">
-  {page.name[lang]}
-</h1>
-<p class="mt-3.5 max-w-text-max text-lead-phone text-text-secondary tablet:text-lead">{lead}</p>
+<div data-page-head>
+  <p class="text-caption text-text-secondary" data-stage-line>{stageLine(page, lang)}</p>
+  <h1 class="mt-2.5 max-w-text-max text-page-title-phone text-balance tablet:text-page-title">
+    {page.name[lang]}
+  </h1>
+  <p class="mt-3.5 max-w-text-max text-lead-phone text-text-secondary tablet:text-lead">{lead}</p>
+</div>

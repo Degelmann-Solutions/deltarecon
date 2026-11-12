@@ -1,5 +1,5 @@
-// What the check scripts share: the preview server, the page register, and
-// the list of failed expectations.
+// What the check scripts share: the preview server, the page register, the
+// glossary register, and the list of failed expectations.
 import { spawn } from 'node:child_process';
 import { readFile } from 'node:fs/promises';
 import path from 'node:path';
@@ -46,15 +46,26 @@ export function startPreview() {
 }
 
 /**
- * Loads the page register, src/site.ts. Node does not run TypeScript, so the
- * file is turned into JavaScript in memory; it imports nothing.
+ * Loads a register under src/. Node does not run TypeScript, so the file is
+ * turned into JavaScript in memory; it imports nothing but types, which the
+ * conversion drops.
  */
-export async function loadRegister() {
-  const source = await readFile(path.join(root, 'src/site.ts'), 'utf8');
+async function loadSource(file) {
+  const source = await readFile(path.join(root, 'src', file), 'utf8');
   const { outputText } = ts.transpileModule(source, {
     compilerOptions: { module: ts.ModuleKind.ESNext, target: ts.ScriptTarget.ES2022 },
   });
   return import(`data:text/javascript;base64,${Buffer.from(outputText).toString('base64')}`);
+}
+
+/** Loads the page register, src/site.ts. */
+export function loadRegister() {
+  return loadSource('site.ts');
+}
+
+/** Loads the glossary register, src/glossary.ts. */
+export function loadGlossary() {
+  return loadSource('glossary.ts');
 }
 
 /** The release number the documentation applies to. */

@@ -206,6 +206,76 @@
     color: var(--color-navy);
   }
 
+  /* Glossary link: the text colour of its surroundings and a dotted
+     underline; quieter than an inline link. On hover and pressed the
+     underline is solid and the colour stays. */
+  .glossary-link,
+  .prose-links a.glossary-link {
+    color: inherit;
+    text-decoration-line: underline;
+    text-decoration-style: dotted;
+    text-decoration-thickness: 1px;
+    text-decoration-color: var(--color-text-secondary);
+    text-underline-offset: 3px;
+  }
+
+  .glossary-link:hover,
+  .glossary-link:active,
+  .prose-links a.glossary-link:hover,
+  .prose-links a.glossary-link:active {
+    color: inherit;
+    text-decoration-style: solid;
+  }
+
+  /* Glossary entry: a hairline above and a bar at the left edge that shows
+     only in the linked state. */
+  .glossary-entry {
+    padding: 16px;
+    border-top: 1px solid var(--color-border);
+    border-left: 2px solid transparent;
+  }
+
+  /* The counterpart of a term in the other language: on the phone on a line
+     of its own, from the phone breakpoint up after the term. */
+  .glossary-counterpart {
+    display: block;
+    margin-top: 2px;
+    color: var(--color-text-secondary);
+    font-size: 0.875rem;
+    font-weight: 400;
+
+    @variant tablet {
+      display: inline;
+      margin-top: 0;
+      margin-left: 10px;
+      white-space: nowrap;
+    }
+  }
+
+  /* The tag above the term, in the page only for the linked state. */
+  .glossary-linked {
+    display: none;
+    margin-bottom: 4px;
+    color: var(--color-teal-text);
+    font-family: var(--font-mono);
+    font-size: var(--text-label-small);
+    font-weight: 400;
+    letter-spacing: var(--text-label-small--letter-spacing);
+    text-transform: uppercase;
+  }
+
+  /* Linked state: the address points at the entry. Three cues: the ground,
+     the bar, the tag. `:target` needs no script and ends when the address
+     changes. */
+  .glossary-entry:target {
+    background: var(--color-bg-subtle);
+    border-left-color: var(--color-teal-text);
+  }
+
+  .glossary-entry:target .glossary-linked {
+    display: block;
+  }
+
   /* A link without underline (chapter tree, page links, language switch,
      product-page link) gets the underline of the inline link on hover.
      `.nav-link-text` marks the part of a boxed link that gets it. */

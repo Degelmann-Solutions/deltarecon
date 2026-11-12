@@ -1,0 +1,110 @@
+---
+// The Glossary of the page's language, built from the glossary register
+// (src/glossary.ts): the letter index, then per letter its label and a
+// description list of its entries. An entry shows its term, the counterpart
+// in the other language, the explanation and the pages that link the term.
+//
+// An entry has the address of the page plus its anchor, the same in both
+// languages. The entry the address points at shows its linked state; the
+// stylesheet does that with `:target`, so it works without a script.
+//
+// The letters of the index, the labels and the language codes are kept out
+// of the search index: the search offers a short word as a hit for every
+// word that begins with it ("DE" for "derive"). The tag of the linked state
+// is kept out as well.
+//
+// "Appears in" is read from the page sources: a page appears under an entry
+// when it writes the glossary link `<Term id="…">` for it.
+import { letterAnchor, lettersOf, termLanguage, termsUsed, type Entry } from '../glossary';
+import { languageOf, otherLanguage, pageAddress, pages, texts, type Page } from '../site';
+
+const lang = languageOf(Astro.url.pathname);
+if (!lang) {
+  throw new Error(`${Astro.url.pathname}: the Glossary stands on a page of no language.`);
+}
+const other = otherLanguage(lang);
+const t = texts[lang];
+const letters = lettersOf(lang);
+
+// The source of every page file of this language, by its file name.
+const sources = import.meta.glob<string>('../pages/*/*.mdx', {
+  query: '?raw',
+  import: 'default',
+  eager: true,
+});
+const sourceOf = (page: Page): string =>
+  sources[`../pages/${lang}/${page.slug[lang] === '' ? 'index' : page.slug[lang]}.mdx`] ?? '';
+const linkedOn = new Map(pages.map((page) => [page, termsUsed(sourceOf(page))]));
+
+/** The pages that link the term of an entry, in path order. */
+const appearsIn = (entry: Entry): Page[] =>
+  pages.filter((page) => linkedOn.get(page)?.includes(entry.anchor));
+---
+
+<nav
+  class="mt-6 flex max-w-text-max flex-wrap gap-1"
+  aria-label={t.letters}
+  data-letter-index
+  data-pagefind-ignore
+>
+  {
+    letters.map(({ letter }) => (
+      <a
+        class="inline-link inline-flex min-h-8 min-w-8 items-center justify-center font-mono text-[0.875rem]"
+        href={`#${letterAnchor(letter)}`}
+      >
+        {letter}
+      </a>
+    ))
+  }
+</nav>
+{
+  letters.map(({ letter, entries }) => (
+    <>
+      <p
+        id={letterAnchor(letter)}
+        class="mt-8 max-w-text-max font-mono text-label text-text-secondary uppercase"
+        data-letter
+        data-language-own
+        data-pagefind-ignore
+      >
+        {letter}
+      </p>
+      <dl class="mt-2 max-w-text-max border-b border-border">
+        {entries.map((entry) => {
+          const termLang = termLanguage(entry, lang);
+          const on = appearsIn(entry);
+          return (
+            <div id={entry.anchor} class="glossary-entry" data-glossary-entry>
+              <dt class="text-sub-heading">
+                <span class="glossary-linked" data-pagefind-ignore>
+                  {t.linkedTerm}
+                </span>
+                <span lang={termLang === lang ? undefined : termLang} data-term-name>
+                  {entry[lang].term}
+                </span>
+                <span class="glossary-counterpart" data-counterpart-term>
+                  <span class="mr-[5px] font-mono text-label-small" data-pagefind-ignore>
+                    {other.toUpperCase()}
+                  </span>
+                  <span lang={entry.termLang ?? other}>{entry[other].term}</span>
+                </span>
+              </dt>
+              <dd class="mt-1.5">
+                <p set:html={entry[lang].explanation} />
+                {on.length > 0 && (
+                  <p class="mt-2 text-caption text-text-secondary" data-appears-in>
+                    {t.appearsIn}:{' '}
+                    {on.map((page, index) => (
+                      <>{index > 0 && ', '}<a class="inline-link" href={pageAddress(page, lang)}>{page.name[lang]}</a></>
+                    ))}
+                  </p>
+                )}
+              </dd>
+            </div>
+          );
+        })}
+      </dl>
+    </>
+  ))
+}
