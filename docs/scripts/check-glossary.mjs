@@ -84,8 +84,10 @@ function readContent(page) {
     ({ LINK_START, LINK_END, BREAK }) => {
       const main = document.querySelector('main');
       if (!main) return null;
+      // The last five hold no text a reader reads as content: code of the
+      // page, and the name and description of a drawing.
       const skipped =
-        '[data-page-head], [data-page-links], h1, h2, h3, h4, h5, h6, code, pre, [data-no-term], a:not([data-term])';
+        '[data-page-head], [data-page-links], h1, h2, h3, h4, h5, h6, code, pre, [data-no-term], a:not([data-term]), script, style, noscript, template, svg title, svg desc';
       const describe = (link) => {
         const style = getComputedStyle(link);
         return {
@@ -238,7 +240,8 @@ async function proveItself(browser, origin) {
     ['a term linked after its first occurrence', 'en', `<p>A deviation shows.</p><p>The ${link('en', 'deviation', 'deviation')} again.</p>`, ['unlinked:deviation']],
     ['a term linked twice', 'en', `<p>A ${link('en', 'deviation', 'deviation')} and two ${link('en', 'deviation', 'deviations')}.</p>`, ['twice:deviation'], '"Deviation"'],
     ['a term linked in a heading and in the text', 'en', `<h2>The ${link('en', 'deviation', 'deviation')}</h2><p>A ${link('en', 'deviation', 'deviation')} shows.</p>`, ['twice:deviation']],
-    ['a linked term in content that is not shown', 'en', `<p>A ${link('en', 'deviation', 'deviation')} shows.</p><div style="display: none"><p>A revision.</p></div>`, ['unlinked:revision']],
+    ['an unlinked term in content that is not shown', 'en', `<p>A ${link('en', 'deviation', 'deviation')} shows.</p><div style="display: none"><p>A revision.</p></div>`, ['unlinked:revision']],
+    ['a term in the code of the page and in the name of a drawing', 'en', '<p>Text.</p><style>.record { color: inherit }</style><script>const value = 1; // a deviation</script><noscript><p>A revision.</p></noscript><svg><title>Value</title><desc>A class.</desc></svg>', []],
     ['a link to an unknown entry', 'en', `<p>${link('en', 'no-such-entry', 'Something')}</p>`, ['unknown:no-such-entry']],
     ['a link to the Glossary of the other language', 'en', `<p>A ${link('de', 'deviation', 'deviation')}.</p>`, ['address:deviation']],
     ['a word in an exempt passage, in code, in a heading, in another link', 'en', '<h2>Deviation</h2><p>Run <code>deviation</code>, <span data-no-term>a deviation from the plan</span>, <a href="/x">the deviation page</a>.</p><pre>deviation</pre>', []],
@@ -289,7 +292,10 @@ async function proveItself(browser, origin) {
       },
       { style, href: `${glossaryAddress.en}#deviation` },
     );
-    const found = short(inspect(await readContent(page), 'en'));
+    // Only the looks are judged here; what else the page holds is its own.
+    const found = short(inspect(await readContent(page), 'en')).filter((problem) =>
+      problem.startsWith('looks:'),
+    );
     expect(
       found.join() === expected.join(),
       `self-test "${name}" on ${stub.address}: the check reports [${found.join(', ')}], expected [${expected.join(', ')}]`,
