@@ -1,7 +1,8 @@
 // The page register of the documentation: the four stages, the ten pages in
 // path order with their names and addresses per language, the texts of the
-// page frame and of the Glossary, and `languageOf`, the language of a page
-// address. Chapter tree, page links, page head, language switch and head
+// page frame and of the Glossary, `languageOf`, the language of a page
+// address, and the page-not-found page, which stands outside the path
+// (`notFoundPage`, `onPath`). Chapter tree, page links, page head, language switch and head
 // data read it, and so do the Glossary (components/Glossary.astro) and the
 // glossary link (components/Term.astro); a page name stands here and in no
 // other file.

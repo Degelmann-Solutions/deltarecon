@@ -21,7 +21,8 @@
 //   - a slow search index shows the loading text once a term is typed, then
 //     the answer;
 //   - a missing search index leaves the page readable and shows the
-//     "not available" text, at the load and after a term is typed;
+//     "not available" text, in the page at the load, shown with focus in
+//     the field and after a term is typed;
 // for the page-not-found pages: the search finds the start page;
 // for the root page: with JavaScript off it stays and offers both languages,
 // each link in its own language; with JavaScript it leads on to a language.
@@ -339,8 +340,9 @@ async function checkEntry(browser, origin, entry) {
     await context.close();
   }
 
-  // Search index missing: readable, the "not available" status at the load
-  // and after a term is typed, no uncaught error.
+  // Search index missing: readable, the "not available" status in the page
+  // at the load, shown once focus is in the field (the field stands in the
+  // top bar here) and after a term is typed, no uncaught error.
   {
     const { context, page, name, scriptErrors } = await open(browser, origin, entry, {
       blockIndex: true,
@@ -348,7 +350,17 @@ async function checkEntry(browser, origin, entry) {
     await checkPage(page, name, entry);
     try {
       const status = page.locator('[data-search-status="unavailable"]');
-      await status.waitFor({ state: 'visible', timeout: 10_000 });
+      await status.waitFor({ state: 'attached', timeout: 10_000 });
+      const panel = page.locator('[data-search] .search-panel');
+      expect(
+        (await panel.getAttribute('data-empty')) !== null,
+        `${name}: the "not available" box lies over the page before focus is in the search`,
+      );
+      await page.focus('[data-search] input');
+      expect(
+        (await panel.getAttribute('data-empty')) === null && (await status.isVisible()),
+        `${name}: the "not available" text is not shown with focus in the field`,
+      );
       const expected = await page.getAttribute('[data-search]', 'data-unavailable');
       const shown = (await status.innerText()).trim();
       expect(

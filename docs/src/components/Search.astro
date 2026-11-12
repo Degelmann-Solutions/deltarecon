@@ -196,7 +196,9 @@ const stages = Object.fromEntries(
 
     // The index answers, or not. A loaded index shows nothing before the
     // reader types; a failed load says at once that the search is not
-    // available.
+    // available. In the top bar the box would lie over the page with focus
+    // elsewhere, so there the text is in the page at once (and announced) and
+    // shown when focus enters the search; in the menu it shows at once.
     loadIndex().then(
       () => {
         status.dataset.searchStatus = 'ready';
@@ -204,6 +206,7 @@ const stages = Object.fromEntries(
       () => {
         status.dataset.searchStatus = 'unavailable';
         say(text('unavailable'));
+        closed = bar.matches && !container.contains(document.activeElement);
         show();
       },
     );
@@ -278,9 +281,10 @@ const stages = Object.fromEntries(
       field.focus();
       close();
     });
-    // Focusing the field with a term opens the list again.
+    // Focusing the field with a term, or with the "not available" text
+    // waiting, opens the list again.
     field.addEventListener('focus', () => {
-      if (field.value.trim()) open();
+      if (field.value.trim() || status.dataset.searchStatus === 'unavailable') open();
     });
     // In the top bar the list lies over the page. When focus leaves the
     // search, the list closes, so that it never covers the focused element.
@@ -289,6 +293,10 @@ const stages = Object.fromEntries(
       const next = event.relatedTarget;
       if (!bar.matches || (next instanceof Node && container.contains(next))) return;
       close();
+    });
+    // The same when the field moves from the menu into the top bar.
+    bar.addEventListener('change', () => {
+      if (bar.matches && !container.contains(document.activeElement)) close();
     });
     window.addEventListener('resize', show);
   }
