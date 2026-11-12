@@ -225,6 +225,10 @@ export interface FrameTexts {
   copyCommand: string;
   copied: string;
   copyFailed: string;
+  /** What follows, hidden, the text of a link that opens in a new tab. */
+  newTab: string;
+  /** The Glossary: the link back to the page the reader came from. */
+  backToPage: string;
 }
 
 export const texts: Record<Lang, FrameTexts> = {
@@ -265,6 +269,8 @@ export const texts: Record<Lang, FrameTexts> = {
     copyCommand: 'Copy command',
     copied: 'Copied',
     copyFailed: 'Not copied. Please select the command by hand.',
+    newTab: 'opens in a new tab',
+    backToPage: 'Back to the previous page',
   },
   de: {
     documentation: 'DeltaRecon-Dokumentation',
@@ -303,6 +309,8 @@ export const texts: Record<Lang, FrameTexts> = {
     copyCommand: 'Befehl kopieren',
     copied: 'Kopiert',
     copyFailed: 'Nicht kopiert. Bitte markieren Sie den Befehl von Hand.',
+    newTab: 'öffnet in neuem Tab',
+    backToPage: 'Zurück zur vorherigen Seite',
   },
 };
 

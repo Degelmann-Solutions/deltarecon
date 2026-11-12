@@ -71,8 +71,10 @@ const stepPages = {
   'quick-start': {
     anchors: ['download', 'check', 'unpack', 'start', 'demo', 'result'],
     optional: ['check'],
-    // The steps that hold a platform switch, and the one with a terminal block.
-    switches: ['check', 'unpack', 'start'],
+    // The steps that hold a platform switch; those among them whose switch
+    // holds no command; and the step with a terminal block.
+    switches: ['download', 'check', 'unpack', 'start'],
+    plain: ['download'],
     terminal: 'start',
     table: 'result',
     closing: {
@@ -97,6 +99,7 @@ const words = {
     command: (number, platform) => `Command, step ${number}, ${platform}`,
     terminal: { windows: 'Terminal session, PowerShell', linux: 'Terminal session, Linux' },
     steps: 'Steps of this page',
+    newTab: 'opens in a new tab',
   },
   de: {
     counter: (number, total) => `Schritt ${number} von ${total}`,
@@ -111,6 +114,7 @@ const words = {
     command: (number, platform) => `Befehl, Schritt ${number}, ${platform}`,
     terminal: { windows: 'Terminalsitzung, PowerShell', linux: 'Terminalsitzung, Linux' },
     steps: 'Schritte dieser Seite',
+    newTab: 'öffnet in neuem Tab',
   },
 };
 
@@ -238,6 +242,19 @@ async function checkCards(page, name, entry, expected) {
     expect(card.figure, `${at}: the card holds neither a step figure nor a flow diagram`);
     expect(!card.state, `${at}: the card carries a state mark`);
   });
+
+  // A link to another site opens in a new tab and says so.
+  const outside = await page.evaluate(() =>
+    [...document.querySelectorAll('main a[href^="http"]')].map((link) => ({
+      href: link.getAttribute('href'),
+      newTab: link.target === '_blank' && link.rel === 'noopener',
+      hidden: link.querySelector('.sr-only')?.textContent.trim(),
+    })),
+  );
+  expect(
+    outside.length > 0 && outside.every((link) => link.newTab && link.hidden === `(${w.newTab})`),
+    `${name}: a link of the content to another site does not open in a new tab with the hidden text "(${w.newTab})": ${JSON.stringify(outside)}`,
+  );
 
   // The chapter tree lists the steps under the current page.
   const tree = await page.evaluate(
@@ -419,11 +436,38 @@ async function checkSwitch(browser, origin, entry, expected, cards) {
     `${name}: the switches stand in the steps [${lists.map((list) => list.step)}], expected [${expected.switches}]`,
   );
   for (const list of lists) {
+    // A switch without a command names no shell.
+    const names = expected.plain.includes(list.step) ? w.labels : w.tabs;
     expect(
       list.label === w.system &&
-        list.tabs.map((tab) => tab.name).join() === PLATFORMS.map((platform) => w.tabs[platform]).join() &&
+        list.tabs.map((tab) => tab.name).join() === PLATFORMS.map((platform) => names[platform]).join() &&
         list.tabs.every((tab) => tab.button && tab.panel),
-      `${name}, step "${list.step}": not a tab list "${w.system}" of the buttons "${w.tabs.windows}" and "${w.tabs.linux}", each naming its panel: ${JSON.stringify(list)}`,
+      `${name}, step "${list.step}": not a tab list "${w.system}" of the buttons "${names.windows}" and "${names.linux}", each naming its panel: ${JSON.stringify(list)}`,
+    );
+  }
+  // Under a switch without a command a hairline closes the tab row, and
+  // the sentences of the platform follow; no code block, no copy button.
+  const plain = await page.evaluate(() =>
+    [...document.querySelectorAll('main [data-platform-switch][data-plain]')].map((element) => {
+      const row = element.querySelector('.platform-tabs');
+      const tab = element.querySelector('[role="tab"][aria-selected="true"]').getBoundingClientRect();
+      const text = [...element.querySelectorAll('.platform-text')].find((part) => part.getClientRects().length > 0);
+      return {
+        step: element.closest('[data-step]')?.id,
+        hairline: getComputedStyle(row).borderBottomStyle === 'solid' && tab.bottom <= row.getBoundingClientRect().bottom - 0.5,
+        gap: text ? text.getBoundingClientRect().top - row.getBoundingClientRect().bottom : -1,
+        blocks: element.querySelectorAll('pre, button[data-copy-button]').length,
+      };
+    }),
+  );
+  expect(
+    plain.map((element) => element.step).join() === expected.plain.join(),
+    `${name}: the switches without a command stand in the steps [${plain.map((element) => element.step)}], expected [${expected.plain}]`,
+  );
+  for (const element of plain) {
+    expect(
+      element.hairline && element.gap >= 8 && element.blocks === 0,
+      `${name}, step "${element.step}": the switch without a command has no hairline under its active tab, no room above its text (${element.gap} px), or it holds a code block or a copy button`,
     );
   }
 
@@ -563,7 +607,7 @@ async function checkCopy(browser, origin, entry, expected, cards) {
           };
         }),
     );
-    const steps = [...expected.switches, expected.terminal];
+    const steps = [...expected.switches.filter((step) => !expected.plain.includes(step)), expected.terminal];
     expect(
       buttons.map((button) => button.step).join() === steps.join(),
       `${name}, ${platform}: the copy buttons stand in the steps [${buttons.map((button) => button.step)}], expected [${steps}]`,
@@ -797,16 +841,19 @@ async function checkWithoutScript(browser, origin, entry, expected, viewport) {
   );
   for (const element of state.switches) {
     const [first, second] = element.parts;
+    const plain = expected.plain.includes(element.step);
+    const names = plain ? w.labels : w.tabs;
     expect(
       element.parts.length === 2 &&
         first.platform === 'windows' &&
         second.platform === 'linux' &&
-        first.label === w.tabs.windows &&
-        second.label === w.tabs.linux &&
-        first.labelTop < first.blockTop &&
-        first.blockTop < second.labelTop &&
-        second.labelTop < second.blockTop,
-      `${name}, step "${element.step}": not the command of Windows and then of Linux, each under its visible label: ${JSON.stringify(element.parts)}`,
+        first.label === names.windows &&
+        second.label === names.linux &&
+        first.labelTop < second.labelTop &&
+        (plain
+          ? first.blockTop === -1 && second.blockTop === -1
+          : first.labelTop < first.blockTop && first.blockTop < second.labelTop && second.labelTop < second.blockTop),
+      `${name}, step "${element.step}": not the part of Windows and then of Linux, each under its visible label${plain ? ', without a command' : ' above its command'}: ${JSON.stringify(element.parts)}`,
     );
   }
   expect(

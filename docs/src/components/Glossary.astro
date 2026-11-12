@@ -6,7 +6,9 @@
 //
 // An entry has the address of the page plus its anchor, the same in both
 // languages. The entry the address points at shows its linked state; the
-// stylesheet does that with `:target`, so it works without a script.
+// stylesheet does that with `:target`, so it works without a script. For a
+// reader who came from a page of the documentation, scripts/glossary-back.ts
+// adds a link back to that page to the entry (its text: `data-back-text`).
 //
 // The letters of the index, the labels and the language codes are kept out
 // of the search index: the search offers a short word as a hit for every
@@ -75,7 +77,7 @@ const appearsIn = (entry: Entry): Page[] =>
           const termLang = termLanguage(entry, lang);
           const on = appearsIn(entry);
           return (
-            <div id={entry.anchor} class="glossary-entry" data-glossary-entry>
+            <div id={entry.anchor} class="glossary-entry" data-glossary-entry data-back-text={t.backToPage}>
               <dt class="text-sub-heading">
                 <span class="glossary-linked" data-pagefind-ignore>
                   {t.linkedTerm}
@@ -108,3 +110,7 @@ const appearsIn = (entry: Entry): Page[] =>
     </>
   ))
 }
+
+<script>
+  import '../scripts/glossary-back.ts';
+</script>

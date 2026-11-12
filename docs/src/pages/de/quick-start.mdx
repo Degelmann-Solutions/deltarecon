@@ -19,6 +19,7 @@ import FileList from '../../components/FileList.astro';
 import FlowBox from '../../components/FlowBox.astro';
 import FlowDiagram from '../../components/FlowDiagram.astro';
 import KeyCap from '../../components/KeyCap.astro';
+import OutsideLink from '../../components/OutsideLink.astro';
 import PathEnd from '../../components/PathEnd.astro';
 import PlatformPart from '../../components/PlatformPart.astro';
 import PlatformSwitch from '../../components/PlatformSwitch.astro';
@@ -40,19 +41,21 @@ export const after = afterLines('de');
 
 <StepCard steps={frontmatter.steps} anchor="download">
 
-Öffnen Sie das Release <a href={releasePage}>{tag}</a> auf GitHub und laden Sie das Archiv für Ihr Betriebssystem herunter.
+Öffnen Sie das Release <OutsideLink href={releasePage}>{tag}</OutsideLink> auf GitHub und laden Sie das Archiv für Ihr Betriebssystem herunter.
 
-<PlatformPart os="windows">
+<PlatformSwitch>
+  <div slot="after-windows">
 
 Für Windows ist es <code translate="no">{zip.file}</code>. Das Windows-Paket ist nicht signiert; der Browser oder SmartScreen kann deshalb beim Herunterladen warnen.
 
-</PlatformPart>
+  </div>
 
-<PlatformPart os="linux">
+  <div slot="after-linux">
 
 Für Linux ist es <code translate="no">{tarball.file}</code>.
 
-</PlatformPart>
+  </div>
+</PlatformSwitch>
 
 Wenn Sie den Download in Schritt 2 prüfen möchten, laden Sie auch <code translate="no">{sumsFile}</code> herunter.
 
@@ -152,7 +155,7 @@ Windows begrenzt die Länge eines Pfads. Entpacken Sie das Archiv deshalb in ein
 
 <StepCard steps={frontmatter.steps} anchor="start">
 
-Starten Sie die Vorführung im Paketordner. `--lang de` wählt Deutsch und `--lang en` Englisch; ohne diese Angabe nimmt die Vorführung die Sprache Ihres Systems.
+Starten Sie die Vorführung im Paketordner.
 
 <PlatformPart os="windows">
 
@@ -172,7 +175,7 @@ Doppelklicken Sie im Paketordner auf `quickstart.cmd`. Oder öffnen Sie PowerShe
 >
   <div slot="after-windows">
 
-Am Ende wartet der Starter, bis Sie eine Taste drücken, gleich wie Sie ihn gestartet haben; deshalb bleibt ein Fenster, das Sie per Doppelklick geöffnet haben, offen.
+Am Ende wartet die Vorführung, bis Sie eine Taste drücken.
 
   </div>
 </PlatformSwitch>
@@ -200,7 +203,7 @@ Die Vorführung erklärt jeden Schritt, bevor er läuft, und wartet auf die Eing
 
 <div class="step-after">
 
-So beginnt die Vorführung, bis sie zum ersten Mal auf die Eingabetaste wartet. Der Zeitstempel im Namen des Ordners der Vorführung ist die Zeit Ihres Starts; bei Ihnen lautet er also anders.
+So beginnt die Vorführung, bis sie zum ersten Mal auf die Eingabetaste wartet.
 
 </div>
 

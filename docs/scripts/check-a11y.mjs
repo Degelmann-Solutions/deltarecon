@@ -81,6 +81,8 @@ const NAVY = 'rgb(30, 37, 71)';
 // the Glossary shows in its linked state.
 const GLOSSARY = 'glossary';
 const LINKED_ENTRY = 'not-resolved';
+// The page a reader of that entry came from, by its glossary link.
+const CAME_FROM = 'quick-start';
 
 const shots = path.join(root, 'screenshots');
 const pages = await loadPages();
@@ -327,11 +329,28 @@ async function checkGlossary(browser, origin, entry, viewport, kind) {
   await page.screenshot({ path: path.join(shots, `glossary-${kind}-${entry.lang}.png`), fullPage: true });
 
   const linked = `${name}, at #${LINKED_ENTRY}`;
-  await page.goto(`${origin}${entry.address}#${LINKED_ENTRY}`, { waitUntil: 'networkidle' });
+  // As a reader arrives from a glossary link of another page: the entry then
+  // also holds the link back to that page.
+  const from = pages.find((candidate) => candidate.lang === entry.lang && candidate.id === CAME_FROM);
+  // The page is left first: an anchor alone would not load the Glossary anew.
+  await page.goto('about:blank');
+  await page.goto(`${origin}${entry.address}#${LINKED_ENTRY}`, {
+    waitUntil: 'networkidle',
+    referer: `${origin}${from.address}`,
+  });
   expect(
     await page.locator(`#${LINKED_ENTRY}:target .glossary-linked`).isVisible(),
     `${linked}: the entry does not show the tag of its linked state`,
   );
+  const back = page.locator(`#${LINKED_ENTRY}:target [data-glossary-back] a`);
+  expect(
+    (await back.count()) === 1 && (await back.isVisible()) && (await back.getAttribute('href')) === `${origin}${from.address}`,
+    `${linked}: arrived from ${from.address}, the entry holds no link back to it`,
+  );
+  if ((await back.count()) === 1) {
+    const box = await back.boundingBox();
+    expect(box.height >= 24 && box.width >= 24, `${linked}: the link back is ${box.width} × ${box.height} px, below 24 × 24`);
+  }
   await checkNoSidewaysScroll(page, linked);
   await checkAxe(page, linked);
   await page.screenshot({

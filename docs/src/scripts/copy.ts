@@ -67,7 +67,8 @@ if (words.copy) {
   // the command of the platform that is shown.
   document.querySelectorAll<HTMLElement>('[data-platform-switch]').forEach((element) => {
     const row = element.querySelector<HTMLElement>(':scope > .platform-tabs');
-    if (!row) return;
+    // A switch without commands has nothing to copy.
+    if (!row || !element.querySelector('[data-copy]')) return;
     row.append(
       copyButton(element.dataset.copyLabel ?? words.copy, () => {
         const platform = document.documentElement.dataset.platform;

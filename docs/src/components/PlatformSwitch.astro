@@ -7,6 +7,12 @@
 //     <div slot="after-linux">What the reader then sees on Linux.</div>
 //   </PlatformSwitch>
 //
+// Without `windows` and `linux` the switch holds no command: no code block
+// and no copy button, the tabs stand above the sentences of the platform
+// and the Windows tab names no shell.
+// A card with content of one platform (PlatformPart, a file list) needs a
+// switch, or the reader cannot get to the other platform there.
+//
 // The delivered page holds two labelled parts one after the other, without
 // tab roles; that is what a reader without JavaScript gets. scripts/
 // platform.ts turns the labels into tabs, and the stylesheet shows the part
@@ -17,12 +23,14 @@ import { pageLanguage, STEP_MARK } from '../markup';
 import { platforms, type Platform } from '../release';
 
 interface Props {
-  windows: string[];
-  linux: string[];
+  windows?: string[];
+  linux?: string[];
 }
 
 const { windows, linux } = Astro.props;
-const lines: Record<Platform, string[]> = { windows, linux };
+const lines: Record<Platform, string[] | undefined> = { windows, linux };
+// A switch without commands: the tabs stand above the sentences alone.
+const plain = !windows && !linux;
 const lang = pageLanguage(Astro.url.pathname);
 const t = texts[lang];
 // The sentences of each platform, from the slot `after-<platform>`. (A slot
@@ -38,17 +46,18 @@ for (const platform of platforms) {
   class="platform-switch"
   data-platform-switch
   data-label={t.operatingSystem}
-  data-copy-label={`${t.copyCommand}, ${stepPlace(STEP_MARK, lang)}`}
+  data-plain={plain || undefined}
+  data-copy-label={plain ? undefined : `${t.copyCommand}, ${stepPlace(STEP_MARK, lang)}`}
 >
   {
     platforms.map((platform) => (
       <div class="platform-part" data-platform-part={platform}>
         <p class="platform-label" data-platform-label>
           {t[platform]}
-          {platform === 'windows' && <small>{t.windowsShell}</small>}
+          {platform === 'windows' && !plain && <small>{t.windowsShell}</small>}
         </p>
-        <CodeBlock lines={lines[platform]} platform={platform} />
-        {after[platform] && <div class="step-after" set:html={after[platform]} />}
+        {lines[platform] && <CodeBlock lines={lines[platform]} platform={platform} />}
+        {after[platform] && <div class={plain ? 'platform-text' : 'step-after'} set:html={after[platform]} />}
       </div>
     ))
   }

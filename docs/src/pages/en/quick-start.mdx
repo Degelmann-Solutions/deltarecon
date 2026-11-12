@@ -19,6 +19,7 @@ import FileList from '../../components/FileList.astro';
 import FlowBox from '../../components/FlowBox.astro';
 import FlowDiagram from '../../components/FlowDiagram.astro';
 import KeyCap from '../../components/KeyCap.astro';
+import OutsideLink from '../../components/OutsideLink.astro';
 import PathEnd from '../../components/PathEnd.astro';
 import PlatformPart from '../../components/PlatformPart.astro';
 import PlatformSwitch from '../../components/PlatformSwitch.astro';
@@ -40,19 +41,21 @@ export const after = afterLines('en');
 
 <StepCard steps={frontmatter.steps} anchor="download">
 
-Open the release <a href={releasePage}>{tag}</a> on GitHub and download the archive for your platform.
+Open the release <OutsideLink href={releasePage}>{tag}</OutsideLink> on GitHub and download the archive for your platform.
 
-<PlatformPart os="windows">
+<PlatformSwitch>
+  <div slot="after-windows">
 
 For Windows it is <code translate="no">{zip.file}</code>. The Windows package is not signed, so the browser or SmartScreen may warn when you download it.
 
-</PlatformPart>
+  </div>
 
-<PlatformPart os="linux">
+  <div slot="after-linux">
 
 For Linux it is <code translate="no">{tarball.file}</code>.
 
-</PlatformPart>
+  </div>
+</PlatformSwitch>
 
 If you want to check the download in step 2, download <code translate="no">{sumsFile}</code> as well.
 
@@ -152,7 +155,7 @@ Windows limits the length of a path. Unpack the archive into a folder with a sho
 
 <StepCard steps={frontmatter.steps} anchor="start">
 
-Start the demo in the package folder. `--lang en` chooses English and `--lang de` German; without it the demo takes the language of your system.
+Start the demo in the package folder.
 
 <PlatformPart os="windows">
 
@@ -172,7 +175,7 @@ Open a terminal, change into the package folder and start it there:
 >
   <div slot="after-windows">
 
-At the end the starter waits until you press a key, however you started it; that is why a window opened by a double click stays open.
+At the end the demo waits for you to press a key.
 
   </div>
 </PlatformSwitch>
@@ -200,7 +203,7 @@ The demo explains each step before it runs and waits for Enter.
 
 <div class="step-after">
 
-This is how the demo begins, up to its first wait for Enter. The time stamp in the name of the demo folder is the time of your start, so yours differs.
+This is how the demo begins, up to its first wait for Enter.
 
 </div>
 

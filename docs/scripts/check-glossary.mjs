@@ -27,6 +27,10 @@
 //     page's language and has the dotted underline;
 //   - "Appears in" of each entry lists exactly the pages that link the term,
 //     in path order, and is absent where no page does.
+//   - the way back: after a click on a glossary link of a page the entry
+//     holds the link "Back to the previous page", and a click on it returns
+//     to that page; the link goes when the address changes; opened directly
+//     or from the Glossary itself the entry holds none;
 //
 // What counts as content: the text of `main` after the page head, without
 // the page links, headings, `code`, `pre`, other links, and passages marked
@@ -47,6 +51,8 @@ const BREAK = '';
 const GROUND = 'rgb(245, 247, 250)';
 const BAR = 'rgb(23, 121, 130)';
 const NONE = 'rgba(0, 0, 0, 0)';
+// The link back to the page a reader came from, written out per language.
+const backTexts = { en: 'Back to the previous page', de: 'Zurück zur vorherigen Seite' };
 
 const glossary = await loadGlossary();
 const pages = await loadPages();
@@ -541,6 +547,67 @@ try {
       }
     }
   }
+  // The way back: a glossary link of a page leads to the entry, which then
+  // holds a link back; a click on it returns to the page. Opened directly,
+  // and when the address changes, the entry holds no such link.
+  for (const lang of Object.keys(linkedOn)) {
+    const from = pages.find((entry) => entry.lang === lang && !isGlossary(entry) && [...linkedOn[lang].values()].some((on) => on.includes(entry.address)));
+    if (!from) {
+      failures.push(`no page of "${lang}" links a term; the way back from the Glossary is not checked`);
+      continue;
+    }
+    const name = `${from.address}, the way back from the Glossary`;
+    const text = backTexts[lang];
+    const back = await browser.newContext();
+    try {
+      const page = await back.newPage();
+      await page.goto(`${origin}${from.address}`);
+      const term = page.locator('main a[data-term]').first();
+      const anchor = await term.getAttribute('data-term');
+      await term.click();
+      await page.waitForURL(`${origin}${glossaryAddress[lang]}#${anchor}`);
+      const link = page.locator(`#${anchor} [data-glossary-back] a`);
+      await link.waitFor({ state: 'visible', timeout: 5_000 }).catch(() => {});
+      expect(
+        (await page.locator('[data-glossary-back]').count()) === 1 &&
+          (await link.count()) === 1 &&
+          (await link.innerText()).trim() === text &&
+          (await link.getAttribute('href')) === `${origin}${from.address}`,
+        `${name}: the entry "${anchor}" does not hold the one link "${text}" to ${from.address}`,
+      );
+      if ((await link.count()) === 1) {
+        await link.click();
+        await page.waitForURL(`${origin}${from.address}`, { timeout: 5_000 }).catch(() => {});
+        expect(page.url() === `${origin}${from.address}`, `${name}: a click on "${text}" leads to ${page.url()}`);
+        // The link goes when the address changes.
+        await page.goForward();
+        await page.waitForURL(`${origin}${glossaryAddress[lang]}#${anchor}`);
+        await page.evaluate(() => {
+          window.location.hash = '#main';
+        });
+        await page.waitForFunction(() => window.location.hash === '#main');
+        expect(
+          (await page.locator('[data-glossary-back]').count()) === 0,
+          `${name}: the link back stays when the address changes`,
+        );
+      }
+      // Opened directly, and from the Glossary itself: no link.
+      const direct = await back.newPage();
+      await direct.goto(`${origin}${glossaryAddress[lang]}#${anchor}`, { waitUntil: 'networkidle' });
+      expect((await direct.locator('[data-glossary-back]').count()) === 0, `${name}: opened directly, the entry holds a link back`);
+      await direct.goto(`${origin}${glossaryAddress[lang]}`, { waitUntil: 'networkidle' });
+      await direct.goto(`${origin}${glossaryAddress[lang]}#${anchor}`, {
+        waitUntil: 'networkidle',
+        referer: `${origin}${glossaryAddress[lang]}`,
+      });
+      await direct.reload({ waitUntil: 'networkidle' });
+      expect((await direct.locator('[data-glossary-back]').count()) === 0, `${name}: arrived from the Glossary itself, the entry holds a link back`);
+    } catch (error) {
+      failures.push(`${name}: ${error.stack ?? error.message}`);
+    }
+    await back.close();
+  }
+
   // The two Glossaries hold the same entries.
   for (const [lang, other] of [
     ['de', 'en'],

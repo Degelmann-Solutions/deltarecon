@@ -626,6 +626,28 @@
     font-weight: 600;
   }
 
+  /* A switch without a command: the hairline under the tab row closes the
+     active tab, and the sentences of the platform follow. */
+  .platform-switch[data-plain] .platform-tab {
+    margin-bottom: 0;
+  }
+
+  .platform-text {
+    margin-top: 12px;
+  }
+
+  .platform-text > div > * + * {
+    margin-top: 12px;
+  }
+
+  .platform-switch[data-plain] .platform-label {
+    padding-bottom: 0;
+  }
+
+  .platform-switch[data-plain]:not([data-tabs]) .platform-label + .platform-text {
+    margin-top: 4px;
+  }
+
   /* ---- Code block and copy button ---- */
 
   .code {
