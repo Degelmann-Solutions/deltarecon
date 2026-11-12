@@ -7,7 +7,8 @@
 //     line, page links (names, sides), no sideways scrolling;
 //   - keyboard: the skip link is the first stop, visible on focus, and leads
 //     to main; Tab reaches every control in reading order, each with a
-//     visible focus ring;
+//     visible focus ring: teal-text on light grounds, teal on the navy
+//     terminal block of a step page;
 //   - the language switch leads to the counterpart and keeps the anchor, the
 //     one the page was loaded with and one set afterwards.
 // Phone (390 px), for every page:
@@ -53,22 +54,22 @@
 // Exits non-zero and names page and control of every failed expectation.
 import { mkdir } from 'node:fs/promises';
 import path from 'node:path';
-import axe from '@axe-core/playwright';
 import { chromium } from 'playwright';
 import {
+  BETWEEN,
+  DESKTOP,
+  PHONE,
+  RING,
+  RING_ON_NAVY,
   expectations,
   loadOtherPages,
   loadPages,
+  pageChecks,
   root,
   searchTexts,
   startPreview,
 } from './harness.mjs';
 
-const AxeBuilder = axe.AxeBuilder ?? axe.default ?? axe;
-const WCAG = ['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'wcag22aa'];
-const DESKTOP = { width: 1280, height: 800 };
-const BETWEEN = { width: 900, height: 800 };
-const PHONE = { width: 390, height: 844 };
 // Two anchors every page has in both languages.
 const ANCHOR = '#main';
 const LATER_ANCHOR = '#chapters';
@@ -80,13 +81,12 @@ const NAVY = 'rgb(30, 37, 71)';
 // the Glossary shows in its linked state.
 const GLOSSARY = 'glossary';
 const LINKED_ENTRY = 'not-resolved';
-// The focus ring on light grounds: 2 px in teal-text.
-const RING = 'rgb(23, 121, 130)';
 
 const shots = path.join(root, 'screenshots');
 const pages = await loadPages();
 const { notFound, rootPage } = await loadOtherPages();
 const { failures, expect, report } = expectations('check-a11y');
+const { checkAxe, checkNoSidewaysScroll } = pageChecks({ failures, expect });
 
 async function open(browser, origin, entry, viewport, { javaScript = true, anchor = '' } = {}) {
   const context = await browser.newContext({ viewport, javaScriptEnabled: javaScript });
@@ -107,23 +107,6 @@ async function open(browser, origin, entry, viewport, { javaScript = true, ancho
  */
 async function settle(page, state) {
   await page.waitForFunction(state, undefined, { timeout: 3_000 }).catch(() => {});
-}
-
-async function checkAxe(page, name) {
-  const { violations } = await new AxeBuilder({ page }).withTags(WCAG).analyze();
-  for (const violation of violations) {
-    for (const node of violation.nodes) {
-      failures.push(`${name}: axe rule "${violation.id}" (${violation.help}): ${node.html}`);
-    }
-  }
-}
-
-async function checkNoSidewaysScroll(page, name) {
-  const { scroll, client } = await page.evaluate(() => ({
-    scroll: document.documentElement.scrollWidth,
-    client: document.documentElement.clientWidth,
-  }));
-  expect(scroll <= client, `${name}: the page scrolls sideways (${scroll} px in ${client} px)`);
 }
 
 /** The element that has focus: what names it, where it is, how it looks. */
@@ -153,6 +136,8 @@ function focused(page) {
       inMain: element.closest('main') !== null,
       inMenu: element.closest('header, #chapters') !== null,
       inLetterIndex: element.closest('nav[data-letter-index]') !== null,
+      // The terminal block is the one dark ground; its ring is teal.
+      onNavy: element.closest('[data-terminal]') !== null,
       isSkipLink: element.matches('a.skip-link[href="#main"]'),
       isMenuButton: element.matches('button[data-menu-button]'),
       isCloseButton: element.matches('button[data-menu-close]'),
@@ -162,7 +147,9 @@ function focused(page) {
 
 /**
  * Numbers every control that takes focus, in the order of the page. `within`
- * limits them to parts of the page.
+ * limits them to parts of the page. A control with `tabindex="-1"` is no
+ * stop: the tab of a platform switch that is not selected is reached with
+ * the arrow keys.
  */
 function markStops(page, within = 'body') {
   return page.evaluate((scope) => {
@@ -172,6 +159,7 @@ function markStops(page, within = 'body') {
       ),
     ].filter(
       (element) =>
+        element.getAttribute('tabindex') !== '-1' &&
         element.closest(scope) !== null &&
         element.getClientRects().length > 0 &&
         getComputedStyle(element).visibility !== 'hidden' &&
@@ -302,7 +290,10 @@ async function checkTabOrder(page, name) {
       );
       return letters;
     }
-    expect(at.ring === RING, `${name}: ${at.description} has no focus ring (outline: ${at.outline})`);
+    expect(
+      at.ring === (at.onNavy ? RING_ON_NAVY : RING),
+      `${name}: ${at.description} has no focus ring${at.onNavy ? ' in teal on navy' : ''} (outline: ${at.outline})`,
+    );
     expect(
       at.width >= 24 && at.height >= 24,
       `${name}: ${at.description} is ${at.width} × ${at.height} px, below 24 × 24`,

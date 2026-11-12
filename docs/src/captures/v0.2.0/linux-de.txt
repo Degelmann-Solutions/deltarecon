@@ -1,0 +1,141 @@
+DeltaRecon – geführter Quick Start
+
+Die Vorführung vergleicht zwei Stände des Referenzmodells delib-history, einer
+Risikolebensversicherung mit 350 Modellpunkten: Release N und den Stand N+1, 32 Revisionen später.
+In vier Schritten zeigt sie, wie DeltaRecon eine Abweichung zwischen zwei Releases findet und auf
+die Änderungen zurückführt, die sie verursachen. Die Vorführung legt ihre Dateien in einem eigenen
+Ordner an, und alle Befehle laufen dort:
+  cd runs/quickstart-20261112T110800Z
+
+Schritt 1 von 4: Release N rechnen
+
+Zuerst schreibt request einen Rechenauftrag nach --output. Er hält fest, welcher Stand gerechnet
+wird (--revision, die Revision fa36857), welchen Namen dieser Stand trägt (--label N) und unter
+welcher Kennung der Auftrag läuft (--run-id run-n-full). Name und Kennung sind frei gewählt und
+erscheinen in den späteren Vergleichen wieder. Ohne --subset gilt der Auftrag für alle Modellpunkte
+des Bestands, mit --subset nur für die genannten. Dann rechnet run diesen Auftrag und hält das
+Ergebnis mit seiner vollständigen Herkunft fest: Code, Parameter und Bestandsdaten. Dieses Ergebnis
+ist die Referenz, gegen die jeder weitere Schritt prüft.
+
+Befehle:
+  deltarecon request --revision fa368575a66d97c94e96dffc62b273ec95511b12 --label N
+      --run-id run-n-full --output release-n/request.json
+  deltarecon run release-n/request.json
+
+Release N ist gerechnet: 350 Modellpunkte, 80.580 Ergebniszeilen. Dateien in release-n: results.csv
+(die Ergebnisse), response.json und run-record.json (der Nachweis, womit was gerechnet wurde).
+
+Schritt 2 von 4: Regression gegen N+1
+
+regression nimmt den Nachweis des Laufs von Release N aus Schritt 1 (release-n/run-record.json) und
+rechnet mit --revision den neueren Stand N+1, die Revision 887b718. Er rechnet auf denselben
+Bestandsdaten und für dieselben Modellpunkte wie Release N und vergleicht beide Ergebnisse Wert für
+Wert. Ohne --tolerance vergleicht er exakt: Jede Abweichung zählt. Den Lauf von N+1 und den
+Vergleich schreibt er in den Ordner --output, den Lauf in dessen Unterordner run. So zeigt sich, ob
+und wo sich die Ergebnisse der beiden Releases unterscheiden. Eine Abweichung ist hier erwartet;
+der Befehl meldet sie mit dem Exit-Status 1.
+
+Befehl:
+  deltarecon regression release-n/run-record.json
+      --revision 887b7181d22550eda2fb52fa1a6bd77376d4eb2e --output regression
+
+Die Regression zeigt eine Abweichung: 408.762 Werte in 350 Modellpunkten weichen ab. Ein Wert ist
+eine Größe eines Modellpunkts in einer Periode.
+
+  Größe                               Modellpunkte   Werte   Perioden
+  Anzahl Verträge                              243  66.825  1 bis 479
+  Bruttobeitrag                                338  29.018  0 bis 479
+  Zahlbeitrag                                  338  29.018  0 bis 479
+  Beitragsverrechnung                          278  26.524  0 bis 479
+  garantierte Todesfallleistung                275  67.953  0 bis 479
+  Kosten 2. Ordnung ohne Provisionen           350  80.580  0 bis 479
+  Provisionen                                  338  28.264  0 bis 479
+  Netto-Cashflow                               350  80.580  0 bis 479
+
+Die Abweichung ist das erwartete Ergebnis; die Vorführung geht weiter. Dateien in regression:
+compare.result.json, compare.deviations.csv (jeder abweichende Wert), signature-table.json (die
+Tabelle oben); der Lauf von N+1 in regression/run.
+
+Schritt 3 von 4: die Änderungen zwischen N und N+1
+
+derive nimmt den Nachweis von Release N aus Schritt 1 (release-n/run-record.json) und den Nachweis
+von N+1 aus Schritt 2 (regression/run/run-record.json) und liest daraus, welche zwei Revisionen
+gerechnet wurden. Dann liest es die Versionsgeschichte zwischen diesen beiden Ständen, listet jede
+Änderung einzeln auf, in der Reihenfolge, in der sie gemacht wurde, und schreibt dieses
+Änderungsverzeichnis nach --output. Jede Änderung ist eine Revision und wird eingeordnet: Daten
+(der Bestand), Parameter (Tabellen wie Storno- oder Kostensätze), Code (die Rechenvorschriften)
+oder nichts davon (zum Beispiel nur Dokumentation).
+
+Befehl:
+  deltarecon derive release-n/run-record.json regression/run/run-record.json --output changes.json
+
+32 Änderungen: 1 Daten, 6 Parameter, 18 Code, 8 ohne Einordnung (eine Änderung kann mehrere
+Einordnungen haben).
+
+  Nr.  Revision  Einordnung       Beschreibung
+    1  b795d8a   ohne Einordnung  Tell release N apart from the present state in the provenance tests
+    2  936e50d   Parameter        Lower the lapse rate of policy year 1 from 0.06 to 0.05
+    3  54b4bca   Parameter, Code  Give single-premium policies their own lapse rate
+    4  2d05ecf   Daten            Raise the largest sum-assured factor of the generated points from 2 to 2.5
+    5  205a880   ohne Einordnung  Describe the main line and what a commit on it stands for
+    6  8f81933   Parameter        Merge branch 'instalment-loadings'
+    7  47f6a33   Code             Inflate the claim expense with expense inflation
+    8  e500700   ohne Einordnung  Describe the commits that demonstrate the interval search
+    9  76fc46c   Code             Raise the claim expense from 250 to 275 EUR per death
+   10  61c8fd7   Code             Lower the renewal commission from 1 to 0.8 per cent of the premium
+   11  c5adfa8   Code             Raise the expense inflation from 2 to 2.5 per cent a year
+   12  83f01cf   Parameter        Lower the instalment loading of half-yearly payment from 2 to 1.5 per cent
+   13  c2c9f75   ohne Einordnung  Say in the test docstring which two states are told apart
+   14  919967d   Code             Raise the premium-related maintenance charge from 3 to 3.5 per cent
+   15  1a218de   ohne Einordnung  Say in the runner docstring that it runs one product folder
+   16  d61b1ed   Code             Raise the initial commission from 2 to 2.5 per cent of the premium sum
+   17  e23137a   Code             Raise the sum-related gamma loading from 0.30 to 0.35 per mille
+   18  29c4a03   Code             Revert "Raise the sum-related gamma loading from 0.30 to 0.35 per mille"
+   19  88cdde3   Parameter        Raise the instalment loading of monthly payment from 4 to 4.5 per cent
+   20  c82b72b   Parameter        Set the instalment loading of monthly payment to 4 per cent again
+   21  5208fe6   ohne Einordnung  Say in the README that the runner reads no network
+   22  2c122ae   Code             Lower the share of deaths by suicide from 3 to 2.5 per cent
+   23  3deff14   Code             Lower the claim expense from 275 to 260 EUR per death
+   24  6a117fc   Code             Shorten the suicide exclusion from three to two policy years
+   25  909eeec   Code             Add a fixed charge of 0.6 cent a year to the Bruttobeitrag
+   26  5f3d085   Code             Raise the renewal commission from 0.8 to 0.9 per cent of the premium
+   27  e13c628   Code             Raise the fixed charge of the Bruttobeitrag from 0.6 to 1.2 cent a year
+   28  a9fbd53   ohne Einordnung  Say in the test docstring that every commit keeps its pins
+   29  2310344   Code             Lower the premium-related maintenance charge from 3.5 to 3.2 per cent
+   30  7f1dc64   Code             Raise the premium-related beta loading from 5 to 5.5 per cent
+   31  2629a5c   ohne Einordnung  Say in the README that a commit may change the documentation only
+   32  887b718   Code             Lower the expense inflation from 2.5 to 2.2 per cent a year
+
+Datei: changes.json (das Änderungsverzeichnis).
+
+Schritt 4 von 4: die Ursache im Bruttobeitrag suchen
+
+Welche der 32 Änderungen verursachen die Abweichung im Bruttobeitrag (--quantity Bruttobeitrag) in
+den ersten fünf Projektionsjahren (--periods 0-59, eine Periode je Monat)? search nimmt dieselben
+beiden Nachweise wie Schritt 3: release-n/run-record.json und regression/run/run-record.json. Es
+rechnet nicht jeden Zwischenstand, sondern halbiert die Versionsgeschichte, bis jede Abweichung
+einer einzelnen Änderung zugeordnet ist. Als Abweichung zählt eine Änderung des Bruttobeitrags um
+mehr als einen Cent je Modellpunkt und Monat; das legt das Toleranzprofil fest (--tolerance). Mit
+--target-only rechnet es die Zwischenstände nur für den Bruttobeitrag in diesen Perioden und ohne
+die Modellprüfungen; die beiden Endstände rechnet es vollständig. Das Ergebnis schreibt es in den
+Ordner --output. Die Bestandsdaten bleiben auf dem Stand von Release N.
+
+Befehl:
+  deltarecon search release-n/run-record.json regression/run/run-record.json
+      --quantity Bruttobeitrag --periods 0-59
+      --tolerance ../../profiles/tolerance-bruttobeitrag.json --target-only --output search
+
+4 Revisionen weichen im Bruttobeitrag ab. Gerechnet wurden 17 von 33 (16 Berechnungen gespart).
+
+  Revision  Beschreibung                                                                Summe der Abweichung
+  936e50d   Lower the lapse rate of policy year 1 from 0.06 to 0.05                               +24.110,00
+  8f81933   Merge branch 'instalment-loadings'                                                    -13.503,67
+  83f01cf   Lower the instalment loading of half-yearly payment from 2 to 1.5 per cent             -4.429,49
+  7f1dc64   Raise the premium-related beta loading from 5 to 5.5 per cent                         +21.174,13
+
+Nicht aufgelöst: Die Änderungen 909eeec, 5f3d085, e13c628, a9fbd53 überschreiten die Toleranz nur
+zusammen; jede einzelne bleibt darunter. DeltaRecon ordnet diesen Teil der Abweichung daher keiner
+von ihnen zu.
+Ergebnis: search/search.result.json.
+
+Fertig. Alle Dateien liegen in runs/quickstart-20261112T110800Z.

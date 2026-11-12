@@ -1,0 +1,55 @@
+---
+// The platform switch: the command of a step for Windows and for Linux,
+// Windows first, each with the sentences that hold for that platform only.
+//
+//   <PlatformSwitch windows={['.\\quickstart.cmd']} linux={['./quickstart']}>
+//     <div slot="after-windows">What the reader then sees on Windows.</div>
+//     <div slot="after-linux">What the reader then sees on Linux.</div>
+//   </PlatformSwitch>
+//
+// The delivered page holds two labelled parts one after the other, without
+// tab roles; that is what a reader without JavaScript gets. scripts/
+// platform.ts turns the labels into tabs, and the stylesheet shows the part
+// of the platform that <html data-platform> names.
+import CodeBlock from './CodeBlock.astro';
+import { stepPlace, texts } from '../site';
+import { pageLanguage, STEP_MARK } from '../markup';
+import { platforms, type Platform } from '../release';
+
+interface Props {
+  windows: string[];
+  linux: string[];
+}
+
+const { windows, linux } = Astro.props;
+const lines: Record<Platform, string[]> = { windows, linux };
+const lang = pageLanguage(Astro.url.pathname);
+const t = texts[lang];
+// The sentences of each platform, from the slot `after-<platform>`. (A slot
+// must not carry the name of a property: MDX hands both over under one name.)
+const after: Record<Platform, string> = { windows: '', linux: '' };
+for (const platform of platforms) {
+  const slot = `after-${platform}`;
+  if (Astro.slots.has(slot)) after[platform] = await Astro.slots.render(slot);
+}
+---
+
+<div
+  class="platform-switch"
+  data-platform-switch
+  data-label={t.operatingSystem}
+  data-copy-label={`${t.copyCommand}, ${stepPlace(STEP_MARK, lang)}`}
+>
+  {
+    platforms.map((platform) => (
+      <div class="platform-part" data-platform-part={platform}>
+        <p class="platform-label" data-platform-label>
+          {t[platform]}
+          {platform === 'windows' && <small>{t.windowsShell}</small>}
+        </p>
+        <CodeBlock lines={lines[platform]} platform={platform} />
+        {after[platform] && <div class="step-after" set:html={after[platform]} />}
+      </div>
+    ))
+  }
+</div>

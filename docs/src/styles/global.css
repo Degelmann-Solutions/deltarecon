@@ -146,6 +146,12 @@
   --spacing-block-max: 820px;
   --spacing-search-field-width: 240px;
   --spacing-search-list-width: 360px;
+  --spacing-card-pad-top: 24px;
+  --spacing-card-pad-bottom: 28px;
+  --spacing-card-pad-top-phone: 16px;
+  --spacing-card-pad-bottom-phone: 20px;
+  --spacing-path-end-marker: 14px;
+  --spacing-trace-width: 1.75px;
 }
 
 /*
@@ -385,6 +391,1024 @@
     font-weight: 700;
   }
 
+  /* A link in running text is at least 24 px high as a target: the padding
+     enlarges its box and leaves the lines where they are. */
+  .prose-links a,
+  .glossary-link {
+    padding-block: 5px;
+  }
+
+  /* ---- Step page (DESIGN.md, Components: Step page) ---- */
+
+  /* The step path: steps indented, a trace down the indent through the
+     centre of each pad. The trace is a border, so it survives a contrast
+     theme. It starts at the centre of the first pad. */
+  .steps {
+    margin-top: 36px;
+  }
+
+  .step {
+    position: relative;
+    padding: 0 0 var(--spacing-step-gap-phone) var(--spacing-step-indent-phone);
+  }
+
+  .step::before {
+    content: "";
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    left: calc(var(--spacing-step-pad-phone) / 2 - var(--spacing-trace-width) / 2);
+    border-left: var(--spacing-trace-width) solid var(--color-teal-text);
+  }
+
+  .step:first-child::before {
+    top: calc(var(--spacing-step-pad-phone) / 2);
+  }
+
+  .step-pad {
+    position: absolute;
+    z-index: 1;
+    top: 0;
+    left: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: var(--spacing-step-pad-phone);
+    height: var(--spacing-step-pad-phone);
+    border: 1.75px solid var(--color-navy);
+    border-radius: var(--radius-full);
+    background: var(--color-bg);
+    font-size: 0.8125rem;
+    font-weight: 600;
+    line-height: 1;
+  }
+
+  .step-card {
+    min-width: 0;
+    padding: var(--spacing-card-pad-top-phone) var(--spacing-card-pad-x-phone)
+      var(--spacing-card-pad-bottom-phone);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-sm);
+    background: var(--color-bg);
+  }
+
+  .step-counter {
+    color: var(--color-text-secondary);
+    font-family: var(--font-mono);
+    font-size: var(--text-label);
+    letter-spacing: var(--text-label--letter-spacing);
+    text-transform: uppercase;
+  }
+
+  /* A tag: "optional" beside the step counter. */
+  .tag {
+    margin-left: 8px;
+    padding: 1px 6px;
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-sm);
+    color: var(--color-text-secondary);
+    font-family: var(--font-mono);
+    font-size: var(--text-label-small);
+    letter-spacing: var(--text-label-small--letter-spacing);
+    text-transform: uppercase;
+  }
+
+  /* The step title is a link to its step and looks like a heading. */
+  .step-title {
+    margin-top: 4px;
+    font-size: var(--text-step-title-phone);
+    font-weight: var(--text-step-title-phone--font-weight);
+    line-height: var(--text-step-title-phone--line-height);
+  }
+
+  .step-title a {
+    display: inline-block;
+    color: inherit;
+  }
+
+  .step-title a:hover,
+  .step-title a:active {
+    text-decoration-line: underline;
+    text-decoration-thickness: 1px;
+    text-underline-offset: 3px;
+  }
+
+  /* Text and figure: one column, the figure below the text; two columns
+     where the content column has its full width. */
+  .step-columns {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: var(--spacing-card-columns-gap-phone);
+    align-items: start;
+    margin-top: 12px;
+  }
+
+  .step-text > * + *,
+  .step-after > * + *,
+  .step-after > div > * + *,
+  .platform-part[data-platform-only] > * + * {
+    margin-top: 12px;
+  }
+
+  .step-text > .platform-switch {
+    margin-top: 16px;
+  }
+
+  /* What the reader sees after a command. */
+  .step-after {
+    margin-top: 12px;
+    color: var(--color-text-secondary);
+  }
+
+  .step-wide {
+    min-width: 0;
+    margin-top: 8px;
+  }
+
+  .step-wide > * + * {
+    margin-top: 12px;
+  }
+
+  /* The path end: a square on the trace axis, the closing line. */
+  .path-end {
+    position: relative;
+    padding-left: var(--spacing-step-indent-phone);
+  }
+
+  .path-end::before {
+    content: "";
+    position: absolute;
+    top: 0;
+    left: calc(var(--spacing-step-pad-phone) / 2 - var(--spacing-trace-width) / 2);
+    height: 6px;
+    border-left: var(--spacing-trace-width) solid var(--color-teal-text);
+  }
+
+  .path-end-marker {
+    position: absolute;
+    top: 6px;
+    left: calc(var(--spacing-step-pad-phone) / 2 - var(--spacing-path-end-marker) / 2);
+    width: 0;
+    height: 0;
+    border: calc(var(--spacing-path-end-marker) / 2) solid var(--color-teal-text);
+  }
+
+  .path-end-line {
+    font-size: 1.0625rem;
+    font-weight: 600;
+  }
+
+  /* ---- Platform switch ---- */
+
+  /* The label of a part: what stands for the tab without JavaScript, in the
+     type of the inactive tab. */
+  .platform-label {
+    color: var(--color-text-secondary);
+    font-size: 0.8125rem;
+    font-weight: 500;
+    line-height: 1.4;
+  }
+
+  .platform-switch .platform-label {
+    padding: 8px 0;
+  }
+
+  .platform-switch .platform-part + .platform-part {
+    margin-top: 12px;
+  }
+
+  .platform-label small,
+  .platform-tab small {
+    margin-left: 6px;
+    color: var(--color-text-secondary);
+    font-family: var(--font-mono);
+    font-size: 0.6875rem;
+    font-weight: 400;
+  }
+
+  /* The tab row (scripts/platform.ts): the tabs, then the copy button at
+     its right end. */
+  .platform-tabs {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-end;
+    border-bottom: 1px solid var(--color-border);
+  }
+
+  .platform-tablist {
+    display: flex;
+  }
+
+  .platform-tab {
+    min-height: 40px;
+    margin-bottom: -1px;
+    padding: 8px 14px;
+    border: 1px solid transparent;
+    border-bottom: 0;
+    border-radius: var(--radius-sm) var(--radius-sm) 0 0;
+    color: var(--color-text-secondary);
+    font-size: 0.8125rem;
+    font-weight: 500;
+    line-height: 1.4;
+  }
+
+  /* Hover and pressed look alike: the ground of the active tab. */
+  .platform-tab:hover,
+  .platform-tab:active {
+    background: var(--color-bg-subtle);
+  }
+
+  .platform-tab[aria-selected="true"] {
+    border-color: var(--color-border);
+    border-top: 2px solid var(--color-teal-text);
+    background: var(--color-bg-subtle);
+    color: var(--color-navy);
+    font-weight: 600;
+  }
+
+  /* ---- Code block and copy button ---- */
+
+  .code {
+    margin: 0;
+    padding: 14px 16px;
+    overflow-x: auto;
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-sm);
+    background: var(--color-bg-subtle);
+    color: var(--color-navy);
+    font-family: var(--font-mono);
+    font-size: var(--text-code-phone);
+    font-variant-ligatures: none;
+    line-height: var(--text-code-phone--line-height);
+    white-space: pre;
+  }
+
+  /* Under its tabs the block joins the active tab. */
+  .platform-switch[data-tabs] .code,
+  .code-block[data-copy-button] .code {
+    border-top: 0;
+    border-radius: 0 0 var(--radius-sm) var(--radius-sm);
+  }
+
+  /* A code block that stands alone: the copy button in a row above it. */
+  .code-head {
+    display: flex;
+    justify-content: flex-end;
+    padding: 4px 12px 0;
+    border: 1px solid var(--color-border);
+    border-bottom: 0;
+    border-radius: var(--radius-sm) var(--radius-sm) 0 0;
+    background: var(--color-bg-subtle);
+  }
+
+  .copy {
+    display: flex;
+    align-items: center;
+    align-self: center;
+    margin-left: auto;
+  }
+
+  .copy-button {
+    min-height: 40px;
+    padding: 0 4px;
+    color: var(--color-teal-text);
+    font-family: var(--font-mono);
+    font-size: var(--text-label);
+    letter-spacing: var(--text-label--letter-spacing);
+    text-align: right;
+    text-transform: uppercase;
+  }
+
+  .copy-button:hover,
+  .copy-button:active {
+    text-decoration-line: underline;
+    text-decoration-thickness: 1px;
+    text-underline-offset: 3px;
+  }
+
+  .copy-button[data-state] {
+    color: var(--color-navy);
+  }
+
+  /* ---- Terminal block: the one dark ground ---- */
+
+  .terminal {
+    min-width: 0;
+    margin-top: 16px;
+    border-radius: var(--radius-sm);
+    background: var(--color-navy);
+    color: var(--color-text-on-dark);
+  }
+
+  .terminal-bar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0 12px;
+    padding: 4px 16px;
+    border-bottom: 1px solid rgb(255 255 255 / 0.18);
+    color: rgb(255 255 255 / 0.75);
+    font-family: var(--font-mono);
+    font-size: var(--text-label);
+    letter-spacing: var(--text-label--letter-spacing);
+    line-height: 2;
+    text-transform: uppercase;
+  }
+
+  .terminal-place {
+    margin-left: auto;
+  }
+
+  .terminal-bar .copy {
+    margin-left: 0;
+  }
+
+  .terminal pre {
+    margin: 0;
+    padding: 16px;
+    overflow-x: auto;
+    color: rgb(255 255 255 / 0.82);
+    font-family: var(--font-mono);
+    font-size: var(--text-code-phone);
+    font-variant-ligatures: none;
+    line-height: var(--text-code-phone--line-height);
+    white-space: pre;
+  }
+
+  .terminal-prompt {
+    color: var(--color-teal);
+  }
+
+  .terminal-command,
+  .terminal-heading {
+    color: var(--color-text-on-dark);
+  }
+
+  .terminal .copy-button {
+    color: var(--color-teal);
+  }
+
+  .terminal .copy-button[data-state] {
+    color: var(--color-text-on-dark);
+  }
+
+  /* The focus ring on navy: teal. The block itself shows it inside. */
+  .terminal pre:focus-visible {
+    outline: 2px solid var(--color-teal);
+    outline-offset: -4px;
+  }
+
+  .terminal .copy-button:focus-visible {
+    outline: 2px solid var(--color-teal);
+    outline-offset: 2px;
+  }
+
+  /* ---- Result table ---- */
+
+  .result-wrap {
+    min-width: 0;
+    margin-top: 16px;
+  }
+
+  .result-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.8125rem;
+    line-height: var(--text-table--line-height);
+  }
+
+  .result-table caption {
+    caption-side: bottom;
+    padding-top: 10px;
+    color: var(--color-text-secondary);
+    font-size: var(--text-caption);
+    line-height: var(--text-caption--line-height);
+    text-align: left;
+  }
+
+  .result-table thead th {
+    color: var(--color-text-secondary);
+    font-family: var(--font-mono);
+    font-size: var(--text-label);
+    font-weight: 400;
+    letter-spacing: var(--text-label--letter-spacing);
+    text-align: left;
+    text-transform: uppercase;
+  }
+
+  .result-table tbody th {
+    font-family: var(--font-mono);
+    font-size: 0.8125rem;
+    font-weight: 400;
+    text-align: left;
+    white-space: nowrap;
+  }
+
+  .result-table .result-num {
+    font-variant-numeric: tabular-nums;
+    text-align: right;
+    white-space: nowrap;
+  }
+
+  .result-table tbody .result-num {
+    font-weight: 600;
+  }
+
+  /* Below the phone breakpoint each row is a record: revision and sum on one
+     line, the description below; the head row stays. The roles of the table
+     are written out in the markup, so it keeps its meaning. */
+  @media not (min-width: 37.5rem) {
+    .result-table {
+      display: flex;
+      flex-direction: column;
+    }
+
+    .result-table thead,
+    .result-table tbody,
+    .result-table caption {
+      display: block;
+    }
+
+    .result-table caption {
+      order: 9;
+    }
+
+    .result-table tr {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      column-gap: 12px;
+      padding: 10px 0;
+      border-bottom: 1px solid var(--color-border);
+    }
+
+    .result-table thead tr {
+      padding: 0 0 8px;
+      border-bottom: 1.5px solid var(--color-navy);
+    }
+
+    .result-table th,
+    .result-table td {
+      display: block;
+    }
+
+    .result-table .result-rev {
+      grid-area: 1 / 1;
+    }
+
+    .result-table .result-num {
+      grid-area: 1 / 2;
+    }
+
+    .result-table .result-desc {
+      grid-area: 2 / 1 / 3 / 3;
+      margin-top: 2px;
+    }
+  }
+
+  @media (min-width: 37.5rem) {
+    .result-wrap {
+      overflow-x: auto;
+    }
+
+    .result-table {
+      font-size: var(--text-table);
+    }
+
+    .result-table th,
+    .result-table td {
+      padding: 10px 12px;
+      border-bottom: 1px solid var(--color-border);
+      vertical-align: top;
+    }
+
+    .result-table thead th {
+      border-bottom: 1.5px solid var(--color-navy);
+      vertical-align: bottom;
+    }
+
+    .result-table th:first-child,
+    .result-table td:first-child {
+      padding-left: 0;
+    }
+
+    .result-table th:last-child,
+    .result-table td:last-child {
+      padding-right: 0;
+    }
+
+    .result-table tbody .result-num {
+      font-weight: 500;
+    }
+  }
+
+  /* ---- Callout ---- */
+
+  .callout {
+    min-width: 0;
+    margin-top: 24px;
+    padding: var(--spacing-callout-pad-phone);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-sm);
+    background: var(--color-bg-subtle);
+  }
+
+  .callout-tag {
+    color: var(--color-teal-text);
+    font-family: var(--font-mono);
+    font-size: var(--text-label);
+    letter-spacing: var(--text-label--letter-spacing);
+    text-transform: uppercase;
+  }
+
+  .callout-title {
+    margin-top: 4px;
+    font-size: var(--text-callout-title);
+    font-weight: var(--text-callout-title--font-weight);
+    line-height: var(--text-callout-title--line-height);
+  }
+
+  .callout-text,
+  .callout-quote {
+    margin-top: 8px;
+  }
+
+  .callout-text {
+    font-size: var(--text-body-small);
+    line-height: var(--text-body-small--line-height);
+  }
+
+  .callout-text > * + * {
+    margin-top: 8px;
+  }
+
+  /* Inline code in a callout stands on the ground of the callout. */
+  .callout-text code {
+    background: var(--color-bg);
+  }
+
+  /* A quoted message of the program. */
+  .callout-quote {
+    padding: 10px 12px;
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-sm);
+    background: var(--color-bg);
+    font-family: var(--font-mono);
+    font-size: 0.78125rem;
+    font-variant-ligatures: none;
+    line-height: 1.6;
+  }
+
+  /* ---- Step figure and its kinds ---- */
+
+  .step-figure {
+    min-width: 0;
+    margin: 0;
+    padding: var(--spacing-figure-pad);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-sm);
+    background: var(--color-bg);
+  }
+
+  .step-figure-caption,
+  .flow-caption {
+    color: var(--color-text-secondary);
+    line-height: var(--text-caption--line-height);
+  }
+
+  .step-figure-caption {
+    margin-top: 10px;
+    font-size: 0.78125rem;
+  }
+
+  /* File list. */
+  .file-list {
+    font-family: var(--font-mono);
+    font-size: var(--text-label);
+    line-height: 1.5;
+  }
+
+  .file-list li {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    gap: 0 10px;
+    padding: 6px 0;
+    border-bottom: 1px solid var(--color-border);
+  }
+
+  .file-list li:last-child {
+    border-bottom: 0;
+  }
+
+  .file-name {
+    overflow-wrap: anywhere;
+    font-variant-ligatures: none;
+  }
+
+  .file-note {
+    margin-left: auto;
+    color: var(--color-text-secondary);
+    font-family: var(--font-sans);
+    text-align: right;
+  }
+
+  /* Key cap: the key, and one sentence beside it. */
+  .key-cap {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+  }
+
+  .key-cap kbd {
+    display: flex;
+    flex: none;
+    align-items: flex-end;
+    justify-content: flex-end;
+    width: 72px;
+    height: 56px;
+    padding: 6px 8px;
+    border: 1.5px solid var(--color-navy);
+    border-radius: var(--radius-sm);
+    font-family: var(--font-mono);
+    font-size: var(--text-label);
+    line-height: 1.2;
+  }
+
+  .key-cap figcaption {
+    color: var(--color-text-secondary);
+    font-size: var(--text-caption);
+    line-height: var(--text-caption--line-height);
+  }
+
+  /* Bar figure: signed sums as bars around a centre zero line. Bars and
+     zero line are borders. A filled bar is filled by its own border. */
+  .bars {
+    display: grid;
+    gap: 10px;
+  }
+
+  .bar-row {
+    display: grid;
+    grid-template-columns: 62px minmax(0, 1fr) 84px;
+    gap: 10px;
+    align-items: center;
+    font-size: var(--text-caption);
+  }
+
+  .bar-revision {
+    font-family: var(--font-mono);
+    font-size: var(--text-label);
+  }
+
+  .bar-value {
+    font-variant-numeric: tabular-nums;
+    text-align: right;
+    white-space: nowrap;
+  }
+
+  .bar-track {
+    position: relative;
+    height: 18px;
+  }
+
+  .bar-track::before {
+    content: "";
+    position: absolute;
+    top: -5px;
+    bottom: -5px;
+    left: calc(50% - 0.5px);
+    border-left: 1px solid var(--color-text-secondary);
+  }
+
+  /* A raising bar stands right of the zero line, a lowering bar left of
+     it. The width is set per bar: its share of the longest, which fills its
+     half of the track. */
+  .bar {
+    position: absolute;
+    top: 2px;
+    height: 14px;
+    border: 1.5px solid var(--color-navy);
+  }
+
+  .bar-raises {
+    left: 50%;
+    border-top-width: 7px;
+    border-bottom-width: 7px;
+  }
+
+  .bar-lowers {
+    right: 50%;
+    min-width: 8px;
+  }
+
+  /* ---- Flow diagram, style "Leiterbahn" ---- */
+
+  .flow {
+    margin: 20px 0 0;
+  }
+
+  .flow-row {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .flow-boxes {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    row-gap: 18px;
+    width: 100%;
+    padding-bottom: 18px;
+    counter-reset: flow;
+  }
+
+  .flow-box {
+    position: relative;
+    padding: 9px 12px;
+    border: 1.5px solid var(--color-navy);
+    border-radius: var(--radius-sm);
+    background: var(--color-bg);
+  }
+
+  li.flow-box {
+    counter-increment: flow;
+  }
+
+  /* The number of the box, a small mono line above its title. */
+  li.flow-box::before {
+    content: counter(flow);
+    display: block;
+    color: var(--color-text-secondary);
+    font-family: var(--font-mono);
+    font-size: var(--text-label-small);
+    line-height: 1.5;
+  }
+
+  .flow-title {
+    margin-top: 2px;
+    font-size: var(--text-caption);
+    font-weight: 600;
+    line-height: 1.35;
+  }
+
+  .flow-sub {
+    margin-top: 6px;
+    color: var(--color-text-secondary);
+    font-family: var(--font-mono);
+    font-size: var(--text-label-small);
+    font-variant-ligatures: none;
+    line-height: 1.5;
+    overflow-wrap: anywhere;
+  }
+
+  /* The trace from a box to the next: vertical in the stack. It ends in a
+     7 px square; the last one runs into the end pad. */
+  li.flow-box::after {
+    content: "";
+    position: absolute;
+    top: calc(100% + 1.5px);
+    left: 24px;
+    height: 18px;
+    border-left: var(--spacing-trace-width) solid var(--color-teal-text);
+  }
+
+  li.flow-box:not(:last-child) > .flow-title::after {
+    content: "";
+    position: absolute;
+    top: calc(100% + 12.5px);
+    left: calc(24px + var(--spacing-trace-width) / 2 - 3.5px);
+    border: 3.5px solid var(--color-teal-text);
+  }
+
+  .flow-end {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-left: 15px;
+    color: var(--color-teal-text);
+    font-family: var(--font-mono);
+    font-size: var(--text-label-small);
+    line-height: 1.4;
+  }
+
+  /* The end pad: a ring with a filled centre, both borders. */
+  .flow-pad {
+    position: relative;
+    flex: none;
+    width: 20px;
+    height: 20px;
+    border: 1.75px solid var(--color-teal-text);
+    border-radius: var(--radius-full);
+  }
+
+  .flow-pad::after {
+    content: "";
+    position: absolute;
+    top: calc(50% - 3.5px);
+    left: calc(50% - 3.5px);
+    border: 3.5px solid var(--color-teal-text);
+    border-radius: var(--radius-full);
+  }
+
+  .flow-caption {
+    margin-top: 12px;
+    font-size: var(--text-caption);
+  }
+
+  /* The small diagram of the archive check: two boxes, a trace from each
+     that meets in one pad. */
+  .check-boxes {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px;
+  }
+
+  .check-boxes .flow-box {
+    padding: 9px 10px;
+  }
+
+  .check-boxes .flow-title {
+    margin-top: 0;
+    font-size: var(--text-label);
+    overflow-wrap: anywhere;
+  }
+
+  .check-trace {
+    position: relative;
+    height: 30px;
+    margin: 0 calc(25% - 3px);
+    border: var(--spacing-trace-width) solid var(--color-teal-text);
+    border-top: 0;
+  }
+
+  .check-trace .flow-pad {
+    position: absolute;
+    bottom: -11px;
+    left: calc(50% - 10px);
+    background: var(--color-bg);
+  }
+
+  .check-equal {
+    margin-top: 16px;
+    color: var(--color-text-secondary);
+    font-family: var(--font-mono);
+    font-size: var(--text-label-small);
+    line-height: 1.5;
+    text-align: center;
+  }
+
+  /* ---- Summary list ---- */
+
+  .summary-list {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    margin-top: 20px;
+    counter-reset: summary;
+  }
+
+  .summary-list li {
+    position: relative;
+    padding: 10px 0 10px 28px;
+    border-top: 1px solid var(--color-border);
+    font-size: var(--text-body-small);
+    line-height: var(--text-body-small--line-height);
+    counter-increment: summary;
+  }
+
+  .summary-list li::before {
+    content: counter(summary);
+    position: absolute;
+    top: 12px;
+    left: 0;
+    color: var(--color-text-secondary);
+    font-family: var(--font-mono);
+    font-size: var(--text-label);
+  }
+
+  .summary-list code {
+    margin-left: 6px;
+  }
+
+  .summary-line {
+    display: block;
+    color: var(--color-text-secondary);
+  }
+
+  /* From the phone breakpoint up: the desktop step path. */
+  @media (min-width: 37.5rem) {
+    .step {
+      padding: 0 0 var(--spacing-step-gap) var(--spacing-step-indent);
+    }
+
+    .step::before {
+      left: calc(var(--spacing-step-pad) / 2 - var(--spacing-trace-width) / 2);
+    }
+
+    .step:first-child::before {
+      top: calc(var(--spacing-step-pad) / 2);
+    }
+
+    .step-pad {
+      width: var(--spacing-step-pad);
+      height: var(--spacing-step-pad);
+      font-size: 0.9375rem;
+    }
+
+    .step-card {
+      padding: var(--spacing-card-pad-top) var(--spacing-card-pad-x) var(--spacing-card-pad-bottom);
+    }
+
+    .step-title {
+      font-size: var(--text-step-title);
+      font-weight: var(--text-step-title--font-weight);
+      line-height: var(--text-step-title--line-height);
+    }
+
+    .path-end {
+      padding-left: var(--spacing-step-indent);
+    }
+
+    .path-end::before {
+      left: calc(var(--spacing-step-pad) / 2 - var(--spacing-trace-width) / 2);
+    }
+
+    .path-end-marker {
+      left: calc(var(--spacing-step-pad) / 2 - var(--spacing-path-end-marker) / 2);
+    }
+
+    .platform-tab {
+      min-height: 0;
+    }
+
+    .copy-button {
+      min-height: 24px;
+    }
+
+    .code,
+    .terminal pre {
+      font-size: var(--text-code);
+      line-height: var(--text-code--line-height);
+    }
+
+    .terminal-bar {
+      padding: 8px 16px;
+      line-height: 1.5;
+    }
+
+    .callout {
+      padding: var(--spacing-callout-pad-y) var(--spacing-callout-pad-x);
+    }
+  }
+
+  /* From the tree breakpoint up the content column has its full width: a
+     card has two columns, a flow diagram is horizontal. */
+  @media (min-width: 80rem) {
+    .step-columns-figure {
+      grid-template-columns: minmax(0, 1fr) var(--spacing-figure-column);
+      gap: var(--spacing-card-columns-gap);
+    }
+
+    .flow-row {
+      flex-direction: row;
+      align-items: center;
+    }
+
+    .flow-boxes {
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      column-gap: 28px;
+      width: auto;
+      flex: 1;
+      padding: 0 28px 0 0;
+    }
+
+    .flow-box {
+      padding: 12px 14px;
+    }
+
+    li.flow-box::after {
+      top: calc(50% - var(--spacing-trace-width) / 2);
+      left: calc(100% + 1.5px);
+      width: 28px;
+      height: 0;
+      border-top: var(--spacing-trace-width) solid var(--color-teal-text);
+      border-left: 0;
+    }
+
+    li.flow-box:not(:last-child) > .flow-title::after {
+      top: calc(50% - 3.5px);
+      left: calc(100% + 22.5px);
+    }
+
+    .flow-end {
+      margin-left: 0;
+    }
+
+    .summary-list {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      column-gap: 36px;
+    }
+  }
+
   .skip-link:not(:focus) {
     width: 1px;
     height: 1px;
@@ -411,4 +1435,35 @@
   border: 0;
   overflow: hidden;
   clip-path: inset(50%);
+}
+
+/* The platform the reader chose: `data-platform` on <html>, set before the
+   page is first shown (layouts/Page.astro) and by the platform switch
+   (scripts/platform.ts). The parts of the other platform are out of the
+   page. Without JavaScript the attribute is absent and both are visible,
+   each under its label. The rules stand outside the layers, so they win. */
+html[data-platform="windows"] [data-platform-part="linux"],
+html[data-platform="linux"] [data-platform-part="windows"] {
+  display: none;
+}
+
+/* The labels stand for the tabs: out of the page once the tabs are there,
+   and, for a part outside a switch, once a platform is chosen. What names
+   the platform in a file list goes with them. */
+[data-platform-switch][data-tabs] > .platform-part > .platform-label,
+html[data-platform] [data-platform-only] > .platform-label,
+html[data-platform] .platform-note {
+  display: none;
+}
+
+/* The page links of a step page stand in the path end, on the step indent. */
+main[data-step-page] > [data-page-links] {
+  margin-top: 16px;
+  margin-left: var(--spacing-step-indent-phone);
+}
+
+@media (min-width: 37.5rem) {
+  main[data-step-page] > [data-page-links] {
+    margin-left: var(--spacing-step-indent);
+  }
 }

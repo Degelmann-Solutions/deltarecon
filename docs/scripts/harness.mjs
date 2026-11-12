@@ -1,10 +1,23 @@
 // What the check scripts share: the preview server, the page register, the
-// glossary register, and the list of failed expectations.
+// glossary register, the list of failed expectations, and the two checks of
+// a page that several scripts run (axe, no sideways scrolling).
 import { spawn } from 'node:child_process';
 import { readFile } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import axe from '@axe-core/playwright';
 import ts from 'typescript';
+
+const AxeBuilder = axe.AxeBuilder ?? axe.default ?? axe;
+/** The rules axe runs: A and AA of WCAG 2.0 to 2.2. */
+export const WCAG = ['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'wcag22aa'];
+/** The window widths of the checks: desktop, between, phone. */
+export const DESKTOP = { width: 1280, height: 800 };
+export const BETWEEN = { width: 900, height: 800 };
+export const PHONE = { width: 390, height: 844 };
+/** The focus ring: teal-text on light grounds, teal on the navy terminal block. */
+export const RING = 'rgb(23, 121, 130)';
+export const RING_ON_NAVY = 'rgb(101, 194, 203)';
 
 export const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 export const PORT = 4399;
@@ -188,6 +201,31 @@ export const searchTexts = {
     notFoundWord: 'renamed',
   },
 };
+
+/**
+ * The checks of an open page that several scripts run, bound to the list of
+ * failed expectations of the script: `checkAxe` (no violation of the WCAG
+ * rules) and `checkNoSidewaysScroll`.
+ */
+export function pageChecks({ failures, expect }) {
+  return {
+    async checkAxe(page, name) {
+      const { violations } = await new AxeBuilder({ page }).withTags(WCAG).analyze();
+      for (const violation of violations) {
+        for (const node of violation.nodes) {
+          failures.push(`${name}: axe rule "${violation.id}" (${violation.help}): ${node.html}`);
+        }
+      }
+    },
+    async checkNoSidewaysScroll(page, name) {
+      const { scroll, client } = await page.evaluate(() => ({
+        scroll: document.documentElement.scrollWidth,
+        client: document.documentElement.clientWidth,
+      }));
+      expect(scroll <= client, `${name}: the page scrolls sideways (${scroll} px in ${client} px)`);
+    },
+  };
+}
 
 /** Collects failed expectations; `report` prints them and ends the script. */
 export function expectations(script) {

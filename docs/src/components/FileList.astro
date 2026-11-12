@@ -1,0 +1,32 @@
+---
+// A file list, one kind of step figure: a short note per file. A file that
+// exists on one platform only follows the choice of the page; without
+// JavaScript every row is visible and the note names the platform.
+//
+//   <FileList label="In the package folder" files={[
+//     { name: 'quickstart.cmd', note: 'guided demo', platform: 'windows' },
+//     { name: 'profiles/', note: 'tolerance profiles' },
+//   ]} />
+import { texts } from '../site';
+import { pageLanguage } from '../markup';
+import type { Platform } from '../release';
+
+interface Props {
+  label: string;
+  files: { name: string; note: string; platform?: Platform }[];
+}
+
+const { label, files } = Astro.props;
+const lang = pageLanguage(Astro.url.pathname);
+---
+
+<ul class="file-list" aria-label={label} data-file-list>
+  {
+    files.map((file) => (
+      <li data-platform-part={file.platform}>
+        <span class="file-name" translate="no" data-file-name>{file.name}</span>
+        <span class="file-note">{file.note}{file.platform && <span class="platform-note">, {texts[lang][file.platform]}</span>}</span>
+      </li>
+    ))
+  }
+</ul>

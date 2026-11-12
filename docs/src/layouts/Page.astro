@@ -9,7 +9,18 @@
 //   lead: One sentence under the title.
 //   description: The description of the page in its head data.
 //   steps:                      (step pages only)
-//     - { anchor: step-1, title: Download the package }
+//     - { anchor: download, title: Download the package }
+//     - { anchor: check, title: Check the archive, optional: true }
+//
+// The step list feeds the chapter tree and the step cards of the page
+// (components/StepCard.astro). The build fails on a step without an anchor
+// or a title and on an anchor that stands twice, and names page and step.
+//
+// The head holds one inline script: it sets the platform the reader chose on
+// an earlier page as `data-platform` on <html>, Windows on the first visit,
+// before the page is first shown. The stylesheet then shows the parts of
+// that platform only (scripts/platform.ts). Without JavaScript the attribute
+// is absent and both platforms' parts are visible.
 //
 // The page-not-found page (NotFound.astro) uses the frame too. It stands
 // outside the path: no stage line, no page links, no current page in the
@@ -27,6 +38,7 @@ import {
   notFoundPage,
   onPath,
   pageAddress,
+  stepFaults,
   texts,
   type Lang,
   type Step,
@@ -43,6 +55,10 @@ interface Props {
 }
 
 const { lang, page: id, lead, description, steps = [] } = Astro.props.frontmatter;
+const faults = stepFaults(steps);
+if (faults.length > 0) {
+  throw new Error(`${Astro.url.pathname}: frontmatter "steps": ${faults.join('; ')}.`);
+}
 if (!languages.includes(lang)) {
   throw new Error(`${Astro.url.pathname}: frontmatter "lang" must be "de" or "en".`);
 }
@@ -63,8 +79,25 @@ if (Astro.url.pathname.replace(/\/?$/, '/') !== address) {
 <html lang={lang}>
   <head>
     <Head lang={lang} page={page} description={description} />
+    <script is:inline>
+      (function () {
+        var platform = 'windows';
+        try {
+          var stored = window.localStorage.getItem('deltarecon-docs-platform');
+          if (stored === 'windows' || stored === 'linux') platform = stored;
+        } catch (error) {
+          // No storage: Windows, the first platform.
+        }
+        document.documentElement.setAttribute('data-platform', platform);
+      })();
+    </script>
   </head>
-  <body class="flex min-h-screen flex-col">
+  <body
+    class="flex min-h-screen flex-col"
+    data-copy-word={texts[lang].copy}
+    data-copied-word={texts[lang].copied}
+    data-copy-failed={texts[lang].copyFailed}
+  >
     <a class="skip-link menu-open:hidden" href="#main">{texts[lang].skipLink}</a>
     <TopBar lang={lang} page={page} />
     <div class="flex flex-1 flex-col tree:grid tree:grid-cols-[288px_minmax(0,1fr)]">
@@ -73,6 +106,7 @@ if (Astro.url.pathname.replace(/\/?$/, '/') !== address) {
         id="main"
         class="mx-auto w-full max-w-content-max px-content-pad-x-phone pt-content-pad-top-phone pb-content-pad-bottom-phone tablet:px-content-pad-x tablet:pt-content-pad-top tablet:pb-content-pad-bottom tree:mx-0 menu-open:hidden"
         data-behind-menu
+        data-step-page={steps.length > 0 || undefined}
         data-pagefind-body={onPath(page) || undefined}
       >
         <PageHead lang={lang} page={page} lead={lead} />
@@ -84,6 +118,8 @@ if (Astro.url.pathname.replace(/\/?$/, '/') !== address) {
     <script>
       import '../scripts/menu.ts';
       import '../scripts/language-switch.ts';
+      import '../scripts/platform.ts';
+      import '../scripts/copy.ts';
     </script>
   </body>
 </html>

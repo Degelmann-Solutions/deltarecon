@@ -1,0 +1,16 @@
+---
+// A key cap, one kind of step figure: the key as a box with its name, and
+// one sentence beside it, which is the caption of the figure.
+//
+//   <KeyCap slot="figure" name="Enter">The demo waits for Enter.</KeyCap>
+interface Props {
+  name: string;
+}
+
+const { name } = Astro.props;
+---
+
+<figure class="step-figure key-cap" data-step-figure>
+  <kbd>{name}</kbd>
+  <figcaption class="prose-links"><slot /></figcaption>
+</figure>

@@ -2,6 +2,275 @@
 layout: ../../layouts/Page.astro
 lang: de
 page: quick-start
-lead: "Diese Seite ist noch nicht geschrieben; sie wird Sie vom Download des Pakets zum ersten Suchergebnis der geführten Vorführung leiten."
-description: "Schritt für Schritt vom Download des veröffentlichten Pakets zum ersten Suchergebnis der geführten Vorführung am Referenzmodell."
+lead: "Sie laden ein Archiv herunter, entpacken es und starten einen Befehl. Installiert wird nichts. Die geführte Vorführung vergleicht dann zwei Stände des Referenzmodells delib-history, einer Risikolebensversicherung mit 350 Modellpunkten, und führt die Abweichung zwischen ihnen auf die Änderungen zurück, die sie verursachen."
+description: "In sechs Schritten vom Download des veröffentlichten Pakets zum ersten Suchergebnis der geführten Vorführung am Referenzmodell, für Windows und Linux."
+steps:
+  - { anchor: download, title: "Das Paket herunterladen" }
+  - { anchor: check, title: "Das Archiv prüfen", optional: true }
+  - { anchor: unpack, title: "Das Archiv entpacken" }
+  - { anchor: start, title: "Die geführte Vorführung starten" }
+  - { anchor: demo, title: "Den vier Schritten der Vorführung folgen" }
+  - { anchor: result, title: "Ihr erstes Suchergebnis lesen" }
 ---
+import ArchiveCheckFigure from '../../components/ArchiveCheckFigure.astro';
+import BarFigure from '../../components/BarFigure.astro';
+import Callout from '../../components/Callout.astro';
+import FileList from '../../components/FileList.astro';
+import FlowBox from '../../components/FlowBox.astro';
+import FlowDiagram from '../../components/FlowDiagram.astro';
+import KeyCap from '../../components/KeyCap.astro';
+import PathEnd from '../../components/PathEnd.astro';
+import PlatformPart from '../../components/PlatformPart.astro';
+import PlatformSwitch from '../../components/PlatformSwitch.astro';
+import ResultTable from '../../components/ResultTable.astro';
+import StepCard from '../../components/StepCard.astro';
+import StepFigure from '../../components/StepFigure.astro';
+import Steps from '../../components/Steps.astro';
+import SummaryList from '../../components/SummaryList.astro';
+import Term from '../../components/Term.astro';
+import TerminalBlock from '../../components/TerminalBlock.astro';
+import { afterLines, firstSentence, notResolved, session } from '../../captures';
+import { archive, packageFolder, releasePage, sumsFile, tag } from '../../release';
+
+export const zip = archive('windows');
+export const tarball = archive('linux');
+export const after = afterLines('de');
+
+<Steps>
+
+<StepCard steps={frontmatter.steps} anchor="download">
+
+Öffnen Sie das Release <a href={releasePage}>{tag}</a> auf GitHub und laden Sie das Archiv für Ihr Betriebssystem herunter.
+
+<PlatformPart os="windows">
+
+Für Windows ist es <code translate="no">{zip.file}</code>. Das Windows-Paket ist nicht signiert; der Browser oder SmartScreen kann deshalb beim Herunterladen warnen.
+
+</PlatformPart>
+
+<PlatformPart os="linux">
+
+Für Linux ist es <code translate="no">{tarball.file}</code>.
+
+</PlatformPart>
+
+Wenn Sie den Download in Schritt 2 prüfen möchten, laden Sie auch <code translate="no">{sumsFile}</code> herunter.
+
+<StepFigure slot="figure">
+  <FileList
+    label="Dateien des Release"
+    files={[
+      { name: zip.file, note: 'Paket', platform: 'windows' },
+      { name: tarball.file, note: 'Paket', platform: 'linux' },
+      { name: sumsFile, note: 'für Schritt 2' },
+    ]}
+  />
+  <p slot="caption">Was Sie von der Seite des Release herunterladen.</p>
+</StepFigure>
+
+</StepCard>
+
+<StepCard steps={frontmatter.steps} anchor="check">
+
+Dieser Schritt zeigt, dass das Archiv unverändert angekommen ist. Führen Sie den Befehl in dem Ordner aus, in dem das Archiv und <code translate="no">{sumsFile}</code> liegen.
+
+<PlatformSwitch
+  windows={[`Get-FileHash -Algorithm SHA256 ${zip.file}`]}
+  linux={[`sha256sum -c ${sumsFile} --ignore-missing`]}
+>
+  <div slot="after-windows">
+
+PowerShell gibt die SHA-256-Prüfsumme des Archivs in Großbuchstaben aus. Abgesehen von Groß- und Kleinschreibung muss sie der Prüfsumme in der Zeile dieses Archivs in <code translate="no">{sumsFile}</code> gleichen:
+
+<p><code translate="no" data-sha256="windows">{zip.sha256}</code></p>
+
+  </div>
+  <div slot="after-linux">
+
+Der Befehl vergleicht das Archiv mit seiner Zeile in <code translate="no">{sumsFile}</code> und muss dafür `OK` melden.
+
+  </div>
+</PlatformSwitch>
+
+<StepFigure slot="figure">
+  <ArchiveCheckFigure archive="Archiv" sums={sumsFile} sumsNote="je Archiv eine Zeile" equal="SHA-256 gleich">Ihr Download</ArchiveCheckFigure>
+  <p slot="caption">Beide müssen dieselbe SHA-256-Prüfsumme ergeben.</p>
+</StepFigure>
+
+</StepCard>
+
+<StepCard steps={frontmatter.steps} anchor="unpack">
+
+Installiert wird nichts: Das Paket enthält sein eigenes Python, DeltaRecon, das <Term id="reference-model">Referenzmodell</Term> mit seiner Versionsgeschichte und die <Term id="tolerance-profile">Toleranzprofile</Term>. Beim Entpacken entsteht ein Ordner, der Paketordner.
+
+<PlatformSwitch
+  windows={[`Expand-Archive ${zip.file} -DestinationPath .`]}
+  linux={[`tar -xzf ${tarball.file}`]}
+>
+  <div slot="after-windows">
+
+Oder entpacken Sie die zip-Datei im Explorer mit „Alle extrahieren“. Der Paketordner ist <code translate="no">{packageFolder('windows')}</code>; in ihm liegen `quickstart.cmd` und `deltarecon.cmd`.
+
+  </div>
+  <div slot="after-linux">
+
+Der Paketordner ist <code translate="no">{packageFolder('linux')}</code>; in ihm liegen `quickstart` und `deltarecon`.
+
+  </div>
+</PlatformSwitch>
+
+<StepFigure slot="figure">
+  <FileList
+    label="Im Paketordner"
+    files={[
+      { name: 'quickstart.cmd', note: 'geführte Vorführung', platform: 'windows' },
+      { name: 'quickstart', note: 'geführte Vorführung', platform: 'linux' },
+      { name: 'deltarecon.cmd', note: 'einzelne Befehle', platform: 'windows' },
+      { name: 'deltarecon', note: 'einzelne Befehle', platform: 'linux' },
+      { name: 'README.txt', note: 'Anleitung, englisch' },
+      { name: 'LIESMICH.txt', note: 'Anleitung, deutsch' },
+      { name: 'delib-history/', note: 'Referenzmodell' },
+      { name: 'profiles/', note: 'Toleranzprofile' },
+      { name: 'python/', note: 'eigenes Python' },
+      { name: 'LICENSE', note: 'Lizenz von DeltaRecon' },
+    ]}
+  />
+  <p slot="caption">Was Sie im Paketordner finden.</p>
+</StepFigure>
+
+<div slot="wide">
+<PlatformPart os="windows">
+<Callout tag="Hinweis" title="In einen Ordner mit kurzem Pfad entpacken">
+
+Windows begrenzt die Länge eines Pfads. Entpacken Sie das Archiv deshalb in einen Ordner mit kurzem Pfad, zum Beispiel `C:\deltarecon`. „Alle extrahieren“ im Explorer legt zusätzlich einen Ordner mit dem Namen der zip-Datei an, in dem dann der Paketordner liegt; das verlängert den Pfad.
+
+</Callout>
+</PlatformPart>
+</div>
+
+</StepCard>
+
+<StepCard steps={frontmatter.steps} anchor="start">
+
+Starten Sie die Vorführung im Paketordner. `--lang de` wählt Deutsch und `--lang en` Englisch; ohne diese Angabe nimmt die Vorführung die Sprache Ihres Systems.
+
+<PlatformPart os="windows">
+
+Doppelklicken Sie im Paketordner auf `quickstart.cmd`. Oder öffnen Sie PowerShell im Paketordner und starten Sie die Vorführung dort:
+
+</PlatformPart>
+
+<PlatformPart os="linux">
+
+Öffnen Sie ein Terminal, wechseln Sie in den Paketordner und starten Sie die Vorführung dort:
+
+</PlatformPart>
+
+<PlatformSwitch
+  windows={['.\\quickstart.cmd']}
+  linux={[`cd ${packageFolder('linux')}`, './quickstart']}
+>
+  <div slot="after-windows">
+
+Am Ende wartet der Starter, bis Sie eine Taste drücken, gleich wie Sie ihn gestartet haben; deshalb bleibt ein Fenster, das Sie per Doppelklick geöffnet haben, offen.
+
+  </div>
+</PlatformSwitch>
+
+<div class="step-after">
+
+Die Vorführung erklärt jeden Schritt, bevor er läuft, und wartet auf die Eingabetaste.
+
+</div>
+
+<KeyCap slot="figure" name="Enter">Die Vorführung wartet vor jedem ihrer vier Schritte auf die Eingabetaste (Enter).</KeyCap>
+
+<div slot="wide">
+<PlatformPart os="windows">
+  <TerminalBlock
+    platform="windows"
+    prompt={`PS C:\\deltarecon\\${packageFolder('windows')}>`}
+    command=".\quickstart.cmd --lang de"
+    lines={session('windows', 'de')}
+  />
+</PlatformPart>
+<PlatformPart os="linux">
+  <TerminalBlock platform="linux" prompt="$" command="./quickstart --lang de" lines={session('linux', 'de')} />
+</PlatformPart>
+
+<div class="step-after">
+
+So beginnt die Vorführung, bis sie zum ersten Mal auf die Eingabetaste wartet. Der Zeitstempel im Namen des Ordners der Vorführung ist die Zeit Ihres Starts; bei Ihnen lautet er also anders.
+
+</div>
+
+<PlatformPart os="windows">
+<Callout tag="Hinweis" title="Windows kann warnen">
+
+Das Windows-Paket ist nicht signiert; SmartScreen kann deshalb beim Start der Vorführung warnen. Bei diesem Paket ist die Warnung erwartet; mit Schritt 2 stellen Sie sicher, dass Ihr Archiv das veröffentlichte ist.
+
+</Callout>
+</PlatformPart>
+</div>
+
+</StepCard>
+
+<StepCard steps={frontmatter.steps} anchor="demo">
+
+Vor jedem Schritt sagt die Vorführung, was der Befehl tut, und zeigt ihn vollständig. Mit der Eingabetaste starten Sie ihn. Danach fasst sie zusammen, was der Schritt geschrieben hat. Die vier Schritte finden eine <Term id="deviation">Abweichung</Term> zwischen zwei Releases, bei der jeder abweichende <Term id="value">Wert</Term> zählt, listen jede <Term id="revision">Revision</Term> dazwischen mit ihrer <Term id="class">Einordnung</Term> auf und suchen die Revisionen, die die Abweichung verursachen.
+
+<FlowDiagram end="Suchergebnis">
+  <FlowBox code="request · run" writes="release-n/">Release N rechnen</FlowBox>
+  <FlowBox code="regression" writes="regression/"><Term id="regression">Regression</Term> gegen N+1</FlowBox>
+  <FlowBox code="derive" writes="changes.json">Die Änderungen zwischen N und N+1</FlowBox>
+  <FlowBox code="search" writes="search/">Die Ursache im <Term id="bruttobeitrag" /> suchen</FlowBox>
+  <p slot="caption">Die vier Schritte der geführten Vorführung. Jeder Schritt schreibt seine Dateien in den Ordner der Vorführung, und die späteren Schritte lesen sie.</p>
+</FlowDiagram>
+
+<SummaryList
+  items={[
+    { name: 'Release N rechnen', code: ['request', 'run'], line: firstSentence(after[0]) },
+    { name: 'Regression gegen N+1', code: ['regression'], line: firstSentence(after[1]) },
+    { name: 'Die Änderungen zwischen N und N+1', code: ['derive'], line: after[2] },
+    { name: 'Die Ursache im Bruttobeitrag suchen', code: ['search'], line: after[3] },
+  ]}
+/>
+
+<Callout tag="Ein Begriff in einfachen Worten" title="Warum der Exit-Status 1 in Schritt 2 erwartet ist">
+
+Jeder Befehl meldet mit einer Zahl, seinem <Term id="exit-status">Exit-Status</Term>, wie er geendet hat. `regression` meldet 0, wenn die beiden Ergebnisse übereinstimmen, und 1, wenn sie sich unterscheiden. Release N und N+1 unterscheiden sich absichtlich; 1 ist hier also das richtige Ergebnis und kein Fehler. Die Vorführung geht weiter.
+
+</Callout>
+
+</StepCard>
+
+<StepCard steps={frontmatter.steps} anchor="result">
+
+Schritt 4 der Vorführung endet mit dieser Tabelle: eine Zeile je Revision, die im Bruttobeitrag in den ersten fünf Projektionsjahren abweicht. Jede Summe trägt ihr Vorzeichen. Unter der Tabelle meldet die Vorführung einen Teil der Abweichung als „<Term id="not-resolved">Nicht aufgelöst</Term>“; der Kasten unten erklärt das.
+
+<ResultTable>Ausgabe von Schritt 4 am Referenzmodell:</ResultTable>
+
+<StepFigure slot="figure">
+  <BarFigure />
+  <p slot="caption">Dieselben vier Summen als Balken: Ein gefüllter Balken erhöht den Bruttobeitrag, ein umrandeter senkt ihn.</p>
+</StepFigure>
+
+<div slot="wide">
+<Callout tag="Ein Begriff in einfachen Worten" title="Was „Nicht aufgelöst“ bedeutet" quote={notResolved('de')}>
+
+Manche Änderungen sind so klein, dass jede einzelne den Bruttobeitrag um weniger als die Toleranz von einem Cent je Modellpunkt und Monat bewegt. Zusammen überschreiten sie die Toleranz. DeltaRecon rät nicht, welche von ihnen die Ursache ist: Es nennt die Gruppe und ordnet diesen Teil der Abweichung keiner Änderung zu.
+
+</Callout>
+
+<div class="step-after">
+
+Das vollständige Ergebnis steht in `search/search.result.json`. Alle Dateien der Vorführung liegen im Ordner der Vorführung unterhalb des Paketordners; die Vorführung nennt ihn am Anfang und am Ende.
+
+</div>
+</div>
+
+</StepCard>
+
+</Steps>
+
+<PathEnd>Mit der Tabelle aus Schritt 6 auf Ihrem Bildschirm ist Etappe 1 abgeschlossen.</PathEnd>

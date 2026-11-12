@@ -19,8 +19,9 @@ Run them in `docs/`. Node 20 and npm are required.
 | `npm ci` | Installs the pinned dependencies from `package-lock.json`. |
 | `npm run local` | Builds the site with its search index and serves it. When port 4321 is free, the pages are at `http://localhost:4321/deltarecon/docs/de/` and `/en/`; otherwise the server takes the next free port. The command prints the address it serves on. |
 | `npm run build` | Builds the site to `dist/` and writes the search index to `dist/pagefind/`. |
-| `npm run check` | Builds the site, then runs the four checks below in Chromium. Every page entry runs it. |
+| `npm run check` | Builds the site, then runs the five checks below in Chromium. Every page entry runs it. |
 | `npm run check:apache` | Builds the site, then checks in an Apache what only Apache shows: unknown addresses and the root address. Needs Docker; not part of `npm run check`. |
+| `npm run check:release -- --search <folder>` | Holds the capture files and the built step pages against the published release. Needs `../dist/release-v<version>/` and the search folder of a run of the demo; not part of `npm run check` (see "Captures and the release check"). |
 | `npx astro check` | Type-checks the project. |
 
 The checks need the Chromium of Playwright. On a machine without it:
@@ -34,17 +35,20 @@ indexes the build output.
 
 ## Checks
 
-`npm run check` runs four scripts one after the other; a fifth,
-`scripts/check-apache.mjs`, runs on its own (below). Each of the four starts
-`astro preview` on a port of its own (`scripts/harness.mjs`), reads the page
-register, and names every failed expectation with its page.
+`npm run check` runs five scripts one after the other; two more,
+`scripts/check-apache.mjs` and `scripts/check-release.mjs`, run on their own
+(below). Each of the five starts `astro preview` (`scripts/harness.mjs`),
+reads the page register, and names every failed expectation with its page.
+`scripts/harness.mjs` also holds what several scripts run on an open page:
+axe and the check for sideways scrolling (`pageChecks`).
 
 | Script | What it asserts |
 |---|---|
 | `scripts/check-site.mjs` | For every page and for the two page-not-found pages: language, release number, link to the counterpart, reading with JavaScript off (no search field), that no request leaves the local origin, and that every file a page loads (typeface, logo, script) is served. For the start page of each language, the search: nothing shown at the load; the hits of a word of the language with the number of matches, each hit with page name, stage line and an excerpt with the match marked; no hit and the no-match text for a word of the other language and for a word of the page-not-found page; an emptied field; Escape, which closes the list and keeps focus and term, in the field and on a hit; a slow search index, which shows the loading text once a term is typed; a missing search index, which puts the "not available" text into the page at the load and shows it with focus in the field and after a term is typed. For the page-not-found pages: the search finds the start page. For the root page: it stays with JavaScript off and offers both languages, and leads on with JavaScript. |
 | `scripts/check-head.mjs` | The built pages are exactly the pages of the register and the three pages outside the path. For every page of the register: title "page name – DeltaRecon documentation", a description of its own, canonical address, `alternate` links for `de` and `en`, Open Graph title, description, address, type, locale and image, and one JSON-LD block that parses and names the page. Titles and descriptions are unique. A page and its counterpart hold the same anchors in their content; a written page sets the anchors of its headings itself; the two Glossaries are the first pages whose anchors are compared. An anchor that belongs to one language, as a letter label of the Glossary, is marked `data-language-own` and left out. For the three pages outside the path: language, a title of its own, `noindex`, and no canonical address. The two `.htaccess` files of the build name the addresses the register gives the page-not-found pages. |
-| `scripts/check-a11y.mjs` | For every page, at desktop and phone width, with the menu closed and open: axe reports no violation of the A and AA rules of WCAG 2.0 to 2.2. Keyboard: the skip link comes first and leads to main, Tab reaches every control in reading order, each with a visible focus ring. The menu below 1280 px: focus on the close button, which says that the menu is open, the page behind inert and the skip link out of the page, the top bar in one row at 320 px, Tab stays inside, Escape and the close button return focus to the menu button. The language switch keeps the anchor the page was loaded with and one set afterwards. With JavaScript off the menu button is a link to the chapter tree at the end of the page. No page scrolls sideways at 1280, 390 and 320 px. For the start page of each language also at 900 px: axe, the menu, no sideways scrolling at 900 and 600 px, an open menu that ends at 1280 px with focus kept in the page, and the search field moving between top bar and menu at 600 px. For the start page of each language, the search result list: axe with the list open, with hits and with no match, in the top bar and in the menu on the phone; its place and look; the hits after the field in tab order, each with a focus ring; the list closed when focus leaves the search in the top bar; Escape in the field, which leaves the menu open; no sideways scrolling with the list open at 600 and 320 px. For the page-not-found pages: axe, the frame without stage line, page links and current page, the two blocks with their languages, skip link, tab order, language switch, menu. For the root page, in a browser that names no language: axe, tab order, no sideways scrolling. Axe does not run with JavaScript off. For the Glossary of each language, at desktop and phone width: Tab reaches every letter of the letter index, each at least 32 × 32 px, and axe runs also at an entry address, where the entry shows its linked state. An error on one page is reported for that page; the others are still checked. |
+| `scripts/check-a11y.mjs` | For every page, at desktop and phone width, with the menu closed and open: axe reports no violation of the A and AA rules of WCAG 2.0 to 2.2. Keyboard: the skip link comes first and leads to main, Tab reaches every control in reading order, each at least 24 × 24 px and with a visible focus ring, teal-text on light grounds and teal inside the navy terminal block of a step page; a control with `tabindex="-1"`, as the tab of a platform switch that is not selected, is no stop. The menu below 1280 px: focus on the close button, which says that the menu is open, the page behind inert and the skip link out of the page, the top bar in one row at 320 px, Tab stays inside, Escape and the close button return focus to the menu button. The language switch keeps the anchor the page was loaded with and one set afterwards. With JavaScript off the menu button is a link to the chapter tree at the end of the page. No page scrolls sideways at 1280, 390 and 320 px. For the start page of each language also at 900 px: axe, the menu, no sideways scrolling at 900 and 600 px, an open menu that ends at 1280 px with focus kept in the page, and the search field moving between top bar and menu at 600 px. For the start page of each language, the search result list: axe with the list open, with hits and with no match, in the top bar and in the menu on the phone; its place and look; the hits after the field in tab order, each with a focus ring; the list closed when focus leaves the search in the top bar; Escape in the field, which leaves the menu open; no sideways scrolling with the list open at 600 and 320 px. For the page-not-found pages: axe, the frame without stage line, page links and current page, the two blocks with their languages, skip link, tab order, language switch, menu. For the root page, in a browser that names no language: axe, tab order, no sideways scrolling. Axe does not run with JavaScript off. For the Glossary of each language, at desktop and phone width: Tab reaches every letter of the letter index, each at least 32 × 32 px, and axe runs also at an entry address, where the entry shows its linked state. An error on one page is reported for that page; the others are still checked. |
 | `scripts/check-glossary.mjs` | First it proves itself on pages it sets itself (an unlinked term, a term linked twice, an exempt passage and more): each must fail or pass as expected. The glossary register: every entry has a term and an explanation in both languages. The Glossary of each language, with JavaScript on and off: the letter index, the entries in the alphabetical order of the language as a description list, each with term, counterpart, language code and `lang`; both Glossaries hold the same entries; at every entry address that entry and no other shows the linked state, which ends when the address changes. Every other page: the first occurrence of a term in the content is its glossary link, no entry is linked twice, and a glossary link leads to its entry on the Glossary of the page's language with a dotted underline. "Appears in" lists exactly the pages that link the term. |
+| `scripts/check-steps.mjs` | First the step list of the frontmatter (`stepFaults` in `src/site.ts`): a step without an anchor or a title and an anchor that stands twice are named. Then every step page, which is every page that holds step cards; what a page must show stands in `stepPages` and `words` at the top of the script, written out per language, and a step page without an entry there fails. Desktop: one card per step in order with counter, the tag "optional" on the optional steps only, pad, trace and a figure or flow diagram; the step title is a link to its step; the chapter tree lists the steps with the titles of the cards; an address with the anchor of a step opens with that step at the top of the window, without a highlight; the path end with its marker on the axis of the pads, the closing line and the page links. The platform switch: Windows on the first visit; a click on "Linux" changes every switch and every part of the page while the used switch keeps its place in the window and focus; arrow keys, Home and End; one tab stop per switch; the choice after a reload, on another page, and before the scripts of the page run; without storage it holds for the page and no error shows. The copy button: after the tabs and before the command; the clipboard holds the command without prompt and output; "Copied" for at least 2 s, announced, focus kept; a refused copy shows and announces the failure text. Every block that scrolls sideways takes focus and is a named region; the terminal block shows its ring inside. The result table and the bar figure, which shows the sums of the table. No transition and no animation in the content. Axe with Windows and with Linux chosen. Phone: one column, the figure below the text, the flow diagram as a stack, the result table as stacked records with its head row, code and terminal scrolling inside their block, tabs and copy button at least 40 px high, no text of a figure below 11 px, the step list left out of the menu, the scroll position kept when the menu opens and closes; an element that reaches beyond the window is named, also at 320 px. JavaScript off, at 1280 and 390 px: both platforms' parts visible, Windows first, each under its label; no tabs, no button, no copy button. |
 
 `npm run check:apache` runs `scripts/check-apache.mjs` after the build. The
 preview server of the other checks knows no `.htaccess`, so this script
@@ -74,7 +78,10 @@ language (`not-found-`) and the root page (`root-`), each at desktop and phone
 width; and the Glossary of each language at desktop and phone width, plain
 and at an entry address (`glossary-`). Lay the first group beside the mock of
 the Overview page when the frame changes, and the last beside the mock of the
-Glossary when the Glossary changes.
+Glossary when the Glossary changes. The check of the step pages writes, per
+step page and language, `<page>-desktop-<lang>.png` and
+`<page>-phone-<lang>.png` (`quick-start-desktop-en.png`); lay them beside the
+mock of the Quick start when a step component changes.
 
 What no script checks: the looks on hover, a Windows contrast theme, a screen
 reader, and zoom to 400 %.
@@ -83,8 +90,9 @@ reader, and zoom to 400 %.
 
 `src/site.ts` is the register of the site: the four stages, the ten pages in
 path order with their name and address per language, the addresses outside
-the documentation, the texts of the page frame and of the Glossary in both
-languages, and the page-not-found page, which stands outside the path
+the documentation, the texts of the page frame, of the Glossary and of the
+step components in both languages, the check of a step list (`stepFaults`),
+and the page-not-found page, which stands outside the path
 (`notFoundPage`, `onPath()`). Chapter
 tree, page links, page head, language switch and head data read it. A page
 name stands there and in no other file; rename a page there.
@@ -150,9 +158,7 @@ description: "The description of the page for search engines and shared links."
   `quick-start` in `en` is `src/pages/en/quick-start.mdx`; an empty slug is
   `index.mdx`. The build fails when file and register disagree.
 - `description` is the page's own and differs from every other page.
-- A step page lists its steps, and the chapter tree shows them under the
-  page: `steps: [{ anchor: step-1, title: "Download the package" }]`. The
-  anchor is the same in both languages.
+- A step page lists its steps in the frontmatter; see "Step pages".
 - A new page needs an entry in `pages` of `src/site.ts` (at its place on the
   path) and both files. `npm run check` fails when a page of the register is
   not built or a built page is not in the register.
@@ -162,6 +168,169 @@ description: "The description of the page for search engines and shared links."
   The same list names a word that several pages of a language hold in
   their name or text ("Engine", "engine"; at least two pages must keep it) and a word that only the page-not-found page holds
   ("Tippfehler", "renamed"); no page of the path may hold the latter.
+
+## Step pages
+
+A page with instructions is a list of step cards on one trace. The Quick
+start is the first; `src/pages/en/quick-start.mdx` is the pattern.
+
+**The step list.** The frontmatter names the steps once per language; the
+card, its counter and the chapter tree read title and number from there:
+
+```
+steps:
+  - { anchor: download, title: "Download the package" }
+  - { anchor: check, title: "Check the archive", optional: true }
+```
+
+The anchor is the address of the step and is the same in both languages.
+The build fails, with page and step, on a step without an anchor or a title,
+on an anchor that stands twice, and on a card whose anchor the list does not
+hold.
+
+**The page.**
+
+```
+<Steps>
+<StepCard steps={frontmatter.steps} anchor="check">
+
+Text of the step.
+
+<PlatformSwitch windows={['Get-FileHash …']} linux={['sha256sum …']}>
+  <div slot="after-windows">
+
+What the reader sees on Windows.
+
+  </div>
+</PlatformSwitch>
+
+<StepFigure slot="figure">
+  <FileList label="…" files={[{ name: 'SHA256SUMS', note: 'for step 2' }]} />
+  <p slot="caption">The caption.</p>
+</StepFigure>
+
+<div slot="wide">
+<Callout tag="Hint" title="…">
+
+Text.
+
+</Callout>
+</div>
+
+</StepCard>
+</Steps>
+
+<PathEnd>The closing line.</PathEnd>
+```
+
+The content of a card is its text column. `slot="figure"` is the right
+column; `slot="wide"` stands below both at the full card width. A card
+without a figure has one column. Text between blank lines is a paragraph.
+
+**The components**, all under `src/components/`; their looks are in
+`src/styles/global.css`, their texts in `texts` of `src/site.ts`.
+
+| Component | What it is |
+|---|---|
+| `Steps`, `StepCard` | The list and one card: pad, counter ("Step 2 of 6"), the word "optional", the title as a link to the step. |
+| `PlatformSwitch` | The command of a step for Windows and Linux (`windows`, `linux`: the command lines), with the sentences that hold for one platform in the slots `after-windows` and `after-linux`. A slot must not carry the name of a property. |
+| `PlatformPart` | Content of one platform outside a switch (`os="windows"`): a sentence, a callout, a terminal block. Every sentence that holds for one platform only stands in a part or in a slot of a switch. |
+| `CodeBlock` | A command that does not differ by platform. `PlatformSwitch` builds its own. |
+| `TerminalBlock` | A session: prompt, command, and output from a capture (`lines={session('windows', 'en')}`). |
+| `StepFigure` | The frame of a step figure with its caption (`slot="caption"`). Into it: `FileList`, `BarFigure`, `ArchiveCheckFigure` (the small diagram of the archive check). |
+| `KeyCap` | A step figure of its own kind: a key and one sentence. |
+| `FlowDiagram`, `FlowBox` | A sequence as boxes on one trace; in the text column of a card without a figure. Horizontal from 1280 px, a stack below. |
+| `SummaryList` | Sub-steps as a numbered list; the second line of a row is output from a capture. |
+| `ResultTable` | The table of the demo's search, from the capture; the content is what the page says before the caption of the program. |
+| `Callout` | A term or an expected outcome in plain words, or a hint. `quote` is a message of the program from a capture. |
+| `PathEnd` | The marker under the last step and the closing line. The page links follow by themselves. |
+
+A component that names its step ("Command, step 2", "Copy command, step 2")
+writes `STEP_MARK` (`src/markup.ts`); the card puts its number there. A page
+never types a step number into a component.
+
+**Platform.** The delivered page holds both platforms' parts one after the
+other, Windows first, each under its label; that is the page without
+JavaScript. An inline script in the head (`src/layouts/Page.astro`) sets
+`data-platform` on `<html>`: Windows, or what the reader chose before
+(`localStorage`, key `deltarecon-docs-platform`). The stylesheet shows the
+parts of that platform; `src/scripts/platform.ts` turns the labels of each
+switch into tabs. `src/scripts/copy.ts` puts in the copy buttons; the
+delivered page has none.
+
+**Glossary terms.** Both platforms' parts count as content, shown or not:
+link a term in one of them only. Output from a capture cannot hold a
+glossary link, so the text of the page links a term before the output that
+names it (the Quick start does so before its flow diagram and its table).
+
+**A new step page** needs an entry in `stepPages` of
+`scripts/check-steps.mjs` (anchors, optional steps, the steps with a switch,
+the closing line per language).
+
+## Captures and the release check
+
+No page types program output. `src/captures/v<version>/` holds the standard
+output of the guided demo of the released package, one file per platform and
+language (`windows-en.txt`, `windows-de.txt`, `linux-en.txt`,
+`linux-de.txt`), in UTF-8 with LF line ends. `src/captures.ts` reads them at
+build time and gives the parts a page shows: `session` (the opening up to
+the commands of the first step, what the reader sees before the demo first
+waits for Enter), `afterLines` (the paragraph after each step), `caption`,
+`searchTable`, `notResolved`. The build fails, with file and part, when a
+file or a part is missing, and when the Windows and the Linux capture of a
+language differ in a part that does not depend on the platform. These four
+files are the only run output under version control.
+
+**Renewing them at a release**, after `src/release.json` holds the new
+number and the SHA-256 of both archives (from `SHA256SUMS` of the release):
+
+1. Unpack the two archives of `../dist/release-v<version>/` into fresh
+   folders, the Linux one on Linux and the Windows one on a Windows host.
+2. In each package folder run the starter once per language and keep its
+   standard output: `./quickstart --lang en --no-pause > linux-en.txt`, and
+   in cmd `quickstart.cmd --lang en --no-pause < NUL > windows-en.txt`; the
+   same with `de`. Each must end with exit status 0.
+3. Convert the Windows files to UTF-8 with LF line ends (the demo writes
+   code page 1252 and CRLF there). Their last line is the line of `pause`
+   that the starter prints; it stays.
+4. Put the four files into `src/captures/v<version>/` and remove the folder
+   of the release before.
+5. Run `npm run check` and then, with the folder `search/` of one of the
+   runs, `npm run check:release -- --search <demo folder>/search`.
+
+`npm run check:release` (`scripts/check-release.mjs`) is the proof that the
+page describes the release. It fails without `../dist/release-v<version>/`
+and without `--search`. Before any build it compares the capture files: the
+Windows and the Linux file of a language line by line, with path separators
+and the time stamp of the demo folder set aside; the table of the search,
+the counts above it and the "Not resolved" message of every file against the
+`search.result.json` of the search folder, whose SHA-256 must be the one
+`../measurements/quick-start-search.SHA256SUMS` names. A difference is named
+with file and line. Then it builds the site and asserts on the Quick start of
+both languages:
+
+- every command stands in a guide of the release: for steps 1 to 3 in
+  `release-notes.md` (a line of a code block or inline code; `<zip>` stands
+  for the Windows archive, and an option may follow a command when the same
+  paragraph of the notes names both), else in the README of the release,
+  which the notes point to and which holds the full `Expand-Archive` command
+  (`git show v<version>:README.md`, so the check needs Git and the tag of
+  the release); from step 4 on in the guide of the page's language in the
+  package of the platform (`README.txt`, `LIESMICH.txt`), else as a line of
+  a code block of the release notes (the `cd` into the package folder). The
+  command of a terminal block is a command of the guide with
+  `--lang <language>`;
+- names of archives and package folders and every SHA-256 on the page are
+  those of `SHA256SUMS`, and `src/release.json` holds the same sums; the
+  file list of the package folder (the step with the anchor `unpack`) names,
+  per platform, exactly the entries of the unpacked package of the release
+  folder, a folder with a closing slash;
+- output on the page stands in the capture of the language, the terminal
+  session line by line; table and bar figure show the revisions and sums of
+  `search.result.json`.
+
+Record commit, command and outcome of a run where the story or the epic asks
+for it.
 
 ## Glossary and glossary links
 
@@ -213,6 +382,10 @@ origin.
 
 ## Release number
 
-The release the documentation applies to stands in `src/release.json` and in
-no other file under `docs/`. `src/release.ts` reads it and derives the tag.
-Renew the number by hand when a release is published.
+The release the documentation applies to stands in `src/release.json` and,
+beside it, only in the name of the folder of its captures
+(`src/captures/v<version>/`). `src/release.json` also holds the SHA-256 of
+the archive of each platform. `src/release.ts` reads it and derives the tag,
+the address of the release page, and the names of the archives and package
+folders. Renew number and sums by hand when a release is published, and the
+captures with them (see "Captures and the release check").

@@ -1,3 +1,7 @@
 {
-  "version": "0.2.0"
+  "version": "0.2.0",
+  "sha256": {
+    "windows": "c44f65968205506fa44af7639b399cd97b96a2fe175ff4ad6cbb2fdd5be4bc4d",
+    "linux": "67d083492770c63db4e264464b73528c51883a7c8b1885ac09f8777b70f1501f"
+  }
 }

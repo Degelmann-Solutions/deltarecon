@@ -1,0 +1,52 @@
+---
+// A terminal block: a session with its output, read-only. The bar names the
+// shell and where the session runs; below it the prompt, the command and
+// the output, which a page takes from a capture (src/captures.ts). The block
+// scrolls sideways inside itself and is a named region. The copy button,
+// put in by scripts/copy.ts, copies the command without the prompt.
+//
+//   <TerminalBlock platform="windows" prompt="PS C:\…>" command=".\quickstart.cmd --lang en"
+//     lines={session('windows', 'en')} />
+import { stepPlace, texts } from '../site';
+import { escapeHtml, outputHtml, pageLanguage, STEP_MARK } from '../markup';
+import type { SessionLine } from '../captures';
+import type { Platform } from '../release';
+
+interface Props {
+  platform: Platform;
+  prompt: string;
+  command: string;
+  lines: SessionLine[];
+}
+
+const { platform, prompt, command, lines } = Astro.props;
+const lang = pageLanguage(Astro.url.pathname);
+const t = texts[lang];
+const shell = platform === 'windows' ? t.windowsShell : t.linuxShell;
+const name = `${t.terminalSession}, ${platform === 'windows' ? t.windowsShell : t.linux}`;
+
+const output = lines
+  .map((line) =>
+    line.heading
+      ? `<span class="terminal-heading">${outputHtml(line.text, lang)}</span>`
+      : outputHtml(line.text, lang),
+  )
+  .join('\n');
+const session =
+  `<span class="terminal-prompt" translate="no">${escapeHtml(prompt)}</span> ` +
+  `<span class="terminal-command" translate="no" data-terminal-command>${escapeHtml(command)}</span>\n\n` +
+  `<span data-capture="session">${output}</span>`;
+---
+
+<div
+  class="terminal"
+  data-terminal
+  data-copy={command}
+  data-copy-label={`${t.copyCommand}, ${stepPlace(STEP_MARK, lang, platform)}`}
+>
+  <div class="terminal-bar">
+    <span>{shell}</span>
+    <span class="terminal-place">{t.packageFolder}</span>
+  </div>
+  <pre tabindex="0" role="region" aria-label={name} set:html={session} />
+</div>

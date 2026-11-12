@@ -1,6 +1,6 @@
 // The page register of the documentation: the four stages, the ten pages in
 // path order with their names and addresses per language, the texts of the
-// page frame and of the Glossary, `languageOf`, the language of a page
+// page frame, of the Glossary and of the step components, `languageOf`, the language of a page
 // address, and the page-not-found page, which stands outside the path
 // (`notFoundPage`, `onPath`). Chapter tree, page links, page head, language switch and head
 // data read it, and so do the Glossary (components/Glossary.astro) and the
@@ -29,11 +29,45 @@ export interface Page {
   slug: Record<Lang, string>;
 }
 
-/** A step of a step page, as the chapter tree lists it under the page. */
+/**
+ * A step of a step page, as the page names it in its frontmatter. The step
+ * card, its counter and the chapter tree read title and anchor from there.
+ */
 export interface Step {
   /** Anchor of the step, the same in both languages. */
   anchor: string;
   title: string;
+  /** A step the reader may skip; its card says "optional". */
+  optional?: boolean;
+}
+
+/** What an anchor of a step looks like: small letters, digits and hyphens. */
+export const stepAnchor = /^[a-z][a-z0-9-]*$/;
+
+/**
+ * What is wrong with the step list of a page, one sentence per fault: a step
+ * without an anchor or a title, an anchor twice. Empty when the list holds.
+ */
+export function stepFaults(steps: unknown): string[] {
+  if (!Array.isArray(steps)) return ['"steps" is not a list'];
+  const faults: string[] = [];
+  const seen = new Set<string>();
+  steps.forEach((step, index) => {
+    const name = `step ${index + 1}`;
+    const anchor: unknown = step?.anchor;
+    const title: unknown = step?.title;
+    if (typeof anchor !== 'string' || !stepAnchor.test(anchor)) {
+      faults.push(`${name} has no anchor of small letters, digits and hyphens`);
+    } else if (seen.has(anchor)) {
+      faults.push(`${name} repeats the anchor "${anchor}"`);
+    } else {
+      seen.add(anchor);
+    }
+    if (typeof title !== 'string' || title.trim() === '') {
+      faults.push(`${name}${typeof anchor === 'string' ? ` ("${anchor}")` : ''} has no title`);
+    }
+  });
+  return faults;
 }
 
 export const stages: readonly Stage[] = [
@@ -170,6 +204,27 @@ export interface FrameTexts {
   letters: string;
   linkedTerm: string;
   appearsIn: string;
+  /** The step page: the counter "Step n of m" and the tag of a step that may be skipped. */
+  step: string;
+  stepOf: string;
+  optional: string;
+  /** The platform switch: its label and the names of its parts. */
+  operatingSystem: string;
+  windows: string;
+  linux: string;
+  /** The shell of each platform, as tab and terminal bar name it. */
+  windowsShell: string;
+  linuxShell: string;
+  /** Names of the blocks that scroll sideways. */
+  command: string;
+  terminalSession: string;
+  /** Where a terminal session runs. */
+  packageFolder: string;
+  /** The copy button: its word, its name, and what it says afterwards. */
+  copy: string;
+  copyCommand: string;
+  copied: string;
+  copyFailed: string;
 }
 
 export const texts: Record<Lang, FrameTexts> = {
@@ -195,6 +250,21 @@ export const texts: Record<Lang, FrameTexts> = {
     letters: 'Letters',
     linkedTerm: 'Linked term',
     appearsIn: 'Appears in',
+    step: 'Step',
+    stepOf: 'of',
+    optional: 'optional',
+    operatingSystem: 'Operating system',
+    windows: 'Windows',
+    linux: 'Linux',
+    windowsShell: 'PowerShell',
+    linuxShell: 'Terminal',
+    command: 'Command',
+    terminalSession: 'Terminal session',
+    packageFolder: 'package folder',
+    copy: 'Copy',
+    copyCommand: 'Copy command',
+    copied: 'Copied',
+    copyFailed: 'Not copied. Please select the command by hand.',
   },
   de: {
     documentation: 'DeltaRecon-Dokumentation',
@@ -218,6 +288,21 @@ export const texts: Record<Lang, FrameTexts> = {
     letters: 'Buchstaben',
     linkedTerm: 'Verlinkter Begriff',
     appearsIn: 'Kommt vor in',
+    step: 'Schritt',
+    stepOf: 'von',
+    optional: 'optional',
+    operatingSystem: 'Betriebssystem',
+    windows: 'Windows',
+    linux: 'Linux',
+    windowsShell: 'PowerShell',
+    linuxShell: 'Terminal',
+    command: 'Befehl',
+    terminalSession: 'Terminalsitzung',
+    packageFolder: 'Paketordner',
+    copy: 'Kopieren',
+    copyCommand: 'Befehl kopieren',
+    copied: 'Kopiert',
+    copyFailed: 'Nicht kopiert. Bitte markieren Sie den Befehl von Hand.',
   },
 };
 
@@ -284,4 +369,20 @@ export function stageLine(page: Page, lang: Lang): string {
 /** Title of a page: "page name – DeltaRecon documentation". */
 export function pageTitle(page: Page, lang: Lang): string {
   return `${page.name[lang]} – ${texts[lang].documentation}`;
+}
+
+/** The counter of a step card: "Step 2 of 6". */
+export function stepCounter(number: number, total: number, lang: Lang): string {
+  return `${texts[lang].step} ${number} ${texts[lang].stepOf} ${total}`;
+}
+
+/**
+ * The place a block of a step page names itself by: "step 2", or
+ * "step 2, Windows" for the part of one platform.
+ */
+export function stepPlace(step: number | string, lang: Lang, platform?: 'windows' | 'linux'): string {
+  // Inside a name the English word is written small; the German noun is not.
+  const word = lang === 'en' ? texts[lang].step.toLowerCase() : texts[lang].step;
+  const place = `${word} ${step}`;
+  return platform ? `${place}, ${texts[lang][platform]}` : place;
 }

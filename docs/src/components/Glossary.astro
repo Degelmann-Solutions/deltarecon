@@ -96,7 +96,7 @@ const appearsIn = (entry: Entry): Page[] =>
                   <p class="mt-2 text-caption text-text-secondary" data-appears-in>
                     {t.appearsIn}:{' '}
                     {on.map((page, index) => (
-                      <>{index > 0 && ', '}<a class="inline-link" href={pageAddress(page, lang)}>{page.name[lang]}</a></>
+                      <>{index > 0 && ', '}<a class="inline-link py-[5px]" href={pageAddress(page, lang)}>{page.name[lang]}</a></>
                     ))}
                   </p>
                 )}
