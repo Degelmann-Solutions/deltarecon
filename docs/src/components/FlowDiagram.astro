@@ -1,0 +1,28 @@
+---
+// A flow diagram in the style "Leiterbahn": a sequence as outlined boxes on
+// one trace with one end pad. It is an ordered list; the traces are
+// decoration. The boxes stand side by side where a step card has two
+// columns and as a vertical stack otherwise; the diagram is never scaled.
+// The caption is part of the figure.
+//
+//   <FlowDiagram end="search result">
+//     <FlowBox code="request · run" writes="release-n/">Compute release N</FlowBox>
+//     <p slot="caption">The four steps of the guided demo.</p>
+//   </FlowDiagram>
+interface Props {
+  /** What the trace ends in. */
+  end: string;
+}
+
+const { end } = Astro.props;
+---
+
+<figure class="flow" data-flow>
+  <div class="flow-row">
+    <ol class="flow-boxes">
+      <slot />
+    </ol>
+    <p class="flow-end"><span class="flow-pad" aria-hidden="true"></span><span>{end}</span></p>
+  </div>
+  <figcaption class="flow-caption prose-links"><slot name="caption" /></figcaption>
+</figure>

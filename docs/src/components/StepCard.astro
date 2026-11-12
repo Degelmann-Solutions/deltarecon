@@ -1,0 +1,58 @@
+---
+// One step of a step page: the pad on the trace, the counter ("Step 2 of
+// 6"), the title as a link to the step, the text, a figure in the right
+// column, and wide parts below both.
+//
+//   <StepCard steps={frontmatter.steps} anchor="unpack">
+//     Text of the step, a platform switch.
+//     <StepFigure slot="figure">…</StepFigure>
+//     <div slot="wide">…a terminal block, a flow diagram, a callout…</div>
+//   </StepCard>
+//
+// Title, number and the word "optional" come from the step list of the
+// frontmatter; the chapter tree reads the same list. The build fails on an
+// anchor the list does not hold. A component inside the card that names its
+// step writes STEP_MARK; the card puts the number there.
+import { stepCounter, texts, type Step } from '../site';
+import { pageLanguage, STEP_MARK } from '../markup';
+
+interface Props {
+  steps: Step[];
+  anchor: string;
+}
+
+const { steps, anchor } = Astro.props;
+const lang = pageLanguage(Astro.url.pathname);
+const index = (steps ?? []).findIndex((step) => step.anchor === anchor);
+if (index === -1) {
+  throw new Error(
+    `${Astro.url.pathname}: the step card "${anchor}" names no step of the frontmatter "steps".`,
+  );
+}
+const step = steps[index];
+const number = index + 1;
+
+const render = async (slot: string): Promise<string> =>
+  Astro.slots.has(slot)
+    ? (await Astro.slots.render(slot)).replaceAll(STEP_MARK, String(number))
+    : '';
+const text = await render('default');
+const figure = await render('figure');
+const wide = await render('wide');
+---
+
+<li class="step" id={anchor} data-step>
+  <span class="step-pad" aria-hidden="true">{number}</span>
+  <div class="step-card">
+    <p class="step-counter">
+      <span data-step-counter>{stepCounter(number, steps.length, lang)}</span>
+      {step.optional && <span class="tag" data-step-optional>{texts[lang].optional}</span>}
+    </p>
+    <h2 class="step-title"><a href={`#${anchor}`}>{step.title}</a></h2>
+    <div class:list={['step-columns', figure && 'step-columns-figure']}>
+      <div class="step-text prose-links" set:html={text} />
+      {figure && <Fragment set:html={figure} />}
+    </div>
+    {wide && <div class="step-wide prose-links" set:html={wide} />}
+  </div>
+</li>

@@ -1,0 +1,38 @@
+---
+// The bar figure: the sums of the search table as horizontal bars around a
+// centre zero line, read from the same capture as the table. A filled bar:
+// the revision raises the Bruttobeitrag; an outlined bar: it lowers it. The
+// value with its sign stands beside each bar as text, so the bars themselves
+// are decoration. The longest bar fills its half. Which way a bar goes is
+// read from the sign the value is printed with. Used inside a StepFigure.
+import { searchTable } from '../captures';
+import { pageLanguage } from '../markup';
+
+const lang = pageLanguage(Astro.url.pathname);
+const { rows } = searchTable(lang);
+const largest = Math.max(...rows.map((row) => Math.abs(row.value)));
+// The longest bar fills its half of the track, 50 % of the track.
+// Where every sum is zero, no bar has a width.
+const share = (value: number): string =>
+  largest === 0 ? '0%' : `${((Math.abs(value) / largest) * 50).toFixed(1)}%`;
+/** Whether the printed sum begins with a minus sign. */
+const lowers = (sum: string): boolean => sum.startsWith('-');
+---
+
+<ul class="bars" data-bars>
+  {
+    rows.map((row) => (
+      <li class="bar-row" data-bar-row>
+        <span class="bar-revision" translate="no">{row.revision}</span>
+        <span class="bar-track" aria-hidden="true">
+          <span
+            class:list={['bar', lowers(row.sum) ? 'bar-lowers' : 'bar-raises']}
+            style={`width: ${share(row.value)}`}
+            data-bar={lowers(row.sum) ? 'lowers' : 'raises'}
+          />
+        </span>
+        <span class="bar-value">{row.sum}</span>
+      </li>
+    ))
+  }
+</ul>

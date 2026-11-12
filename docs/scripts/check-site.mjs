@@ -83,6 +83,9 @@ async function open(
   return { context, page, name, scriptErrors };
 }
 
+/** What follows, hidden, the text of a link that opens in a new tab. */
+const newTab = { en: 'opens in a new tab', de: 'öffnet in neuem Tab' };
+
 /** Every page: language, page name, release number, link to the counterpart. */
 async function checkPage(page, name, entry) {
   expect(
@@ -96,6 +99,26 @@ async function checkPage(page, name, entry) {
     expect(text.includes(ownWord), `${name}: the page text lacks "${ownWord}"`);
   }
   expect(text.includes(version), `${name}: the page does not show the release number ${version}`);
+  // The footer: the links to GitHub open in a new tab and say so; the links
+  // to the company website do not.
+  const footer = await page.evaluate(() =>
+    [...document.querySelectorAll('body > footer a')].map((item) => ({
+      href: item.href,
+      newTab: item.target === '_blank' && item.rel === 'noopener',
+      hidden: item.querySelector('.sr-only')?.textContent.trim() ?? '',
+    })),
+  );
+  const said = `(${newTab[entry.lang]})`;
+  expect(
+    footer.length === 4 &&
+      footer.every((item) =>
+        new URL(item.href).hostname === 'github.com'
+          ? item.newTab && item.hidden === said
+          : !item.newTab && item.hidden === '',
+      ) &&
+      footer.filter((item) => item.newTab).length === 2,
+    `${name}: the footer has not four links of which the two to GitHub open in a new tab with the hidden text "${said}": ${JSON.stringify(footer)}`,
+  );
   const link = page.locator(`a[data-counterpart][href="${entry.counterpart}"]`);
   expect((await link.count()) === 1, `${name}: not exactly one link to ${entry.counterpart}`);
   if ((await link.count()) === 1) {

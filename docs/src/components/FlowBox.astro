@@ -1,0 +1,17 @@
+---
+// One box of a flow diagram: its number (from the list), its title (the
+// content), and a mono line that names the commands and what they write.
+interface Props {
+  /** The commands of the box, as the page writes them. */
+  code: string;
+  /** The file or folder the box writes. */
+  writes: string;
+}
+
+const { code, writes } = Astro.props;
+---
+
+<li class="flow-box" data-flow-box>
+  <p class="flow-title"><slot /></p>
+  <p class="flow-sub" translate="no">{code}<br /><span aria-hidden="true">→ </span>{writes}</p>
+</li>

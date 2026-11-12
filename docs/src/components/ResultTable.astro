@@ -1,0 +1,46 @@
+---
+// The result table of the demo's search: the columns as the program prints
+// them, read from the capture (src/captures.ts). The caption stays with the
+// table: what the page says about it (the slot), then the line the demo
+// prints above the table. The revision is the header of its row. On a German
+// page the descriptions are English and carry their language.
+//
+// Below the phone breakpoint the stylesheet stacks each row to a record:
+// revision and sum on one line, the description below, the head row
+// visible. The roles are written out, so the table keeps its meaning there.
+//
+//   <ResultTable>Output of step 4 on the reference model:</ResultTable>
+import { caption, searchTable } from '../captures';
+import { outputHtml, pageLanguage } from '../markup';
+
+const lang = pageLanguage(Astro.url.pathname);
+const table = searchTable(lang);
+const [revision, description, sum] = table.head;
+---
+
+<div class="result-wrap">
+  <table class="result-table" role="table" data-result-table>
+    <caption>
+      <slot />
+      <span data-capture="caption" set:html={outputHtml(caption(lang), lang)} />
+    </caption>
+    <thead role="rowgroup">
+      <tr role="row">
+        <th scope="col" role="columnheader" class="result-rev" data-capture="head">{revision}</th>
+        <th scope="col" role="columnheader" class="result-desc" data-capture="head">{description}</th>
+        <th scope="col" role="columnheader" class="result-num" data-capture="head">{sum}</th>
+      </tr>
+    </thead>
+    <tbody role="rowgroup">
+      {
+        table.rows.map((row) => (
+          <tr role="row" data-capture="row">
+            <th scope="row" role="rowheader" class="result-rev" translate="no">{row.revision}</th>
+            <td role="cell" class="result-desc" lang={lang === 'en' ? undefined : 'en'}>{row.description}</td>
+            <td role="cell" class="result-num">{row.sum}</td>
+          </tr>
+        ))
+      }
+    </tbody>
+  </table>
+</div>

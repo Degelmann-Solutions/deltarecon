@@ -1,0 +1,77 @@
+---
+// The platform switch: the command of a step for Windows and for Linux,
+// Windows first, each with the sentences that hold for that platform only.
+//
+//   <PlatformSwitch windows={['.\\quickstart.cmd']} linux={['./quickstart']}>
+//     <div slot="after-windows">What the reader then sees on Windows.</div>
+//     <div slot="after-linux">What the reader then sees on Linux.</div>
+//   </PlatformSwitch>
+//
+// Without `windows` and `linux` the switch holds no command: no code block
+// and no copy button, the tabs stand above the sentences of the platform
+// and the Windows tab names no shell. Such a switch needs both slots. The
+// build fails for a switch that names the command of one platform only, and
+// for a switch without commands that lacks the sentences of a platform.
+// A card with content of one platform (PlatformPart, a file list) needs a
+// switch, or the reader cannot get to the other platform there.
+//
+// The delivered page holds two labelled parts one after the other, without
+// tab roles; that is what a reader without JavaScript gets. scripts/
+// platform.ts turns the labels into tabs, and the stylesheet shows the part
+// of the platform that <html data-platform> names.
+import CodeBlock from './CodeBlock.astro';
+import { stepPlace, texts } from '../site';
+import { pageLanguage, STEP_MARK } from '../markup';
+import { platforms, type Platform } from '../release';
+
+interface Props {
+  windows?: string[];
+  linux?: string[];
+}
+
+const { windows, linux } = Astro.props;
+const lines: Record<Platform, string[] | undefined> = { windows, linux };
+if (Boolean(windows) !== Boolean(linux)) {
+  throw new Error(
+    `${Astro.url.pathname}: a platform switch names the command of "${windows ? 'windows' : 'linux'}" only; it needs "windows" and "linux", or neither.`,
+  );
+}
+// A switch without commands: the tabs stand above the sentences alone.
+const plain = !windows && !linux;
+const lang = pageLanguage(Astro.url.pathname);
+const t = texts[lang];
+// The sentences of each platform, from the slot `after-<platform>`. (A slot
+// must not carry the name of a property: MDX hands both over under one name.)
+const after: Record<Platform, string> = { windows: '', linux: '' };
+for (const platform of platforms) {
+  const slot = `after-${platform}`;
+  if (Astro.slots.has(slot)) after[platform] = await Astro.slots.render(slot);
+  // The text is what counts: an empty element in the slot is no sentence.
+  if (plain && after[platform].replace(/<[^>]*>/g, '').trim() === '') {
+    throw new Error(
+      `${Astro.url.pathname}: a platform switch without commands lacks the text of the slot "${slot}".`,
+    );
+  }
+}
+---
+
+<div
+  class="platform-switch"
+  data-platform-switch
+  data-label={t.operatingSystem}
+  data-plain={plain || undefined}
+  data-copy-label={plain ? undefined : `${t.copyCommand}, ${stepPlace(STEP_MARK, lang)}`}
+>
+  {
+    platforms.map((platform) => (
+      <div class="platform-part" data-platform-part={platform}>
+        <p class="platform-label" data-platform-label>
+          {t[platform]}
+          {platform === 'windows' && !plain && <small>{t.windowsShell}</small>}
+        </p>
+        {lines[platform] && <CodeBlock lines={lines[platform]} platform={platform} />}
+        {after[platform] && <div class={plain ? 'platform-text' : 'step-after'} set:html={after[platform]} />}
+      </div>
+    ))
+  }
+</div>

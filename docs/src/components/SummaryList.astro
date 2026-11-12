@@ -1,0 +1,28 @@
+---
+// A summary list: a numbered list inside a step card that sums up sub-steps,
+// as for the four steps of the demo. Each row: a name, the commands as
+// inline code, and a second line, which is output of the program read from
+// a capture (src/captures.ts). Not interactive.
+//
+//   <SummaryList items={[{ name: 'Compute release N', code: ['request', 'run'], line: … }]} />
+import { outputHtml, pageLanguage } from '../markup';
+
+interface Props {
+  items: { name: string; code: string[]; line: string }[];
+}
+
+const { items } = Astro.props;
+const lang = pageLanguage(Astro.url.pathname);
+---
+
+<ol class="summary-list" data-summary-list>
+  {
+    items.map((item) => (
+      <li>
+        <b set:html={outputHtml(item.name, lang)} />
+        {item.code.map((code) => <code translate="no">{code}</code>)}
+        <span class="summary-line" data-capture="after" set:html={outputHtml(item.line, lang)} />
+      </li>
+    ))
+  }
+</ol>

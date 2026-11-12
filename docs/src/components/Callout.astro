@@ -1,0 +1,27 @@
+---
+// A callout: explains one term or one expected outcome in plain words, or
+// gives the hint for a failing step. A mono tag, a title (a level-3
+// heading), the text. `quote` is a message of the program, read from a
+// capture, in a white box above the text. A callout is no landmark.
+//
+//   <Callout tag="A term in plain words" title="What “Not resolved” means" quote={notResolved('en')}>
+//     Text.
+//   </Callout>
+import { outputHtml, pageLanguage } from '../markup';
+
+interface Props {
+  tag: string;
+  title: string;
+  quote?: string[];
+}
+
+const { tag, title, quote = [] } = Astro.props;
+const lang = pageLanguage(Astro.url.pathname);
+---
+
+<div class="callout" data-callout>
+  <p class="callout-tag">{tag}</p>
+  <h3 class="callout-title">{title}</h3>
+  {quote.map((message) => <p class="callout-quote" data-capture="not-resolved" set:html={outputHtml(message, lang)} />)}
+  <div class="callout-text prose-links"><slot /></div>
+</div>

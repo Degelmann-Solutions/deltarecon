@@ -6,7 +6,10 @@
 //
 // An entry has the address of the page plus its anchor, the same in both
 // languages. The entry the address points at shows its linked state; the
-// stylesheet does that with `:target`, so it works without a script.
+// stylesheet does that with `:target`, so it works without a script. For a
+// reader who came from a page of the documentation, scripts/glossary-back.ts
+// adds a link back to that page to the entry. Its text stands once in the
+// page, as `data-back-text` of the letter index.
 //
 // The letters of the index, the labels and the language codes are kept out
 // of the search index: the search offers a short word as a hit for every
@@ -45,6 +48,7 @@ const appearsIn = (entry: Entry): Page[] =>
   class="mt-6 flex max-w-text-max flex-wrap gap-1"
   aria-label={t.letters}
   data-letter-index
+  data-back-text={t.backToPage}
   data-pagefind-ignore
 >
   {
@@ -96,7 +100,7 @@ const appearsIn = (entry: Entry): Page[] =>
                   <p class="mt-2 text-caption text-text-secondary" data-appears-in>
                     {t.appearsIn}:{' '}
                     {on.map((page, index) => (
-                      <>{index > 0 && ', '}<a class="inline-link" href={pageAddress(page, lang)}>{page.name[lang]}</a></>
+                      <>{index > 0 && ', '}<a class="inline-link py-[5px]" href={pageAddress(page, lang)}>{page.name[lang]}</a></>
                     ))}
                   </p>
                 )}
@@ -108,3 +112,7 @@ const appearsIn = (entry: Entry): Page[] =>
     </>
   ))
 }
+
+<script>
+  import '../scripts/glossary-back.ts';
+</script>

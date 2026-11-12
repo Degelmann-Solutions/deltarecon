@@ -1,7 +1,9 @@
 ---
 // The footer: one row of four links to imprint, privacy, licence and
 // repository. Imprint and privacy are pages of the company website, which is
-// German.
+// German. Licence and repository are on GitHub, another site: they open in
+// a new tab (OutsideLink.astro).
+import OutsideLink from './OutsideLink.astro';
 import { outside, texts, type Lang } from '../site';
 
 interface Props {
@@ -13,9 +15,10 @@ const t = texts[lang];
 const links = [
   { name: t.imprint, href: outside.imprint, hreflang: 'de' },
   { name: t.privacy, href: outside.privacy, hreflang: 'de' },
-  { name: t.licence, href: outside.licence, hreflang: 'en' },
-  { name: t.repository, href: outside.repository, hreflang: 'en' },
+  { name: t.licence, href: outside.licence, hreflang: 'en', newTab: true },
+  { name: t.repository, href: outside.repository, hreflang: 'en', newTab: true },
 ];
+const look = 'inline-link inline-flex min-h-6 items-center';
 ---
 
 <footer
@@ -23,10 +26,14 @@ const links = [
   data-behind-menu
 >
   {
-    links.map((link) => (
-      <a class="inline-link inline-flex min-h-6 items-center" href={link.href} hreflang={link.hreflang}>
-        {link.name}
-      </a>
-    ))
+    links.map((link) =>
+      link.newTab ? (
+        <OutsideLink class={look} href={link.href} hreflang={link.hreflang}>{link.name}</OutsideLink>
+      ) : (
+        <a class={look} href={link.href} hreflang={link.hreflang}>
+          {link.name}
+        </a>
+      ),
+    )
   }
 </footer>

@@ -1,0 +1,15 @@
+---
+// A step figure: the small figure in the right column of a step card, with
+// its caption below. A page puts a file list, a bar figure or a small
+// diagram into it.
+//
+//   <StepFigure slot="figure">
+//     <FileList … />
+//     <p slot="caption">What you find in the package folder.</p>
+//   </StepFigure>
+---
+
+<figure class="step-figure" data-step-figure>
+  <slot />
+  <figcaption class="step-figure-caption prose-links"><slot name="caption" /></figcaption>
+</figure>

@@ -2,6 +2,278 @@
 layout: ../../layouts/Page.astro
 lang: en
 page: quick-start
-lead: "This page is not written yet; it will lead you from the download of the package to the first search result of the guided demo."
-description: "Step by step from the download of the released package to the first search result of the guided demo on the reference model."
+lead: "You download one archive, unpack it and start one command. Nothing is installed. The guided demo then compares two states of the reference model delib-history, a term life insurance with 350 model points, and traces the deviation between them back to the changes that cause it."
+description: "In six steps from the download of the released package to the first search result of the guided demo on the reference model, for Windows and Linux."
+steps:
+  - { anchor: download, title: "Download the package" }
+  - { anchor: check, title: "Check the archive", optional: true }
+  - { anchor: unpack, title: "Unpack the archive" }
+  - { anchor: start, title: "Start the guided demo" }
+  - { anchor: demo, title: "Follow the four steps of the demo" }
+  - { anchor: result, title: "Read your first search result" }
 ---
+import ArchiveCheckFigure from '../../components/ArchiveCheckFigure.astro';
+import BarFigure from '../../components/BarFigure.astro';
+import Callout from '../../components/Callout.astro';
+import FileList from '../../components/FileList.astro';
+import FlowBox from '../../components/FlowBox.astro';
+import FlowDiagram from '../../components/FlowDiagram.astro';
+import KeyCap from '../../components/KeyCap.astro';
+import OutsideLink from '../../components/OutsideLink.astro';
+import PathEnd from '../../components/PathEnd.astro';
+import PlatformPart from '../../components/PlatformPart.astro';
+import PlatformSwitch from '../../components/PlatformSwitch.astro';
+import ResultTable from '../../components/ResultTable.astro';
+import StepCard from '../../components/StepCard.astro';
+import StepFigure from '../../components/StepFigure.astro';
+import Steps from '../../components/Steps.astro';
+import SummaryList from '../../components/SummaryList.astro';
+import Term from '../../components/Term.astro';
+import TerminalBlock from '../../components/TerminalBlock.astro';
+import { afterLines, firstSentence, notResolved, session } from '../../captures';
+import { archive, packageFolder, releasePage, sumsFile, tag } from '../../release';
+
+export const zip = archive('windows');
+export const tarball = archive('linux');
+export const after = afterLines('en');
+
+<Steps>
+
+<StepCard steps={frontmatter.steps} anchor="download">
+
+Open the release <OutsideLink href={releasePage} hreflang="en">{tag}</OutsideLink> on GitHub and download the archive for your platform.
+
+<PlatformSwitch>
+  <div slot="after-windows">
+
+For Windows it is <code translate="no">{zip.file}</code>. The Windows package is not signed, so the browser or SmartScreen may warn when you download it.
+
+  </div>
+
+  <div slot="after-linux">
+
+For Linux it is <code translate="no">{tarball.file}</code>.
+
+  </div>
+</PlatformSwitch>
+
+If you want to check the download in step 2, download <code translate="no">{sumsFile}</code> as well.
+
+<StepFigure slot="figure">
+  <FileList
+    label="Files of the release"
+    files={[
+      { name: zip.file, note: 'package', platform: 'windows' },
+      { name: tarball.file, note: 'package', platform: 'linux' },
+      { name: sumsFile, note: 'for step 2' },
+    ]}
+  />
+  <p slot="caption">What you download from the release page.</p>
+</StepFigure>
+
+</StepCard>
+
+<StepCard steps={frontmatter.steps} anchor="check">
+
+This step shows that the archive arrived unchanged. Run the command in the folder that holds the archive and <code translate="no">{sumsFile}</code>.
+
+<PlatformSwitch
+  windows={[`Get-FileHash -Algorithm SHA256 ${zip.file}`]}
+  linux={[`sha256sum -c ${sumsFile} --ignore-missing`]}
+>
+  <div slot="after-windows">
+
+PowerShell prints the SHA-256 of the archive in capital letters. Apart from upper and lower case, it must equal the SHA-256 in the line of this archive in <code translate="no">{sumsFile}</code>:
+
+<p><code translate="no" data-sha256="windows">{zip.sha256}</code></p>
+
+  </div>
+  <div slot="after-linux">
+
+The command compares the archive with its line in <code translate="no">{sumsFile}</code> and must report `OK` for it.
+
+  </div>
+</PlatformSwitch>
+
+<StepFigure slot="figure">
+  <ArchiveCheckFigure archive="Archive" sums={sumsFile} sumsNote="one line each" equal="SHA-256 equal">your download</ArchiveCheckFigure>
+  <p slot="caption">Both must give the same SHA-256.</p>
+</StepFigure>
+
+</StepCard>
+
+<StepCard steps={frontmatter.steps} anchor="unpack">
+
+Nothing is installed: the package holds its own Python, DeltaRecon, the <Term id="reference-model">reference model</Term> with its history, and the <Term id="tolerance-profile">tolerance profiles</Term>. Unpacking gives one folder, the package folder.
+
+<PlatformSwitch
+  windows={[`Expand-Archive ${zip.file} -DestinationPath .`]}
+  linux={[`tar -xzf ${tarball.file}`]}
+>
+  <div slot="after-windows">
+
+Or unpack the zip with "Extract All" in Explorer. The package folder is <code translate="no">{packageFolder('windows')}</code>, the folder that holds `quickstart.cmd` and `deltarecon.cmd`.
+
+  </div>
+  <div slot="after-linux">
+
+The package folder is <code translate="no">{packageFolder('linux')}</code>, the folder that holds `quickstart` and `deltarecon`.
+
+  </div>
+</PlatformSwitch>
+
+<StepFigure slot="figure">
+  <FileList
+    label="In the package folder"
+    files={[
+      { name: 'quickstart.cmd', note: 'guided demo', platform: 'windows' },
+      { name: 'quickstart', note: 'guided demo', platform: 'linux' },
+      { name: 'deltarecon.cmd', note: 'single commands', platform: 'windows' },
+      { name: 'deltarecon', note: 'single commands', platform: 'linux' },
+      { name: 'README.txt', note: 'guide, English' },
+      { name: 'LIESMICH.txt', note: 'guide, German' },
+      { name: 'delib-history/', note: 'reference model' },
+      { name: 'profiles/', note: 'tolerance profiles' },
+      { name: 'python/', note: 'its own Python' },
+      { name: 'LICENSE', note: 'licence of DeltaRecon' },
+    ]}
+  />
+  <p slot="caption">What you find in the package folder.</p>
+</StepFigure>
+
+<div slot="wide">
+<PlatformPart os="windows">
+<Callout tag="Hint" title="Unpack into a folder with a short path">
+
+Windows limits the length of a path. Unpack the archive into a folder with a short path, for example `C:\deltarecon`. "Extract All" in Explorer adds a folder named after the zip, which then holds the package folder; that makes the path longer.
+
+</Callout>
+</PlatformPart>
+</div>
+
+</StepCard>
+
+<StepCard steps={frontmatter.steps} anchor="start">
+
+Start the demo in the package folder.
+
+<PlatformPart os="windows">
+
+Double-click `quickstart.cmd` in the package folder. Or open PowerShell in the package folder and start it there:
+
+</PlatformPart>
+
+<PlatformPart os="linux">
+
+Open a terminal, change into the package folder and start it there:
+
+</PlatformPart>
+
+<PlatformSwitch
+  windows={['.\\quickstart.cmd']}
+  linux={[`cd ${packageFolder('linux')}`, './quickstart']}
+>
+  <div slot="after-windows">
+
+At the end the demo waits for you to press a key.
+
+  </div>
+</PlatformSwitch>
+
+<div class="step-after">
+
+The demo explains each step before it runs and waits for Enter.
+
+</div>
+
+<KeyCap slot="figure" name="Enter">The demo waits for Enter before each of its four steps.</KeyCap>
+
+<div slot="wide">
+<PlatformPart os="windows">
+  <TerminalBlock
+    platform="windows"
+    prompt={`PS C:\\deltarecon\\${packageFolder('windows')}>`}
+    command=".\quickstart.cmd --lang en"
+    lines={session('windows', 'en')}
+  />
+</PlatformPart>
+<PlatformPart os="linux">
+  <TerminalBlock platform="linux" prompt="$" command="./quickstart --lang en" lines={session('linux', 'en')} />
+</PlatformPart>
+
+<div class="step-after">
+
+This is how the demo begins, up to its first wait for Enter.
+
+</div>
+
+<PlatformPart os="windows">
+<Callout tag="Hint" title="Windows may warn">
+
+The Windows package is not signed, so SmartScreen may warn when you start the demo. For this package the warning is expected; with step 2 you make sure that your archive is the published one.
+
+</Callout>
+</PlatformPart>
+</div>
+
+</StepCard>
+
+<StepCard steps={frontmatter.steps} anchor="demo">
+
+Before each step the demo says what the command does and shows it in full. Press Enter to run it. Afterwards it sums up what the step wrote. The four steps find a <Term id="deviation">deviation</Term> between two releases, where every <Term id="value">value</Term> that differs counts, list every <Term id="revision">revision</Term> between them with its <Term id="class">class</Term>, and search for the revisions that cause the deviation.
+
+<FlowDiagram end="search result">
+  <FlowBox code="request · run" writes="release-n/">Compute release N</FlowBox>
+  <FlowBox code="regression" writes="regression/"><Term id="regression">Regression</Term> against N+1</FlowBox>
+  <FlowBox code="derive" writes="changes.json">The changes between N and N+1</FlowBox>
+  <FlowBox code="search" writes="search/">Find the cause in the <Term id="bruttobeitrag" /></FlowBox>
+  <p slot="caption">The four steps of the guided demo. Each step writes its files into the demo folder, and the later steps read them.</p>
+</FlowDiagram>
+
+<SummaryList
+  items={[
+    { name: 'Compute release N', code: ['request', 'run'], line: firstSentence(after[0]) },
+    { name: 'Regression against N+1', code: ['regression'], line: firstSentence(after[1]) },
+    { name: 'The changes between N and N+1', code: ['derive'], line: after[2] },
+    { name: 'Find the cause in the Bruttobeitrag', code: ['search'], line: after[3] },
+  ]}
+/>
+
+<Callout tag="A term in plain words" title="Why exit status 1 is expected in step 2">
+
+Every command reports with a number, its <Term id="exit-status">exit status</Term>, how it ended. `regression` reports 0 when the two results agree and 1 when they differ. Release N and N+1 differ on purpose, so 1 is the correct outcome here and not an error. The demo goes on.
+
+</Callout>
+
+</StepCard>
+
+<StepCard steps={frontmatter.steps} anchor="result">
+
+Step 4 of the demo ends with this table: one row per revision that deviates in the <span lang="de">Bruttobeitrag</span>, the gross premium, in the first five projection years. Each sum carries its sign. Below the table the demo reports one part of the deviation as "<Term id="not-resolved">Not resolved</Term>"; the box below explains it.
+
+<ResultTable>Output of step 4 on the reference model:</ResultTable>
+
+<StepFigure slot="figure">
+  <BarFigure />
+  <p slot="caption">The same four sums as bars: filled raises the <span lang="de">Bruttobeitrag</span>, outlined lowers it.</p>
+</StepFigure>
+
+<div slot="wide">
+<Callout tag="A term in plain words" title="What “Not resolved” means" quote={notResolved('en')}>
+
+Some changes are so small that each one alone moves the <span lang="de">Bruttobeitrag</span> by less than the tolerance of one cent per model point and month. Together they exceed it. DeltaRecon does not guess which of them is the cause: it names the group and leaves this part of the deviation unattributed.
+
+</Callout>
+
+<div class="step-after">
+
+The full result is in `search/search.result.json`. Every file of the demo is in the demo folder below the package folder; the demo names it at its start and at its end.
+
+</div>
+</div>
+
+</StepCard>
+
+</Steps>
+
+<PathEnd>With the table of step 6 on your screen, stage 1 is complete.</PathEnd>

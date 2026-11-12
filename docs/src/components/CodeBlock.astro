@@ -1,0 +1,30 @@
+---
+// A code block: one command or a few, uncoloured. It scrolls sideways inside
+// its box, takes keyboard focus for that and is a named region ("Command,
+// step 2"). The copy button is put in by scripts/copy.ts, which reads the
+// command from `data-copy`.
+//
+//   <CodeBlock lines={['./quickstart']} />
+//
+// `platform` adds the platform to the name; `place` replaces "step n" on a
+// page without steps.
+import { stepPlace, texts } from '../site';
+import { pageLanguage, STEP_MARK } from '../markup';
+import type { Platform } from '../release';
+
+interface Props {
+  lines: string[];
+  platform?: Platform;
+  place?: string;
+}
+
+const { lines, platform, place } = Astro.props;
+const lang = pageLanguage(Astro.url.pathname);
+const t = texts[lang];
+const where = place ?? stepPlace(STEP_MARK, lang, platform);
+const command = lines.join('\n');
+---
+
+<div class="code-block" data-copy={command} data-copy-label={`${t.copyCommand}, ${where}`}>
+  <pre class="code" tabindex="0" role="region" aria-label={`${t.command}, ${where}`} translate="no"><code>{command}</code></pre>
+</div>
