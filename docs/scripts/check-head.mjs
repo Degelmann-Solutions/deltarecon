@@ -214,7 +214,9 @@ try {
       checkHead(entry, await readHead(page), seen);
       anchors.set(
         entry.address,
-        await page.$$eval('main [id]', (elements) => elements.map((element) => element.id).sort()),
+        await page.$$eval('main [id]:not([data-language-own])', (elements) =>
+          elements.map((element) => element.id).sort(),
+        ),
       );
     } catch (error) {
       failures.push(`${entry.address}: ${error.stack ?? error.message}`);
@@ -233,9 +235,12 @@ try {
     }
   }
   // The language switch keeps the anchor, so a page and its counterpart hold
-  // the same anchors. The stubs have none in their content; the check takes
-  // effect with the first page that has. A heading gets its anchor from its
+  // the same anchors. The two Glossaries are the first pages whose anchors
+  // are compared; the stubs have none in their content. A heading gets its
   // text, which differs by language, so such a page sets its anchors itself.
+  // An anchor that belongs to one language, as a letter label of the Glossary
+  // (the letters differ by language), is marked `data-language-own` and left
+  // out.
   for (const entry of pages) {
     const own = anchors.get(entry.address);
     const other = anchors.get(entry.counterpart);
