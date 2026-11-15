@@ -1,0 +1,56 @@
+---
+// The line of the changes: every change between release N and the state
+// N+1 as one square on a trace, in the order of the history, inside a wide
+// figure. The revisions of the search table are filled squares with their
+// numbers; a bracket marks the interval the search reports as not resolved.
+// Beside the line a key says in words what each shape stands for.
+//
+//   <ChangeLine
+//     count="32 changes, from release N at the left to the state N+1 at the right"
+//     found="A revision of the search table, with the number of its change"
+//     unresolved="Not resolved: changes 25 to 28"
+//     other="Every other change"
+//   />
+//
+// The trace is RevisionTrack.astro, which reads squares, numbers and the
+// interval from the capture of the example; the page gives the words. Trace
+// and key stand side by side where the wide figure has room, and as a stack
+// otherwise; the trace is never scaled.
+import { outputHtml, pageLanguage } from '../markup';
+import RevisionTrack from './RevisionTrack.astro';
+
+interface Props {
+  /** The line above the trace: how many changes, and from where to where. */
+  count: string;
+  /** The key of a filled square. */
+  found: string;
+  /** The key of the bracket. */
+  unresolved: string;
+  /** The key of a small outlined square. */
+  other: string;
+}
+
+const { count, found, unresolved, other } = Astro.props;
+const lang = pageLanguage(Astro.url.pathname);
+---
+
+<div class="change-line" data-change-line>
+  <div class="change-line-trace" data-change-trace>
+    <p class="idea-count" data-change-count set:html={outputHtml(count, lang)} />
+    <RevisionTrack marked />
+  </div>
+  <ul class="change-key" data-change-key>
+    <li>
+      <span class="change-key-mark" aria-hidden="true"><span class="idea-square idea-square-deviating"></span></span>
+      <span data-change-key-text="found" set:html={outputHtml(found, lang)} />
+    </li>
+    <li>
+      <span class="change-key-mark" aria-hidden="true"><span class="idea-interval"></span></span>
+      <span data-change-key-text="unresolved" set:html={outputHtml(unresolved, lang)} />
+    </li>
+    <li>
+      <span class="change-key-mark" aria-hidden="true"><span class="idea-square"></span></span>
+      <span data-change-key-text="other" set:html={outputHtml(other, lang)} />
+    </li>
+  </ul>
+</div>

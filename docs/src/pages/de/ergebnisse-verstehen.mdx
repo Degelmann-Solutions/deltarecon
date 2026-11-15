@@ -2,6 +2,227 @@
 layout: ../../layouts/Page.astro
 lang: de
 page: understand-the-results
-lead: "Diese Seite ist noch nicht geschrieben; sie wird erklären, was jedes Ergebnis bedeutet."
-description: "Was jedes Ergebnis von DeltaRecon bedeutet und wie Sie es lesen."
+lead: "Die geführte Vorführung des Quick Starts gibt drei Tabellen aus. Diese Seite geht sie in der Reihenfolge der Vorführung durch und erklärt jede Spalte und jeden Befund."
+description: "So lesen Sie die drei Tabellen der Vorführung von DeltaRecon: wo sich die Ergebnisse zweier Releases unterscheiden, was sich zwischen ihnen geändert hat und welche Änderungen die Abweichung verursachen."
 ---
+import BarFigure from '../../components/BarFigure.astro';
+import Callout from '../../components/Callout.astro';
+import ChangeLine from '../../components/ChangeLine.astro';
+import DemoTable from '../../components/DemoTable.astro';
+import Prose from '../../components/Prose.astro';
+import ResultTable from '../../components/ResultTable.astro';
+import Row from '../../components/Row.astro';
+import RowList from '../../components/RowList.astro';
+import SectionHeading from '../../components/SectionHeading.astro';
+import SubHeading from '../../components/SubHeading.astro';
+import Term from '../../components/Term.astro';
+import WideFigure from '../../components/WideFigure.astro';
+import { changeOf, changeTable, example, notResolved, quantityOf, regressionTable, searchCounts, searchRowOf, searchTable, unresolved } from '../../captures';
+import { listOf } from '../../markup';
+import { findPage, pageAddress } from '../../site';
+
+export const facts = example('de');
+export const regression = regressionTable('de');
+export const changes = changeTable('de');
+export const search = searchTable('de');
+export const counts = searchCounts('de');
+export const found = listOf(facts.deviating.map((entry) => entry.number), 'de');
+export const [interval] = unresolved('de');
+export const quantity = (name) => quantityOf('de', name);
+export const change = (revision) => changeOf('de', revision);
+export const sum = (revision) => searchRowOf('de', revision).sum;
+export const howItWorks = findPage('how-deltarecon-works');
+export const enginePage = findPage('engine-requirements');
+export const typed = {
+  // Numbers the captures do not hold, from the owner conversation of
+  // 2026-11-15 (plan of ticket 6). A new release's captures: compare by hand.
+  newBusiness: '237',
+  singlePremiumInForce: '8',
+  singlePremiumDeviating: '6',
+  singlePremiumFinalYear: '2',
+  withoutPremium: '12',
+  withoutPremiumSingle: '8',
+  withoutPremiumPaidUp: '4',
+  singlePremium: '25',
+  earlyYears: '33',
+  inForceDeviating: '38',
+  sumOfFour: '+27.350,97',
+  whole: '+27.367,60',
+  remainder: '16,63',
+};
+
+<SectionHeading id="regression-table">Wo sich die Ergebnisse unterscheiden</SectionHeading>
+
+<Prose>
+
+Die Vorführung läuft am <Term id="reference-model">Referenzmodell</Term>. In ihrem zweiten Schritt rechnet die <Term id="regression">Regression</Term> den Stand N+1 auf denselben Bestandsdaten und für dieselben Modellpunkte wie Release N und vergleicht beide Ergebnisse <Term id="value">Wert</Term> für Wert. Ihre Tabelle sagt, wo sie eine <Term id="deviation">Abweichung</Term> gefunden hat: eine Zeile je Größe, zum Beispiel für den <Term id="bruttobeitrag" />.
+
+</Prose>
+
+<DemoTable table="regression">Ausgabe von Schritt 2 am Referenzmodell:</DemoTable>
+
+<SubHeading>Die Spalten</SubHeading>
+
+<RowList>
+  <Row name={regression.head[0]}>Ein Ergebnis, das das Referenzmodell für jeden Modellpunkt und jede Periode ausgibt.</Row>
+  <Row name={regression.head[1]}>In wie vielen der {facts.modelPoints} Modellpunkte mindestens ein Wert der Größe abweicht.</Row>
+  <Row name={regression.head[2]}>Wie viele Werte der Größe abweichen. Ein Wert ist eine Größe eines Modellpunkts in einer Periode.</Row>
+  <Row name={regression.head[3]}>Die erste und die letzte Periode, in der ein Wert abweicht. Eine Periode ist ein Projektionsmonat, gezählt ab 0 am Bewertungsstichtag.</Row>
+</RowList>
+
+<Prose>
+
+Jeder Wert ist ein Erwartungswert des Modellpunkts, gewichtet mit der Anzahl der Verträge im Bestand. Die Zahlungsströme sind brutto und nicht abgezinst.
+
+Das Referenzmodell gibt zehn Größen aus. Zwei davon stehen nicht in der Tabelle, der garantierte Rückkaufswert und die garantierte Erlebensfallleistung: Sie weichen nicht ab.
+
+</Prose>
+
+<SubHeading>Warum gerade diese Modellpunkte abweichen</SubHeading>
+
+<Prose>
+
+Die Zahl der Modellpunkte ist von Zeile zu Zeile verschieden, weil jede Größe auf andere Änderungen reagiert.
+
+<strong>Anzahl Verträge</strong>, {quantity('Anzahl Verträge').modelPoints} Modellpunkte. Alle {typed.newBusiness} Modellpunkte des Neugeschäfts weichen ab, weil der Stornosatz des ersten Versicherungsjahres gesenkt wurde. Von den {typed.singlePremiumInForce} Modellpunkten gegen Einmalbeitrag, deren Verträge schon laufen, weichen {typed.singlePremiumDeviating} ab, weil Verträge gegen Einmalbeitrag einen eigenen Stornosatz bekommen haben (Änderung <code translate="no">{change('54b4bca').revision}</code>); die anderen {typed.singlePremiumFinalYear} sind in ihrem letzten Jahr. Periode 0 weicht nicht ab: Die Anzahl steht vor jedem Abgang der Periode.
+
+<strong>Bruttobeitrag</strong>, <strong>Zahlbeitrag</strong> und <strong>Provisionen</strong>, {quantity('Bruttobeitrag').modelPoints} Modellpunkte. Die {typed.withoutPremium} Modellpunkte ohne Abweichung laufen schon und zahlen keinen Beitrag mehr: {typed.withoutPremiumSingle} gegen Einmalbeitrag und {typed.withoutPremiumPaidUp} nach dem Ende ihrer Beitragszahlungsdauer. Nur Monate, in denen ein Beitrag fällig wird, tragen einen Wert. Daher {quantity('Bruttobeitrag').values} Werte beim Bruttobeitrag und {quantity('Provisionen').values} bei den Provisionen, und nicht {quantity('Netto-Cashflow').values}.
+
+<strong>Beitragsverrechnung</strong>, {quantity('Beitragsverrechnung').modelPoints} Modellpunkte. Keiner der {typed.singlePremium} Modellpunkte gegen Einmalbeitrag weicht ab: Sie haben keinen Überschuss in dieser Form.
+
+<strong>garantierte Todesfallleistung</strong>, {quantity('garantierte Todesfallleistung').modelPoints} Modellpunkte. Alle Modellpunkte des Neugeschäfts weichen ab. Von den {typed.inForceDeviating} abweichenden Modellpunkten, deren Verträge schon laufen, sind {typed.earlyYears} im ersten oder zweiten Versicherungsjahr. Das passt zu den Änderungen am Ausschluss bei Selbsttötung und am Anteil der Todesfälle durch Selbsttötung.
+
+<strong>Kosten 2. Ordnung ohne Provisionen</strong> und <strong>Netto-Cashflow</strong>, alle {quantity('Netto-Cashflow').modelPoints} Modellpunkte und alle {quantity('Netto-Cashflow').values} Ergebniszeilen. Die Kosten je Leistungsfall und die Kosteninflation wirken auf jeden Modellpunkt in jedem Monat.
+
+</Prose>
+
+<SectionHeading id="change-table">Was sich zwischen den beiden Releases geändert hat</SectionHeading>
+
+<Prose>
+
+Der dritte Schritt liest die Versionsgeschichte des Modells zwischen Release N und dem Stand N+1 und listet jede Änderung einzeln auf, in der Reihenfolge, in der sie gemacht wurde. Jede Änderung ist eine <Term id="revision">Revision</Term> und bekommt eine <Term id="class">Einordnung</Term>.
+
+</Prose>
+
+<DemoTable table="changes">Ausgabe von Schritt 3 am Referenzmodell:</DemoTable>
+
+<SubHeading>Die Spalten</SubHeading>
+
+<RowList>
+  <Row name={changes.head[0]}>Die Stelle der Änderung in der Versionsgeschichte, gezählt ab 1 nach Release N. Änderung {facts.revisions} ist der Stand N+1.</Row>
+  <Row name={changes.head[1]}>Der kurze Name, unter dem die Versionsgeschichte die Änderung führt. Er bezeichnet genau diese Änderung.</Row>
+  <Row name={changes.head[2]}>Was die Änderung betrifft. Eine Änderung kann mehrere Einordnungen haben.</Row>
+  <Row name={changes.head[3]}>Die kurze Notiz, die ihr Verfasser der Änderung mitgegeben hat, wie geschrieben. Die Notizen des Referenzmodells sind englisch.</Row>
+</RowList>
+
+<SubHeading>Die vier Einordnungen</SubHeading>
+
+<RowList>
+  <Row name={change('2d05ecf').classes}>Der Bestand. Änderung {change('2d05ecf').number}: „<span lang="en">{change('2d05ecf').description}</span>“.</Row>
+  <Row name={change('936e50d').classes}>Tabellen wie Storno- oder Kostensätze. Änderung {change('936e50d').number}: „<span lang="en">{change('936e50d').description}</span>“.</Row>
+  <Row name={change('76fc46c').classes}>Die Rechenvorschriften. Änderung {change('76fc46c').number}: „<span lang="en">{change('76fc46c').description}</span>“.</Row>
+  <Row name={change('205a880').classes}>Nichts davon, zum Beispiel nur Dokumentation. Änderung {change('205a880').number}: „<span lang="en">{change('205a880').description}</span>“.</Row>
+</RowList>
+
+<SubHeading>Wie die Einordnungen ermittelt werden</SubHeading>
+
+<Prose>
+
+DeltaRecon beurteilt nicht den Inhalt einer Änderung und liest dafür auch nicht die Beschreibung: Die Beschreibung ist das, was der Autor geschrieben hat, kein Befund. Es betrachtet die Dateien. Für jede Revision nimmt es die Dateien, die sie gegenüber der Revision davor hinzufügt, entfernt oder ändert; bei einer Zusammenführung ist das der Stand, bevor der Seitenzweig hinzukam. Die Revision erhält die Einordnung jeder dieser Dateien. Deshalb kann eine Revision zwei Einordnungen haben, und eine Revision, die keine solche Datei berührt, hat keine.
+
+Welche Datei welche Einordnung hat, weiß DeltaRecon nicht von sich aus. Das sagt der <Term id="adapter">Adapter</Term> der Engine. Der Adapter liest auch die Historie und nennt die Dateien jeder Revision. Für das Referenzmodell legt sein Adapter fest:
+
+</Prose>
+
+<RowList>
+  <Row name={change('2d05ecf').classes}>Die Tabelle der Modellpunkte, <code translate="no">model_point_table.csv</code>.</Row>
+  <Row name={change('936e50d').classes}>Jede andere CSV-Datei im Ordner des Produkts, zum Beispiel <code translate="no">lapse_table.csv</code>.</Row>
+  <Row name={change('76fc46c').classes}>Jede Datei im Ordner des Modells, <code translate="no">RLV_DE_S</code>.</Row>
+  <Row name={change('205a880').classes}>Jede andere Datei, zum Beispiel die Beschreibung des Repositorys oder seine Tests.</Row>
+</RowList>
+
+<Prose>
+
+Die Einordnung sagt also, wo geändert wurde, nicht was die Änderung bedeutet. Änderung {change('76fc46c').number}, „<span lang="en">{change('76fc46c').description}</span>“, ändert einen Kostensatz und ist dennoch Code: Im Referenzmodell steht dieser Satz in den Rechenvorschriften, nicht in einer Tabelle.
+
+Bei Ihrer eigenen Engine legt Ihr Adapter fest, welche Dateien Daten, Parameter und Code sind. <a href={pageAddress(enginePage, 'de')}>{enginePage.name.de}</a> beschreibt, was ein Adapter leisten muss.
+
+</Prose>
+
+<SubHeading>Eine Zusammenführung, eine Rücknahme und eine Änderung mit zwei Einordnungen</SubHeading>
+
+<Prose>
+
+Änderung {change('8f81933').number}, „<span lang="en">{change('8f81933').description}</span>“, ist eine Zusammenführung: Sie bringt die Arbeit eines Seitenzweigs in die Hauptlinie. Die Tabelle führt sie als eine Revision.
+
+Änderung {change('29c4a03').number} ist eine Rücknahme: Sie nimmt Änderung {change('e23137a').number} zurück. Beide bleiben in der Liste, jede als eigene Revision.
+
+Änderung {change('54b4bca').number}, „<span lang="en">{change('54b4bca').description}</span>“, hat zwei Einordnungen, {change('54b4bca').classes}: Sie betrifft eine Tabelle und die Rechenvorschriften.
+
+</Prose>
+
+<SectionHeading id="search-result">Welche Änderungen die Abweichung verursachen</SectionHeading>
+
+<Prose>
+
+Der vierte Schritt sucht unter den {facts.revisions} Änderungen diejenigen, die die Abweichung im Bruttobeitrag in den ersten fünf Projektionsjahren verursachen. Als Abweichung zählt hier eine Änderung des Bruttobeitrags um mehr als einen Cent je Modellpunkt und Monat. Unter der Tabelle meldet die Vorführung einen Teil der Abweichung als „<Term id="not-resolved">Nicht aufgelöst</Term>“.
+
+</Prose>
+
+<ResultTable>Ausgabe von Schritt 4 am Referenzmodell:</ResultTable>
+
+<SubHeading>Die Spalten</SubHeading>
+
+<RowList>
+  <Row name={search.head[0]}>Eine Änderung, die für sich allein abweicht, mit ihrem kurzen Namen aus der Tabelle der Änderungen.</Row>
+  <Row name={search.head[1]}>Ihre Beschreibung aus der Tabelle der Änderungen.</Row>
+  <Row name={search.head[2]}>Die Summe mit Vorzeichen von „Stand nach der Revision minus Stand davor“ im Bruttobeitrag, über alle {facts.modelPoints} Modellpunkte und die Projektionsmonate 0 bis 59 ab dem Bewertungsstichtag. Plus: Die Revision erhöht den erwarteten Bruttobeitrag. Minus: Sie senkt ihn.</Row>
+</RowList>
+
+<Prose>
+
+Ein Beispiel: {sum('936e50d')} bei <code translate="no">{change('936e50d').revision}</code> bedeutet, dass der erwartete Bruttobeitrag über alle {facts.modelPoints} Modellpunkte und die ersten 60 Projektionsmonate nach dieser Revision um {sum('936e50d').slice(1)} EUR höher ist als davor.
+
+Die Zeile über der Tabelle sagt „{counts.computed} von {counts.states}“. {counts.states} ist die Zahl der Stände: Release N und ein Stand nach jeder der {facts.revisions} Änderungen. {counts.computed} davon wurden gerechnet.
+
+</Prose>
+
+<WideFigure label="Summe der Abweichung im Bruttobeitrag, je Revision">
+  <ChangeLine
+    count={`${facts.revisions} Änderungen, von Release N links bis zum Stand N+1 rechts`}
+    found={`Eine Revision der Tabelle, mit der Nummer ihrer Änderung: ${found}`}
+    unresolved={`Nicht aufgelöst: die Änderungen ${interval[0].number} bis ${interval.at(-1).number}`}
+    other="Jede andere Änderung: Die Suche ordnet ihr keine Abweichung zu"
+  />
+  <BarFigure slot="second" numbered />
+  <p slot="caption">Die {facts.revisions} Änderungen in der Reihenfolge, in der sie gemacht wurden, jede als ein Quadrat. Die gefüllten Quadrate sind die {facts.deviating.length} Revisionen der Tabelle: die Änderungen {found}. Die Klammer markiert die Änderungen {interval[0].number} bis {interval.at(-1).number}, die die Suche als nicht aufgelöst meldet. Unter der Linie die Summen der Tabelle als Balken: Ein gefüllter Balken erhöht den Bruttobeitrag, ein umrandeter senkt ihn.</p>
+</WideFigure>
+
+<SubHeading>Die vier Revisionen</SubHeading>
+
+<RowList>
+  <Row name="Ein niedrigerer Stornosatz im ersten Versicherungsjahr" code={change('936e50d').revision}>{sum('936e50d')}. Der Stornosatz des ersten Versicherungsjahres sinkt von 6 auf 5 Prozent. Der Beitrag je Vertrag bleibt gleich; mehr Verträge bleiben im Bestand, also wird mehr erwarteter Beitrag fällig.</Row>
+  <Row name="Die Ratenzuschläge, aus einem Seitenzweig" code={change('8f81933').revision}>{sum('8f81933')}. Die Zusammenführung ändert die Tabelle der Ratenzuschläge, <code translate="no">freq_loading_table.csv</code>.</Row>
+  <Row name="Der Ratenzuschlag bei halbjährlicher Zahlung" code={change('83f01cf').revision}>{sum('83f01cf')}. Sie ändert dieselbe Tabelle der Ratenzuschläge.</Row>
+  <Row name="Ein höherer beitragsbezogener Zuschlag" code={change('7f1dc64').revision}>{sum('7f1dc64')}. Sie erhöht den beitragsbezogenen Zuschlag in der Beitragsäquivalenz.</Row>
+</RowList>
+
+<Prose>
+
+Die vier Summen ergeben zusammen {typed.sumOfFour}. Die ganze Abweichung des Bruttobeitrags zwischen N und N+1, über dieselben Modellpunkte und Monate, beträgt {typed.whole}. Der Rest von {typed.remainder} ist das, was unter der Toleranz bleibt, einschließlich des Abschnitts, der nicht aufgelöst ist.
+
+</Prose>
+
+<Callout tag="Ein Befund in einfachen Worten" title="Was „Nicht aufgelöst“ hier bedeutet" quote={notResolved('de')}>
+
+Die Suche hat den Abschnitt der vier Änderungen <code translate="no">{interval[0].revision}</code> bis <code translate="no">{interval.at(-1).revision}</code> halbiert. Jede Hälfte bleibt unter einem Cent je Modellpunkt und Monat; beide zusammen überschreiten ihn. Von den vier Änderungen betreffen nur <code translate="no">{change('909eeec').revision}</code> und <code translate="no">{change('e13c628').revision}</code> den Bruttobeitrag: ein fester Betrag von 0,6 und dann 1,2 Cent im Jahr. <code translate="no">{change('5f3d085').revision}</code> ändert die Bestandspflegeprovision, und <code translate="no">{change('a9fbd53').revision}</code> ändert nur einen Text, der einen Test beschreibt, und keine Rechnung. Die Suche nennt den Abschnitt, nicht die Ursache darin.
+
+</Callout>
+
+<SubHeading>Änderungen, die sich aufheben</SubHeading>
+
+<Prose>
+
+Die Vorführung zeigt auch eine Grenze. Die Änderungen {change('e23137a').number} und {change('29c4a03').number}, eine Änderung und ihre Rücknahme, heben sich innerhalb eines Abschnitts auf, ebenso die Änderungen {change('88cdde3').number} und {change('c82b72b').number}, eine Änderung und ihr Zurücksetzen. Die Suche teilt diese Abschnitte deshalb nicht. <a href={pageAddress(howItWorks, 'de')}>{howItWorks.name.de}</a> beschreibt die Suche und ihre Grenzen.
+
+</Prose>

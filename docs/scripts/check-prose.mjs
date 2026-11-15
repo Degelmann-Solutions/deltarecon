@@ -12,7 +12,15 @@
 // the number of model points; and it throws on a capture text whose table of
 // the changes lacks a revision of the search table, lacks its rows, or whose
 // commands name no revision. The build shows those facts, so a capture that
-// lacks one fails the build.
+// lacks one fails the build. The same file reads the two four-column tables
+// of the demo and the interval of a "Not resolved" message: each is held
+// against the capture in a second way. The reader of the table of the
+// regression must throw on a capture text without the table, without its
+// head row and without the sentence above it; the reader of the table of
+// the changes on one without the table, without its head row and with a row
+// that leaves the columns of its head row; the reader of the interval on a
+// message with a revision the table of the changes does not hold, without a
+// revision, and with changes that do not follow one another.
 //
 // Then, for every page of prose of both languages:
 //   - every level-2 heading of the content is a section heading with the
@@ -32,6 +40,20 @@
 //   - the bars below it: one per revision of the search table, the label
 //     "number · revision", the sum as the capture of the language prints it;
 //   - a row list numbers its rows and closes with a hairline;
+//   - the two four-column tables of the demo (DemoTable.astro): head row,
+//     rows and the sentence above as the capture of the language prints
+//     them; the table of the search: revision and sum of each row as the
+//     capture prints them, a caption that is not empty. For all three: the
+//     roles written out, a header per row. At
+//     1280 px a row is one line; at 390 and 320 px every row, the head row
+//     included, is a record of two lines with every column name visible,
+//     and no cell reaches beyond the window;
+//   - the line of the changes: one square per change, 7 px, those of the
+//     search table 11 px with their number, a bracket from the first to the
+//     last change of the interval that is not resolved, with their numbers;
+//     the key names the numbers; at 1280 px the key stands right of the
+//     trace, at 390 and 320 px below it, and the squares keep their size;
+//     the bars below it as under the idea figure;
 //   - the path block: the four stages of the register in order, each with
 //     its number, its name, one sentence and a link to each of its pages but
 //     the page itself, by the name and address of the register;
@@ -65,6 +87,14 @@ const prosePages = {
     rows: 3,
     path: true,
   },
+  'understand-the-results': {
+    sections: ['regression-table', 'change-table', 'search-result'],
+    counterpart: 'change-table',
+    rows: 23,
+    // The three tables of the demo and the line of the changes.
+    tables: true,
+    line: true,
+  },
 };
 
 /** The widths the idea figure is looked at: side by side, then as a stack. */
@@ -73,7 +103,7 @@ const PLATFORMS = ['windows', 'linux'];
 
 const site = await loadRegister();
 const pages = await loadPages();
-const { exampleFacts } = await loadExample();
+const { exampleFacts, regressionTable, changeTable, unresolvedInterval } = await loadExample();
 const release = await loadRelease();
 const { failures, expect, report } = expectations('check-prose');
 const { checkAxe, checkNoSidewaysScroll } = pageChecks({ failures, expect });
@@ -201,8 +231,176 @@ async function checkExample() {
       read.length === PLATFORMS.length && new Set(read).size === 1,
       `captures of "${lang}": the facts of the example differ by platform`,
     );
+    facts[lang] = { ...facts[lang], ...(await checkTables(lang)) };
   }
   return facts;
+}
+
+/**
+ * The readers of the two four-column tables and of the interval that is not
+ * resolved, on the capture files of a language and on capture texts that
+ * lack a part. Returns what the pages must show.
+ */
+async function checkTables(lang) {
+  const read = [];
+  let shown = {};
+  for (const platform of PLATFORMS) {
+    const file = captureFile(platform, lang);
+    const source = await readCapture(platform, lang);
+    const lines = source.split('\n');
+    let regression;
+    let changes;
+    let interval;
+    try {
+      regression = regressionTable(source, file);
+      changes = changeTable(source, file);
+      const message = lines
+        .slice(lines.findIndex((line) => /^(Not resolved|Nicht aufgelöst):/.test(line)))
+        .join(' ')
+        .split(/\s(?:Result|Ergebnis):/)[0];
+      interval = unresolvedInterval(message, changes.rows, file);
+    } catch (error) {
+      failures.push(`src/${file}: the tables of the demo are not read: ${error.message}`);
+      continue;
+    }
+    read.push(JSON.stringify({ regression, changes, interval }));
+    shown = { regression, changes, interval };
+
+    // Held against the capture in another way: by the line of the head row.
+    const cellsOf = (line) => line.trim().split(/\s{2,}/);
+    const blockAfter = (head) => {
+      const at = lines.findIndex((line) => line.trim() === head);
+      const end = lines.findIndex((line, index) => index > at && line.trim() === '');
+      return at === -1 ? [] : lines.slice(at + 1, end);
+    };
+    const regressionHead = lang === 'en' ? 'Quantity  Model points  Values  Periods' : 'Größe  Modellpunkte  Werte  Perioden';
+    const regressionLines = lines.filter((line) => cellsOf(line).join('  ') === regressionHead);
+    expect(regressionLines.length === 1, `src/${file}: the check finds no head row "${regressionHead}"`);
+    const below = blockAfter(regressionLines[0]?.trim());
+    expect(
+      regression.head.join('  ') === regressionHead &&
+        regression.rows.length === below.length &&
+        regression.rows.length > 0 &&
+        regression.rows.every(
+          (row, index) =>
+            cellsOf(below[index]).join('|') === [row.quantity, row.modelPoints, row.values, row.periods].join('|'),
+        ),
+      `src/${file}: the table of the regression is read as ${regression.rows.length} rows under [${regression.head}], the capture has ${below.length} lines under its head row`,
+    );
+    const sentence = (text) => {
+      const flat = source.replace(/\s+/g, ' ');
+      return flat.includes(text);
+    };
+    expect(
+      regression.caption.length > 20 && sentence(regression.caption) && /\d/.test(regression.caption),
+      `src/${file}: the sentence above the table of the regression is read as "${regression.caption}"`,
+    );
+    const numbered = lines.filter((line) => /^\s*\d+\s+[0-9a-f]{7}\s{2,}\S/.test(line));
+    expect(
+      changes.rows.length === numbered.length &&
+        changes.head.length === 4 &&
+        changes.rows.every((row, index) => {
+          const line = numbered[index];
+          return (
+            new RegExp(`^\\s*${row.number}\\s+${row.revision}\\s+`).test(line) &&
+            line.trimEnd().endsWith(row.description) &&
+            line.replace(/\s+/g, ' ').includes(` ${row.revision} ${row.classes} ${row.description.replace(/\s+/g, ' ')}`)
+          );
+        }),
+      `src/${file}: the table of the changes is read as ${changes.rows.length} rows, the capture has ${numbered.length}; or a row is not cut as printed`,
+    );
+    expect(
+      changes.caption.startsWith(`${changes.rows.length} `) && sentence(changes.caption),
+      `src/${file}: the sentence above the table of the changes is read as "${changes.caption}"`,
+    );
+    expect(
+      interval.length > 0 &&
+        interval.every(
+          (entry) =>
+            new RegExp(`^\\s*${entry.number}\\s+${entry.revision}\\s`).test(numbered[entry.number - 1] ?? ''),
+        ),
+      `src/${file}: the interval that is not resolved is read as [${interval.map((entry) => `${entry.number} ${entry.revision}`)}]`,
+    );
+
+    // Capture texts that lack a part: each must throw and name the part.
+    const regressionAt = lines.indexOf(regressionLines[0]);
+    const changesAt = lines.indexOf(numbered[0]) - 1;
+    // The lines of the sentence above the table of the regression, as read.
+    let sentenceLines = 0;
+    while (
+      sentenceLines < regressionAt &&
+      lines
+        .slice(regressionAt - 1 - sentenceLines, regressionAt - 1)
+        .map((line) => line.trim())
+        .join(' ') !== regression.caption
+    ) {
+      sentenceLines += 1;
+    }
+    expect(
+      sentenceLines > 0 && sentenceLines < regressionAt,
+      `src/${file}: the check does not find the lines of the sentence above the table of the regression`,
+    );
+    const without = (from, count) => lines.filter((_, index) => index < from || index >= from + count).join('\n');
+    const cases = [
+      [
+        'no table of the regression',
+        () => regressionTable(without(regressionAt, below.length + 1), file),
+        'the table of the regression',
+      ],
+      [
+        'a table of the regression without its head row',
+        () => regressionTable(without(regressionAt, 1), file),
+        'the head row of the table of the regression',
+      ],
+      [
+        'a table of the regression without the sentence above it',
+        () => regressionTable(without(regressionAt - 1 - sentenceLines, sentenceLines + 1), file),
+        'the sentence above the table of the regression',
+      ],
+      [
+        'no table of the changes',
+        () => changeTable(lines.filter((line) => !numbered.includes(line)).join('\n'), file),
+        'the table of the changes',
+      ],
+      [
+        'a table of the changes without its head row',
+        () => changeTable(without(changesAt, 1), file),
+        'the head row of the table of the changes',
+      ],
+      [
+        'a row of the table of the changes that leaves its columns',
+        () => changeTable(source.replace(numbered[1], numbered[1].replace(/\s{6,}/, ' x ')), file),
+        'row 2 of the table of the changes',
+      ],
+      [
+        'a "Not resolved" message with a revision the table of the changes does not hold',
+        () => unresolvedInterval('0000000, 1111111', changes.rows, file),
+        '0000000',
+      ],
+      [
+        'a "Not resolved" message without a revision',
+        () => unresolvedInterval('nothing', changes.rows, file),
+        'a revision in a "Not resolved" message',
+      ],
+      [
+        'a "Not resolved" message whose changes do not follow one another',
+        () => unresolvedInterval(`${changes.rows[0].revision}, ${changes.rows[2].revision}`, changes.rows, file),
+        'an interval',
+      ],
+    ];
+    for (const [name, call, part] of cases) {
+      const message = thrown(call);
+      expect(
+        message !== null && message.includes(file) && message.includes(part),
+        `src/${file}: ${name}: the reader ${message === null ? 'does not throw' : `throws "${message}"`}, expected a message with the file and "${part}"`,
+      );
+    }
+  }
+  expect(
+    read.length === PLATFORMS.length && new Set(read).size === 1,
+    `captures of "${lang}": the tables of the demo differ by platform`,
+  );
+  return shown;
 }
 
 async function open(browser, origin, entry, viewport, anchor = '') {
@@ -380,34 +578,8 @@ async function checkIdea(page, name, facts, lang, stacked) {
 
   // The squares: one per revision; those of the search table larger, numbered.
   expect(idea.hidden, `${name}: the squares are not hidden from assistive technology`);
-  expect(
-    idea.squares.length === facts.revisions,
-    `${name}: ${idea.squares.length} squares, the capture has ${facts.revisions} revisions`,
-  );
+  checkSquares(name, idea.squares, idea.track, facts);
   const numbers = facts.deviating.map((entry) => entry.number);
-  idea.squares.forEach((square, index) => {
-    const number = index + 1;
-    const marked = numbers.includes(number);
-    const size = marked ? 11 : 7;
-    expect(
-      square.kind === (marked ? 'deviating' : 'plain') && square.number === (marked ? String(number) : ''),
-      `${name}: square ${number} is "${square.kind}" with the number "${square.number}"`,
-    );
-    expect(
-      Math.abs(square.box.width - size) < 0.1 && Math.abs(square.box.height - size) < 0.1,
-      `${name}: square ${number} is ${square.box.width} × ${square.box.height} px, not ${size} × ${size}`,
-    );
-    expect(Number.parseFloat(square.border) > 0, `${name}: square ${number} is not drawn as a border`);
-    const previous = idea.squares[index - 1];
-    expect(
-      !previous || square.box.left >= previous.box.right - 0.05,
-      `${name}: square ${number} overlaps square ${number - 1}`,
-    );
-    expect(
-      square.box.left >= idea.track.left - 0.05 && square.box.right <= idea.track.right + 0.05,
-      `${name}: square ${number} stands outside the trace`,
-    );
-  });
   expect(
     idea.track.left >= idea.figure.left && idea.track.right <= idea.figure.right,
     `${name}: the trace reaches beyond its figure`,
@@ -467,6 +639,318 @@ async function checkIdea(page, name, facts, lang, stacked) {
       `${name}: bar ${index + 1} shows "${bar.value}" (${bar.kind}), the capture "${row.sum}"`,
     );
   });
+}
+
+/** The squares of a trace: one per revision, in their sizes, inside it. */
+function checkSquares(name, squares, track, facts, marked = false) {
+  expect(
+    squares.length === facts.revisions,
+    `${name}: ${squares.length} squares, the capture has ${facts.revisions} revisions`,
+  );
+  const numbers = facts.deviating.map((entry) => entry.number);
+  const unresolved = (facts.interval ?? []).map((entry) => entry.number);
+  squares.forEach((square, index) => {
+    const number = index + 1;
+    const found = numbers.includes(number);
+    const size = found ? 11 : 7;
+    const kind = found ? 'deviating' : marked && unresolved.includes(number) ? 'unresolved' : 'plain';
+    expect(
+      square.kind === kind && square.number === (found ? String(number) : ''),
+      `${name}: square ${number} is "${square.kind}" with the number "${square.number}"`,
+    );
+    expect(
+      Math.abs(square.box.width - size) < 0.1 && Math.abs(square.box.height - size) < 0.1,
+      `${name}: square ${number} is ${square.box.width} × ${square.box.height} px, not ${size} × ${size}`,
+    );
+    expect(Number.parseFloat(square.border) > 0, `${name}: square ${number} is not drawn as a border`);
+    const previous = squares[index - 1];
+    expect(
+      !previous || square.box.left >= previous.box.right - 0.05,
+      `${name}: square ${number} overlaps square ${number - 1}`,
+    );
+    expect(
+      square.box.left >= track.left - 0.05 && square.box.right <= track.right + 0.05,
+      `${name}: square ${number} stands outside the trace`,
+    );
+  });
+}
+
+/** The tables of the demo on a page: what they show, and how a row is laid out. */
+async function checkDemoTables(page, name, facts, lang, stacked) {
+  const tables = await page.evaluate(() => {
+    const box = (element) => {
+      const { left, right, top, bottom, width, height } = element.getBoundingClientRect();
+      return { left, right, top, bottom, width, height };
+    };
+    const cellsOf = (row) =>
+      [...row.children].map((cell) => ({
+        text: cell.textContent.trim(),
+        role: cell.getAttribute('role'),
+        tag: cell.tagName,
+        scope: cell.getAttribute('scope'),
+        lang: cell.getAttribute('lang'),
+        marked: [...cell.querySelectorAll('[lang]')].map((part) => `${part.getAttribute('lang')}:${part.textContent}`),
+        translate: cell.getAttribute('translate'),
+        box: box(cell),
+        shown: cell.getClientRects().length > 0 && getComputedStyle(cell).visibility === 'visible',
+      }));
+    return [...document.querySelectorAll('main table[data-demo-table], main table[data-result-table]')].map((table) => ({
+      kind: table.dataset.demoTable ?? 'search',
+      roles: [table, ...table.querySelectorAll('thead, tbody, tr')].map((element) => element.getAttribute('role')).join(' '),
+      caption: table.querySelector('caption [data-capture="caption"]')?.textContent.replace(/\s+/g, ' ').trim() ?? '',
+      captionShown: (table.querySelector('caption')?.getClientRects().length ?? 0) > 0,
+      own: table.querySelector('caption')?.firstChild?.textContent.trim() ?? '',
+      box: box(table),
+      display: getComputedStyle(table.querySelector('tbody tr')).display,
+      head: cellsOf(table.querySelector('thead tr')),
+      headBox: box(table.querySelector('thead tr')),
+      rows: [...table.querySelectorAll('tbody tr')].map((row) => ({ box: box(row), cells: cellsOf(row) })),
+      window: document.documentElement.clientWidth,
+    }));
+  });
+  const expected = {
+    regression: {
+      head: facts.regression.head,
+      caption: facts.regression.caption,
+      rows: facts.regression.rows.map((row) => [row.quantity, row.modelPoints, row.values, row.periods]),
+      header: 0,
+    },
+    changes: {
+      head: facts.changes.head,
+      caption: facts.changes.caption,
+      rows: facts.changes.rows.map((row) => [String(row.number), row.revision, row.classes, row.description]),
+      header: 1,
+    },
+    search: { rows: facts.rows.map((row) => [row.revision, null, row.sum]), header: 0 },
+  };
+  expect(
+    tables.map((table) => table.kind).join() === 'regression,changes,search',
+    `${name}: the tables are [${tables.map((table) => table.kind)}], expected the three of the demo in its order`,
+  );
+  for (const table of tables) {
+    const which = `${name}: table "${table.kind}"`;
+    const listed = expected[table.kind];
+    const columns = table.head.length;
+    expect(
+      table.roles === ['table', 'rowgroup', 'row', 'rowgroup', ...Array(table.rows.length).fill('row')].join(' '),
+      `${which}: the roles of table, row groups and rows are not written out`,
+    );
+    expect(
+      table.head.every((cell) => cell.tag === 'TH' && cell.role === 'columnheader' && cell.scope === 'col' && cell.shown),
+      `${which}: its head row is not ${columns} visible column headers`,
+    );
+    expect(
+      table.captionShown && table.own !== '' && table.caption !== '',
+      `${which}: no caption with the words of the page and the sentence of the demo`,
+    );
+    if (listed.head) {
+      expect(
+        JSON.stringify(table.head.map((cell) => cell.text)) === JSON.stringify(listed.head) && columns === 4,
+        `${which}: its head row is [${table.head.map((cell) => cell.text)}], the capture prints [${listed.head}]`,
+      );
+      expect(table.caption === listed.caption, `${which}: its caption holds "${table.caption}", the capture "${listed.caption}"`);
+    }
+    expect(
+      table.rows.length === listed.rows.length,
+      `${which}: ${table.rows.length} rows, the capture has ${listed.rows.length}`,
+    );
+    table.rows.forEach((row, index) => {
+      const wanted = listed.rows[index] ?? [];
+      const where = `${which}, row ${index + 1}`;
+      expect(
+        row.cells.length === columns && row.cells.every((cell, at) => wanted[at] === null || cell.text === wanted[at]),
+        `${where}: it shows [${row.cells.map((cell) => cell.text)}], the capture [${wanted}]`,
+      );
+      expect(
+        row.cells.every((cell, at) =>
+          at === listed.header
+            ? cell.tag === 'TH' && cell.role === 'rowheader' && cell.scope === 'row'
+            : cell.tag === 'TD' && cell.role === 'cell',
+        ),
+        `${where}: its header is not column ${listed.header + 1}, or a role is not written out`,
+      );
+      // A German quantity on an English page, an English description on a
+      // German page and a hash carry what they are.
+      if (table.kind === 'regression') {
+        expect(row.cells[0].lang === (lang === 'en' ? 'de' : null), `${where}: the quantity does not carry its language`);
+      }
+      if (table.kind === 'changes') {
+        const description = row.cells[3];
+        expect(
+          row.cells[1].translate === 'no' && description.lang === (lang === 'de' ? 'en' : null),
+          `${where}: the revision is not marked as not to be translated, or the description does not carry its language`,
+        );
+        expect(
+          !description.text.includes('Bruttobeitrag') || description.marked.includes('de:Bruttobeitrag'),
+          `${where}: "Bruttobeitrag" in the description does not carry its language`,
+        );
+      }
+      expect(
+        row.cells.every((cell) => cell.shown && cell.box.left >= -0.5 && cell.box.right <= table.window + 0.5),
+        `${where}: a cell is not shown or reaches beyond the window`,
+      );
+      const tops = new Set(row.cells.map((cell) => Math.round(cell.box.top)));
+      if (!stacked) {
+        expect(tops.size === 1 && table.display === 'table-row', `${where}: its cells do not stand in one line (${table.display})`);
+      } else {
+        expect(table.display === 'grid' && tops.size === 2, `${where}: it is no record of two lines (${table.display}, ${tops.size} lines)`);
+        // Every cell stands on the line of its column name in the head
+        // row and, in a four-column table, below it.
+        const lineOf = (cells, at) => (Math.round(cells[at].box.top) > Math.min(...cells.map((cell) => Math.round(cell.box.top))) ? 2 : 1);
+        expect(
+          row.cells.every(
+            (cell, at) =>
+              lineOf(row.cells, at) === lineOf(table.head, at) &&
+              (columns !== 4 || Math.abs(cell.box.left - table.head[at].box.left) < 1),
+          ),
+          `${where}: a cell does not stand under its column name`,
+        );
+      }
+    });
+    expect(
+      table.box.left >= -0.5 && table.box.right <= table.window + 0.5,
+      `${which}: it reaches beyond the window (${Math.round(table.box.right)} px in ${table.window} px)`,
+    );
+    if (stacked && columns === 4) {
+      const names = new Set(table.head.map((cell) => Math.round(cell.box.top)));
+      expect(
+        names.size === 2 && table.head.every((cell) => cell.box.right <= table.window + 0.5 && cell.box.width > 0),
+        `${which}: its head row is no record of two lines with every column name inside the window`,
+      );
+    }
+  }
+}
+
+/** The line of the changes at one width: `stacked` says where its key must stand. */
+async function checkLine(page, name, facts, lang, stacked) {
+  const line = await page.evaluate(() => {
+    const element = document.querySelector('main [data-change-line]');
+    if (!element) return null;
+    const figure = element.closest('[data-wide-figure]');
+    const box = (part) => {
+      const { left, right, top, bottom, width, height } = part.getBoundingClientRect();
+      return { left, right, top, bottom, width, height };
+    };
+    const track = element.querySelector('[data-idea-track]');
+    const text = (part) => part?.textContent.replace(/\s+/g, ' ').trim() ?? '';
+    return {
+      inFigure: figure !== null,
+      figure: figure ? box(figure) : null,
+      caption: text(figure?.querySelector(':scope > figcaption')),
+      trace: box(element.querySelector('[data-change-trace]')),
+      key: box(element.querySelector('[data-change-key]')),
+      keys: Object.fromEntries(
+        [...element.querySelectorAll('[data-change-key-text]')].map((part) => [part.dataset.changeKeyText, text(part)]),
+      ),
+      count: text(element.querySelector('[data-change-count]')),
+      track: box(track),
+      hidden: track.getAttribute('aria-hidden') === 'true',
+      scaled: [element, track, ...element.querySelectorAll('[data-change-trace], [data-idea-square]')].some(
+        (part) => getComputedStyle(part).transform !== 'none' || getComputedStyle(part).zoom !== '1',
+      ),
+      squares: [...track.querySelectorAll('[data-idea-square]')].map((square) => ({
+        kind: square.dataset.ideaSquare,
+        number: square.textContent.trim(),
+        box: box(square),
+        border: getComputedStyle(square).borderTopWidth,
+      })),
+      intervals: [...track.querySelectorAll('[data-idea-interval]')].map((interval) => ({
+        name: interval.dataset.ideaInterval,
+        label: text(interval),
+        labelBox: box(interval.querySelector('span')),
+        box: box(interval),
+        border: getComputedStyle(interval).borderTopWidth,
+        open: getComputedStyle(interval).borderBottomWidth,
+      })),
+      bars: [...(figure?.querySelectorAll('[data-bar-row]') ?? [])].map((row) => ({
+        label: row.querySelector('.bar-revision').textContent.replace(/\s+/g, ' ').trim(),
+        value: row.querySelector('.bar-value').textContent.trim(),
+      })),
+    };
+  });
+  if (!line) {
+    failures.push(`${name}: no line of the changes`);
+    return;
+  }
+  expect(line.inFigure, `${name}: the line of the changes stands outside a wide figure`);
+  expect(line.hidden, `${name}: the squares are not hidden from assistive technology`);
+  expect(!line.scaled, `${name}: the line of the changes is scaled`);
+  checkSquares(name, line.squares, line.track, facts, true);
+  expect(
+    line.track.left >= line.figure.left && line.track.right <= line.figure.right,
+    `${name}: the trace reaches beyond its figure`,
+  );
+
+  // The bracket: from the first to the last change of the interval, above them.
+  const [first, last] = [facts.interval[0].number, facts.interval.at(-1).number];
+  const [from, to] = [line.squares[first - 1]?.box, line.squares[last - 1]?.box];
+  const [interval] = line.intervals;
+  expect(
+    line.intervals.length === 1 && interval.name === `${first}-${last}` && interval.label === `${first}–${last}`,
+    `${name}: the brackets are [${line.intervals.map((entry) => `${entry.name} "${entry.label}"`)}], expected one for ${first}–${last}`,
+  );
+  if (interval && from && to) {
+    expect(
+      Math.abs(interval.box.left - (from.left - 2)) < 1 && Math.abs(interval.box.right - (to.right + 2)) < 1,
+      `${name}: the bracket spans ${interval.box.left} to ${interval.box.right} px, the changes ${first} to ${last} stand from ${from.left} to ${to.right} px`,
+    );
+    expect(
+      interval.box.bottom <= from.top && Number.parseFloat(interval.border) > 0 && Number.parseFloat(interval.open) === 0,
+      `${name}: the bracket is not a border above its squares, open below`,
+    );
+    expect(
+      interval.labelBox.bottom <= interval.box.top + 0.5 &&
+        interval.labelBox.left >= line.figure.left &&
+        interval.labelBox.right <= line.figure.right,
+      `${name}: the numbers of the bracket do not stand above it, inside the figure`,
+    );
+  }
+
+  // The words: the count, the key, the caption.
+  const list = new Intl.ListFormat(lang === 'en' ? 'en-GB' : 'de', { type: 'conjunction' }).format(
+    facts.deviating.map((entry) => String(entry.number)),
+  );
+  expect(
+    line.count.startsWith(`${facts.revisions} `),
+    `${name}: the line above the trace is "${line.count}", expected the count ${facts.revisions} first`,
+  );
+  expect(
+    (line.keys.found ?? '').includes(list),
+    `${name}: the key of the filled square is "${line.keys.found}", expected the numbers ${list}`,
+  );
+  expect(
+    new RegExp(`\\b${first}\\b.*\\b${last}\\b`).test(line.keys.unresolved ?? ''),
+    `${name}: the key of the bracket is "${line.keys.unresolved}", expected the numbers ${first} and ${last}`,
+  );
+  expect((line.keys.other ?? '').length > 10, `${name}: the key of the small square is "${line.keys.other}"`);
+  expect(
+    line.caption.includes(list) && new RegExp(`\\b${first}\\b.*\\b${last}\\b`).test(line.caption),
+    `${name}: the caption does not name the revisions ${list} and the changes ${first} and ${last}`,
+  );
+
+  // Where the key stands.
+  if (stacked) {
+    expect(
+      line.key.top >= line.trace.bottom - 0.5 && Math.abs(line.key.left - line.trace.left) < 1,
+      `${name}: the line of the changes is not a stack of trace and key`,
+    );
+  } else {
+    expect(
+      line.key.left >= line.trace.right - 0.5 && line.key.top < line.trace.bottom && line.key.bottom > line.trace.top,
+      `${name}: the key does not stand right of the trace`,
+    );
+  }
+
+  // The bars below: the revisions of the search table with number and sum.
+  expect(
+    line.bars.length === facts.rows.length &&
+      line.bars.every(
+        (bar, index) =>
+          bar.label === `${facts.deviating[index].number} · ${facts.rows[index].revision}` &&
+          bar.value === facts.rows[index].sum,
+      ),
+    `${name}: the bars are [${line.bars.map((bar) => `${bar.label} ${bar.value}`)}], expected the rows of the search table`,
+  );
 }
 
 /** Row lists: numbered rows, a hairline above each and below the list. */
@@ -568,8 +1052,10 @@ async function checkProsePage(browser, origin, entry, listed, facts) {
     const name = at(DESKTOP);
     await checkHeadings(page, name, listed);
     const figures = await checkFigures(page, name);
-    expect(!listed.idea || figures > 0, `${name}: no wide figure`);
+    expect(!(listed.idea || listed.line) || figures > 0, `${name}: no wide figure`);
     if (listed.idea) await checkIdea(page, name, facts, entry.lang, false);
+    if (listed.tables) await checkDemoTables(page, name, facts, entry.lang, false);
+    if (listed.line) await checkLine(page, name, facts, entry.lang, false);
     await checkRowLists(page, name, listed.rows ?? 0);
     if (listed.path) await checkPathBlock(page, name, entry);
     await checkNoMotion(page, name);
@@ -578,12 +1064,14 @@ async function checkProsePage(browser, origin, entry, listed, facts) {
     await context.close();
   }
 
-  // Phone, and the narrowest width: the idea figure as a stack.
+  // Phone, and the narrowest width: the figures as a stack, the tables as records.
   for (const viewport of [PHONE, NARROW]) {
     const { context, page } = await open(browser, origin, entry, viewport);
     const name = at(viewport);
     await checkFigures(page, name);
     if (listed.idea) await checkIdea(page, name, facts, entry.lang, true);
+    if (listed.tables) await checkDemoTables(page, name, facts, entry.lang, true);
+    if (listed.line) await checkLine(page, name, facts, entry.lang, true);
     await checkNoSidewaysScroll(page, name);
     if (viewport === PHONE) await checkAxe(page, name);
     await context.close();

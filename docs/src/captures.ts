@@ -14,14 +14,33 @@
 //   - `caption`: the paragraph above the table of the search, step 4;
 //   - `searchTable`: the head and the rows of that table;
 //   - `notResolved`: the "Not resolved" messages below it;
+//   - `regressionTable` and `changeTable`: the two four-column tables of the
+//     demo, after steps 2 and 3, each with the sentence above it (example.ts);
+//   - `unresolved`: the changes each "Not resolved" message names, with
+//     their numbers in the table of the changes;
+//   - `searchCounts`: how many states there are and how many the search
+//     computed, from the sentence above the table of the search;
 //   - `example`: the facts of the example a page of prose shows (example.ts):
 //     the number of revisions, the number of each revision of the search
 //     table in the table of the changes, the revisions of the two states,
 //     the number of model points.
+// `changeOf`, `quantityOf` and `searchRowOf` give one row of a table by its
+// revision or its quantity, for a page that writes about that row.
 // Only `session` differs by platform (path separators, the time stamp of the
 // demo folder). The other parts are read from the Windows capture and must
 // equal the Linux one.
-import { exampleFacts, type ExampleFacts } from './example';
+import {
+  changeTable as readChangeTable,
+  exampleFacts,
+  regressionTable as readRegressionTable,
+  unresolvedInterval,
+  type ChangeRow,
+  type ChangeTable,
+  type DeviatingRevision,
+  type ExampleFacts,
+  type RegressionRow,
+  type RegressionTable,
+} from './example';
 import { platforms, tag, type Platform } from './release';
 import type { Lang } from './site';
 
@@ -32,9 +51,22 @@ const files = import.meta.glob<string>('./captures/*/*.txt', {
 });
 
 /** What the lines of a part begin with, per language. They are found, not shown. */
-const markers: Record<Lang, { step: RegExp; notResolved: string; result: string }> = {
-  en: { step: /^Step (\d) of 4: /, notResolved: 'Not resolved:', result: 'Result:' },
-  de: { step: /^Schritt (\d) von 4: /, notResolved: 'Nicht aufgelöst:', result: 'Ergebnis:' },
+const markers: Record<
+  Lang,
+  { step: RegExp; notResolved: string; result: string; computed: RegExp }
+> = {
+  en: {
+    step: /^Step (\d) of 4: /,
+    notResolved: 'Not resolved:',
+    result: 'Result:',
+    computed: /(\d+) of (\d+) were computed/,
+  },
+  de: {
+    step: /^Schritt (\d) von 4: /,
+    notResolved: 'Nicht aufgelöst:',
+    result: 'Ergebnis:',
+    computed: /Gerechnet wurden (\d+) von (\d+)/,
+  },
 };
 const STEPS = 4;
 
@@ -58,12 +90,23 @@ export interface SearchTable {
   rows: SearchRow[];
 }
 
+export interface SearchCounts {
+  /** How many states the search computed. */
+  computed: number;
+  /** How many states there are: release N and one after each change. */
+  states: number;
+}
+
 interface Parts {
   session: SessionLine[];
   afterLines: string[];
   searchTable: SearchTable;
   notResolved: string[];
   example: ExampleFacts;
+  regressionTable: RegressionTable;
+  changeTable: ChangeTable;
+  unresolved: DeviatingRevision[][];
+  searchCounts: SearchCounts;
 }
 
 function fileOf(platform: Platform, lang: Lang): string {
@@ -173,12 +216,35 @@ function read(platform: Platform, lang: Lang): Parts {
     file,
   );
 
+  // The two four-column tables. Each stands in its step, under the sentence
+  // the demo prints after the commands of that step.
+  const regression = readRegressionTable(source, file);
+  if (regression.caption !== afterLines[1]) throw missing('the table of the regression in step 2');
+  const changes = readChangeTable(source, file);
+  if (changes.caption !== afterLines[2]) throw missing('the table of the changes in step 3');
+
+  // The changes each "Not resolved" message names.
+  const unresolved = notResolved.map((message) => unresolvedInterval(message, changes.rows, file));
+
+  // How many states the search computed, and of how many: one state more
+  // than there are changes.
+  const counted = marker.computed.exec(afterLines[STEPS - 1]);
+  if (!counted) throw missing('the number of states the search computed');
+  const searchCounts = { computed: Number(counted[1]), states: Number(counted[2]) };
+  if (searchCounts.states !== example.revisions + 1) {
+    throw missing(`one state more than the ${example.revisions} changes (the search names ${searchCounts.states})`);
+  }
+
   return {
     session,
     afterLines,
     searchTable: { head: head as [string, string, string], rows },
     notResolved,
     example,
+    regressionTable: regression,
+    changeTable: changes,
+    unresolved,
+    searchCounts,
   };
 }
 
@@ -197,7 +263,16 @@ function parts(platform: Platform, lang: Lang): Parts {
 function shared(lang: Lang): Parts {
   const [first, ...others] = platforms.map((platform) => ({ platform, parts: parts(platform, lang) }));
   for (const other of others) {
-    for (const part of ['afterLines', 'searchTable', 'notResolved', 'example'] as const) {
+    for (const part of [
+      'afterLines',
+      'searchTable',
+      'notResolved',
+      'example',
+      'regressionTable',
+      'changeTable',
+      'unresolved',
+      'searchCounts',
+    ] as const) {
       if (JSON.stringify(first.parts[part]) !== JSON.stringify(other.parts[part])) {
         throw new Error(
           `src/${fileOf(first.platform, lang)} and src/${fileOf(other.platform, lang)} differ in "${part}"; only paths and the time stamp of the demo folder may differ.`,
@@ -240,6 +315,63 @@ export function notResolved(lang: Lang): string[] {
  */
 export function example(lang: Lang): ExampleFacts {
   return shared(lang).example;
+}
+
+/** The table of the regression, step 2: the sentence above it, head and rows. */
+export function regressionTable(lang: Lang): RegressionTable {
+  return shared(lang).regressionTable;
+}
+
+/** The table of the changes, step 3: the sentence above it, head and rows. */
+export function changeTable(lang: Lang): ChangeTable {
+  return shared(lang).changeTable;
+}
+
+/** The changes each "Not resolved" message names, with their numbers. */
+export function unresolved(lang: Lang): DeviatingRevision[][] {
+  return shared(lang).unresolved;
+}
+
+/** How many states there are and how many the search computed. */
+export function searchCounts(lang: Lang): SearchCounts {
+  return shared(lang).searchCounts;
+}
+
+/** The row of a table a page writes about; the build fails where it is not there. */
+function rowOf<Row>(rows: readonly Row[], found: (row: Row) => boolean, part: string, lang: Lang): Row {
+  const row = rows.find(found);
+  if (!row) throw new Error(`src/${fileOf(platforms[0], lang)}: ${part} is missing.`);
+  return row;
+}
+
+/** The row of a revision in the table of the changes. */
+export function changeOf(lang: Lang, revision: string): ChangeRow {
+  return rowOf(
+    changeTable(lang).rows,
+    (row) => row.revision === revision,
+    `the revision ${revision} in the table of the changes`,
+    lang,
+  );
+}
+
+/** The row of a quantity in the table of the regression. */
+export function quantityOf(lang: Lang, quantity: string): RegressionRow {
+  return rowOf(
+    regressionTable(lang).rows,
+    (row) => row.quantity === quantity,
+    `the quantity "${quantity}" in the table of the regression`,
+    lang,
+  );
+}
+
+/** The row of a revision in the table of the search. */
+export function searchRowOf(lang: Lang, revision: string): SearchRow {
+  return rowOf(
+    searchTable(lang).rows,
+    (row) => row.revision === revision,
+    `the revision ${revision} in the table of the search`,
+    lang,
+  );
 }
 
 /** The first sentence of a paragraph of the demo. A number holds no ". ". */

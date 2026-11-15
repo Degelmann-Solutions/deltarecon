@@ -208,6 +208,16 @@ export const searchTexts = {
 };
 
 /**
+ * A word that only one page of a language holds and no page of the other
+ * language, per page of the register that has one: the search must find
+ * that page by it, and nothing in the other language. The start pages have
+ * theirs in `searchTexts` (`ownWord`).
+ */
+export const pageWords = {
+  'understand-the-results': { en: 'bracket', de: 'Stornosatz' },
+};
+
+/**
  * The checks of an open page that several scripts run, bound to the list of
  * failed expectations of the script: `checkAxe` (no violation of the WCAG
  * rules) and `checkNoSidewaysScroll`.

@@ -33,6 +33,7 @@ import {
   loadOtherPages,
   loadPages,
   loadRelease,
+  pageWords,
   searchTexts,
   startPreview,
 } from './harness.mjs';
@@ -243,6 +244,20 @@ async function checkSearch(page, name, entry) {
     expect(
       none.hits.length === 0 && none.shown && none.status === texts.noMatch(term),
       `${name}: search for "${term}" gave ${none.hits.length} hits and the status "${none.status}", expected "${texts.noMatch(term)}"`,
+    );
+  }
+
+  // The word of a page: that page alone, and no hit for the word of its
+  // counterpart.
+  for (const [id, words] of Object.entries(pageWords)) {
+    const found = ofLanguage.filter((candidate) => candidate.id === id);
+    expect(found.length === 1, `${name}: the register holds no page "${id}" (pageWords in scripts/harness.mjs)`);
+    checkHits(name, words[entry.lang], await search(page, words[entry.lang]), found, entry.lang);
+    const other = words[entry.otherLang];
+    const none = await search(page, other);
+    expect(
+      none.hits.length === 0 && none.status === texts.noMatch(other),
+      `${name}: search for "${other}" gave ${none.hits.length} hits and the status "${none.status}", expected "${texts.noMatch(other)}"`,
     );
   }
 

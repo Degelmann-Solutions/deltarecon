@@ -923,6 +923,100 @@
     }
   }
 
+  /* The two four-column tables of the demo (DemoTable.astro): the table of
+     the regression and the table of the changes. They share the looks
+     above. A quantity name is text, not a hash; the number of a change
+     stands right-aligned before its revision. */
+  .result-table tbody .result-key {
+    font-family: var(--font-sans);
+    font-size: inherit;
+    font-weight: 500;
+    white-space: normal;
+  }
+
+  .result-table .result-no {
+    color: var(--color-text-secondary);
+    font-variant-numeric: tabular-nums;
+  }
+
+  .result-table .result-class {
+    white-space: nowrap;
+  }
+
+  /* A table that stands in a page of prose, outside a step card. */
+  main > .result-wrap {
+    max-width: var(--spacing-block-max);
+    margin-top: 24px;
+  }
+
+  /* Below the phone breakpoint a row of a four-column table is a record of
+     two lines, and the head row has the same two lines, so that each column
+     name stands above its values. Regression: the quantity, then model
+     points, values and periods side by side. Changes: number, revision and
+     class side by side, then the description. */
+  @media not (min-width: 37.5rem) {
+    .result-table-regression tr {
+      grid-template-columns: minmax(0, 4fr) minmax(0, 3fr) minmax(0, 3fr);
+    }
+
+    .result-table-regression .result-key {
+      grid-area: 1 / 1 / 2 / 4;
+    }
+
+    .result-table-regression .result-num {
+      margin-top: 2px;
+      text-align: left;
+    }
+
+    .result-table-regression tbody .result-num {
+      font-weight: 400;
+    }
+
+    .result-table-regression .result-points {
+      grid-area: 2 / 1;
+    }
+
+    .result-table-regression .result-values {
+      grid-area: 2 / 2;
+    }
+
+    .result-table-regression .result-periods {
+      grid-area: 2 / 3;
+    }
+
+    .result-table-changes tr {
+      grid-template-columns: 2.25rem 5rem minmax(0, 1fr);
+    }
+
+    .result-table-changes .result-no {
+      grid-area: 1 / 1;
+    }
+
+    .result-table-changes .result-rev {
+      grid-area: 1 / 2;
+    }
+
+    .result-table-changes .result-class {
+      grid-area: 1 / 3;
+    }
+
+    .result-table-changes .result-desc {
+      grid-area: 2 / 1 / 3 / 4;
+    }
+
+    .result-table-regression thead th,
+    .result-table-changes thead th {
+      overflow-wrap: anywhere;
+    }
+  }
+
+  @media (min-width: 37.5rem) {
+    .result-table .result-no {
+      width: 1%;
+      text-align: right;
+    }
+  }
+
   /* ---- Callout ---- */
 
   .callout {
@@ -1677,6 +1771,91 @@
 
     .idea-track {
       padding: 0 10px;
+    }
+  }
+
+  /* ---- Line of the changes ---- */
+
+  /* The trace of the revisions with the intervals that are not resolved
+     marked (RevisionTrack.astro with `marked`). The squares stand as on the
+     trace of the idea figure, each in a column of its own, so that a
+     bracket can span the columns of its interval. It is a border, open
+     below, with the numbers of its first and last change above it. */
+  .idea-track-marked {
+    display: grid;
+    grid-template-columns: repeat(var(--revisions), auto);
+    justify-items: start;
+    margin-top: 28px;
+  }
+
+  .idea-interval {
+    position: absolute;
+    top: -9px;
+    right: -2px;
+    left: -2px;
+    height: 6px;
+    border: 1.5px solid var(--color-navy);
+    border-bottom: 0;
+  }
+
+  .idea-interval span {
+    position: absolute;
+    bottom: 9px;
+    left: 50%;
+    transform: translateX(-50%);
+    color: var(--color-navy);
+    font-family: var(--font-mono);
+    font-size: var(--text-label-small);
+    line-height: 1;
+    white-space: nowrap;
+  }
+
+  /* The line of the changes: the trace, and a key that says in words what
+     each shape stands for. As a stack: the trace, then the key. */
+  .change-line {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    row-gap: 20px;
+  }
+
+  /* Room below the trace for the numbers of the filled squares. */
+  .change-line-trace {
+    padding-bottom: 22px;
+  }
+
+  .change-key {
+    display: grid;
+    gap: 8px;
+    font-size: var(--text-caption);
+    line-height: var(--text-caption--line-height);
+  }
+
+  .change-key li {
+    display: grid;
+    grid-template-columns: 30px minmax(0, 1fr);
+    column-gap: 8px;
+    align-items: start;
+  }
+
+  /* The shape a key names, drawn as on the trace. */
+  .change-key-mark {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 1.5em;
+  }
+
+  .change-key-mark .idea-interval {
+    position: static;
+    width: 26px;
+  }
+
+  /* Where the wide figure has room, the key stands right of the trace. */
+  @container (min-width: 640px) {
+    .change-line {
+      grid-template-columns: minmax(0, 1fr) 264px;
+      column-gap: 36px;
+      align-items: center;
     }
   }
 

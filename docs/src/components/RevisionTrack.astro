@@ -1,0 +1,59 @@
+---
+// The trace of the revisions between release N and the state N+1: one
+// square per revision in order. A revision of the search table is a larger,
+// filled square with its number below. Read from the capture of the example
+// (src/captures.ts). The idea figure and the line of the changes draw it.
+//
+// With `marked` it also marks each interval a "Not resolved" message names:
+// a bracket above its squares, with the numbers of its first and last
+// change. The squares are decoration and hidden from assistive technology;
+// the figure that holds the trace says in text what they show.
+import { example, unresolved } from '../captures';
+import { pageLanguage } from '../markup';
+
+interface Props {
+  /** Whether the intervals that are not resolved are marked. */
+  marked?: boolean;
+}
+
+const { marked = false } = Astro.props;
+const lang = pageLanguage(Astro.url.pathname);
+const facts = example(lang);
+const numbers = new Set(facts.deviating.map((entry) => entry.number));
+const squares = Array.from({ length: facts.revisions }, (_, index) => index + 1);
+const intervals = marked
+  ? unresolved(lang).map((interval) => ({ first: interval[0].number, last: interval.at(-1)!.number }))
+  : [];
+const inInterval = (number: number): boolean =>
+  intervals.some(({ first, last }) => number >= first && number <= last);
+---
+
+<ol
+  class:list={['idea-track', marked && 'idea-track-marked']}
+  aria-hidden="true"
+  data-idea-track
+  style={marked ? `--revisions: ${facts.revisions}` : undefined}
+>
+  {
+    [
+      ...squares.map((number) =>
+        numbers.has(number) ? (
+          <li class="idea-square idea-square-deviating" data-idea-square="deviating">
+            <span>{number}</span>
+          </li>
+        ) : (
+          <li class="idea-square" data-idea-square={inInterval(number) ? 'unresolved' : 'plain'} />
+        ),
+      ),
+      ...intervals.map(({ first, last }) => (
+        <li
+          class="idea-interval"
+          style={`grid-column: ${first} / ${last + 1}`}
+          data-idea-interval={`${first}-${last}`}
+        >
+          <span>{`${first}–${last}`}</span>
+        </li>
+      )),
+    ]
+  }
+</ol>

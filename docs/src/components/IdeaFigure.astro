@@ -12,14 +12,16 @@
 //     deviating="4 of them deviate in the Bruttobeitrag"
 //   />
 //
-// Squares, numbers and the two short hashes are read from the capture of the
-// example (src/captures.ts); the page gives the words. The squares are
+// The two short hashes are read from the capture of the example
+// (src/captures.ts), and the trace with its squares and numbers is
+// RevisionTrack.astro; the page gives the words. The squares are
 // decoration: the two lines of text count the revisions, and the caption of
 // the wide figure names those of the search table. The boxes stand beside
 // the trace where it fits and as a stack otherwise; the trace is never
 // scaled.
 import { example } from '../captures';
 import { outputHtml, pageLanguage } from '../markup';
+import RevisionTrack from './RevisionTrack.astro';
 
 interface Box {
   /** The small line above the title: which state the box is. */
@@ -41,8 +43,6 @@ interface Props {
 const { before, after, revision, count, deviating } = Astro.props;
 const lang = pageLanguage(Astro.url.pathname);
 const facts = example(lang);
-const numbers = new Set(facts.deviating.map((entry) => entry.number));
-const squares = Array.from({ length: facts.revisions }, (_, index) => index + 1);
 const ends = [
   { key: 'before', box: before, hash: facts.releaseN },
   { key: 'after', box: after, hash: facts.stateN1 },
@@ -60,19 +60,7 @@ const [first, last] = ends;
   </li>
   <li class="idea-revisions" data-idea-revisions>
     <p class="idea-count" data-idea-count set:html={outputHtml(count, lang)} />
-    <ol class="idea-track" aria-hidden="true" data-idea-track>
-      {
-        squares.map((number) =>
-          numbers.has(number) ? (
-            <li class="idea-square idea-square-deviating" data-idea-square="deviating">
-              <span>{number}</span>
-            </li>
-          ) : (
-            <li class="idea-square" data-idea-square="plain" />
-          ),
-        )
-      }
-    </ol>
+    <RevisionTrack />
     <p
       class="idea-count idea-count-deviating"
       data-idea-deviating
