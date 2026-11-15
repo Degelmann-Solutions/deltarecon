@@ -1,0 +1,46 @@
+---
+// A wide figure of a page of prose: a figure over the full content width
+// with its caption inside, below the drawing. The caption is the text
+// alternative of the figure: it says in words what the drawing shows. A
+// second part may stand below a hairline, under a small label.
+//
+//   <WideFigure label="Sum of the deviation, by revision">
+//     <IdeaFigure … />
+//     <BarFigure slot="second" numbered />
+//     <p slot="caption">What the figure shows.</p>
+//   </WideFigure>
+//
+// The build fails on a figure without a caption and on a second part
+// without its label.
+import { outputHtml, pageLanguage } from '../markup';
+
+interface Props {
+  /** The label of the second part. */
+  label?: string;
+}
+
+const { label } = Astro.props;
+const lang = pageLanguage(Astro.url.pathname);
+if (!Astro.slots.has('caption')) {
+  throw new Error(`${Astro.url.pathname}: a wide figure has no caption (slot "caption").`);
+}
+const second = Astro.slots.has('second');
+if (second !== (label !== undefined)) {
+  throw new Error(
+    `${Astro.url.pathname}: the second part of a wide figure needs both its content (slot "second") and its "label".`,
+  );
+}
+---
+
+<figure class="wide-figure" data-wide-figure>
+  <slot />
+  {
+    second && (
+      <div class="wide-figure-second" data-wide-figure-second>
+        <p class="wide-figure-label" set:html={outputHtml(label ?? '', lang)} />
+        <slot name="second" />
+      </div>
+    )
+  }
+  <figcaption class="wide-figure-caption prose-links"><slot name="caption" /></figcaption>
+</figure>

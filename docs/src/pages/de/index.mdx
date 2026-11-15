@@ -2,6 +2,90 @@
 layout: ../../layouts/Page.astro
 lang: de
 page: overview
-lead: "Diese Seite ist eine Baustelle: Hier entsteht der Überblick über DeltaRecon."
+lead: "Nach einem Release verändern viele gleichzeitige Änderungen an Daten, Parametern und Code die Ergebnisse eines Berechnungsprogramms. Der Vergleich der beiden Stände zeigt, wie groß die Differenz ist. DeltaRecon führt sie auf die Änderungen zurück, die sie verursachen."
 description: "Was DeltaRecon tut und was Sie damit tun können: Es findet eine Abweichung zwischen zwei Releases und führt sie auf die Änderungen zurück, die sie verursachen."
 ---
+import BarFigure from '../../components/BarFigure.astro';
+import IdeaFigure from '../../components/IdeaFigure.astro';
+import PathBlock from '../../components/PathBlock.astro';
+import Prose from '../../components/Prose.astro';
+import Row from '../../components/Row.astro';
+import RowList from '../../components/RowList.astro';
+import SectionHeading from '../../components/SectionHeading.astro';
+import Term from '../../components/Term.astro';
+import WideFigure from '../../components/WideFigure.astro';
+import { example } from '../../captures';
+import { listOf } from '../../markup';
+import { findPage, pageAddress } from '../../site';
+
+export const facts = example('de');
+export const deviating = facts.deviating.length;
+export const numbers = listOf(facts.deviating.map((entry) => entry.number), 'de');
+export const quickStart = findPage('quick-start');
+export const howItWorks = findPage('how-deltarecon-works');
+export const requirements = findPage('engine-requirements');
+
+<SectionHeading id="what-it-does">Was DeltaRecon tut</SectionHeading>
+
+<Prose>
+
+Die Veränderungsanalyse kennen Sie aus Bilanz und Solvency II: eine Überleitung vom Vorjahr auf den aktuellen Stand, Schritt für Schritt. DeltaRecon nimmt als Schritte die <Term id="revision">Revisionen</Term> des versionierten Berechnungsprogramms. Jede Revision ist eine Änderung. Zwischen Release N und dem Stand N+1 rechnet DeltaRecon Stände, vergleicht sie und ordnet die <Term id="deviation">Abweichung</Term> in einer Größe den einzelnen Revisionen zu, die sie verursachen.
+
+Jedes Ergebnis stammt aus Rechnungen und Vergleichen, die jedes Mal dasselbe Ergebnis liefern. DeltaRecon verwendet keine Agenten.
+
+Das Bild zeigt das Beispiel des Quick Starts am <Term id="reference-model">Referenzmodell</Term>: Der Stand N+1 liegt {facts.revisions} Revisionen nach Release N, und {deviating} davon weichen im <Term id="bruttobeitrag" /> ab.
+
+</Prose>
+
+<WideFigure label="Summe der Abweichung im Bruttobeitrag, je Revision">
+  <IdeaFigure
+    before={{ label: 'Release N', title: 'Das Referenzmodell vor den Änderungen' }}
+    after={{ label: 'Stand N+1', title: 'Das Referenzmodell nach den Änderungen' }}
+    revision="Revision"
+    count={`${facts.revisions} Revisionen von Release N bis zum Stand N+1`}
+    deviating={`${deviating} davon weichen im Bruttobeitrag ab`}
+  />
+  <BarFigure slot="second" numbered />
+  <p slot="caption">Das Beispiel des Quick Starts am Referenzmodell. Jedes Quadrat ist eine Revision, in der Reihenfolge, in der sie gemacht wurde. {deviating} Revisionen weichen im Bruttobeitrag in den ersten fünf Projektionsjahren ab: die Revisionen {numbers}. Ein gefüllter Balken erhöht den Bruttobeitrag, ein umrandeter senkt ihn.</p>
+</WideFigure>
+
+<SectionHeading id="what-you-need">Was Sie brauchen</SectionHeading>
+
+<Prose>
+
+Einen Computer mit Windows oder Linux. Sie laden ein Archiv herunter und entpacken es. Installiert wird nichts: Das Paket enthält alles, was es braucht, auch das Referenzmodell, eine Risikolebensversicherung mit {facts.modelPoints} Modellpunkten. Das Referenzmodell führt die Mechanik vor und ist kein Bewertungsmodell; sein Bestand ist synthetisch und enthält keine Kundendaten.
+
+</Prose>
+
+<SectionHeading id="what-you-get">Was Sie bekommen</SectionHeading>
+
+<Prose>
+
+Die geführte Vorführung des Quick Starts läuft in vier Schritten und zeigt drei Tabellen. Jeder Lauf hinterlässt außerdem einen <Term id="record">Nachweis</Term>, womit was gerechnet wurde: Code, Parameter und Bestandsdaten.
+
+</Prose>
+
+<RowList>
+  <Row name="Wo sich die Ergebnisse der beiden Releases unterscheiden">Nach der <Term id="regression">Regression</Term>. Spalten: Größe, Modellpunkte, <Term id="value">Werte</Term>, Perioden.</Row>
+  <Row name="Was sich zwischen den beiden Releases geändert hat">Nach der Auflistung der Änderungen. Spalten: Nr., Revision, <Term id="class">Einordnung</Term>, Beschreibung.</Row>
+  <Row name="Welche Änderungen die Abweichung verursachen">Nach der Suche. Spalten: Revision, Beschreibung, Summe der Abweichung.</Row>
+</RowList>
+
+<SectionHeading id="for-you">Ist das etwas für Sie?</SectionHeading>
+
+<Prose>
+
+Sie möchten wissen, was DeltaRecon genau kann, und es ohne technischen Hintergrund ausprobieren: Beginnen Sie mit dem <a href={pageAddress(quickStart, 'de')}>{quickStart.name.de}</a>. Er führt Sie vom Download bis zur ersten Ergebnistabelle.
+
+Regressionstests kosten Ihr Team viel Zeit, und Sie möchten einschätzen, was die Anbindung Ihrer eigenen Engine erfordert: Lesen Sie <a href={pageAddress(howItWorks, 'de')}>{howItWorks.name.de}</a> und danach <a href={pageAddress(requirements, 'de')}>{requirements.name.de}</a>.
+
+</Prose>
+
+<SectionHeading id="next">Wie es weitergeht</SectionHeading>
+
+<PathBlock>
+  <span slot="stage-1">Laden Sie das Paket herunter und sehen Sie das erste Ergebnis am Referenzmodell.</span>
+  <span slot="stage-2">Was jedes Ergebnis bedeutet, wie DeltaRecon arbeitet und wo seine Grenzen liegen.</span>
+  <span slot="stage-3">Probieren Sie eigene Rechnungen am Referenzmodell aus.</span>
+  <span slot="stage-4">Was Ihre Engine mitbringen muss und wie Sie die Anbindung bauen.</span>
+</PathBlock>

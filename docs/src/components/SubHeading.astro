@@ -1,0 +1,21 @@
+---
+// A sub-heading of a page of prose: a level-3 heading that divides a
+// section, for example the groups of a long list.
+//
+//   <SubHeading>Files the engine reads</SubHeading>
+//
+// With `id` it has an address, the same in both languages. The build fails
+// on an `id` that is not small letters, digits and hyphens.
+import { stepAnchor } from '../site';
+
+interface Props {
+  id?: string;
+}
+
+const { id } = Astro.props;
+if (id !== undefined && (typeof id !== 'string' || !stepAnchor.test(id))) {
+  throw new Error(`${Astro.url.pathname}: the "id" of a sub-heading is not small letters, digits and hyphens.`);
+}
+---
+
+<h3 class="sub-heading" id={id} data-sub-heading><slot /></h3>

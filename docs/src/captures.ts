@@ -13,10 +13,15 @@
 //     steps;
 //   - `caption`: the paragraph above the table of the search, step 4;
 //   - `searchTable`: the head and the rows of that table;
-//   - `notResolved`: the "Not resolved" messages below it.
+//   - `notResolved`: the "Not resolved" messages below it;
+//   - `example`: the facts of the example a page of prose shows (example.ts):
+//     the number of revisions, the number of each revision of the search
+//     table in the table of the changes, the revisions of the two states,
+//     the number of model points.
 // Only `session` differs by platform (path separators, the time stamp of the
 // demo folder). The other parts are read from the Windows capture and must
 // equal the Linux one.
+import { exampleFacts, type ExampleFacts } from './example';
 import { platforms, tag, type Platform } from './release';
 import type { Lang } from './site';
 
@@ -58,6 +63,7 @@ interface Parts {
   afterLines: string[];
   searchTable: SearchTable;
   notResolved: string[];
+  example: ExampleFacts;
 }
 
 function fileOf(platform: Platform, lang: Lang): string {
@@ -159,7 +165,21 @@ function read(platform: Platform, lang: Lang): Parts {
   }
   if (notResolved.length === 0) throw missing(`the message "${marker.notResolved}"`);
 
-  return { session, afterLines, searchTable: { head: head as [string, string, string], rows }, notResolved };
+  // The facts of the example, with the number of each revision of the table.
+  const example = exampleFacts(
+    source,
+    lang,
+    rows.map((row) => row.revision),
+    file,
+  );
+
+  return {
+    session,
+    afterLines,
+    searchTable: { head: head as [string, string, string], rows },
+    notResolved,
+    example,
+  };
 }
 
 const cache = new Map<string, Parts>();
@@ -177,7 +197,7 @@ function parts(platform: Platform, lang: Lang): Parts {
 function shared(lang: Lang): Parts {
   const [first, ...others] = platforms.map((platform) => ({ platform, parts: parts(platform, lang) }));
   for (const other of others) {
-    for (const part of ['afterLines', 'searchTable', 'notResolved'] as const) {
+    for (const part of ['afterLines', 'searchTable', 'notResolved', 'example'] as const) {
       if (JSON.stringify(first.parts[part]) !== JSON.stringify(other.parts[part])) {
         throw new Error(
           `src/${fileOf(first.platform, lang)} and src/${fileOf(other.platform, lang)} differ in "${part}"; only paths and the time stamp of the demo folder may differ.`,
@@ -211,6 +231,15 @@ export function searchTable(lang: Lang): SearchTable {
 /** The "Not resolved" messages of the search. */
 export function notResolved(lang: Lang): string[] {
   return shared(lang).notResolved;
+}
+
+/**
+ * The facts of the example: how many revisions lie between the two states,
+ * the number of each revision of the search table, the revisions of the two
+ * states, the number of model points.
+ */
+export function example(lang: Lang): ExampleFacts {
+  return shared(lang).example;
 }
 
 /** The first sentence of a paragraph of the demo. A number holds no ". ". */

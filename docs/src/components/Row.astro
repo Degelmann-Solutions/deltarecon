@@ -1,0 +1,28 @@
+---
+// One row of a row list: its number (from the list), its name in plain
+// words, a code name after it where it has one, a second line (the
+// content), and a tag at the right end, for example "optional".
+import { outputHtml, pageLanguage } from '../markup';
+
+interface Props {
+  /** The name of the row in plain words. */
+  name: string;
+  /** The name in the code, shown after the name as inline code. */
+  code?: string;
+  /** A tag at the right end; on the phone below the text. */
+  tag?: string;
+}
+
+const { name, code, tag } = Astro.props;
+const lang = pageLanguage(Astro.url.pathname);
+---
+
+<li class="row" data-row>
+  <div class="row-text">
+    <p class="row-name">
+      <span set:html={outputHtml(name, lang)} />{code && <code translate="no">{code}</code>}
+    </p>
+    {Astro.slots.has('default') && <p class="row-line prose-links"><slot /></p>}
+  </div>
+  {tag && <span class="tag row-tag" data-row-tag>{tag}</span>}
+</li>

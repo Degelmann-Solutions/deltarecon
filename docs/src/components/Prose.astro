@@ -1,0 +1,13 @@
+---
+// Prose: the paragraphs of a page of prose, at most `text-max` wide. Links
+// in it are inline links or glossary links. Text between blank lines is a
+// paragraph.
+//
+//   <Prose>
+//
+//   A paragraph with a <Term id="deviation">deviation</Term>.
+//
+//   </Prose>
+---
+
+<div class="prose prose-links" data-prose><slot /></div>

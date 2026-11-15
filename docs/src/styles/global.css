@@ -1123,6 +1123,20 @@
     min-width: 8px;
   }
 
+  /* With the number of the revision before its hash ("30 · 7f1dc64"), as
+     the wide figure of the idea shows the bars, the label needs more room. */
+  .bars-numbered .bar-row {
+    grid-template-columns: 92px minmax(0, 1fr) 80px;
+    gap: 6px;
+  }
+
+  @media (min-width: 37.5rem) {
+    .bars-numbered .bar-row {
+      grid-template-columns: 104px minmax(0, 1fr) 84px;
+      gap: 10px;
+    }
+  }
+
   /* ---- Flow diagram, style "Leiterbahn" ---- */
 
   .flow {
@@ -1429,6 +1443,367 @@
       grid-template-columns: repeat(2, minmax(0, 1fr));
       column-gap: 36px;
     }
+  }
+
+  /* ---- Section heading ---- */
+
+  /* A level-2 heading of a page of prose. It is a link to itself and looks
+     like a heading; on hover it gets the underline, as a step title does. */
+  .section-heading {
+    max-width: var(--spacing-text-max);
+    margin-top: var(--spacing-section-gap-phone);
+    font-size: var(--text-section-heading-phone);
+    font-weight: var(--text-section-heading-phone--font-weight);
+    line-height: var(--text-section-heading-phone--line-height);
+  }
+
+  .section-heading a {
+    display: inline-block;
+    color: inherit;
+  }
+
+  .section-heading a:hover,
+  .section-heading a:active {
+    text-decoration-line: underline;
+    text-decoration-thickness: 1px;
+    text-underline-offset: 3px;
+  }
+
+  @media (min-width: 37.5rem) {
+    .section-heading {
+      margin-top: var(--spacing-section-gap);
+      font-size: var(--text-section-heading);
+      font-weight: var(--text-section-heading--font-weight);
+      line-height: var(--text-section-heading--line-height);
+    }
+  }
+
+  /* ---- Sub-heading ---- */
+
+  .sub-heading {
+    max-width: var(--spacing-text-max);
+    margin-top: 32px;
+    font-size: var(--text-sub-heading);
+    font-weight: var(--text-sub-heading--font-weight);
+    line-height: var(--text-sub-heading--line-height);
+  }
+
+  /* ---- Prose ---- */
+
+  .prose {
+    max-width: var(--spacing-text-max);
+  }
+
+  .prose > * {
+    margin-top: 16px;
+  }
+
+  /* ---- Wide figure ---- */
+
+  /* A figure over the full content width, its caption inside. It is a
+     container, so that a drawing in it can ask how much room it has. */
+  .wide-figure {
+    container-type: inline-size;
+    margin: 28px 0 0;
+    padding: 16px;
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-sm);
+    background: var(--color-bg);
+  }
+
+  /* The second part, below a hairline, under a small label. */
+  .wide-figure-second {
+    max-width: 560px;
+    margin-top: 28px;
+    padding-top: 20px;
+    border-top: 1px solid var(--color-border);
+  }
+
+  .wide-figure-label {
+    margin-bottom: 12px;
+    color: var(--color-text-secondary);
+    font-family: var(--font-mono);
+    font-size: var(--text-label-small);
+    letter-spacing: var(--text-label-small--letter-spacing);
+    text-transform: uppercase;
+  }
+
+  .wide-figure-caption {
+    max-width: var(--spacing-text-max);
+    margin-top: 16px;
+    color: var(--color-text-secondary);
+    font-size: var(--text-caption);
+    line-height: var(--text-caption--line-height);
+  }
+
+  @media (min-width: 37.5rem) {
+    .wide-figure {
+      padding: 24px;
+    }
+  }
+
+  /* ---- Idea figure ---- */
+
+  /* Two outlined boxes and between them the revisions on a trace. As a
+     stack: box, trace with its two lines of text, box, joined by short
+     vertical traces. Trace and squares are borders, so they survive a
+     contrast theme; the squares keep their size at every width. */
+  .idea {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .idea-end .flow-box {
+    padding: 14px 16px;
+  }
+
+  .idea-label {
+    color: var(--color-text-secondary);
+    font-family: var(--font-mono);
+    font-size: var(--text-label-small);
+    line-height: 1.5;
+  }
+
+  .idea-revisions {
+    position: relative;
+    padding: 14px 0;
+  }
+
+  .idea-revisions::before,
+  .idea-revisions::after {
+    content: "";
+    position: absolute;
+    left: 24px;
+    height: 14px;
+    border-left: var(--spacing-trace-width) solid var(--color-teal-text);
+  }
+
+  .idea-revisions::before {
+    top: 0;
+  }
+
+  .idea-revisions::after {
+    bottom: 0;
+  }
+
+  .idea-count {
+    margin: 8px 0 12px;
+    color: var(--color-text-secondary);
+    font-family: var(--font-mono);
+    font-size: var(--text-label-small);
+    line-height: 1.4;
+    text-align: center;
+  }
+
+  .idea-count-deviating {
+    margin: 26px 0 8px;
+    color: var(--color-teal-text);
+  }
+
+  .idea-track {
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    height: 12px;
+    padding: 0 6px;
+  }
+
+  .idea-track::before {
+    content: "";
+    position: absolute;
+    top: calc(50% - var(--spacing-trace-width) / 2);
+    right: 0;
+    left: 0;
+    border-top: var(--spacing-trace-width) solid var(--color-teal-text);
+  }
+
+  /* One square per revision: 7 px, outlined. */
+  .idea-square {
+    position: relative;
+    flex: none;
+    width: 7px;
+    height: 7px;
+    border: 1.5px solid var(--color-navy);
+    background: var(--color-bg);
+  }
+
+  /* A revision of the search table: 11 px, filled by its own border, with
+     its number below. The border widths are whole pixels, 6 and 5, since a
+     browser draws half a pixel of border as none. */
+  .idea-square-deviating {
+    width: 0;
+    height: 0;
+    border: solid var(--color-teal-text);
+    border-width: 6px 5px 5px 6px;
+  }
+
+  .idea-square-deviating span {
+    position: absolute;
+    top: 9px;
+    left: -0.5px;
+    transform: translateX(-50%);
+    color: var(--color-navy);
+    font-family: var(--font-mono);
+    font-size: var(--text-label-small);
+    line-height: 1;
+  }
+
+  /* Where the wide figure has room for both boxes and the whole trace, the
+     boxes stand left and right of it. Below that, also between the phone
+     breakpoint and this width, the figure stays a stack. */
+  @container (min-width: 640px) {
+    .idea {
+      grid-template-columns: 184px minmax(0, 1fr) 184px;
+      align-items: center;
+    }
+
+    .idea-revisions {
+      padding: 0;
+    }
+
+    .idea-revisions::before,
+    .idea-revisions::after {
+      display: none;
+    }
+
+    .idea-count {
+      margin: 0 0 12px;
+    }
+
+    .idea-count-deviating {
+      margin: 26px 0 0;
+    }
+
+    .idea-track {
+      padding: 0 10px;
+    }
+  }
+
+  /* ---- Row list ---- */
+
+  /* Numbered rows with a hairline above each and below the list. The
+     number comes from the list. */
+  .row-list {
+    max-width: var(--spacing-block-max);
+    margin-top: 16px;
+    border-bottom: 1px solid var(--color-border);
+    counter-reset: row;
+  }
+
+  .row {
+    display: grid;
+    grid-template-columns: 24px minmax(0, 1fr);
+    column-gap: 8px;
+    align-items: start;
+    padding: 12px 0;
+    border-top: 1px solid var(--color-border);
+    counter-increment: row;
+  }
+
+  .row::before {
+    content: counter(row);
+    padding-top: 3px;
+    color: var(--color-text-secondary);
+    font-family: var(--font-mono);
+    font-size: var(--text-label);
+  }
+
+  .row-name {
+    font-size: var(--text-callout-title);
+    font-weight: var(--text-callout-title--font-weight);
+    line-height: 1.45;
+  }
+
+  .row-name code {
+    margin-left: 4px;
+    font-weight: 400;
+  }
+
+  .row-line {
+    margin-top: 2px;
+    color: var(--color-text-secondary);
+    font-size: var(--text-body-small);
+    line-height: var(--text-body-small--line-height);
+  }
+
+  /* The tag: on the phone below the text, from the phone breakpoint up at
+     the right end of the row. */
+  .row-tag {
+    grid-column: 2;
+    justify-self: start;
+    margin: 6px 0 0;
+  }
+
+  @media (min-width: 37.5rem) {
+    .row {
+      grid-template-columns: 28px minmax(0, 1fr) auto;
+    }
+
+    .row-tag {
+      grid-column: auto;
+      margin-top: 3px;
+    }
+  }
+
+  /* ---- Path block ---- */
+
+  /* The four stages as in the chapter tree: a trace with square pads, both
+     borders. The trace is decoration; the list carries the order. */
+  .path-block {
+    max-width: var(--spacing-text-max);
+    margin-top: 20px;
+  }
+
+  .path-block > li {
+    position: relative;
+    padding: 0 0 22px 24px;
+  }
+
+  .path-block > li::before {
+    content: "";
+    position: absolute;
+    top: 8px;
+    bottom: -8px;
+    left: 3.25px;
+    border-left: 1.5px solid var(--color-navy);
+    opacity: 0.4;
+  }
+
+  .path-block > li:last-child {
+    padding-bottom: 0;
+  }
+
+  .path-block > li:last-child::before {
+    display: none;
+  }
+
+  .path-block > li::after {
+    content: "";
+    position: absolute;
+    top: 7px;
+    left: 0;
+    border: 4px solid var(--color-navy);
+  }
+
+  .path-stage {
+    color: var(--color-text-secondary);
+    font-family: var(--font-mono);
+    font-size: var(--text-label-small);
+    letter-spacing: var(--text-label-small--letter-spacing);
+    text-transform: uppercase;
+  }
+
+  .path-name {
+    font-size: 1rem;
+    font-weight: 600;
+  }
+
+  .path-text {
+    margin-top: 2px;
+    color: var(--color-text-secondary);
+    font-size: var(--text-body-small);
+    line-height: var(--text-body-small--line-height);
   }
 
   .skip-link:not(:focus) {
