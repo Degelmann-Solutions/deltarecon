@@ -1,0 +1,92 @@
+---
+// One of the two four-column tables of the demo: the table of the
+// regression (step 2) or the table of the changes (step 3), with the
+// columns as the program prints them, read from the capture
+// (src/captures.ts). It stands beside ResultTable.astro, the three-column
+// table of the search, and shares its looks. The caption stays with the
+// table: what the page says about it (the slot), then the sentence the demo
+// prints above the table. The quantity, or the revision, is the header of
+// its row. A quantity name is German and a description English in both
+// languages; each carries its language on a page of the other one.
+//
+// Below the phone breakpoint the stylesheet stacks each row to a record,
+// and the head row to the same lines, so that every column name stays
+// readable above its values. The roles are written out, so the table keeps
+// its meaning there.
+//
+//   <DemoTable table="regression">Output of step 2 on the reference model:</DemoTable>
+//   <DemoTable table="changes">Output of step 3 on the reference model:</DemoTable>
+import { changeTable, regressionTable } from '../captures';
+import { outputHtml, pageLanguage } from '../markup';
+
+interface Props {
+  /** Which table of the demo. */
+  table: 'regression' | 'changes';
+}
+
+const { table } = Astro.props;
+const lang = pageLanguage(Astro.url.pathname);
+if (table !== 'regression' && table !== 'changes') {
+  throw new Error(`${Astro.url.pathname}: a demo table is "regression" or "changes", not "${table}".`);
+}
+const regression = regressionTable(lang);
+const changes = changeTable(lang);
+const german = lang === 'de' ? undefined : 'de';
+const english = lang === 'en' ? undefined : 'en';
+---
+
+<div class="result-wrap">
+  {
+    table === 'regression' ? (
+      <table class="result-table result-table-regression" role="table" data-demo-table="regression">
+        <caption>
+          <slot />
+          <span data-capture="caption" set:html={outputHtml(regression.caption, lang)} />
+        </caption>
+        <thead role="rowgroup">
+          <tr role="row">
+            <th scope="col" role="columnheader" class="result-key" data-capture="head">{regression.head[0]}</th>
+            <th scope="col" role="columnheader" class="result-num result-points" data-capture="head">{regression.head[1]}</th>
+            <th scope="col" role="columnheader" class="result-num result-values" data-capture="head">{regression.head[2]}</th>
+            <th scope="col" role="columnheader" class="result-num result-periods" data-capture="head">{regression.head[3]}</th>
+          </tr>
+        </thead>
+        <tbody role="rowgroup">
+          {regression.rows.map((row) => (
+            <tr role="row" data-capture="row">
+              <th scope="row" role="rowheader" class="result-key" lang={german}>{row.quantity}</th>
+              <td role="cell" class="result-num result-points">{row.modelPoints}</td>
+              <td role="cell" class="result-num result-values">{row.values}</td>
+              <td role="cell" class="result-num result-periods">{row.periods}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    ) : (
+      <table class="result-table result-table-changes" role="table" data-demo-table="changes">
+        <caption>
+          <slot />
+          <span data-capture="caption" set:html={outputHtml(changes.caption, lang)} />
+        </caption>
+        <thead role="rowgroup">
+          <tr role="row">
+            <th scope="col" role="columnheader" class="result-no" data-capture="head">{changes.head[0]}</th>
+            <th scope="col" role="columnheader" class="result-rev" data-capture="head">{changes.head[1]}</th>
+            <th scope="col" role="columnheader" class="result-class" data-capture="head">{changes.head[2]}</th>
+            <th scope="col" role="columnheader" class="result-desc" data-capture="head">{changes.head[3]}</th>
+          </tr>
+        </thead>
+        <tbody role="rowgroup">
+          {changes.rows.map((row) => (
+            <tr role="row" data-capture="row">
+              <td role="cell" class="result-no">{row.number}</td>
+              <th scope="row" role="rowheader" class="result-rev" translate="no">{row.revision}</th>
+              <td role="cell" class="result-class">{row.classes}</td>
+              <td role="cell" class="result-desc" lang={english} set:html={outputHtml(row.description, 'en')} />
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    )
+  }
+</div>
