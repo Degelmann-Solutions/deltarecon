@@ -19,7 +19,7 @@ Run them in `docs/`. Node 20 and npm are required.
 | `npm ci` | Installs the pinned dependencies from `package-lock.json`. |
 | `npm run local` | Builds the site with its search index and serves it. When port 4321 is free, the pages are at `http://localhost:4321/deltarecon/docs/de/` and `/en/`; otherwise the server takes the next free port. The command prints the address it serves on. |
 | `npm run build` | Builds the site to `dist/` and writes the search index to `dist/pagefind/`. |
-| `npm run check` | Builds the site, then runs the five checks below in Chromium. Every page entry runs it. |
+| `npm run check` | Builds the site, then runs the six checks below in Chromium. Every page entry runs it. |
 | `npm run check:apache` | Builds the site, then checks in an Apache what only Apache shows: unknown addresses and the root address. Needs Docker; not part of `npm run check`. |
 | `npm run check:release -- --search <folder>` | Holds the capture files and the built step pages against the published release. Needs `../dist/release-v<version>/` and the search folder of a run of the demo; not part of `npm run check` (see "Captures and the release check"). |
 | `npx astro check` | Type-checks the project. |
@@ -35,9 +35,9 @@ indexes the build output.
 
 ## Checks
 
-`npm run check` runs five scripts one after the other; two more,
+`npm run check` runs six scripts one after the other; two more,
 `scripts/check-apache.mjs` and `scripts/check-release.mjs`, run on their own
-(below). Each of the five starts `astro preview` (`scripts/harness.mjs`),
+(below). Each of the six starts `astro preview` (`scripts/harness.mjs`),
 reads the page register, and names every failed expectation with its page.
 `scripts/harness.mjs` also holds what several scripts run on an open page:
 axe and the check for sideways scrolling (`pageChecks`).
@@ -49,6 +49,7 @@ axe and the check for sideways scrolling (`pageChecks`).
 | `scripts/check-a11y.mjs` | For every page, at desktop and phone width, with the menu closed and open: axe reports no violation of the A and AA rules of WCAG 2.0 to 2.2. Keyboard: the skip link comes first and leads to main, Tab reaches every control in reading order, each at least 24 × 24 px and with a visible focus ring, teal-text on light grounds and teal inside the navy terminal block of a step page; a control with `tabindex="-1"`, as the tab of a platform switch that is not selected, is no stop. The menu below 1280 px: focus on the close button, which says that the menu is open, the page behind inert and the skip link out of the page, the top bar in one row at 320 px, Tab stays inside, Escape and the close button return focus to the menu button. The language switch keeps the anchor the page was loaded with and one set afterwards. With JavaScript off the menu button is a link to the chapter tree at the end of the page. No page scrolls sideways at 1280, 390 and 320 px. For the start page of each language also at 900 px: axe, the menu, no sideways scrolling at 900 and 600 px, an open menu that ends at 1280 px with focus kept in the page, and the search field moving between top bar and menu at 600 px. For the start page of each language, the search result list: axe with the list open, with hits and with no match, in the top bar and in the menu on the phone; its place and look; the hits after the field in tab order, each with a focus ring; the list closed when focus leaves the search in the top bar; Escape in the field, which leaves the menu open; no sideways scrolling with the list open at 600 and 320 px. For the page-not-found pages: axe, the frame without stage line, page links and current page, the two blocks with their languages, skip link, tab order, language switch, menu. For the root page, in a browser that names no language: axe, tab order, no sideways scrolling. Axe does not run with JavaScript off. For the Glossary of each language, at desktop and phone width: Tab reaches every letter of the letter index, each at least 32 × 32 px, and axe runs also at an entry address, arrived at from the Quick start, where the entry shows its linked state and the link back to that page. An error on one page is reported for that page; the others are still checked. |
 | `scripts/check-glossary.mjs` | First it proves itself on pages it sets itself (an unlinked term, a term linked twice, an exempt passage and more): each must fail or pass as expected. The glossary register: every entry has a term and an explanation in both languages. The Glossary of each language, with JavaScript on and off: the letter index, the entries in the alphabetical order of the language as a description list, each with term, counterpart, language code and `lang`; both Glossaries hold the same entries; at every entry address that entry and no other shows the linked state, which ends when the address changes. Every other page: the first occurrence of a term in the content is its glossary link, no entry is linked twice, and a glossary link leads to its entry on the Glossary of the page's language with a dotted underline. "Appears in" lists exactly the pages that link the term. The way back: after a click on a glossary link of a page the entry holds the link "Back to the previous page", a click on it returns to that page, the link is there again after going forward to the entry, and it goes when the address changes; opened directly, or with a Glossary of either language, another site or an address outside the documentation as the page before, the entry holds none. |
 | `scripts/check-steps.mjs` | First the step list of the frontmatter (`stepFaults` in `src/site.ts`): a step without an anchor or a title and an anchor that stands twice are named. Then every step page, which is every page that holds step cards; what a page must show stands in `stepPages` and `words` at the top of the script, written out per language, and a step page without an entry there fails. Desktop: one card per step in order with counter, the tag "optional" on the optional steps only, pad, trace and a figure or flow diagram; the step title is a link to its step; the chapter tree lists the steps with the titles of the cards; an address with the anchor of a step opens with that step at the top of the window, without a highlight; the path end with its marker on the axis of the pads, the closing line and the page links. A card with a part of one platform holds a platform switch. A link of the content to GitHub opens in a new tab with its hidden text, a link to another site is a plain link; the step of the download holds exactly one link to the page of the release on GitHub (`<repository>/releases/tag/v<version>`), named by its tag. The platform switch, also the one without a command (a hairline under its active tab, no code block, no copy button): Windows on the first visit; a click on "Linux" changes every switch and every part of the page while the used switch keeps its place in the window and focus; arrow keys, Home and End; one tab stop per switch; the choice after a reload, on another page, and before the scripts of the page run; without storage it holds for the page and no error shows. The copy button: after the tabs and before the command; the clipboard holds the command without prompt and output; "Copied" for at least 2 s, announced, focus kept; a refused copy shows and announces the failure text. Every block that scrolls sideways takes focus and is a named region; the terminal block shows its ring inside. The result table and the bar figure, which shows the sums of the table: the bar of the largest sum spans half the track, the others in proportion to their sums. No transition and no animation in the content. Axe with Windows and with Linux chosen. Phone: one column, the figure below the text, the flow diagram as a stack, the result table as stacked records with its head row, code and terminal scrolling inside their block, tabs and copy button at least 40 px high, no text of a figure below 11 px, the step list left out of the menu, the scroll position kept when the menu opens and closes; an element that reaches beyond the window is named, also at 320 px. JavaScript off, at 1280 and 390 px: both platforms' parts visible, Windows first, each under its label; no tabs, no button, no copy button. |
+| `scripts/check-prose.mjs` | First the reader of the facts of the example (`src/example.ts`) on the four capture files: the number of revisions, the number of each revision of the search table, the revisions of the two states and the number of model points, each held against the capture in a second way; and it must throw, with the file and the part, on a capture text whose table of the changes lacks a revision of the search table or its rows, whose commands name no revision, and on a search table without rows. Then every page of prose, which is every page that holds section headings; what a page must show stands in `prosePages` at the top of the script, and a page of prose without an entry there fails. Every level-2 heading of the content is a section heading with the anchor the script names, in order, and a link to itself; no other link leads to a section. The language switch at the address of a section opens the counterpart at that section. A wide figure spans the content width and holds its caption as text; no text of a figure is below 11 px. The idea figure: the boxes name the revisions of the two states; one square per revision, 7 px, those of the search table 11 px with their number, drawn as borders and hidden from assistive technology; the two lines of text begin with the counts and the caption names the numbers; at 1280 px the boxes stand left and right of the trace, at 390 and 320 px the figure is a stack of box, trace, box, and the squares keep their size, do not overlap and stay inside the figure. The bars below it carry "number · revision" and the sum of the capture of the language. A row list numbers its rows. The path block shows the four stages of the register, each with a sentence and a link to each of its pages but the page itself, by name and address of the register. No transition and no animation; no sideways scrolling at 1280, 390 and 320 px; axe at 1280 and 390 px. |
 
 `npm run check:apache` runs `scripts/check-apache.mjs` after the build. The
 preview server of the other checks knows no `.htaccess`, so this script
@@ -77,9 +78,9 @@ with hits and with no match (`search-list-`); the page-not-found page of each
 language (`not-found-`) and the root page (`root-`), each at desktop and phone
 width; and the Glossary of each language at desktop and phone width, plain
 and at an entry address (`glossary-`). Lay the first group beside the mock of
-the Overview page when the frame changes, and the last beside the mock of the
-Glossary when the Glossary changes. The check of the step pages writes, per
-step page and language, `<page>-desktop-<lang>.png` and
+the Overview page when the frame or a component of a page of prose changes,
+and the last beside the mock of the Glossary when the Glossary changes. The
+check of the step pages writes, per step page and language, `<page>-desktop-<lang>.png` and
 `<page>-phone-<lang>.png` (`quick-start-desktop-en.png`); lay them beside the
 mock of the Quick start when a step component changes.
 
@@ -91,8 +92,9 @@ reader, and zoom to 400 %.
 `src/site.ts` is the register of the site: the four stages, the ten pages in
 path order with their name and address per language, the addresses outside
 the documentation, the texts of the page frame, of the Glossary and of the
-step components in both languages, the check of a step list (`stepFaults`),
-and the page-not-found page, which stands outside the path
+step components in both languages (the components of a page of prose need
+none of their own; the path block takes the word for "Stage" from the
+frame), the check of a step list (`stepFaults`), and the page-not-found page, which stands outside the path
 (`notFoundPage`, `onPath()`). Chapter
 tree, page links, page head, language switch and head data read it. A page
 name stands there and in no other file; rename a page there.
@@ -162,9 +164,14 @@ description: "The description of the page for search engines and shared links."
 - A new page needs an entry in `pages` of `src/site.ts` (at its place on the
   path) and both files. `npm run check` fails when a page of the register is
   not built or a built page is not in the register.
-- Only the start pages hold the words "Baustelle" (German) and "scaffold"
-  (English); the search checks look for them. Whoever replaces the start
-  page's text gives `searchTexts` in `scripts/harness.mjs` two other words.
+- Only the start pages hold the words "Veränderungsanalyse" (German) and
+  "balance" (English); the search checks look for them (`ownWord` of
+  `searchTexts` in `scripts/harness.mjs`). No other page of the language
+  may hold the word of its start page, and no page the word of the other
+  language. Whoever takes such a word out of a start page gives `searchTexts`
+  another. Try a new word in the built search of both languages first: the
+  search also finds a word that begins like a part of a name, so
+  "reconciliation" finds "DeltaRecon" on German pages and cannot be the word.
   The same list names a word that several pages of a language hold in
   their name or text ("Engine", "engine"; at least two pages must keep it) and a word that only the page-not-found page holds
   ("Tippfehler", "renamed"); no page of the path may hold the latter.
@@ -285,6 +292,78 @@ names it (the Quick start does so before its flow diagram and its table).
 the steps whose switch holds no command, the step with the link to the page
 of the release where it has one, the closing line per language).
 
+## Pages of prose
+
+A page that explains is prose under section headings, with wide figures and
+lists. The Overview is the first; `src/pages/en/index.mdx` is the pattern. A
+page imports the components it uses.
+
+```
+<SectionHeading id="what-you-get">What you get</SectionHeading>
+
+<Prose>
+
+A paragraph with a <Term id="record">record</Term>.
+
+</Prose>
+
+<RowList>
+  <Row name="Where the results differ">The second line of the row.</Row>
+  <Row name="The engine selection" code="--engine" tag="optional">The second line.</Row>
+</RowList>
+
+<WideFigure label="Sum of the deviation, by revision">
+  <IdeaFigure … />
+  <BarFigure slot="second" numbered />
+  <p slot="caption">What the figure shows, in words.</p>
+</WideFigure>
+```
+
+**The components**, all under `src/components/`; their looks are in
+`src/styles/global.css`, one section each.
+
+| Component | What it is |
+|---|---|
+| `SectionHeading` | A level-2 heading with an address of its own; the heading is a link to itself. `id` is the anchor, the same in both languages, so that the language switch keeps the position. The build fails, with the page, on a heading without an `id` of small letters, digits and hyphens. A page of prose writes no `##` heading: its anchor would follow its text, which differs by language. |
+| `SubHeading` | A level-3 heading that divides a section; `id` is optional and, where given, small letters, digits and hyphens. |
+| `Prose` | Paragraphs, at most 720 px wide. Text between blank lines is a paragraph; links are inline links or glossary links. |
+| `WideFigure` | A figure over the content width. The drawing is its content, the caption the slot `caption`; the caption is the text alternative of the figure and says in words what the drawing shows. A second part below a hairline is the slot `second` with the property `label`. The build fails without a caption and when only one of `second` and `label` is there. |
+| `IdeaFigure` | The idea of DeltaRecon in one picture, inside a wide figure: two outlined boxes and between them one square per revision. Squares, their numbers and the two short hashes come from the captures (`example` of `src/captures.ts`); the page gives the words (`before`, `after`, `revision`, `count`, `deviating`). The boxes stand beside the trace where the wide figure is at least 640 px wide inside, and as a stack otherwise; the trace is never scaled. |
+| `BarFigure` with `numbered` | The bars of the search table as the second part of that figure: each label begins with the number of its revision ("2 · 936e50d"). Without `numbered` it is the bar figure of a step card. |
+| `RowList`, `Row` | Numbered rows; the list gives the numbers. A row has a `name` in plain words, a `code` name after it, a `tag` at its right end (on the phone below the text), and its content as the second line. Write a row on one line, so that its content is no paragraph of its own. |
+| `PathBlock` | The four stages with their pages, from the register: stage number, stage name and a link to each page of the stage but the page the block stands on. The page gives one sentence per stage in the slots `stage-1` to `stage-4`, each a `<span>` on one line. The build fails on a stage without its sentence. |
+
+**Numbers of the example.** A page types no number of revisions, hash, sum
+or number of model points of the example. It reads them: `example(lang)` of `src/captures.ts` gives the number
+of revisions, the number of each revision of the search table, the short
+hashes of the two states and the number of model points; `listOf` of
+`src/markup.ts` writes a list in words ("2, 6, 12 and 30"). The Overview
+types what no part of `captures.ts` gives: the number of steps and of tables
+of the demo, the projection years of the search, and the column names of the
+three tables. No check holds these against the captures; whoever takes a new
+release's captures compares them by hand.
+
+**A link to a page of the documentation** takes name and address from the
+register, so that a renamed page needs no edit:
+
+```
+import { findPage, pageAddress } from '../../site';
+
+export const quickStart = findPage('quick-start');
+
+Start with the <a href={pageAddress(quickStart, 'en')}>{quickStart.name.en}</a>.
+```
+
+**Glossary terms.** The words of a figure and of a list row count as content.
+Link a term in the prose before the figure or the row that names it, or in
+the row itself; a property of a component (`name`, `count`, `label`) cannot
+hold a glossary link.
+
+**A new page of prose** needs an entry in `prosePages` of
+`scripts/check-prose.mjs` (the anchors of its sections in order, the section
+the language switch is tried at, whether it holds the idea figure and the
+path block, the number of its rows).
+
 ## Captures and the release check
 
 No page types program output. `src/captures/v<version>/` holds the standard
@@ -294,7 +373,12 @@ language (`windows-en.txt`, `windows-de.txt`, `linux-en.txt`,
 build time and gives the parts a page shows: `session` (the opening up to
 the commands of the first step, what the reader sees before the demo first
 waits for Enter), `afterLines` (the paragraph after each step), `caption`,
-`searchTable`, `notResolved`. The build fails, with file and part, when a
+`searchTable`, `notResolved`, and `example`: the facts of the example a page
+of prose shows, which `src/example.ts` reads from the same text (the number
+of revisions from the table of the changes, the number of each revision of
+the search table in it, the revisions of the two states from the commands of
+steps 1 and 2, the number of model points). The build fails, with file and
+part, when a
 file or a part is missing, and when the Windows and the Linux capture of a
 language differ in a part that does not depend on the platform. These four
 files are the only run output under version control.

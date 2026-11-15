@@ -1,0 +1,25 @@
+---
+// A section heading of a page of prose: a level-2 heading that divides the
+// page and has an address of its own. The heading is a link to itself, so
+// that the reader can copy the address on every width.
+//
+//   <SectionHeading id="what-you-get">What you get</SectionHeading>
+//
+// The page sets the anchor, the same in both languages, so that the language
+// switch keeps the position. The build fails on a heading without one.
+import { stepAnchor } from '../site';
+
+interface Props {
+  /** Anchor of the section: small letters, digits and hyphens. */
+  id: string;
+}
+
+const { id } = Astro.props;
+if (typeof id !== 'string' || !stepAnchor.test(id)) {
+  throw new Error(
+    `${Astro.url.pathname}: a section heading has no "id" of small letters, digits and hyphens.`,
+  );
+}
+---
+
+<h2 class="section-heading" id={id} data-section-heading><a href={`#${id}`}><slot /></a></h2>

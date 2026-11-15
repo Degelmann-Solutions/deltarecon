@@ -81,6 +81,11 @@ export function loadGlossary() {
   return loadSource('glossary.ts');
 }
 
+/** Loads the reader of the facts of the example, src/example.ts. */
+export function loadExample() {
+  return loadSource('example.ts');
+}
+
 /** The release number the documentation applies to. */
 export async function loadRelease() {
   return JSON.parse(await readFile(path.join(root, 'src/release.json'), 'utf8')).version;
@@ -186,7 +191,7 @@ export const searchTexts = {
     count: (number) => `${number} Treffer`,
     // A word that only the start page holds; one that several pages hold;
     // one that only the page-not-found page holds.
-    ownWord: 'Baustelle',
+    ownWord: 'Veränderungsanalyse',
     sharedWord: 'Engine',
     notFoundWord: 'Tippfehler',
   },
@@ -196,7 +201,7 @@ export const searchTexts = {
     unavailable: 'The search is not available.',
     noMatch: (term) => `No matches for “${term}”.`,
     count: (number) => (number === 1 ? '1 match' : `${number} matches`),
-    ownWord: 'scaffold',
+    ownWord: 'balance',
     sharedWord: 'engine',
     notFoundWord: 'renamed',
   },

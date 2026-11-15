@@ -3,8 +3,9 @@
 // page frame, of the Glossary and of the step components, `languageOf`, the language of a page
 // address, and the page-not-found page, which stands outside the path
 // (`notFoundPage`, `onPath`). Chapter tree, page links, page head, language switch and head
-// data read it, and so do the Glossary (components/Glossary.astro) and the
-// glossary link (components/Term.astro); a page name stands here and in no
+// data read it, and so do the Glossary (components/Glossary.astro), the
+// glossary link (components/Term.astro) and the path block of a page of
+// prose (components/PathBlock.astro); a page name stands here and in no
 // other file.
 //
 // This file imports nothing, so that the check scripts can load it (see
