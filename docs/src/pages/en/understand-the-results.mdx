@@ -32,6 +32,7 @@ export const quantity = (name) => quantityOf('en', name);
 export const change = (revision) => changeOf('en', revision);
 export const sum = (revision) => searchRowOf('en', revision).sum;
 export const howItWorks = findPage('how-deltarecon-works');
+export const enginePage = findPage('engine-requirements');
 export const typed = {
   // Numbers the captures do not hold, from the owner conversation of
   // 2026-11-15 (plan of ticket 6). A new release's captures: compare by hand.
@@ -122,6 +123,31 @@ The third step reads the history of the model between release N and the state N+
   <Row name={change('76fc46c').classes}>The calculation rules. Change {change('76fc46c').number}: “{change('76fc46c').description}”.</Row>
   <Row name={change('205a880').classes}>None of these, for example documentation only. Change {change('205a880').number}: “{change('205a880').description}”.</Row>
 </RowList>
+
+<SubHeading>How the classes are found</SubHeading>
+
+<Prose>
+
+DeltaRecon does not judge the content of a change, and it does not read the description: the description is what the author wrote, not a finding. It looks at the files. For every revision it takes the files that the revision adds, removes or alters against the revision before it; for a merge that is the state before the side branch came in. The revision gets the class of every one of these files. That is why a revision can have two classes, and why a revision that touches no such file has none.
+
+Which file has which class, DeltaRecon does not know by itself. The <Term id="adapter">adapter</Term> of the engine says it. The adapter also reads the history and names the files of each revision. For the reference model its adapter declares:
+
+</Prose>
+
+<RowList>
+  <Row name={change('2d05ecf').classes}>The table of the model points, <code translate="no">model_point_table.csv</code>.</Row>
+  <Row name={change('936e50d').classes}>Every other CSV file in the folder of the product, for example <code translate="no">lapse_table.csv</code>.</Row>
+  <Row name={change('76fc46c').classes}>Every file in the folder of the model, <code translate="no">RLV_DE_S</code>.</Row>
+  <Row name={change('205a880').classes}>Every other file, for example the description of the repository or its tests.</Row>
+</RowList>
+
+<Prose>
+
+The class therefore says where a change was made, not what it means. Change {change('76fc46c').number}, “{change('76fc46c').description}”, alters a cost rate and is still code: in the reference model this rate stands in the calculation rules, not in a table.
+
+With an engine of your own, your adapter declares which files are data, parameters and code. <a href={pageAddress(enginePage, 'en')}>{enginePage.name.en}</a> describes what an adapter has to provide.
+
+</Prose>
 
 <SubHeading>A merge, a revert and a change with two classes</SubHeading>
 

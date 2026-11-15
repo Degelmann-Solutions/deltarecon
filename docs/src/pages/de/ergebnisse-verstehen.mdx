@@ -32,6 +32,7 @@ export const quantity = (name) => quantityOf('de', name);
 export const change = (revision) => changeOf('de', revision);
 export const sum = (revision) => searchRowOf('de', revision).sum;
 export const howItWorks = findPage('how-deltarecon-works');
+export const enginePage = findPage('engine-requirements');
 export const typed = {
   // Numbers the captures do not hold, from the owner conversation of
   // 2026-11-15 (plan of ticket 6). A new release's captures: compare by hand.
@@ -122,6 +123,31 @@ Der dritte Schritt liest die Versionsgeschichte des Modells zwischen Release N u
   <Row name={change('76fc46c').classes}>Die Rechenvorschriften. Änderung {change('76fc46c').number}: „<span lang="en">{change('76fc46c').description}</span>“.</Row>
   <Row name={change('205a880').classes}>Nichts davon, zum Beispiel nur Dokumentation. Änderung {change('205a880').number}: „<span lang="en">{change('205a880').description}</span>“.</Row>
 </RowList>
+
+<SubHeading>Wie die Einordnungen ermittelt werden</SubHeading>
+
+<Prose>
+
+DeltaRecon beurteilt nicht den Inhalt einer Änderung und liest dafür auch nicht die Beschreibung: Die Beschreibung ist das, was der Autor geschrieben hat, kein Befund. Es betrachtet die Dateien. Für jede Revision nimmt es die Dateien, die sie gegenüber der Revision davor hinzufügt, entfernt oder ändert; bei einer Zusammenführung ist das der Stand, bevor der Seitenzweig hinzukam. Die Revision erhält die Einordnung jeder dieser Dateien. Deshalb kann eine Revision zwei Einordnungen haben, und eine Revision, die keine solche Datei berührt, hat keine.
+
+Welche Datei welche Einordnung hat, weiß DeltaRecon nicht von sich aus. Das sagt der <Term id="adapter">Adapter</Term> der Engine. Der Adapter liest auch die Historie und nennt die Dateien jeder Revision. Für das Referenzmodell legt sein Adapter fest:
+
+</Prose>
+
+<RowList>
+  <Row name={change('2d05ecf').classes}>Die Tabelle der Modellpunkte, <code translate="no">model_point_table.csv</code>.</Row>
+  <Row name={change('936e50d').classes}>Jede andere CSV-Datei im Ordner des Produkts, zum Beispiel <code translate="no">lapse_table.csv</code>.</Row>
+  <Row name={change('76fc46c').classes}>Jede Datei im Ordner des Modells, <code translate="no">RLV_DE_S</code>.</Row>
+  <Row name={change('205a880').classes}>Jede andere Datei, zum Beispiel die Beschreibung des Repositorys oder seine Tests.</Row>
+</RowList>
+
+<Prose>
+
+Die Einordnung sagt also, wo geändert wurde, nicht was die Änderung bedeutet. Änderung {change('76fc46c').number}, „<span lang="en">{change('76fc46c').description}</span>“, ändert einen Kostensatz und ist dennoch Code: Im Referenzmodell steht dieser Satz in den Rechenvorschriften, nicht in einer Tabelle.
+
+Bei Ihrer eigenen Engine legt Ihr Adapter fest, welche Dateien Daten, Parameter und Code sind. <a href={pageAddress(enginePage, 'de')}>{enginePage.name.de}</a> beschreibt, was ein Adapter leisten muss.
+
+</Prose>
 
 <SubHeading>Eine Zusammenführung, eine Rücknahme und eine Änderung mit zwei Einordnungen</SubHeading>
 

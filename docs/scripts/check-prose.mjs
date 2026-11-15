@@ -90,7 +90,7 @@ const prosePages = {
   'understand-the-results': {
     sections: ['regression-table', 'change-table', 'search-result'],
     counterpart: 'change-table',
-    rows: 19,
+    rows: 23,
     // The three tables of the demo and the line of the changes.
     tables: true,
     line: true,

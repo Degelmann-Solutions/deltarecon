@@ -39,6 +39,21 @@ export interface Entry {
 
 export const entries: readonly Entry[] = [
   {
+    anchor: 'adapter',
+    en: {
+      term: 'Adapter',
+      forms: ['adapters'],
+      explanation:
+        'The piece that connects a calculation engine to DeltaRecon. Through it DeltaRecon has the engine compute a state of the model, reads the history of the changes, and learns which files are data, parameters and code.',
+    },
+    de: {
+      term: 'Adapter',
+      forms: ['Adapters', 'Adaptern'],
+      explanation:
+        'Das Verbindungsstück zwischen einer Rechen-Engine und DeltaRecon. Über ihn lässt DeltaRecon die Engine einen Stand des Modells rechnen, liest die Historie der Änderungen und erfährt, welche Dateien Daten, Parameter und Code sind.',
+    },
+  },
+  {
     anchor: 'bruttobeitrag',
     termLang: 'de',
     en: {
