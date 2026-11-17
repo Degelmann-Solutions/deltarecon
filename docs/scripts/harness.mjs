@@ -215,6 +215,7 @@ export const searchTexts = {
  */
 export const pageWords = {
   'understand-the-results': { en: 'bracket', de: 'Stornosatz' },
+  'how-deltarecon-works': { en: 'middle', de: 'Durchlauf' },
 };
 
 /**

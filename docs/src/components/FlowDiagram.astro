@@ -9,20 +9,34 @@
 //     <FlowBox code="request · run" writes="release-n/">Compute release N</FlowBox>
 //     <p slot="caption">The four steps of the guided demo.</p>
 //   </FlowDiagram>
+//
+// With `wide` it is a wide figure of a page of prose: it spans the content
+// width and has the frame and the caption of a wide figure. It is a figure
+// itself and does not stand inside `WideFigure`.
+//
+//   <FlowDiagram wide end="search result">
+//     <FlowBox>Two recorded results</FlowBox>
+//     <p slot="caption">What the diagram shows, in words.</p>
+//   </FlowDiagram>
 interface Props {
   /** What the trace ends in. */
   end: string;
+  /** A wide figure of a page of prose, not a part of a step card. */
+  wide?: boolean;
 }
 
-const { end } = Astro.props;
+const { end, wide = false } = Astro.props;
+if (wide && !Astro.slots.has('caption')) {
+  throw new Error(`${Astro.url.pathname}: a wide flow diagram has no caption (slot "caption").`);
+}
 ---
 
-<figure class="flow" data-flow>
+<figure class:list={['flow', wide && 'wide-figure']} data-flow data-wide-figure={wide ? '' : undefined}>
   <div class="flow-row">
     <ol class="flow-boxes">
       <slot />
     </ol>
     <p class="flow-end"><span class="flow-pad" aria-hidden="true"></span><span>{end}</span></p>
   </div>
-  <figcaption class="flow-caption prose-links"><slot name="caption" /></figcaption>
+  <figcaption class:list={[wide ? 'wide-figure-caption' : 'flow-caption', 'prose-links']}><slot name="caption" /></figcaption>
 </figure>

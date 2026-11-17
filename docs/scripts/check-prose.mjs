@@ -54,6 +54,14 @@
 //     the key names the numbers; at 1280 px the key stands right of the
 //     trace, at 390 and 320 px below it, and the squares keep their size;
 //     the bars below it as under the idea figure;
+//   - the wide flow diagram: a wide figure that is an ordered list of the
+//     boxes `prosePages` names, in their order, each numbered, without a
+//     mono line; the trace ends in the pad and the words `prosePages` names;
+//     the first row list of the page names the same parts in the same order,
+//     so that the diagram stands as text beside itself. At 1280 px the boxes
+//     stand side by side from left to right with the end right of them; at
+//     390 and 320 px they are a stack with the end below; nothing is scaled
+//     and every box stays inside the figure;
 //   - the path block: the four stages of the register in order, each with
 //     its number, its name, one sentence and a link to each of its pages but
 //     the page itself, by the name and address of the register;
@@ -94,6 +102,22 @@ const prosePages = {
     // The three tables of the demo and the line of the changes.
     tables: true,
     line: true,
+  },
+  'how-deltarecon-works': {
+    sections: ['path', 'search', 'limits'],
+    counterpart: 'limits',
+    rows: 9,
+    // The wide flow diagram: its boxes in order and what its trace ends in.
+    flow: {
+      en: {
+        boxes: ['Two recorded results', 'The changes in order', 'Search by halving', 'Attribution to single changes'],
+        end: 'search result',
+      },
+      de: {
+        boxes: ['Zwei Ergebnisse mit Nachweis', 'Die Änderungen der Reihe nach', 'Suche durch Halbieren', 'Zuordnung zu einzelnen Änderungen'],
+        end: 'Suchergebnis',
+      },
+    },
   },
 };
 
@@ -953,6 +977,111 @@ async function checkLine(page, name, facts, lang, stacked) {
   );
 }
 
+/** The wide flow diagram at one width: `stacked` says how its boxes must stand. */
+async function checkFlow(page, name, listed, stacked) {
+  const flow = await page.evaluate(() => {
+    const figure = document.querySelector('main [data-flow]');
+    if (!figure) return null;
+    const box = (element) => {
+      const { left, right, top, bottom, width, height } = element.getBoundingClientRect();
+      return { left, right, top, bottom, width, height };
+    };
+    const text = (element) => element?.textContent.replace(/\s+/g, ' ').trim() ?? '';
+    const list = figure.querySelector('.flow-boxes');
+    const end = figure.querySelector('.flow-end');
+    const boxes = [...list.children];
+    return {
+      count: document.querySelectorAll('main [data-flow]').length,
+      wide: figure.hasAttribute('data-wide-figure') && figure.tagName === 'FIGURE',
+      figure: box(figure),
+      counter: getComputedStyle(list).counterReset,
+      ordered: list.tagName === 'OL' && boxes.every((item) => item.tagName === 'LI' && item.hasAttribute('data-flow-box')),
+      boxes: boxes.map((item) => ({
+        title: text(item.querySelector('.flow-title')),
+        sub: item.querySelector('.flow-sub') !== null,
+        number: getComputedStyle(item, '::before').content,
+        // The computed content names the counter, not its value: the box
+        // must also count it up, and the list must start it.
+        counted: getComputedStyle(item).counterIncrement,
+        size: Number.parseFloat(getComputedStyle(item.querySelector('.flow-title')).fontSize),
+        border: getComputedStyle(item).borderTopStyle,
+        box: box(item),
+      })),
+      end: { text: text(end), box: box(end), padHidden: end.querySelector('.flow-pad')?.getAttribute('aria-hidden') === 'true' },
+      scaled: [figure, list, end, ...boxes].some(
+        (part) => getComputedStyle(part).transform !== 'none' || getComputedStyle(part).zoom !== '1',
+      ),
+      // The parts as text beside the diagram: the names of the first row list.
+      rows: [...(document.querySelector('main [data-row-list]')?.querySelectorAll(':scope > [data-row] .row-name') ?? [])].map(text),
+    };
+  });
+  if (!flow) {
+    failures.push(`${name}: no flow diagram`);
+    return;
+  }
+  expect(flow.count === 1 && flow.wide, `${name}: the page holds ${flow.count} flow diagrams, expected one wide one (FlowDiagram with "wide")`);
+  expect(flow.ordered, `${name}: the boxes of the flow diagram are no ordered list`);
+  const titles = flow.boxes.map((entry) => entry.title);
+  expect(
+    JSON.stringify(titles) === JSON.stringify(listed.boxes),
+    `${name}: the boxes of the flow diagram are [${titles}], expected [${listed.boxes}] (prosePages in scripts/check-prose.mjs)`,
+  );
+  expect(
+    JSON.stringify(flow.rows) === JSON.stringify(titles),
+    `${name}: the first row list names [${flow.rows}], the flow diagram [${titles}]: the diagram does not stand as text beside itself`,
+  );
+  expect(
+    flow.end.text === listed.end && flow.end.padHidden,
+    `${name}: the trace ends in "${flow.end.text}", expected "${listed.end}" after a pad hidden from assistive technology`,
+  );
+  expect(!flow.scaled, `${name}: the flow diagram is scaled`);
+  expect(
+    /\bflow\b/.test(flow.counter),
+    `${name}: the list of the flow diagram does not start the counter of its boxes (counter-reset: ${flow.counter})`,
+  );
+  flow.boxes.forEach((entry, index) => {
+    const which = `${name}: box ${index + 1} of the flow diagram`;
+    const previous = flow.boxes[index - 1];
+    expect(
+      (entry.number.includes('counter(flow)') || entry.number === `"${index + 1}"`) && /\bflow 1\b/.test(entry.counted),
+      `${which} carries no number (content: ${entry.number}, counter-increment: ${entry.counted})`,
+    );
+    expect(!entry.sub && entry.border === 'solid', `${which} holds a mono line or is not outlined`);
+    expect(Math.abs(entry.size - 13) < 0.1, `${which}: its title is ${entry.size} px, not 13 px`);
+    expect(
+      entry.box.left >= flow.figure.left && entry.box.right <= flow.figure.right + 0.05,
+      `${which} reaches beyond its figure`,
+    );
+    if (!previous) return;
+    if (stacked) {
+      expect(
+        entry.box.top >= previous.box.bottom &&
+          Math.abs(entry.box.left - previous.box.left) < 1 &&
+          Math.abs(entry.box.width - previous.box.width) < 1,
+        `${which} does not stand below box ${index}, at its width`,
+      );
+    } else {
+      expect(
+        entry.box.left >= previous.box.right && Math.abs(entry.box.top - previous.box.top) < 1,
+        `${which} does not stand right of box ${index}, in its row`,
+      );
+    }
+  });
+  const last = flow.boxes.at(-1)?.box;
+  if (last) {
+    expect(
+      stacked
+        ? flow.end.box.top >= last.bottom
+        : flow.end.box.left >= last.right && flow.end.box.top < last.bottom && flow.end.box.bottom > last.top,
+      `${name}: the end of the trace does not stand ${stacked ? 'below' : 'right of'} the last box`,
+    );
+    expect(
+      flow.end.box.left >= flow.figure.left && flow.end.box.right <= flow.figure.right + 0.05,
+      `${name}: the end of the trace reaches beyond its figure`,
+    );
+  }
+}
+
 /** Row lists: numbered rows, a hairline above each and below the list. */
 async function checkRowLists(page, name, expected) {
   const lists = await page.evaluate(() =>
@@ -1052,10 +1181,11 @@ async function checkProsePage(browser, origin, entry, listed, facts) {
     const name = at(DESKTOP);
     await checkHeadings(page, name, listed);
     const figures = await checkFigures(page, name);
-    expect(!(listed.idea || listed.line) || figures > 0, `${name}: no wide figure`);
+    expect(!(listed.idea || listed.line || listed.flow) || figures > 0, `${name}: no wide figure`);
     if (listed.idea) await checkIdea(page, name, facts, entry.lang, false);
     if (listed.tables) await checkDemoTables(page, name, facts, entry.lang, false);
     if (listed.line) await checkLine(page, name, facts, entry.lang, false);
+    if (listed.flow) await checkFlow(page, name, listed.flow[entry.lang], false);
     await checkRowLists(page, name, listed.rows ?? 0);
     if (listed.path) await checkPathBlock(page, name, entry);
     await checkNoMotion(page, name);
@@ -1072,6 +1202,7 @@ async function checkProsePage(browser, origin, entry, listed, facts) {
     if (listed.idea) await checkIdea(page, name, facts, entry.lang, true);
     if (listed.tables) await checkDemoTables(page, name, facts, entry.lang, true);
     if (listed.line) await checkLine(page, name, facts, entry.lang, true);
+    if (listed.flow) await checkFlow(page, name, listed.flow[entry.lang], true);
     await checkNoSidewaysScroll(page, name);
     if (viewport === PHONE) await checkAxe(page, name);
     await context.close();
