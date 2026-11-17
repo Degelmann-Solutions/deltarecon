@@ -1233,6 +1233,10 @@
 
   /* ---- Flow diagram, style "Leiterbahn" ---- */
 
+  /* As a wide figure of a page of prose (FlowDiagram with `wide`) the
+     figure also carries `wide-figure`, whose rules stand further down and so
+     set its margin, frame and caption; the boxes and the trace are these. */
+
   .flow {
     margin: 20px 0 0;
   }
