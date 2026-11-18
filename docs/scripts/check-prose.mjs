@@ -25,7 +25,23 @@
 // Then, for every page of prose of both languages:
 //   - every level-2 heading of the content is a section heading with the
 //     anchor `prosePages` names, in its order, and is a link to itself; the
-//     page holds no "on this page" list;
+//     page holds no "on this page" list: no other link leads to a section,
+//     apart from a section `prosePages` names as linked from the content
+//     (the options several commands share, on "Single commands"), which
+//     must then be linked;
+//   - no part of the content names a step that is not there (the mark a
+//     step card replaces);
+//   - the platform switches of a page of prose, which stand between its
+//     blocks: those `prosePages` names, in order, each named by its place
+//     ("Command, request, Windows"), and those without a command. Windows on
+//     the first visit; a tab list of two buttons, the copy button after it,
+//     then the command, a named region that takes focus; a click on "Linux"
+//     changes every switch while the used one keeps focus; the copy button
+//     copies the command that is shown; a switch without a command holds no
+//     code block and no copy button; axe with Linux chosen; at 390 px tabs
+//     and copy button are at least 40 px high; with JavaScript off both
+//     parts stand one after the other, Windows first, each under its label,
+//     without tabs and buttons;
 //   - the language switch, at the address of a section, opens the
 //     counterpart at the same section;
 //   - a wide figure holds its caption, which is text; no text of a figure is
@@ -119,7 +135,23 @@ const prosePages = {
       },
     },
   },
+  'single-commands': {
+    sections: ['start', 'request', 'run', 'replay', 'compare', 'regression', 'derive', 'walk', 'search', 'quickstart', 'shared-options'],
+    counterpart: 'search',
+    rows: 91,
+    // The section that the sections of the commands link to.
+    linked: ['shared-options'],
+    // The platform switches: the place each switch with a command names, in
+    // order, and the number of switches without a command.
+    switches: {
+      places: ['request', 'run', 'replay', 'regression', 'derive', 'walk', 'search', 'quickstart'],
+      plain: 1,
+    },
+  },
 };
+
+/** The mark a step card puts its number in the place of (src/markup.ts). */
+const STEP_MARK = '⟦step⟧';
 
 /** The widths the idea figure is looked at: side by side, then as a stack. */
 const NARROW = { width: 320, height: 844 };
@@ -466,15 +498,279 @@ async function checkHeadings(page, name, listed) {
     JSON.stringify(anchors) === JSON.stringify(listed.sections),
     `${name}: the sections are [${anchors}], expected [${listed.sections}] (prosePages in scripts/check-prose.mjs)`,
   );
-  // No "on this page" list: no link of the page but a heading itself leads to a section.
+  // No "on this page" list: no link of the page but a heading itself leads
+  // to a section, apart from a section the entry names as linked from the
+  // content, and then only from inside the content.
+  const linked = listed.linked ?? [];
   const others = await page.evaluate(
     (ids) =>
       [...document.querySelectorAll('a[href^="#"]')]
         .filter((link) => ids.includes(link.getAttribute('href').slice(1)) && !link.closest('h2'))
-        .map((link) => link.getAttribute('href')),
+        .map((link) => ({ href: link.getAttribute('href'), content: link.closest('main [data-row], main [data-prose], main [data-callout]') !== null })),
     anchors,
   );
-  expect(others.length === 0, `${name}: links to sections outside their headings: [${others}]`);
+  const strangers = others.filter((link) => !(link.content && linked.includes(link.href.slice(1))));
+  expect(
+    strangers.length === 0,
+    `${name}: links to sections outside their headings: [${strangers.map((link) => link.href)}]`,
+  );
+  for (const anchor of linked) {
+    expect(
+      others.some((link) => link.href === `#${anchor}`),
+      `${name}: no link of the content leads to the section "${anchor}", which prosePages names as linked`,
+    );
+  }
+  // A part that names its step stands in a step card, which a page of prose has not.
+  const marked = await page.evaluate((mark) => document.querySelector('main').innerHTML.includes(mark), STEP_MARK);
+  expect(!marked, `${name}: a part of the content names a step ("${STEP_MARK}"); outside a step card it needs "place"`);
+}
+
+/** What a page of prose shows of its platform switches, in order. */
+function switchState(page) {
+  return page.evaluate(() => {
+    const shown = (element) => Boolean(element) && element.getClientRects().length > 0;
+    const height = (element) => (element ? element.getBoundingClientRect().height : 0);
+    return {
+      chosen: document.documentElement.dataset.platform,
+      focus: document.activeElement?.dataset?.platformTab,
+      switches: [...document.querySelectorAll('main [data-platform-switch]')].map((element, index) => {
+        const list = element.querySelector('[role="tablist"]');
+        const tabs = [...element.querySelectorAll('[role="tab"]')];
+        const button = element.querySelector('button[data-copy-button]');
+        const parts = [...element.querySelectorAll(':scope > [data-platform-part]')];
+        const part = parts.find(shown);
+        const region = part?.querySelector('pre');
+        const text = part?.querySelector('.platform-text, .step-after');
+        return {
+          index,
+          block: element.parentElement === document.querySelector('main'),
+          plain: element.hasAttribute('data-plain'),
+          label: list?.getAttribute('aria-label') ?? '',
+          tabs: tabs.map((tab) => ({
+            platform: tab.dataset.platformTab,
+            name: tab.textContent.trim().replace(/\s+/g, ' '),
+            button: tab.tagName === 'BUTTON',
+            selected: tab.getAttribute('aria-selected') === 'true',
+            stop: tab.tabIndex === 0,
+            panel: document.getElementById(tab.getAttribute('aria-controls') ?? '')?.getAttribute('role') === 'tabpanel',
+            height: height(tab),
+          })),
+          hasFocus: element.contains(document.activeElement),
+          parts: parts.map((candidate) => ({ platform: candidate.dataset.platformPart, shown: shown(candidate) })),
+          labels: parts.filter((candidate) => shown(candidate.querySelector(':scope > [data-platform-label]'))).length,
+          blocks: element.querySelectorAll('pre').length,
+          button: button && {
+            name: button.getAttribute('aria-label') ?? '',
+            height: height(button),
+            // After the tab list, before the command.
+            placed:
+              Boolean(list && region) &&
+              Boolean(list.compareDocumentPosition(button) & Node.DOCUMENT_POSITION_FOLLOWING) &&
+              Boolean(button.compareDocumentPosition(region) & Node.DOCUMENT_POSITION_FOLLOWING),
+          },
+          region: region && {
+            name: region.getAttribute('aria-label') ?? '',
+            role: region.getAttribute('role'),
+            stop: region.tabIndex === 0,
+            scrolls: getComputedStyle(region).overflowX,
+            command: region.textContent,
+            copy: region.closest('[data-copy]')?.dataset.copy,
+          },
+          text: text ? text.textContent.trim() : '',
+        };
+      }),
+    };
+  });
+}
+
+/** The platform switches of a page of prose. */
+async function checkSwitches(browser, origin, entry, listed) {
+  const t = entry.texts;
+  const wanted = listed.places.length + listed.plain;
+  const tabNames = { windows: `${t.windows} ${t.windowsShell}`, linux: t.linux };
+  const withScript = async (viewport, options = {}) => {
+    const context = await browser.newContext({ viewport, ...options });
+    const page = await context.newPage();
+    const errors = [];
+    page.on('pageerror', (error) => errors.push(error.message));
+    await page.goto(`${origin}${entry.address}`, { waitUntil: 'networkidle' });
+    await page.waitForSelector('html[data-menu]');
+    return { context, page, errors };
+  };
+
+  /** Every switch shows `platform`, and each is what the entry names. */
+  const expectSwitches = (state, name, platform) => {
+    expect(state.chosen === platform, `${name}: <html data-platform> is "${state.chosen}", expected "${platform}"`);
+    expect(
+      state.switches.length === wanted && state.switches.filter((element) => element.plain).length === listed.plain,
+      `${name}: ${state.switches.length} platform switches, ${state.switches.filter((element) => element.plain).length} of them without a command; expected ${wanted} and ${listed.plain} (prosePages in scripts/check-prose.mjs)`,
+    );
+    const places = [...listed.places];
+    for (const element of state.switches) {
+      const which = `${name}, platform switch ${element.index + 1}`;
+      expect(element.block, `${which}: it does not stand between the blocks of the page`);
+      expect(
+        element.label === t.operatingSystem &&
+          element.tabs.length === 2 &&
+          element.tabs[0].platform === 'windows' &&
+          element.tabs[1].platform === 'linux' &&
+          element.tabs.every((tab) => tab.button && tab.panel) &&
+          element.tabs[0].name === (element.plain ? t.windows : tabNames.windows) &&
+          element.tabs[1].name === tabNames.linux,
+        `${which}: not a tab list "${t.operatingSystem}" of the buttons "${tabNames.windows}" and "${tabNames.linux}", each naming its panel: ${JSON.stringify(element.tabs)}`,
+      );
+      expect(
+        element.tabs.filter((tab) => tab.selected).map((tab) => tab.platform).join() === platform &&
+          element.tabs.filter((tab) => tab.stop).length === 1,
+        `${which}: the selected tab is not "${platform}", or the switch has not one tab stop`,
+      );
+      expect(
+        element.parts.length === 2 && element.parts.every((part) => part.shown === (part.platform === platform)) && element.labels === 0,
+        `${which}: it does not show the part of "${platform}" alone, under the tabs: ${JSON.stringify(element.parts)}`,
+      );
+      if (element.plain) {
+        expect(
+          element.blocks === 0 && !element.button && element.text !== '',
+          `${which}: a switch without a command holds a code block or a copy button, or no text`,
+        );
+        continue;
+      }
+      const place = places.shift();
+      expect(
+        Boolean(element.region) &&
+          element.region.name === `${t.command}, ${place}, ${t[platform]}` &&
+          element.region.role === 'region' &&
+          element.region.stop &&
+          element.region.scrolls === 'auto' &&
+          element.region.command === element.region.copy,
+        `${which}: its command is not the named region "${t.command}, ${place}, ${t[platform]}" that takes focus and scrolls inside its block: ${JSON.stringify(element.region)}`,
+      );
+      expect(
+        Boolean(element.button) && element.button.name === `${t.copyCommand}, ${place}` && element.button.placed,
+        `${which}: no copy button "${t.copyCommand}, ${place}" after the tabs and before the command: ${JSON.stringify(element.button)}`,
+      );
+    }
+  };
+
+  // A page whose entry names no switch holds none.
+  if (wanted === 0) {
+    const name = `${entry.address} (${DESKTOP.width} px, platform switches)`;
+    const { context, page } = await withScript(DESKTOP);
+    const { switches } = await switchState(page);
+    expect(
+      switches.length === 0,
+      `${name}: ${switches.length} platform switches, and prosePages names none (scripts/check-prose.mjs)`,
+    );
+    await context.close();
+    return;
+  }
+
+  // Desktop: Windows first, then a click on "Linux" in a switch in the middle.
+  {
+    const name = `${entry.address} (${DESKTOP.width} px, platform switches)`;
+    const { context, page, errors } = await withScript(DESKTOP, { permissions: ['clipboard-read', 'clipboard-write'] });
+    expectSwitches(await switchState(page), `${name}, first visit`, 'windows');
+    const used = Math.floor(wanted / 2);
+    const list = page.locator('main [data-platform-switch]').nth(used).locator('[role="tablist"]');
+    await list.scrollIntoViewIfNeeded();
+    const before = (await list.boundingBox()).y;
+    await list.locator('[data-platform-tab="linux"]').click();
+    const state = await switchState(page);
+    expectSwitches(state, `${name}, a click on Linux`, 'linux');
+    expect(
+      state.focus === 'linux' && state.switches[used]?.hasFocus,
+      `${name}, a click on Linux: focus is not on the tab "linux" of the used switch`,
+    );
+    const after = (await list.boundingBox()).y;
+    expect(Math.abs(after - before) <= 1, `${name}, a click on Linux: the used switch moved from ${before} to ${after} px in the window`);
+    await page.keyboard.press('ArrowLeft');
+    expectSwitches(await switchState(page), `${name}, the key ArrowLeft`, 'windows');
+    await page.keyboard.press('End');
+    expectSwitches(await switchState(page), `${name}, the key End`, 'linux');
+    // The copy button copies the command that is shown.
+    const first = (await switchState(page)).switches.find((element) => !element.plain);
+    if (first) {
+      const button = page.locator('main [data-platform-switch]').nth(first.index).locator('button[data-copy-button]');
+      await button.click();
+      await page.waitForFunction((index) => document.querySelectorAll('main [data-platform-switch]')[index].querySelector('button[data-copy-button][data-state]') !== null, first.index, { timeout: 5_000 }).catch(() => {});
+      const copied = await page.evaluate(() => navigator.clipboard.readText());
+      expect(
+        copied === first.region?.copy && (await button.textContent()) === t.copied,
+        `${name}: the copy button of platform switch ${first.index + 1} copied "${copied}" and reads "${await button.textContent()}", expected "${first.region?.copy}" and "${t.copied}"`,
+      );
+      await page.waitForFunction(() => document.querySelector('main button[data-copy-button][data-state]') === null, undefined, { timeout: 10_000 }).catch(() => {});
+    }
+    await checkAxe(page, `${name}, Linux`);
+    await checkNoSidewaysScroll(page, `${name}, Linux`);
+    expect(errors.length === 0, `${name}: script errors: ${errors.join(' | ')}`);
+    await context.close();
+  }
+
+  // Phone: tabs and copy button are at least 40 px high.
+  {
+    const name = `${entry.address} (${PHONE.width} px, platform switches)`;
+    const { context, page } = await withScript(PHONE);
+    const state = await switchState(page);
+    expectSwitches(state, name, 'windows');
+    for (const element of state.switches) {
+      expect(
+        element.tabs.every((tab) => tab.height >= 40) && (!element.button || element.button.height >= 40),
+        `${name}, platform switch ${element.index + 1}: a tab or the copy button is below 40 px (${element.tabs.map((tab) => tab.height)}, ${element.button?.height})`,
+      );
+    }
+    await context.close();
+  }
+
+  // JavaScript off: both parts, Windows first, each under its label.
+  {
+    const name = `${entry.address} (${DESKTOP.width} px, JavaScript off)`;
+    const context = await browser.newContext({ viewport: DESKTOP, javaScriptEnabled: false });
+    const page = await context.newPage();
+    await page.goto(`${origin}${entry.address}`);
+    const state = await page.evaluate(() => {
+      const shown = (element) => Boolean(element) && element.getClientRects().length > 0;
+      return {
+        chosen: document.documentElement.dataset.platform,
+        tabs: document.querySelectorAll('main [role="tab"], main [role="tablist"], main [role="tabpanel"]').length,
+        buttons: [...document.querySelectorAll('main button')].filter(shown).length,
+        switches: [...document.querySelectorAll('main [data-platform-switch]')].map((element) => ({
+          plain: element.hasAttribute('data-plain'),
+          parts: [...element.querySelectorAll(':scope > [data-platform-part]')].map((part) => {
+            const label = part.querySelector(':scope > [data-platform-label]');
+            const block = part.querySelector('pre');
+            return {
+              platform: part.dataset.platformPart,
+              label: shown(label) ? label.textContent.trim().replace(/\s+/g, ' ') : '',
+              labelTop: label?.getBoundingClientRect().top,
+              blockTop: shown(block) ? block.getBoundingClientRect().top : -1,
+            };
+          }),
+        })),
+      };
+    });
+    expect(state.chosen === undefined, `${name}: <html> names a platform`);
+    expect(
+      state.tabs === 0 && state.buttons === 0,
+      `${name}: the page holds tabs or a visible button (${state.tabs} tab parts, ${state.buttons} buttons)`,
+    );
+    expect(state.switches.length === wanted, `${name}: ${state.switches.length} platform switches, expected ${wanted}`);
+    state.switches.forEach((element, index) => {
+      const [first, second] = element.parts;
+      expect(
+        element.parts.length === 2 &&
+          first.platform === 'windows' &&
+          second.platform === 'linux' &&
+          first.label === (element.plain ? t.windows : tabNames.windows) &&
+          second.label === tabNames.linux &&
+          first.labelTop < second.labelTop &&
+          (element.plain
+            ? first.blockTop === -1 && second.blockTop === -1
+            : first.labelTop < first.blockTop && first.blockTop < second.labelTop && second.labelTop < second.blockTop),
+        `${name}, platform switch ${index + 1}: not the part of Windows and then of Linux, each under its visible label${element.plain ? ', without a command' : ' above its command'}: ${JSON.stringify(element.parts)}`,
+      );
+    });
+    await context.close();
+  }
 }
 
 /** The language switch at the address of a section. */
@@ -1209,6 +1505,9 @@ async function checkProsePage(browser, origin, entry, listed, facts) {
   }
 
   if (listed.counterpart) await checkCounterpart(browser, origin, entry, listed.counterpart);
+
+  // A page of prose holds platform switches only where its entry names them.
+  await checkSwitches(browser, origin, entry, listed.switches ?? { places: [], plain: 0 });
 }
 
 const { origin: reported, stop } = startPreview();

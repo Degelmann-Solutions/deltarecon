@@ -648,6 +648,13 @@
     margin-top: 4px;
   }
 
+  /* On a page of prose a switch is a block of its own between prose and
+     row lists. */
+  main > .platform-switch {
+    max-width: var(--spacing-block-max);
+    margin-top: 16px;
+  }
+
   /* ---- Code block and copy button ---- */
 
   .code {
@@ -663,6 +670,9 @@
     font-variant-ligatures: none;
     line-height: var(--text-code-phone--line-height);
     white-space: pre;
+    /* A block that takes focus at the edge of the window is scrolled fully
+       into it, with its border and its focus ring. */
+    scroll-margin-block: 8px;
   }
 
   /* Under its tabs the block joins the active tab. */
