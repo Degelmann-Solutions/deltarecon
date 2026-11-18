@@ -37,7 +37,7 @@ export const components = { code: (props) => <code translate="no" {...props} /> 
 
 DeltaRecon rechnet selbst nichts. Es stellt einer Rechen-Engine eine feste Reihe von Fragen, das Protokoll, und arbeitet mit den Antworten. Um Ihre Engine anzubinden, bauen Sie eine Anbindung, den <Term id="adapter">Adapter</Term>, der diese Fragen für Ihre Engine beantwortet. Der Adapter ist eine Klasse in Python. Ihre Engine selbst bleibt unverändert.
 
-Dafür muss Ihre Engine vier Dinge liefern können. Zu einem Release: seine Modellpunkte und die Projektion jedes Modellpunkts, mit einem <Term id="value">Wert</Term> je Größe und Periode, und seine Parameter. Zu zwei Releases: die Versionsgeschichte zwischen ihnen als einzelne <Term id="revision">Revisionen</Term>, jede mit dem, was sie berührt: Daten, Parameter oder Code. Und zu jeder Revision dieser Versionsgeschichte: den Stand des Modells nach ihr, damit DeltaRecon diesen Stand rechnen lassen kann.
+Dafür muss Ihre Engine drei Dinge liefern können. Zu einem Release: seine Modellpunkte und die Projektion jedes Modellpunkts, mit einem <Term id="value">Wert</Term> je Größe und Periode, und seine Parameter. Zu zwei Releases: die Versionsgeschichte zwischen ihnen als einzelne <Term id="revision">Revisionen</Term>, jede mit dem, was sie berührt: Daten, Parameter oder Code. Und zu jeder Revision dieser Versionsgeschichte: den Stand des Modells nach ihr, damit DeltaRecon diesen Stand rechnen lassen kann.
 
 Der Maßstab für die Größe einer solchen Anbindung ist die Anbindung des <Term id="reference-model">Referenzmodells</Term>, die zum Paket gehört: eine Datei mit {lines(files.connection)} Zeilen, Kommentare und Leerzeilen mitgezählt.
 
@@ -66,7 +66,7 @@ Zu einem Release, das für einen Lauf geöffnet ist, muss die Anbindung liefern 
   <Row name="Die Kennungen aller Modellpunkte" code="model_point_ids" member="Session">Die öffentliche Kennung jedes Modellpunkts des Release.</Row>
   <Row name="Eine Projektion je Modellpunkt" code="project" member="Session">Die Perioden eines Modellpunkts, mit einem Wert je Größe.</Row>
   <Row name="Die Parameter" code="parameters" member="Session">Die Parameter des Release, in der Form, in der der <Term id="record">Nachweis</Term> eines Laufs sie enthält.</Row>
-  <Row name="Die Zeitbasis" code="time_basis" member="Session">Der Name der Zeitbasis, die sagt, was eine Periode ist. Zwei Ergebnisse werden nur verglichen, wenn beide dieselbe Zeitbasis nennen.</Row>
+  <Row name="Die Zeitbasis" code="time_basis" member="Session">Der Name der Zeitbasis: was eine Periode zählt.</Row>
   <Row name="Die Größen" code="quantities" member="Session">Name und Einheit jeder Größe, in der Reihenfolge der Ergebnisspalten.</Row>
 </RowList>
 
@@ -131,7 +131,7 @@ Der Ausschnitt zeigt, wie das Referenzmodell die ersten beiden Fragen an ein ge�
 
 <Prose>
 
-Sieben der neun Befehle arbeiten mit einer Engine: alle außer `compare` und `quickstart`. Jeder der sieben nimmt die Engine von einer von drei Stellen, in dieser Reihenfolge:
+Bei sieben der neun Befehle wählen Sie die Engine: bei allen außer `compare`, das nichts rechnet, und `quickstart`, das immer das Referenzmodell nimmt. Jeder der sieben nimmt die Engine von einer von drei Stellen, in dieser Reihenfolge:
 
 </Prose>
 
