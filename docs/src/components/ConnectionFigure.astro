@@ -1,0 +1,76 @@
+---
+// The connection figure: where the adapter sits and what the reader builds.
+// Three outlined boxes on one trace, DeltaRecon, the reader's connection and
+// the reader's engine; the box the reader builds has a dashed outline, the
+// two others a solid one. The first trace carries one label. It is a wide
+// figure itself and does not stand inside `WideFigure`.
+//
+//   <ConnectionFigure
+//     trace="protocol"
+//     boxes={[
+//       { state: 'exists', title: 'DeltaRecon', sub: 'comparison · walk · search' },
+//       { state: 'you build', title: 'Your connection', sub: 'the adapter, one class', built: true },
+//       { state: 'exists, unchanged', title: 'Your engine', sub: 'with the history of its releases' },
+//     ]}
+//   >
+//     <p slot="caption">What the figure shows, in words.</p>
+//   </ConnectionFigure>
+//
+// The page gives the words, one version per language. The boxes are an
+// ordered list; the traces are decoration. The caption is the text
+// alternative of the figure. The boxes stand side by side from the tree
+// breakpoint up and as a stack below; the figure is never scaled.
+//
+// The build fails on a figure without a caption, with other than three
+// boxes, with other than one box that is built, and without the label of
+// its trace.
+interface Box {
+  /** The small line above the title: whether the box exists or is built. */
+  state: string;
+  title: string;
+  /** The small line below the title. */
+  sub: string;
+  /** The box the reader builds: dashed. */
+  built?: boolean;
+}
+
+interface Props {
+  boxes: Box[];
+  /** The label of the first trace. */
+  trace: string;
+}
+
+const { boxes, trace } = Astro.props;
+const where = Astro.url.pathname;
+if (!Astro.slots.has('caption')) {
+  throw new Error(`${where}: a connection figure has no caption (slot "caption").`);
+}
+if (!Array.isArray(boxes) || boxes.length !== 3) {
+  throw new Error(`${where}: a connection figure has ${Array.isArray(boxes) ? boxes.length : 'no'} boxes, not three.`);
+}
+if (boxes.filter((box) => box.built).length !== 1) {
+  throw new Error(`${where}: a connection figure marks exactly one box as built ("built").`);
+}
+if (boxes.some((box) => !box.state || !box.title || !box.sub)) {
+  throw new Error(`${where}: a box of a connection figure lacks "state", "title" or "sub".`);
+}
+if (typeof trace !== 'string' || trace.trim() === '') {
+  throw new Error(`${where}: a connection figure has no label of its first trace ("trace").`);
+}
+---
+
+<figure class="wide-figure connection" data-wide-figure data-connection>
+  <ol class="connection-boxes">
+    {
+      boxes.map((box, index) => (
+        <li class:list={['connection-box', box.built && 'connection-built']} data-connection-box data-built={box.built ? '' : undefined}>
+          <p class="connection-state">{box.state}</p>
+          <p class="flow-title">{box.title}</p>
+          <p class="flow-sub">{box.sub}</p>
+          {index === 0 && <p class="connection-label" data-connection-label>{trace}</p>}
+        </li>
+      ))
+    }
+  </ol>
+  <figcaption class="wide-figure-caption prose-links"><slot name="caption" /></figcaption>
+</figure>
