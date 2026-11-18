@@ -42,6 +42,13 @@
 //     of its row) and the bar figure, which shows the sums of the table:
 //     the bar of the largest sum spans half the track, the others in
 //     proportion to their sums;
+//   - a page of sessions of single commands: one terminal block per platform
+//     in each step, named with its step; the output carries the language
+//     "en" and a command none; where an output is cut, one mark stands in
+//     the place of the lines left out, with their number, in the language
+//     of the page, on a line of its own, in the typeface of the text between
+//     two dashed rules; a page without a result table or a flow diagram in
+//     its entry holds none;
 //   - nothing in the content moves: no transition, no animation;
 //   - axe with Windows and with Linux chosen; no sideways scrolling.
 // Phone (390 px): one column, the figure below the text, the flow diagram
@@ -80,16 +87,41 @@ const stepPages = {
     anchors: ['download', 'check', 'unpack', 'start', 'demo', 'result'],
     optional: ['check'],
     // The steps that hold a platform switch; those among them whose switch
-    // holds no command (may be left out: none); the step with a terminal
-    // block; the step with the link to the page of the release.
+    // holds no command (may be left out: none); the steps with a terminal
+    // block; the step with the link to the page of the release; the step
+    // with the result table and its bar figure; whether the page holds a
+    // flow diagram. A page without `table` or `flow` must hold no such
+    // table or diagram.
     switches: ['download', 'check', 'unpack', 'start'],
     plain: ['download'],
-    terminal: 'start',
+    terminal: ['start'],
     release: 'download',
     table: 'result',
+    flow: true,
     closing: {
       en: 'With the table of step 6 on your screen, stage 1 is complete.',
       de: 'Mit der Tabelle aus Schritt 6 auf Ihrem Bildschirm ist Etappe 1 abgeschlossen.',
+    },
+  },
+  'own-calculations': {
+    anchors: ['folder', 'other-quantity', 'without-tolerance', 'older-revision', 'newer-revision', 'changes', 'search'],
+    optional: [],
+    switches: ['folder', 'other-quantity', 'without-tolerance', 'older-revision', 'newer-revision', 'changes', 'search'],
+    terminal: ['folder', 'other-quantity', 'without-tolerance', 'older-revision', 'newer-revision', 'changes', 'search'],
+    // The terminal blocks are sessions of single commands: each names its
+    // step, and its output is English on the page of either language.
+    sessions: true,
+    // The step whose output is cut, how many lines are left out, and the
+    // line of page text that stands in their place.
+    cut: {
+      step: 'newer-revision',
+      left: 350,
+      en: '350 lines left out here: one line per model point',
+      de: 'Hier sind 350 Zeilen ausgelassen: eine Zeile je Modellpunkt',
+    },
+    closing: {
+      en: 'You have run three calculations of your own. “Single commands” describes each command.',
+      de: 'Sie haben drei eigene Rechnungen durchgeführt. „Einzelne Befehle“ beschreibt jeden Befehl.',
     },
   },
 };
@@ -108,6 +140,7 @@ const words = {
     failed: 'Not copied. Please select the command by hand.',
     command: (number, platform) => `Command, step ${number}, ${platform}`,
     terminal: { windows: 'Terminal session, PowerShell', linux: 'Terminal session, Linux' },
+    session: (number, platform) => `Terminal session, step ${number}, ${platform === 'windows' ? 'PowerShell' : 'Linux'}`,
     steps: 'Steps of this page',
     newTab: 'opens in a new tab',
   },
@@ -123,6 +156,7 @@ const words = {
     failed: 'Nicht kopiert. Bitte markieren Sie den Befehl von Hand.',
     command: (number, platform) => `Befehl, Schritt ${number}, ${platform}`,
     terminal: { windows: 'Terminalsitzung, PowerShell', linux: 'Terminalsitzung, Linux' },
+    session: (number, platform) => `Terminalsitzung, Schritt ${number}, ${platform === 'windows' ? 'PowerShell' : 'Linux'}`,
     steps: 'Schritte dieser Seite',
     newTab: 'öffnet in neuem Tab',
   },
@@ -377,7 +411,9 @@ async function checkRegions(page, name, entry, expected, cards) {
   for (const region of regions) {
     const number = cards.findIndex((card) => card.anchor === region.step) + 1;
     const wanted = region.terminal
-      ? w.terminal[region.part]
+      ? expected.sessions
+        ? w.session(number, region.part)
+        : w.terminal[region.part]
       : w.command(number, w.labels[region.part]);
     expect(
       region.tabindex === '0' && region.role === 'region' && region.overflow === 'auto',
@@ -385,6 +421,15 @@ async function checkRegions(page, name, entry, expected, cards) {
     );
     expect(region.name === wanted, `${name}: a block of step "${region.step}" is named "${region.name}", expected "${wanted}"`);
   }
+  const terminals = regions.filter((region) => region.terminal);
+  expect(
+    PLATFORMS.every(
+      (platform) =>
+        terminals.filter((region) => region.part === platform).map((region) => region.step).join() ===
+        expected.terminal.join(),
+    ),
+    `${name}: the terminal blocks stand in the steps [${terminals.map((region) => `${region.step} (${region.part})`)}], expected one per platform in each of [${expected.terminal}]`,
+  );
   const terminal = page.locator('main [data-terminal] pre:visible').first();
   await terminal.focus();
   await page.keyboard.press('Shift+Tab');
@@ -401,6 +446,11 @@ async function checkRegions(page, name, entry, expected, cards) {
 
 /** The result table and the bar figure beside it. */
 async function checkTable(page, name, entry, expected) {
+  if (!expected.table) {
+    const tables = await page.locator('main table[data-result-table], main [data-bar-row]').count();
+    expect(tables === 0, `${name}: the page holds a result table or a bar figure, and its entry in stepPages names no step "table"`);
+    return;
+  }
   const table = await page.evaluate((anchor) => {
     const card = document.getElementById(anchor);
     const element = card?.querySelector('table[data-result-table]');
@@ -475,6 +525,65 @@ async function checkTable(page, name, entry, expected) {
     // Only an outlined bar has a least width: it must never look filled.
     if (lowers) {
       expect(bar.width >= 8, `${name}: the outlined bar of ${bar.revision} is ${bar.width} px wide, below 8 px`);
+    }
+  }
+}
+
+/**
+ * The sessions of single commands: the output is English on a page of
+ * either language; where the output of a step is cut, one line of page text
+ * stands in the place of the lines left out, in the language of the page
+ * and in the typeface of the text, between two dashed rules, so that it
+ * does not read as output.
+ */
+async function checkSessions(page, name, entry, expected) {
+  const sessions = await page.evaluate(() =>
+    [...document.querySelectorAll('main [data-terminal]')].map((block) => {
+      const pre = block.querySelector('pre');
+      return {
+        step: block.closest('[data-step]')?.id,
+        part: block.closest('[data-platform-part]')?.dataset.platformPart,
+        outputs: [...block.querySelectorAll('[data-capture="command-output"]')].map(
+          (output) => output.closest('[lang]')?.getAttribute('lang'),
+        ),
+        commands: [...block.querySelectorAll('[data-terminal-command]')].map(
+          (command) => command.getAttribute('translate') === 'no' && !command.hasAttribute('lang'),
+        ),
+        cuts: [...block.querySelectorAll('.terminal-cut')].map((cut) => {
+          const style = getComputedStyle(cut);
+          return {
+            text: cut.textContent,
+            left: cut.dataset.cut,
+            lang: cut.closest('[lang]')?.getAttribute('lang'),
+            ownLine: cut.previousSibling?.textContent.endsWith('\n') && cut.nextSibling?.textContent.startsWith('\n'),
+            typeface: style.fontFamily !== getComputedStyle(pre).fontFamily,
+            rules: `${style.borderTopStyle} ${style.borderBottomStyle}`,
+          };
+        }),
+      };
+    }),
+  );
+  for (const session of sessions) {
+    const at = `${name}, step "${session.step}", ${session.part}`;
+    expect(
+      session.outputs.length > 0 && session.outputs.every((lang) => lang === 'en'),
+      `${at}: the output of the session does not carry the language "en" (${session.outputs})`,
+    );
+    expect(session.commands.every(Boolean), `${at}: a command is not marked as not to be translated, or it carries a language`);
+    const cut = expected.cut?.step === session.step ? expected.cut : undefined;
+    expect(
+      session.cuts.length === (cut ? 1 : 0),
+      `${at}: the session holds ${session.cuts.length} marks of a cut, expected ${cut ? 1 : 0}`,
+    );
+    for (const mark of cut ? session.cuts : []) {
+      expect(
+        mark.text === cut[entry.lang] && mark.left === String(cut.left) && mark.lang === entry.lang,
+        `${at}: the mark of the cut reads "${mark.text}" for ${mark.left} lines in the language "${mark.lang}", expected "${cut[entry.lang]}" for ${cut.left} lines in "${entry.lang}"`,
+      );
+      expect(
+        mark.ownLine && mark.typeface && mark.rules === 'dashed dashed',
+        `${at}: the mark of the cut does not stand on a line of its own in the typeface of the text between two dashed rules (${JSON.stringify(mark)})`,
+      );
     }
   }
 }
@@ -666,7 +775,10 @@ async function checkCopy(browser, origin, entry, expected, cards) {
             command: command.dataset.copy,
             shown: block.textContent,
             terminal: command.matches('[data-terminal]'),
-            typed: command.querySelector('[data-terminal-command]')?.textContent,
+            // A session of several commands is copied one command per line.
+            typed: [...command.querySelectorAll('[data-terminal-command]')]
+              .map((typed) => typed.textContent)
+              .join('\n'),
             order: (!tab || after(tab, button)) && after(button, block),
             // The button never lies over the command text.
             clear: button.getBoundingClientRect().bottom <= block.getBoundingClientRect().top + 1,
@@ -674,7 +786,16 @@ async function checkCopy(browser, origin, entry, expected, cards) {
           };
         }),
     );
-    const steps = [...expected.switches.filter((step) => !expected.plain.includes(step)), expected.terminal];
+    // In the order of the page: all the switches with a command stand
+    // before the terminal block of the Quick start, and on a page of
+    // sessions each step holds its switch and then its terminal block.
+    const withCommand = expected.switches.filter((step) => !expected.plain.includes(step));
+    const steps = expected.sessions
+      ? expected.anchors.flatMap((step) => [
+          ...(withCommand.includes(step) ? [step] : []),
+          ...(expected.terminal.includes(step) ? [step] : []),
+        ])
+      : [...withCommand, ...expected.terminal];
     expect(
       buttons.map((button) => button.step).join() === steps.join(),
       `${name}, ${platform}: the copy buttons stand in the steps [${buttons.map((button) => button.step)}], expected [${steps}]`,
@@ -689,7 +810,9 @@ async function checkCopy(browser, origin, entry, expected, cards) {
       expect(button.height >= 24, `${at}: the button is ${button.height} px high, below 24 px`);
       if (button.terminal) {
         expect(
-          button.command === button.typed && button.shown.includes(button.command) && button.shown.trim() !== button.command,
+          button.command === button.typed &&
+            button.command.split('\n').every((line) => button.shown.includes(line)) &&
+            button.shown.trim() !== button.command,
           `${at}: the command of the terminal block is not the typed command without prompt and output`,
         );
       } else {
@@ -780,7 +903,7 @@ async function checkPhone(browser, origin, entry, expected, kind) {
       return { anchor: card.id, below: !figure || box(figure).top >= box(text).bottom, left: !figure || Math.abs(box(figure).left - box(text).left) < 1 };
     });
     const boxes = [...document.querySelectorAll('main [data-flow-box]')].map(box);
-    const table = document.querySelector(`#${tableStep} table[data-result-table]`);
+    const table = tableStep ? document.querySelector(`#${tableStep} table[data-result-table]`) : null;
     const rows = table
       ? [...table.querySelectorAll('tbody tr')].map((row) => {
           const [revision, description, sum] = [...row.children].map(box);
@@ -810,15 +933,21 @@ async function checkPhone(browser, origin, entry, expected, kind) {
         .filter((element) => [...element.childNodes].some((node) => node.nodeType === Node.TEXT_NODE && node.data.trim() !== ''))
         .map((element) => Number.parseFloat(getComputedStyle(element).fontSize)),
     };
-  }, expected.table);
+  }, expected.table ?? '');
   for (const card of layout.cards) {
     expect(card.below && card.left, `${name}, step "${card.anchor}": the figure does not stand below the text in one column`);
   }
-  expect(layout.flowBoxes > 0 && layout.flowStacked, `${name}: the flow diagram is not a vertical stack`);
-  expect(
-    layout.rows.length > 0 && layout.rows.every(Boolean) && layout.headShown && !layout.tableScrolls,
-    `${name}: the result table is not stacked records (revision and sum on one line, description below) with a visible head row, or it scrolls sideways`,
-  );
+  if (expected.flow) {
+    expect(layout.flowBoxes > 0 && layout.flowStacked, `${name}: the flow diagram is not a vertical stack`);
+  } else {
+    expect(layout.flowBoxes === 0, `${name}: the page holds a flow diagram, and its entry in stepPages does not say so ("flow")`);
+  }
+  if (expected.table) {
+    expect(
+      layout.rows.length > 0 && layout.rows.every(Boolean) && layout.headShown && !layout.tableScrolls,
+      `${name}: the result table is not stacked records (revision and sum on one line, description below) with a visible head row, or it scrolls sideways`,
+    );
+  }
   for (const block of layout.blocks) {
     expect(block.inside, `${name}: the block "${block.name}" reaches beyond the window`);
     if (block.terminal) expect(block.scrolls, `${name}: the terminal block "${block.name}" does not scroll inside itself`);
@@ -948,6 +1077,7 @@ async function checkStepPage(browser, origin, entry, expected) {
     cards = await checkCards(page, name, entry, expected);
     await checkRegions(page, name, entry, expected, cards);
     await checkTable(page, name, entry, expected);
+    if (expected.sessions) await checkSessions(page, name, entry, expected);
     await checkNoMotion(page, name);
     await checkNoSidewaysScroll(page, name);
     await checkAxe(page, `${name}, Windows`);
@@ -1031,7 +1161,7 @@ try {
       continue;
     }
     // An entry without `plain`: no switch of the page is without a command.
-    const expected = { plain: [], ...listed };
+    const expected = { plain: [], terminal: [], ...listed };
     // An error on one page is a failure of that page; the others still run.
     try {
       await checkStepPage(browser, origin, entry, expected);

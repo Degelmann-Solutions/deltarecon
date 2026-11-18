@@ -1,0 +1,5 @@
+command: $Q = "runs\" + (Get-ChildItem runs -Directory -Filter quickstart-* | Sort-Object Name | Select-Object -Last 1).Name
+exit status: 0
+command: echo $Q
+runs\quickstart-20261117T201341Z
+exit status: 0

@@ -48,7 +48,7 @@ axe and the check for sideways scrolling (`pageChecks`).
 | `scripts/check-head.mjs` | The built pages are exactly the pages of the register and the three pages outside the path. For every page of the register: title "page name – DeltaRecon documentation", a description of its own, canonical address, `alternate` links for `de` and `en`, Open Graph title, description, address, type, locale and image, and one JSON-LD block that parses and names the page. Titles and descriptions are unique. A page and its counterpart hold the same anchors in their content; a written page sets the anchors of its headings itself; the two Glossaries are the first pages whose anchors are compared. An anchor that belongs to one language, as a letter label of the Glossary, is marked `data-language-own` and left out. For the three pages outside the path: language, a title of its own, `noindex`, and no canonical address. The two `.htaccess` files of the build name the addresses the register gives the page-not-found pages. |
 | `scripts/check-a11y.mjs` | For every page, at desktop and phone width, with the menu closed and open: axe reports no violation of the A and AA rules of WCAG 2.0 to 2.2. Keyboard: the skip link comes first and leads to main, Tab reaches every control in reading order, each at least 24 × 24 px and with a visible focus ring, teal-text on light grounds and teal inside the navy terminal block of a step page; a control with `tabindex="-1"`, as the tab of a platform switch that is not selected, is no stop. The menu below 1280 px: focus on the close button, which says that the menu is open, the page behind inert and the skip link out of the page, the top bar in one row at 320 px, Tab stays inside, Escape and the close button return focus to the menu button. The language switch keeps the anchor the page was loaded with and one set afterwards. With JavaScript off the menu button is a link to the chapter tree at the end of the page. No page scrolls sideways at 1280, 390 and 320 px. For the start page of each language also at 900 px: axe, the menu, no sideways scrolling at 900 and 600 px, an open menu that ends at 1280 px with focus kept in the page, and the search field moving between top bar and menu at 600 px. For the start page of each language, the search result list: axe with the list open, with hits and with no match, in the top bar and in the menu on the phone; its place and look; the hits after the field in tab order, each with a focus ring; the list closed when focus leaves the search in the top bar; Escape in the field, which leaves the menu open; no sideways scrolling with the list open at 600 and 320 px. For the page-not-found pages: axe, the frame without stage line, page links and current page, the two blocks with their languages, skip link, tab order, language switch, menu. For the root page, in a browser that names no language: axe, tab order, no sideways scrolling. Axe does not run with JavaScript off. For the Glossary of each language, at desktop and phone width: Tab reaches every letter of the letter index, each at least 32 × 32 px, and axe runs also at an entry address, arrived at from the Quick start, where the entry shows its linked state and the link back to that page. An error on one page is reported for that page; the others are still checked. |
 | `scripts/check-glossary.mjs` | First it proves itself on pages it sets itself (an unlinked term, a term linked twice, an exempt passage and more): each must fail or pass as expected. The glossary register: every entry has a term and an explanation in both languages. The Glossary of each language, with JavaScript on and off: the letter index, the entries in the alphabetical order of the language as a description list, each with term, counterpart, language code and `lang`; both Glossaries hold the same entries; at every entry address that entry and no other shows the linked state, which ends when the address changes. Every other page: the first occurrence of a term in the content is its glossary link, no entry is linked twice, and a glossary link leads to its entry on the Glossary of the page's language with a dotted underline. "Appears in" lists exactly the pages that link the term. The way back: after a click on a glossary link of a page the entry holds the link "Back to the previous page", a click on it returns to that page, the link is there again after going forward to the entry, and it goes when the address changes; opened directly, or with a Glossary of either language, another site or an address outside the documentation as the page before, the entry holds none. |
-| `scripts/check-steps.mjs` | First the step list of the frontmatter (`stepFaults` in `src/site.ts`): a step without an anchor or a title and an anchor that stands twice are named. Then every step page, which is every page that holds step cards; what a page must show stands in `stepPages` and `words` at the top of the script, written out per language, and a step page without an entry there fails. Desktop: one card per step in order with counter, the tag "optional" on the optional steps only, pad, trace and a figure or flow diagram; the step title is a link to its step; the chapter tree lists the steps with the titles of the cards; an address with the anchor of a step opens with that step at the top of the window, without a highlight; the path end with its marker on the axis of the pads, the closing line and the page links. A card with a part of one platform holds a platform switch. A link of the content to GitHub opens in a new tab with its hidden text, a link to another site is a plain link; the step of the download holds exactly one link to the page of the release on GitHub (`<repository>/releases/tag/v<version>`), named by its tag. The platform switch, also the one without a command (a hairline under its active tab, no code block, no copy button): Windows on the first visit; a click on "Linux" changes every switch and every part of the page while the used switch keeps its place in the window and focus; arrow keys, Home and End; one tab stop per switch; the choice after a reload, on another page, and before the scripts of the page run; without storage it holds for the page and no error shows. The copy button: after the tabs and before the command; the clipboard holds the command without prompt and output; "Copied" for at least 2 s, announced, focus kept; a refused copy shows and announces the failure text. Every block that scrolls sideways takes focus and is a named region; the terminal block shows its ring inside. The result table and the bar figure, which shows the sums of the table: the bar of the largest sum spans half the track, the others in proportion to their sums. No transition and no animation in the content. Axe with Windows and with Linux chosen. Phone: one column, the figure below the text, the flow diagram as a stack, the result table as stacked records with its head row, code and terminal scrolling inside their block, tabs and copy button at least 40 px high, no text of a figure below 11 px, the step list left out of the menu, the scroll position kept when the menu opens and closes; an element that reaches beyond the window is named, also at 320 px. JavaScript off, at 1280 and 390 px: both platforms' parts visible, Windows first, each under its label; no tabs, no button, no copy button. |
+| `scripts/check-steps.mjs` | First the step list of the frontmatter (`stepFaults` in `src/site.ts`): a step without an anchor or a title and an anchor that stands twice are named. Then every step page, which is every page that holds step cards; what a page must show stands in `stepPages` and `words` at the top of the script, written out per language, and a step page without an entry there fails. Desktop: one card per step in order with counter, the tag "optional" on the optional steps only, pad, trace and a figure or flow diagram; the step title is a link to its step; the chapter tree lists the steps with the titles of the cards; an address with the anchor of a step opens with that step at the top of the window, without a highlight; the path end with its marker on the axis of the pads, the closing line and the page links. A card with a part of one platform holds a platform switch. A link of the content to GitHub opens in a new tab with its hidden text, a link to another site is a plain link; the step of the download holds exactly one link to the page of the release on GitHub (`<repository>/releases/tag/v<version>`), named by its tag. The platform switch, also the one without a command (a hairline under its active tab, no code block, no copy button): Windows on the first visit; a click on "Linux" changes every switch and every part of the page while the used switch keeps its place in the window and focus; arrow keys, Home and End; one tab stop per switch; the choice after a reload, on another page, and before the scripts of the page run; without storage it holds for the page and no error shows. The copy button: after the tabs and before the command; the clipboard holds the command without prompt and output; "Copied" for at least 2 s, announced, focus kept; a refused copy shows and announces the failure text. Every block that scrolls sideways takes focus and is a named region; the terminal block shows its ring inside. The result table and the bar figure, which shows the sums of the table: the bar of the largest sum spans half the track, the others in proportion to their sums. No transition and no animation in the content. Axe with Windows and with Linux chosen. Phone: one column, the figure below the text, the flow diagram as a stack, the result table as stacked records with its head row, code and terminal scrolling inside their block, tabs and copy button at least 40 px high, no text of a figure below 11 px, the step list left out of the menu, the scroll position kept when the menu opens and closes; an element that reaches beyond the window is named, also at 320 px. A page of sessions of single commands ("Your own calculations on the reference model"): one terminal block per platform in each step, named with its step; its copy button copies every command of the session, one per line; the output carries the language `en` on the page of either language and a command none; where the output of a step is cut, one mark stands in the place of the lines left out, with their number, in the language of the page, on a line of its own, in the typeface of the text between two dashed rules. A page whose entry names no result table and no flow diagram must hold none. JavaScript off, at 1280 and 390 px: both platforms' parts visible, Windows first, each under its label; no tabs, no button, no copy button. |
 | `scripts/check-prose.mjs` | First the reader of the facts of the example (`src/example.ts`) on the four capture files: the number of revisions, the number of each revision of the search table, the revisions of the two states and the number of model points, each held against the capture in a second way; and it must throw, with the file and the part, on a capture text whose table of the changes lacks a revision of the search table or its rows, whose commands name no revision, and on a search table without rows. Then the readers of the two four-column tables of the demo and of the interval of a "Not resolved" message, in the same file: head row, rows and the sentence above each table, held against the capture in a second way. The reader of the table of the regression must throw on a capture text without the table, without its head row and without the sentence above it; the reader of the table of the changes on one without the table, without its head row and with a row that leaves the columns of its head row; the reader of the interval on a message whose revisions the table of the changes does not hold, that names none, or whose changes do not follow one another. Then every page of prose, which is every page that holds section headings; what a page must show stands in `prosePages` at the top of the script, and a page of prose without an entry there fails. Every level-2 heading of the content is a section heading with the anchor the script names, in order, and a link to itself; no other link leads to a section. The language switch at the address of a section opens the counterpart at that section. A wide figure spans the content width and holds its caption as text; no text of a figure is below 11 px. The idea figure: the boxes name the revisions of the two states; one square per revision, 7 px, those of the search table 11 px with their number, drawn as borders and hidden from assistive technology; the two lines of text begin with the counts and the caption names the numbers; at 1280 px the boxes stand left and right of the trace, at 390 and 320 px the figure is a stack of box, trace, box, and the squares keep their size, do not overlap and stay inside the figure. The bars below it carry "number · revision" and the sum of the capture of the language. A row list numbers its rows. The tables of the demo: for the two of `DemoTable`, head row, rows and the sentence above as the capture of the language prints them; for the table of the search, revision and sum of each row as the capture prints them, and a caption that is not empty. For all three: the roles written out, a header per row, a quantity, a description and "Bruttobeitrag" with their language, a hash marked as not to be translated; at 1280 px a row is one line, at 390 and 320 px every row and the head row are records of two lines, each cell on the line of its column name and, in a four-column table, below it, and no cell reaches beyond the window. The line of the changes: one square per change, those of the search table 11 px with their number, a bracket from the first to the last change of the interval that is not resolved with their numbers above it, the key and the caption with the numbers; at 1280 px the key stands right of the trace, at 390 and 320 px below it; nothing is scaled; the bars below it as under the idea figure. The wide flow diagram: one per page, a wide figure and an ordered list of the boxes the script names per language, in their order, each numbered, outlined, with a title of 13 px and no mono line; the trace ends in a pad hidden from assistive technology and the words the script names; the first row list of the page names the same parts in the same order; at 1280 px the boxes stand side by side from left to right with the end right of them, at 390 and 320 px as a stack with the end below; nothing is scaled and nothing reaches beyond the figure. The path block shows the four stages of the register, each with a sentence and a link to each of its pages but the page itself, by name and address of the register. No transition and no animation; no sideways scrolling at 1280, 390 and 320 px; axe at 1280 and 390 px. |
 
 `npm run check:apache` runs `scripts/check-apache.mjs` after the build. The
@@ -249,13 +249,14 @@ without a figure has one column. Text between blank lines is a paragraph.
 | `PlatformSwitch` | The command of a step for Windows and Linux (`windows`, `linux`: the command lines), with the sentences that hold for one platform in the slots `after-windows` and `after-linux`. A slot must not carry the name of a property. Without `windows` and `linux` it holds no command: the tabs stand above the sentences, without code block and copy button, and the Windows tab names no shell. The build fails for a switch with the command of one platform only, and for a switch without commands that lacks the sentences of a platform. |
 | `PlatformPart` | Content of one platform outside a switch (`os="windows"`): a sentence, a callout, a terminal block. Every sentence that holds for one platform only stands in a part or in a slot of a switch. Only in a card that holds a platform switch; a card with content of one platform and no command gets a `PlatformSwitch` without commands, or the reader cannot change the platform there. |
 | `CodeBlock` | A command that does not differ by platform. `PlatformSwitch` builds its own. |
-| `TerminalBlock` | A session: prompt, command, and output from a capture (`lines={session('windows', 'en')}`). |
+| `TerminalBlock` | A session: prompt, command, and output from a capture (`lines={session('windows', 'en')}`). With `entries` in place of `command` and `lines` it is a session of single commands, each with the prompt and what it printed; the block then names its step ("Terminal session, step 2, PowerShell"), its copy button copies every command, one per line, and the output carries `lang="en"` on a German page, a quantity name `lang="de"`, a hash and a path `translate="no"` (`commandOutputHtml` in `src/markup.ts`). |
+| `CommandSession` | The terminal session of a step of single commands, once per platform, from the captures of the step (`step`, `commands`: the command lines the page types, the same it gives the platform switch). The build fails when they are not the commands of the capture. `cut` leaves a run of lines out and puts one line of page text in its place, the mark of a cut; see "Captures and the release check". |
 | `StepFigure` | The frame of a step figure with its caption (`slot="caption"`). Into it: `FileList`, `BarFigure`, `ArchiveCheckFigure` (the small diagram of the archive check). |
 | `KeyCap` | A step figure of its own kind: a key and one sentence. |
 | `FlowDiagram`, `FlowBox` | A sequence as boxes on one trace; in the text column of a card without a figure. Horizontal from 1280 px, a stack below. `code` and `writes` of a box are its mono line; a box without them has none. With `wide` the diagram is a wide figure of a page of prose, see "Pages of prose". |
-| `SummaryList` | Sub-steps as a numbered list; the second line of a row is output from a capture. |
+| `SummaryList` | Sub-steps as a numbered list; the second line of a row is output from a capture, and `lineLang` names its language where that is not the language of the page. |
 | `ResultTable` | The table of the demo's search, from the capture; the content is what the page says before the caption of the program. |
-| `Callout` | A term or an expected outcome in plain words, or a hint. `quote` is a message of the program from a capture. |
+| `Callout` | A term or an expected outcome in plain words, or a hint. `quote` is a message of the program from a capture, and `quoteLang` names its language where that is not the language of the page. |
 | `PathEnd` | The marker under the last step and the closing line. The page links follow by themselves. |
 
 A component that names its step ("Command, step 2", "Copy command, step 2")
@@ -295,8 +296,12 @@ names it (the Quick start does so before its flow diagram and its table).
 
 **A new step page** needs an entry in `stepPages` of
 `scripts/check-steps.mjs` (anchors, optional steps, the steps with a switch,
-the steps whose switch holds no command, the step with the link to the page
-of the release where it has one, the closing line per language).
+the steps whose switch holds no command, the steps with a terminal block,
+the step with the link to the page of the release, the step with the result
+table and whether the page holds a flow diagram, where it has them, and the
+closing line per language; for a page of sessions of single commands
+`sessions` and, where an output is cut, the step, the number of lines left
+out and the mark per language).
 
 ## Pages of prose
 
@@ -411,7 +416,8 @@ above the table of the search. The build fails, with file and
 part, when a
 file or a part is missing, and when the Windows and the Linux capture of a
 language differ in a part that does not depend on the platform. These four
-files are the only run output under version control.
+files and the captures of the page of own calculations (below) are the only
+run output under version control.
 
 **Renewing them at a release**, after `src/release.json` holds the new
 number and the SHA-256 of both archives (from `SHA256SUMS` of the release):
@@ -464,6 +470,78 @@ both languages:
 - output on the page stands in the capture of the language, the terminal
   session of each of the two platforms line by line; table and bar figure show the revisions and sums of
   `search.result.json`.
+
+**The captures of "Your own calculations on the reference model".** The page
+shows the single commands a reader types after the quick start, and their
+output. Its captures stand in `src/captures/v<version>/own-calculations/`,
+where the reader of the demo captures does not see them:
+
+- `order.txt` names the steps of the captures in the order they run: the
+  anchors of the seven steps of the page, then `repeat`, the command of the
+  second step once more, which the package refuses.
+- `<step>-windows.txt` and `<step>-linux.txt` hold, per command of the step,
+  the line `command: <the command as typed>`, what it printed (standard
+  output and standard error), and the line `exit status: <n>`; UTF-8 with LF
+  line ends.
+
+`src/ownCalculations.ts` reads them at build time. `sessionOf(step,
+platform, commands)` gives the session of a step and fails the build, with
+step and platform, when `commands`, the lines the page types, are not those
+of the capture; `cut` puts the mark of a cut in the place of a run of lines;
+`statusOf`, `outputOf`, `runsOf`, `contributionsOf` and `beyondDemo` give
+the facts the text of the page names (an exit status, the counts of a
+search, what a search finds beyond the table of the demo), and `refusal`
+the message of the refused command with "…" in the place of the path it
+names. The build also fails when the Windows and the Linux capture of a
+step differ in more than what varies by run: the path separators, the time
+stamp of the demo folder, and the folder the package was unpacked into,
+which only the refusal names. The page types the command lines (`commands`
+at the top of each page file), the names of the files in its file lists,
+and no output.
+
+**Renewing them at a release**, after the captures of the demo:
+
+1. Unpack the two archives into fresh folders, the Linux one on Linux and
+   the Windows one on a Windows host, and run the guided demo once in each
+   package folder: `./quickstart --lang en --no-pause`, and in PowerShell
+   `.\quickstart.cmd --lang en --no-pause`.
+2. On Linux, in the package folder:
+   `bash <docs>/scripts/capture-own-calculations.sh <docs>/src/captures/v<version>/own-calculations <new folder>`.
+   The script reads the `command:` lines of the present captures, runs them
+   in their order in one shell, as a reader types them, and writes each
+   step's file anew into the new folder, which must not exist.
+3. On the Windows host, in Windows PowerShell in the package folder, with a
+   copy of the capture folder and of the script on the host:
+   `powershell -NoProfile -ExecutionPolicy Bypass -File capture-own-calculations.ps1 -Source <copy of the capture folder> -Target <new folder>`.
+   It does the same for the `-windows.txt` files and writes UTF-8 with LF
+   line ends.
+4. Put the files of both new folders into the capture folder, with
+   `order.txt`. A command that changed with the release is changed in the
+   `command:` line of its capture before the scripts run, and in both page
+   files after.
+5. Run `npm run check` and `npm run check:release` as above. Where the
+   output changed, read both pages against it: the text names what the
+   output shows, the file lists name what the commands wrote, and
+   `stepPages` of `scripts/check-steps.mjs` names the number of lines the
+   cut leaves out.
+
+For this page `npm run check:release` holds, before the build, the captures
+of the two platforms against each other, with file and line, and that a
+command which starts the launcher is the same on both apart from the name
+of the launcher and the path separators. On the built page of both
+languages it asserts:
+
+- every command that starts the launcher names a command of the released
+  `deltarecon`, and every option it gives stands in the help of that command
+  (`deltarecon --help` and `deltarecon <command> --help` of the unpacked
+  Linux package of the release folder; the check runs it, so it needs Linux
+  on x86-64). The commands of this page stand in no guide;
+- the commands of the platform switch and of the terminal session of each
+  step are those of the capture of that step and platform, and the session
+  shows the output of the capture line by line, where the mark of a cut
+  stands for as many lines as it names;
+- a quoted message and the lines of the summary list stand in a capture of
+  the page, and a capture that is no step of the page is quoted on it.
 
 Record commit, command and outcome of a run where the story or the epic asks
 for it.

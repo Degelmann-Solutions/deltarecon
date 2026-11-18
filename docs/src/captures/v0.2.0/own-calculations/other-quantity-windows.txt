@@ -1,0 +1,28 @@
+command: .\deltarecon.cmd search $Q\release-n\run-record.json $Q\regression\run\run-record.json --quantity Provisionen --periods 0-59 --target-only --output $Q\search-provisionen
+search: searched; 22 states run, 33 for a walk, 11 saved
+state 0 against the older record: reproduced
+state 32 against the newer record: reproduced
+target: Provisionen; periods 0 to 59
+inner states: run on the target only, without the model checks
+held: input_data; the effect on it of 1 revisions is not shown
+intervals judged: 41
+contribution from state 1 to 2: 936e50dee4f7a01bdd60ff9105b5e3f3c1ef0d0f
+  Provisionen: sum 133.621167775, absolute sum 133.621167775
+contribution from state 5 to 6: 8f81933700278ef7c4622aa9aaa7ddc3712968bf
+  Provisionen: sum -67.0454602838, absolute sum 67.0454602838
+contribution from state 9 to 10: 61c8fd7190c6b208ba2090060bdb202801fa73c4
+  Provisionen: sum -3549.88542881, absolute sum 3549.88542881
+contribution from state 11 to 12: 83f01cfdf69cf14be78df7c64637447f0335c73e
+  Provisionen: sum -17.7348368453, absolute sum 17.7348368453
+contribution from state 15 to 16: d61b1ed82a3afe9f48f3d98aed3c011c8bcec78a
+  Provisionen: sum 63778.4431639, absolute sum 63778.4431639
+contribution from state 24 to 25: 909eeec61bb0ff7e89862986f2fad517ce7cca7d
+  Provisionen: sum 0.809438176173, absolute sum 0.809438176173
+contribution from state 25 to 26: 5f3d085c441c68dfedae5d04956bee90f5183bcd
+  Provisionen: sum 1772.73274582, absolute sum 1772.73274582
+contribution from state 26 to 27: e13c628782d077bed74f085bf636cb0dccfb5b36
+  Provisionen: sum 0.816324198199, absolute sum 0.816324198199
+contribution from state 29 to 30: 7f1dc645848ad55a18986435353290aafd94938d
+  Provisionen: sum 1890.69555207, absolute sum 1890.69555207
+search result: runs\quickstart-20261117T201341Z\search-provisionen\search.result.json
+exit status: 0

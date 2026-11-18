@@ -1,0 +1,13 @@
+command: ./deltarecon derive $Q/own/older/run-record.json $Q/own/regression/run/run-record.json --output $Q/own/changes.json
+derive: 8 changes from d61b1ed82a3afe9f48f3d98aed3c011c8bcec78a to 6a117fc70a8ce6c06897eccdf8497cf2d9b1407f
+  e23137a8de69bcbda4119718c4b75725ac66cdef [code] Raise the sum-related gamma loading from 0.30 to 0.35 per mille
+  29c4a03a59bb65aae909d736dd0b0c4229d38804 [code] Revert "Raise the sum-related gamma loading from 0.30 to 0.35 per mille"
+  88cdde3f0dcb4a5fad2174ea35bd8114a604278c [parameter] Raise the instalment loading of monthly payment from 4 to 4.5 per cent
+  c82b72bb03578d1b63dbb863edbecca9754e4414 [parameter] Set the instalment loading of monthly payment to 4 per cent again
+  5208fe688c5059cced84998216feb8f439ef3d5f [no class] Say in the README that the runner reads no network
+  2c122ae67b0cabe25243af12c21539f1a60d3eef [code] Lower the share of deaths by suicide from 3 to 2.5 per cent
+  3deff146f04c8845ebdcf37eef72788eceaceb3e [code] Lower the claim expense from 275 to 260 EUR per death
+  6a117fc70a8ce6c06897eccdf8497cf2d9b1407f [code] Shorten the suicide exclusion from three to two policy years
+remainder: none
+manifest: runs/quickstart-20261117T202512Z/own/changes.json
+exit status: 0

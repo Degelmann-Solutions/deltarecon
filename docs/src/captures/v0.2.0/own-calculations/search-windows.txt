@@ -1,0 +1,14 @@
+command: .\deltarecon.cmd search $Q\own\older\run-record.json $Q\own\regression\run\run-record.json --quantity "garantierte Todesfallleistung" --periods 0-11 --target-only --output $Q\own\search
+search: searched; 6 states run, 9 for a walk, 3 saved
+state 0 against the older record: reproduced
+state 8 against the newer record: reproduced
+target: garantierte Todesfallleistung; periods 0 to 11
+inner states: run on the target only, without the model checks
+held: input_data; the effect on it of 0 revisions is not shown
+intervals judged: 9
+contribution from state 5 to 6: 2c122ae67b0cabe25243af12c21539f1a60d3eef
+  garantierte Todesfallleistung: sum 617.02405529, absolute sum 617.02405529
+contribution from state 7 to 8: 6a117fc70a8ce6c06897eccdf8497cf2d9b1407f
+  garantierte Todesfallleistung: sum 26.406628473, absolute sum 26.406628473
+search result: runs\quickstart-20261117T201341Z\own\search\search.result.json
+exit status: 0

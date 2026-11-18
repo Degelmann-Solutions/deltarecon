@@ -36,6 +36,50 @@ export function outputHtml(text: string, lang: Lang): string {
   return lang === 'en' ? escaped.replace(german, '<span lang="de">$&</span>') : escaped;
 }
 
+/**
+ * The quantities of the reference model, as the program prints them: German
+ * in both languages (contracts/v3/domain/liability_cashflow.md). A name that
+ * holds another stands before it.
+ */
+const quantities = [
+  'Kosten 2. Ordnung ohne Provisionen',
+  'garantierte Erlebensfallleistung',
+  'garantierte Todesfallleistung',
+  'garantierter Rückkaufswert',
+  'kalkulatorische Kosten',
+  'Beitragsverrechnung',
+  'Anzahl Verträge',
+  'Netto-Cashflow',
+  'Bruttobeitrag',
+  'Zahlbeitrag',
+  'Provisionen',
+];
+/** A quantity name, a full hash (a revision, a SHA-256), or a path. */
+const marked = new RegExp(
+  `(${quantities.map((name) => name.replaceAll('.', '\\.')).join('|')})` +
+    '|(\\b(?:[0-9a-f]{64}|[0-9a-f]{40})\\b|(?:[A-Za-z]:)?[\\w.\\\\/-]*[\\\\/][\\w.\\\\/-]+)',
+  'g',
+);
+
+/**
+ * A line a single command prints, as markup. The single commands print
+ * English only: a quantity name is German and carries its language, a hash
+ * and a path are marked as not to be translated (EXPERIENCE.md,
+ * Accessibility Floor, Language).
+ */
+export function commandOutputHtml(text: string): string {
+  let html = '';
+  let at = 0;
+  for (const match of text.matchAll(marked)) {
+    html += escapeHtml(text.slice(at, match.index));
+    html += match[1]
+      ? `<span lang="de">${escapeHtml(match[1])}</span>`
+      : `<span translate="no">${escapeHtml(match[0])}</span>`;
+    at = match.index + match[0].length;
+  }
+  return html + escapeHtml(text.slice(at));
+}
+
 /** A list in words, as the language writes it: "2, 6, 12 and 30". */
 export function listOf(items: readonly (string | number)[], lang: Lang): string {
   return new Intl.ListFormat(lang === 'en' ? 'en-GB' : 'de', { type: 'conjunction' }).format(
