@@ -261,12 +261,12 @@ function faultsOf(lang, groups, facts) {
   return found;
 }
 
-/** What differs between the two languages: groups and hint links. */
+/** What differs between the two languages: groups, their number of hints, and hint links. */
 function languageFaults(factsByLang) {
   const found = [];
   const [first, second] = site.languages;
   const key = (facts) => ({
-    groups: facts[hints.helpPage].groups.map((group) => group.anchor),
+    groups: facts[hints.helpPage].groups.map((group) => `${group.anchor} (${group.hints.length} hints)`),
     links: Object.fromEntries(
       Object.entries(facts).map(([id, pageFacts]) => [
         id,

@@ -2390,6 +2390,7 @@
     margin-top: 6px;
   }
 
+  .hint-text ul,
   .contact-tell ul {
     padding-left: 20px;
     list-style: disc;
