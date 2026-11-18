@@ -1,0 +1,41 @@
+---
+// One hint of a hint group: what the reader sees, as a level-3 heading, and
+// beside it (on the phone below it) what it means and what to do.
+//
+//   <Hint title="The window closes at the end">Text.</Hint>
+//
+// A title that holds inline code stands in the slot `title` in place of the
+// property. `quote` is a message of the program, read from a capture, in the
+// white mono box of the callout above the text; `quoteLang` is its language
+// where that is not the language of the page. A page types no message. A
+// sentence that must stand before the message, as the one that links a
+// glossary term the message names, goes into the slot `before`.
+// The build fails on a hint without a title or without text.
+import { outputHtml, pageLanguage } from '../markup';
+import type { Lang } from '../site';
+
+interface Props {
+  title?: string;
+  quote?: string[];
+  quoteLang?: Lang;
+}
+
+const { title, quote = [], quoteLang } = Astro.props;
+const where = Astro.url.pathname;
+const lang = pageLanguage(where);
+if (!title && !Astro.slots.has('title')) {
+  throw new Error(`${where}: a hint has no title.`);
+}
+if (!Astro.slots.has('default')) {
+  throw new Error(`${where}: the hint "${title ?? ''}" has no text.`);
+}
+---
+
+<div class="hint" data-hint>
+  <h3 class="hint-title">{title ?? <slot name="title" />}</h3>
+  <div class="hint-text prose-links">
+    <slot name="before" />
+    {quote.map((message) => <p class="callout-quote" data-hint-quote lang={!quoteLang || quoteLang === lang ? undefined : quoteLang} set:html={outputHtml(message, lang)} />)}
+    <slot />
+  </div>
+</div>

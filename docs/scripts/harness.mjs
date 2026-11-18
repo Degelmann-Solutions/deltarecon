@@ -81,6 +81,11 @@ export function loadGlossary() {
   return loadSource('glossary.ts');
 }
 
+/** Loads the register of the hint groups, src/hints.ts. */
+export function loadHints() {
+  return loadSource('hints.ts');
+}
+
 /** Loads the reader of the facts of the example, src/example.ts. */
 export function loadExample() {
   return loadSource('example.ts');
@@ -219,6 +224,7 @@ export const pageWords = {
   'single-commands': { en: 'launcher', de: 'Umgebungsvariable' },
   'engine-requirements': { en: 'yardstick', de: 'Maßstab' },
   'build-an-adapter': { en: 'lookup', de: 'Kleinbuchstaben' },
+  'when-something-goes-wrong': { en: 'phone', de: 'Telefon' },
 };
 
 /**

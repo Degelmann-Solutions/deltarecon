@@ -117,6 +117,7 @@ import {
   RING,
   expectations,
   loadExample,
+  loadHints,
   loadPages,
   loadRegister,
   loadRelease,
@@ -206,6 +207,18 @@ const { exampleFacts, regressionTable, changeTable, unresolvedInterval } = await
 const release = await loadRelease();
 const { failures, expect, report } = expectations('check-prose');
 const { checkAxe, checkNoSidewaysScroll } = pageChecks({ failures, expect });
+
+// "When something goes wrong" is a page of prose too: its sections are the
+// hint groups of the register (src/hints.ts), in its order, and the section
+// of the contact block. A step or a section of another page links to its
+// group, and the group back; those links cross pages, so no link of the page
+// itself leads to a section. scripts/check-hints.mjs holds the groups, the
+// hint links and the contact block.
+const hints = await loadHints();
+prosePages[hints.helpPage] = {
+  sections: [...hints.hintGroups.map((group) => group.anchor), hints.contactAnchor],
+  counterpart: hints.hintGroups[hints.hintGroups.length - 1].anchor,
+};
 
 const captureFile = (platform, lang) => `captures/v${release}/${platform}-${lang}.txt`;
 const readCapture = (platform, lang) =>

@@ -2,6 +2,295 @@
 layout: ../../layouts/Page.astro
 lang: de
 page: when-something-goes-wrong
-lead: "Diese Seite ist noch nicht geschrieben; sie wird Hinweise zu allem geben, was wie ein Fehler aussieht, und die Kontaktdaten nennen."
+lead: "Das meiste, was wie ein Fehler aussieht, ist erwartet. Diese Seite nennt solche Fälle nach Seite und Schritt, in der Reihenfolge Ihres Wegs durch die Dokumentation. Ist Ihr Fall nicht dabei, schreiben Sie uns oder rufen Sie an."
 description: "Hinweise, nach Schritten geordnet, zu allem, was wie ein Fehler aussieht, und die Kontaktdaten für alles Weitere."
 ---
+import ContactBlock from '../../components/ContactBlock.astro';
+import Hint from '../../components/Hint.astro';
+import HintGroup from '../../components/HintGroup.astro';
+import OutsideLink from '../../components/OutsideLink.astro';
+import SectionHeading from '../../components/SectionHeading.astro';
+import Term from '../../components/Term.astro';
+import { notResolved } from '../../captures';
+import { contactAnchor } from '../../hints';
+import { refusal, statusOf } from '../../ownCalculations';
+import { tag } from '../../release';
+import { outside } from '../../site';
+// The README of the release, which describes the way without a package.
+export const readme = `${outside.repository}/blob/${tag}/README.md#quick-start`;
+// Inline code of this page names files, commands, options and outcomes:
+// none of it is to be translated.
+export const components = { code: (props) => <code translate="no" {...props} /> };
+
+<HintGroup id="quick-start-download">
+
+<Hint title="Der Browser oder Windows warnt beim Herunterladen">
+
+Erwartet. Das Windows-Paket ist nicht signiert; der Browser oder SmartScreen kann deshalb beim Herunterladen warnen. Mit Schritt 2 des Quick Starts stellen Sie sicher, dass Ihr Archiv das veröffentlichte ist.
+
+</Hint>
+
+<Hint title="Sie arbeiten mit macOS">
+
+Für macOS gibt es kein Paket. Arbeiten Sie dort mit einem Checkout des Repositorys; die <OutsideLink href={readme} hreflang="en">README des Release</OutsideLink> beschreibt diesen Weg, auf Englisch.
+
+</Hint>
+
+</HintGroup>
+
+<HintGroup id="quick-start-check">
+
+<Hint title="PowerShell gibt die SHA-256-Prüfsumme in Großbuchstaben aus">
+
+Erwartet. Abgesehen von Groß- und Kleinschreibung muss sie der Prüfsumme in der Zeile Ihres Archivs in `SHA256SUMS` gleichen.
+
+</Hint>
+
+<Hint>
+<span slot="title"><code translate="no">SHA256SUMS</code> nennt zwei Archive, und Sie haben eines heruntergeladen</span>
+
+Erwartet. Die Datei enthält eine Zeile je Archiv. Unter Linux lässt `--ignore-missing` im Befehl des Schritts die Prüfung das Archiv übergehen, das nicht da ist; für Ihres muss der Befehl `OK` melden. Unter Windows vergleichen Sie mit der Zeile Ihres Archivs.
+
+</Hint>
+
+</HintGroup>
+
+<HintGroup id="quick-start-unpack">
+
+<Hint>
+<span slot="title">Sie finden <code translate="no">quickstart.cmd</code> nicht</span>
+
+„Alle extrahieren“ im Explorer legt zusätzlich einen Ordner mit dem Namen der zip-Datei an, in dem dann der Paketordner liegt. Der Paketordner ist der Ordner, in dem `quickstart.cmd` und `deltarecon.cmd` liegen.
+
+</Hint>
+
+<Hint title="Der Pfad des Paketordners ist lang">
+
+Windows begrenzt die Länge eines Pfads. Entpacken Sie das Archiv in einen Ordner mit kurzem Pfad, zum Beispiel `C:\deltarecon`. Der Ordner, den „Alle extrahieren“ zusätzlich anlegt, verlängert den Pfad.
+
+</Hint>
+
+</HintGroup>
+
+<HintGroup id="quick-start-start">
+
+<Hint title="SmartScreen warnt beim Start der Vorführung">
+
+Bei diesem Paket erwartet: Es ist nicht signiert. Mit Schritt 2 stellen Sie sicher, dass Ihr Archiv das veröffentlichte ist.
+
+</Hint>
+
+<Hint title="Die Vorführung spricht die falsche Sprache">
+
+Sie spricht die Sprache Ihres Systems. Starten Sie sie mit `--lang de` oder `--lang en`, um Deutsch oder Englisch zu wählen.
+
+</Hint>
+
+<Hint title="Das Fenster schließt sich am Ende">
+
+Erwartet. Ein Fenster, das ein Doppelklick geöffnet hat, bleibt am Ende offen, bis Sie eine Taste drücken. Wenn es sich schließt, geht nichts verloren: Die Vorführung hat ihre Dateien in einen neuen Ordner `runs\quickstart-<UTC-Zeit>` im Paketordner geschrieben und diesen Ordner am Anfang und am Ende genannt.
+
+</Hint>
+
+<Hint title="Die Vorführung endet sofort und meldet, dass es ihren Ordner schon gibt">
+
+Die Vorführung schreibt in einen neuen Ordner, der nach der Uhrzeit ihres Starts benannt ist, auf die Sekunde genau, und sie überschreibt nichts. Gibt es diesen Ordner schon, endet sie mit dem <Term id="exit-status">Exit-Status</Term> 2. Starten Sie die Vorführung noch einmal.
+
+</Hint>
+
+</HintGroup>
+
+<HintGroup id="quick-start-demo">
+
+<Hint title="Schritt 2 der Vorführung endet mit dem Exit-Status 1">
+
+Erwartet. `regression` meldet 0, wenn die beiden Ergebnisse übereinstimmen, und 1, wenn sie sich unterscheiden. Release N und N+1 unterscheiden sich absichtlich; 1 ist hier also das richtige Ergebnis und kein Fehler: Der Befehl meldet die <Term id="deviation">Abweichung</Term> zwischen den beiden <Term id="revision">Revisionen</Term>. Die Vorführung geht weiter.
+
+</Hint>
+
+<Hint>
+<span slot="title">Die Vorführung meldet <code translate="no">abgebrochen</code></span>
+
+Die Vorführung wurde mit Strg+C abgebrochen. Sie endet mit dem Exit-Status 130.
+
+</Hint>
+
+</HintGroup>
+
+<HintGroup id="quick-start-result">
+
+<Hint title="Nach der Tabelle folgt ein Block „Nicht aufgelöst“" quote={notResolved('de')}>
+<p slot="before">Das ist ein Ergebnis und kein Fehler. Das Glossar erklärt den Begriff: <Term id="not-resolved">Nicht aufgelöst</Term>.</p>
+
+Manche Änderungen sind so klein, dass jede einzelne den <Term id="bruttobeitrag" /> um weniger als die Toleranz von einem Cent je Modellpunkt und Monat bewegt. Zusammen überschreiten sie die Toleranz. DeltaRecon rät nicht, welche von ihnen die Ursache ist: Es nennt die Gruppe und ordnet diesen Teil der Abweichung keiner Änderung zu.
+
+</Hint>
+
+</HintGroup>
+
+<HintGroup id="own-calculations-folder">
+
+<Hint>
+<span slot="title">Ein Befehl der Seite läuft in der Eingabeaufforderung <code translate="no">cmd</code> nicht</span>
+
+Die Befehle jener Seite sind für PowerShell geschrieben; in `cmd` laufen sie nicht. Öffnen Sie PowerShell im Paketordner und geben Sie sie dort ein.
+
+</Hint>
+
+<Hint title="Sie haben das Fenster geschlossen und ein neues geöffnet">
+
+Die Variable `Q` gilt, solange das Fenster offen bleibt. Geben Sie in einem neuen Fenster die beiden Zeilen aus Schritt 1 noch einmal ein; jeder spätere Befehl der Seite verwendet die Variable.
+
+</Hint>
+
+<Hint title="Ihr Ordner heißt anders als der, den die Seite zeigt">
+
+Erwartet. Der Ordner trägt die Uhrzeit, zu der Ihre Vorführung begonnen hat.
+
+</Hint>
+
+</HintGroup>
+
+<HintGroup id="own-calculations-other-quantity">
+
+<Hint title="Der Befehl gibt eine Weile nichts aus">
+
+Erwartet. Er rechnet eine Weile und gibt erst etwas aus, wenn er fertig ist.
+
+</Hint>
+
+<Hint title="Die Ausgabe ist englisch und zeigt mehr Stellen">
+
+Erwartet. Die einzelnen Befehle geben ihre Meldungen nur auf Englisch aus, und Zahlen mit mehr Stellen als die Tabellen der Vorführung.
+
+</Hint>
+
+<Hint title="Der Befehl endet sofort und meldet, dass es seinen Ordner schon gibt" quote={[refusal('repeat')]} quoteLang="en">
+
+Sie haben einen Befehl ein zweites Mal gestartet. Er endet sofort mit dem Exit-Status {statusOf('repeat')} und dieser Meldung; „…“ steht für den vollständigen Pfad des Ordners. Kein Befehl überschreibt eine Datei. Um eine Rechnung zu wiederholen, geben Sie ihr nach `--output` einen Namen, den es noch nicht gibt, zum Beispiel `search-provisionen-2` statt `search-provisionen`.
+
+</Hint>
+
+</HintGroup>
+
+<HintGroup id="own-calculations-newer-revision">
+
+<Hint title={`Der Befehl endet mit dem Exit-Status ${statusOf('newer-revision')}`}>
+
+Erwartet, und kein Fehler: Die beiden Stände unterscheiden sich, und der Status sagt das. Der nächste Befehl läuft trotzdem.
+
+</Hint>
+
+</HintGroup>
+
+<HintGroup id="own-calculations-search">
+
+<Hint title="Der Name der Größe enthält ein Leerzeichen">
+
+Der Name einer Größe mit einem Leerzeichen steht in Anführungszeichen, wie im Befehl des Schritts: `--quantity "garantierte Todesfallleistung"`.
+
+</Hint>
+
+</HintGroup>
+
+<HintGroup id="single-commands-start">
+<span slot="title">Einen einzelnen Befehl starten</span>
+
+<Hint title="Ein Befehl startet nicht, weil es seine Ausgabe schon gibt">
+
+Kein Befehl überschreibt eine vorhandene Datei. Ein Befehl, dessen Ausgabe es schon gibt, startet nicht; er endet mit dem Exit-Status 2. Um eine Rechnung zu wiederholen, geben Sie ihr eine Ausgabe, die es noch nicht gibt.
+
+</Hint>
+
+<Hint title="Ein Befehl endet mit dem Exit-Status 1">
+
+Es gibt etwas anzusehen, oder der Befehl hat abgelehnt: ein Lauf, der fehlgeschlagen ist, abgelehnt wurde oder mit einem Fehler geendet hat; ein `replay`, das den Lauf nicht wieder ergibt; ein Vergleich oder eine <Term id="regression">Regression</Term> mit einer Abweichung; ein <Term id="change-manifest">Änderungsverzeichnis</Term>, das sich nicht ableiten lässt; ein `walk` oder eine Suche, die abgelehnt wird oder anhält.
+
+Bei der Regression des Quick Starts ist der Status 1 erwartet: Sie meldet die Abweichung zwischen den beiden Revisionen, und die folgenden Befehle laufen trotzdem.
+
+</Hint>
+
+<Hint title="Ein Befehl endet mit dem Exit-Status 2">
+
+Der Befehl konnte nicht starten. Zum Beispiel: Eine Ausgabe gibt es schon, die gewählte Engine lässt sich nicht laden, die Datei einer Toleranz oder das Ziel einer Suche ist fehlerhaft, oder ein <Term id="record">Nachweis</Term> ist nicht der eines gelungenen Laufs.
+
+</Hint>
+
+</HintGroup>
+
+<HintGroup id="single-commands-run">
+<span slot="title"><code translate="no">run</code>: eine Anfrage rechnen</span>
+
+<Hint>
+<span slot="title">Ein Lauf endet mit <code translate="no">failed</code>, <code translate="no">error</code> oder <code translate="no">rejected</code></span>
+
+Dann gibt es keine Ergebnisse. `failed`: Ein Modellpunkt hat einen Fehler ausgelöst, eine Prüfung ist falsch, oder ein Ergebnis ist keine endliche Zahl. `error`: Die Anfrage wurde angenommen, aber die Engine konnte den Stand nicht wiederherstellen oder nicht lesen. `rejected`: Die Anfrage hat eine Regel verletzt, und nichts ist gelaufen.
+
+Der Nachweis wird bei jedem Ausgang geschrieben, außer bei einer Datei, die sich nicht als Anfrage für einen Lauf lesen lässt.
+
+</Hint>
+
+</HintGroup>
+
+<HintGroup id="single-commands-quickstart">
+<span slot="title"><code translate="no">quickstart</code>: die geführte Vorführung</span>
+
+<Hint title="Die Vorführung endet mit einem anderen Exit-Status als 0">
+
+Status 1: Ein Schritt hat mit einem anderen Status geendet, als die Vorführung erwartet. Status 2: Den Ordner der Vorführung gibt es schon, er lässt sich nicht anlegen, oder ein Fehler des Betriebssystems beendet einen Schritt. Status 130: Sie haben die Vorführung mit Strg+C abgebrochen.
+
+</Hint>
+
+</HintGroup>
+
+<HintGroup id="build-an-adapter-select">
+
+<Hint title="Der Befehl sagt in einer Zeile, was nicht stimmt, und endet mit dem Exit-Status 2">
+
+Die Auswahl Ihrer Engine lässt sich nicht laden, und der Befehl schreibt nichts. Das gilt für einen Ordner, der kein Ordner ist, für eine Auswahl, die nicht die Form `<module>:<class>` hat, für ein Modul, das nicht gefunden wird, für einen Namen im Modul, der keine Klasse ist, und für eine Klasse, die die Zahl der Arbeitsprozesse nicht als Argument annimmt.
+
+</Hint>
+
+<Hint title="Der Befehl endet mit einem Traceback von Python">
+
+In diesem Release beantwortet DeltaRecon vier Fehler einer Anbindung mit einem Traceback von Python und dem Exit-Status 1, nicht mit einer eigenen Meldung. Das ist eine Grenze dieses Release und kein Fehler in der Art, wie Sie den Befehl aufrufen. Die letzte Zeile des Tracebacks nennt die Ursache.
+
+- Das Modul Ihrer Anbindung löst beim Laden einen anderen Fehler aus als einen fehlgeschlagenen Import, zum Beispiel einen Syntaxfehler.
+- Ihre Klasse löst selbst einen Fehler aus, wenn sie mit der Zahl der Arbeitsprozesse aufgerufen wird.
+- Ihrer Klasse fehlt ein Teil des Protokolls.
+- Die Versionsgeschichte, die Ihre Anbindung liefert, verletzt das Protokoll.
+
+Sagt Ihnen die letzte Zeile nicht, was zu ändern ist, schicken Sie uns die letzten Zeilen des Tracebacks. Die Kontaktdaten stehen am Ende dieser Seite.
+
+</Hint>
+
+</HintGroup>
+
+<HintGroup id="build-an-adapter-first-run">
+
+<Hint title="Ein Befehl des ersten Laufs endet mit einem Traceback">
+
+Sehen Sie bei den bekannten Grenzen in Schritt 6 jener Seite nach; der Hinweis über dieser Gruppe nennt sie.
+
+</Hint>
+
+<Hint title="Ihre Engine findet den Ordner ihrer Versionsgeschichten nicht von selbst">
+
+Ergänzen Sie in beiden Befehlen `--repositories` mit diesem Ordner.
+
+</Hint>
+
+</HintGroup>
+
+<SectionHeading id={contactAnchor}>Wenn nichts davon hilft</SectionHeading>
+
+<ContactBlock tag="Kontakt" title="Schreiben Sie uns oder rufen Sie an">
+
+Damit wir helfen können, nennen Sie uns bitte:
+
+- das Release, zum Beispiel {tag}
+- Windows oder Linux
+- den Schritt, bei dem es nicht weiterging
+- die letzten Zeilen, die das Fenster zeigt
+
+</ContactBlock>

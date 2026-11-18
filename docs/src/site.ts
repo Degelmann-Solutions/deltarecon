@@ -2,7 +2,8 @@
 // path order with their names and addresses per language, the texts of the
 // page frame, of the Glossary, of the step components and of the code excerpt, `languageOf`, the language of a page
 // address, and the page-not-found page, which stands outside the path
-// (`notFoundPage`, `onPath`). Chapter tree, page links, page head, language switch and head
+// (`notFoundPage`, `onPath`), and the contact details of the help page
+// (`contact`). Chapter tree, page links, page head, language switch and head
 // data read it, and so do the Glossary (components/Glossary.astro), the
 // glossary link (components/Term.astro) and the path block of a page of
 // prose (components/PathBlock.astro); a page name stands here and in no
@@ -172,6 +173,21 @@ export const outside = {
   previewImage: 'https://degelmann-solutions.de/og-image.png',
 } as const;
 
+/**
+ * The contact details of the page "When something goes wrong". They are
+ * typed here, in this one place, from the imprint of the company website
+ * (`outside.imprint`; in the repository of the website `src/config/site.ts`,
+ * shown by `src/pages/impressum.astro`): the provider and its address, the
+ * e-mail address and the phone number, exactly as the imprint states them.
+ * The documentation cannot read that repository; whoever changes the imprint
+ * changes them here.
+ */
+export const contact = {
+  email: 'kontakt@degelmann-solutions.de',
+  phone: '+49 175 6085584',
+  address: ['Degelmann GmbH', 'Zur Strachau 12', '21368 Boitze'],
+} as const;
+
 export const company = 'Degelmann Solutions';
 export const product = 'DeltaRecon';
 
@@ -234,6 +250,18 @@ export interface FrameTexts {
   excerptLine: string;
   excerptLines: string;
   excerptTo: string;
+  /** The hint link of a step and of a section, to its group on the help page. */
+  hintLinkStep: string;
+  hintLinkSection: string;
+  /** The group label of a section on the help page: "Single commands · section". */
+  hintSection: string;
+  /** What stands before the link of a group to its step or its section. */
+  hintToStep: string;
+  hintToSection: string;
+  /** The labels of the contact block. */
+  contactEmail: string;
+  contactPhone: string;
+  contactAddress: string;
 }
 
 export const texts: Record<Lang, FrameTexts> = {
@@ -279,6 +307,14 @@ export const texts: Record<Lang, FrameTexts> = {
     excerptLine: 'line',
     excerptLines: 'lines',
     excerptTo: 'to',
+    hintLinkStep: 'If something goes wrong at this step',
+    hintLinkSection: 'If something goes wrong in this section',
+    hintSection: 'section',
+    hintToStep: 'To the step',
+    hintToSection: 'To the section',
+    contactEmail: 'E-mail',
+    contactPhone: 'Phone',
+    contactAddress: 'Address',
   },
   de: {
     documentation: 'DeltaRecon-Dokumentation',
@@ -322,6 +358,14 @@ export const texts: Record<Lang, FrameTexts> = {
     excerptLine: 'Zeile',
     excerptLines: 'Zeilen',
     excerptTo: 'bis',
+    hintLinkStep: 'Wenn bei diesem Schritt etwas schiefgeht',
+    hintLinkSection: 'Wenn in diesem Abschnitt etwas schiefgeht',
+    hintSection: 'Abschnitt',
+    hintToStep: 'Zum Schritt',
+    hintToSection: 'Zum Abschnitt',
+    contactEmail: 'E-Mail',
+    contactPhone: 'Telefon',
+    contactAddress: 'Anschrift',
   },
 };
 
@@ -375,6 +419,12 @@ export function pageAddress(page: Page, lang: Lang): string {
 export function languageOf(pathname: string): Lang | undefined {
   const base = import.meta.env.BASE_URL.replace(/\/?$/, '/');
   return languages.find((lang) => pathname.startsWith(`${base}${lang}/`));
+}
+
+/** The page that stands at an address on the host, if it is one of the path. */
+export function pageAt(pathname: string): Page | undefined {
+  const address = pathname.replace(/\/?$/, '/');
+  return pages.find((page) => languages.some((lang) => pageAddress(page, lang) === address));
 }
 
 /** The stage line of the page head: the stage, or the page kind. */

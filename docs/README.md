@@ -19,7 +19,7 @@ Run them in `docs/`. Node 20 and npm are required.
 | `npm ci` | Installs the pinned dependencies from `package-lock.json`. |
 | `npm run local` | Builds the site with its search index and serves it. When port 4321 is free, the pages are at `http://localhost:4321/deltarecon/docs/de/` and `/en/`; otherwise the server takes the next free port. The command prints the address it serves on. |
 | `npm run build` | Builds the site to `dist/` and writes the search index to `dist/pagefind/`. |
-| `npm run check` | Builds the site, then runs the seven checks below in Chromium. Every page entry runs it. The last of them reads Git and needs the tag of the release and the branch `main` in the local clone. |
+| `npm run check` | Builds the site, then runs the eight checks below in Chromium. Every page entry runs it. The last of them reads Git and needs the tag of the release and the branch `main` in the local clone. |
 | `npm run check:apache` | Builds the site, then checks in an Apache what only Apache shows: unknown addresses and the root address. Needs Docker; not part of `npm run check`. |
 | `npm run check:release -- --search <folder>` | Holds the capture files, the built step pages and the page of single commands against the published release. Needs `../dist/release-v<version>/` and the search folder of a run of the demo; not part of `npm run check` (see "Captures and the release check"). |
 | `npm run check:first-run` | Builds the site, then runs the commands of the last step of "Build an adapter step by step" on the engine of `../examples/toy_engine/`, with `uv run deltarecon` in the checkout. Needs `uv`; not part of `npm run check` (see "The first run of the adapter page"). |
@@ -36,9 +36,9 @@ indexes the build output.
 
 ## Checks
 
-`npm run check` runs seven scripts one after the other; three more,
+`npm run check` runs eight scripts one after the other; three more,
 `scripts/check-apache.mjs`, `scripts/check-release.mjs` and
-`scripts/check-first-run.mjs`, run on their own (below). Each of the seven starts `astro preview` (`scripts/harness.mjs`),
+`scripts/check-first-run.mjs`, run on their own (below). Each of the eight starts `astro preview` (`scripts/harness.mjs`),
 reads the page register, and names every failed expectation with its page.
 `scripts/harness.mjs` also holds what several scripts run on an open page:
 axe and the check for sideways scrolling (`pageChecks`).
@@ -51,6 +51,7 @@ axe and the check for sideways scrolling (`pageChecks`).
 | `scripts/check-glossary.mjs` | First it proves itself on pages it sets itself (an unlinked term, a term linked twice, an exempt passage and more): each must fail or pass as expected. The glossary register: every entry has a term and an explanation in both languages. The Glossary of each language, with JavaScript on and off: the letter index, the entries in the alphabetical order of the language as a description list, each with term, counterpart, language code and `lang`; both Glossaries hold the same entries; at every entry address that entry and no other shows the linked state, which ends when the address changes. Every other page: the first occurrence of a term in the content is its glossary link, no entry is linked twice, and a glossary link leads to its entry on the Glossary of the page's language with a dotted underline. "Appears in" lists exactly the pages that link the term. The way back: after a click on a glossary link of a page the entry holds the link "Back to the previous page", a click on it returns to that page, the link is there again after going forward to the entry, and it goes when the address changes; opened directly, or with a Glossary of either language, another site or an address outside the documentation as the page before, the entry holds none. |
 | `scripts/check-steps.mjs` | First the step list of the frontmatter (`stepFaults` in `src/site.ts`): a step without an anchor or a title and an anchor that stands twice are named. Then every step page, which is every page that holds step cards; what a page must show stands in `stepPages` and `words` at the top of the script, written out per language, and a step page without an entry there fails. Desktop: one card per step in order with counter, the tag "optional" on the optional steps only, pad, trace and a figure or flow diagram; the step title is a link to its step; the chapter tree lists the steps with the titles of the cards; an address with the anchor of a step opens with that step at the top of the window, without a highlight; the path end with its marker on the axis of the pads, the closing line and the page links. A card with a part of one platform holds a platform switch. A link of the content to GitHub opens in a new tab with its hidden text, a link to another site is a plain link; the step of the download holds exactly one link to the page of the release on GitHub (`<repository>/releases/tag/v<version>`), named by its tag. The platform switch, also the one without a command (a hairline under its active tab, no code block, no copy button): Windows on the first visit; a click on "Linux" changes every switch and every part of the page while the used switch keeps its place in the window and focus; arrow keys, Home and End; one tab stop per switch; the choice after a reload, on another page, and before the scripts of the page run; without storage it holds for the page and no error shows. The copy button: after the tabs and before the command; the clipboard holds the command without prompt and output; "Copied" for at least 2 s, announced, focus kept; a refused copy shows and announces the failure text. Every block that scrolls sideways takes focus and is a named region; the terminal block shows its ring inside. A code excerpt in a card ("Build an adapter step by step"): in the steps and in the number the entry of the page names (`excerpts`), a figure with a caption over the full card width below the columns, its code a region named after its file that Tab reaches, with the focus ring, without a copy button; at 390 px inside the window, its code scrolling inside its box with the arrow key. A code block that is no command (`documents`: the compare request of that page) carries the name the entry gives it, and its copy button is named after it. A page whose entry names no excerpt and no such block must hold none. The result table and the bar figure, which shows the sums of the table: the bar of the largest sum spans half the track, the others in proportion to their sums. No transition and no animation in the content. Axe with Windows and with Linux chosen. Phone: one column, the figure below the text, the flow diagram as a stack, the result table as stacked records with its head row, code and terminal scrolling inside their block, tabs and copy button at least 40 px high, no text of a figure below 11 px, the step list left out of the menu, the scroll position kept when the menu opens and closes; an element that reaches beyond the window is named, also at 320 px. A page of sessions of single commands ("Your own calculations on the reference model"): one terminal block per platform in each step, named with its step; its copy button copies every command of the session, one per line; the output carries the language `en` on the page of either language and a command none; where the output of a step is cut, one mark stands in the place of the lines left out, with their number, in the language of the page, on a line of its own, in the typeface of the text between two dashed rules. A page whose entry names no result table and no flow diagram must hold none. JavaScript off, at 1280 and 390 px: both platforms' parts visible, Windows first, each under its label; no tabs, no button, no copy button. |
 | `scripts/check-prose.mjs` | First the reader of the facts of the example (`src/example.ts`) on the four capture files: the number of revisions, the number of each revision of the search table, the revisions of the two states and the number of model points, each held against the capture in a second way; and it must throw, with the file and the part, on a capture text whose table of the changes lacks a revision of the search table or its rows, whose commands name no revision, and on a search table without rows. Then the readers of the two four-column tables of the demo and of the interval of a "Not resolved" message, in the same file: head row, rows and the sentence above each table, held against the capture in a second way. The reader of the table of the regression must throw on a capture text without the table, without its head row and without the sentence above it; the reader of the table of the changes on one without the table, without its head row and with a row that leaves the columns of its head row; the reader of the interval on a message whose revisions the table of the changes does not hold, that names none, or whose changes do not follow one another. Then every page of prose, which is every page that holds section headings; what a page must show stands in `prosePages` at the top of the script, and a page of prose without an entry there fails. Every level-2 heading of the content is a section heading with the anchor the script names, in order, and a link to itself; no other link leads to a section, apart from a section the entry of the page names as linked from the content (`linked`; the options several commands share on "Single commands"), which the content must then link. No part of the content names a step that is not there. The platform switches of a page of prose are those its entry names (`switches`), each a block between the blocks of the page: a tab list of two buttons, the copy button after it, the command as a named region with the place the page gives it ("Command, request, Windows"); Windows on the first visit, a click on "Linux" and the arrow keys change every switch while the used one keeps focus and place, the copy button copies the command that is shown, a switch without a command holds no code block and no copy button; axe with Linux chosen; tabs and copy button at least 40 px high at 390 px; with JavaScript off both parts under their labels, Windows first, without tabs and buttons. A page of prose whose entry names no switch must hold none. The language switch at the address of a section opens the counterpart at that section. A wide figure spans the content width and holds its caption as text; no text of a figure is below 11 px. The idea figure: the boxes name the revisions of the two states; one square per revision, 7 px, those of the search table 11 px with their number, drawn as borders and hidden from assistive technology; the two lines of text begin with the counts and the caption names the numbers; at 1280 px the boxes stand left and right of the trace, at 390 and 320 px the figure is a stack of box, trace, box, and the squares keep their size, do not overlap and stay inside the figure. The bars below it carry "number · revision" and the sum of the capture of the language. A row list numbers its rows; the code name of a row follows its name as inline code that is not translated, in weight 400, and the tag of a row is a small mono label in capitals with a hairline border, at 1280 px at the right end of the row and at 390 and 320 px below its text; where the entry of the page names the numbers of code names and tags (`codes`, `tags`), the page holds as many. A sub-heading is a level-3 heading of 18 px after a section heading, as many as the entry names (`subHeadings`). The connection figure: one per page, a wide figure and an ordered list of the three boxes the script names per language, each with its two small lines; only the box the script names as built is dashed, the others are solid; the first trace carries the one label, in teal-text; at 1280 px the boxes stand side by side with the label between the first two, above the trace, at 390 and 320 px they are a stack with the label between the first two; nothing is scaled and nothing reaches beyond the figure. The yardstick box: a block of the page with a navy border, its tag, the line that begins with the number of lines in 22 px, and a text that names a file as inline code. A code excerpt: a figure with a caption and a head row that names its file first; its code is a region named after its file that Tab reaches, with the focus ring, not translated, without markup (uncoloured), and scrolls sideways inside its box, at 390 and 320 px with the arrow key; it holds no copy button. A page whose entry names no yardstick box and no code excerpt must hold none. The tables of the demo: for the two of `DemoTable`, head row, rows and the sentence above as the capture of the language prints them; for the table of the search, revision and sum of each row as the capture prints them, and a caption that is not empty. For all three: the roles written out, a header per row, a quantity, a description and "Bruttobeitrag" with their language, a hash marked as not to be translated; at 1280 px a row is one line, at 390 and 320 px every row and the head row are records of two lines, each cell on the line of its column name and, in a four-column table, below it, and no cell reaches beyond the window. The line of the changes: one square per change, those of the search table 11 px with their number, a bracket from the first to the last change of the interval that is not resolved with their numbers above it, the key and the caption with the numbers; at 1280 px the key stands right of the trace, at 390 and 320 px below it; nothing is scaled; the bars below it as under the idea figure. The wide flow diagram: one per page, a wide figure and an ordered list of the boxes the script names per language, in their order, each numbered, outlined, with a title of 13 px and no mono line; the trace ends in a pad hidden from assistive technology and the words the script names; the first row list of the page names the same parts in the same order; at 1280 px the boxes stand side by side from left to right with the end right of them, at 390 and 320 px as a stack with the end below; nothing is scaled and nothing reaches beyond the figure. The path block shows the four stages of the register, each with a sentence and a link to each of its pages but the page itself, by name and address of the register. No transition and no animation; no sideways scrolling at 1280, 390 and 320 px; axe at 1280 and 390 px. |
+| `scripts/check-hints.mjs` | The hint list and the contact block of "When something goes wrong" and the hint links that lead to it, in both languages (see "The help page"). First the register of the hint groups (`groupFaults` in `src/hints.ts`): anchors of small letters, digits and hyphens, each once; pages of the page register in path order; one group per step or section. Then it proves itself on the facts it has read from the built pages, altered in one place each: a group whose step is not there, a hint link without a group, a group whose step carries no hint link, a group and a hint link in one language only, groups out of order and a heading that is not the title of the step must each be named with the group, the step or the page. On the built pages: the help page shows exactly the groups of the register, in its order; a group names a step or a section that its page holds, carries the label of page and step ("Quick start · step 1", for a section the word "section") outside its heading, the title of the step card or the heading of the section as a section heading with the anchor of the group, at least one hint with a level-3 title and a text, and one link to its step by that title; a step or a section with a group carries exactly one hint link, inside it, in the words of the language, to its group on the help page of the language, and no other step or section carries one; both languages hold the same groups and the same hint links. Followed in the browser: every hint link opens the help page of its language at its group, and the link of the group leads back to the step or section. The contact block: the last block of the page under the last section heading, its title a level-3 heading; e-mail, phone and address are those of `contact` in `src/site.ts`, the e-mail the one link (`mailto:`); the list of what to tell names the release of `src/release.json`; the page holds no form. The looks at 1280, 390 and 320 px: the group label in mono 12 px capitals, the group heading 22 px and on the phone 20 px, 4 px below its label; a hint with a hairline above and 16 px padding, at 1280 px in two columns, the left 260 px wide and 36 px from the right, at 390 and 320 px in one column; a quoted message in the white mono box; the contact block with a 1 px navy border, 24 px padding and on the phone 16 px, the e-mail in mono, underlined and at least 24 px high, the values 18 px beside their labels and on the phone 16 px below them, the address 14 px; no sideways scrolling. Axe, the section headings and the language switch of the page are checked by the scripts above, as for every page of prose. |
 | `scripts/check-excerpts.mjs` | What the built pages show of the repository's code, held against the tag of the release (`v<version>` of `src/release.json`), which it reads with the `git` program. First it proves itself on texts it sets itself: an altered excerpt, a range that does not hold the code, a member the protocol does not hold, a member a complete page leaves out or names twice, a file that differs on `main`, a wrong number of lines and a tag the clone does not hold must each fail and name what the message is to name. Then, on every page of the register: the code of a code excerpt is, character for character, the lines its head row names of its file at the tag, and the head row names file, lines and tag; a row marked as a member of the protocol (`member`) names a method or an annotated attribute of that class in `degelmann/deltarecon/protocol.py` at the tag, or, where the row carries a tag such as "optional", an operation the comment of the class describes; a row marked as a name of the engine selection (`selection`) names, with the first word of its code name, a name that stands in `degelmann/deltarecon/engine_selection.py` at the tag; on a page with such rows every code name of a row carries one of the two marks; on a page the script names as complete (`COMPLETE`: "Build an adapter step by step") every member of `Engine` and of `Session` at the tag, the operations their comments describe included, has exactly one row marked as that member, so a member the page leaves out or names twice fails; a number of lines (`data-lines-of`) is that of its file at the tag, and the number of a yardstick box the sum over its files, each of which its text names as inline code. Once: the two files are the same on `main` as at the tag. It fails, with the name of the tag, when the local clone does not hold the tag, and when no built page holds an excerpt, a member row or a yardstick box. It does not read what a row says about a member, and on a page that is not named as complete not whether it lists every member of the protocol. |
 
 `npm run check:apache` runs `scripts/check-apache.mjs` after the build. The
@@ -84,7 +85,10 @@ the Overview page when the frame or a component of a page of prose changes,
 and the last beside the mock of the Glossary when the Glossary changes. The
 check of the step pages writes, per step page and language, `<page>-desktop-<lang>.png` and
 `<page>-phone-<lang>.png` (`quick-start-desktop-en.png`); lay them beside the
-mock of the Quick start when a step component changes.
+mock of the Quick start when a step component changes. The check of the hints
+writes `help-desktop-<lang>.png` and `help-phone-<lang>.png`; lay them beside
+the mock of "When something goes wrong" when a component of the help page
+changes.
 
 What no script checks: the looks on hover, a Windows contrast theme, a screen
 reader, and zoom to 400 %.
@@ -96,7 +100,7 @@ path order with their name and address per language, the addresses outside
 the documentation, the texts of the page frame, of the Glossary and of the
 step components in both languages (the components of a page of prose need
 none of their own, apart from the words "lines … to …" of the head row of a
-code excerpt; the path block takes the word for "Stage" from the frame), the check of a step list (`stepFaults`), and the page-not-found page, which stands outside the path
+code excerpt; the path block takes the word for "Stage" from the frame), the words of a hint link and of a hint group and the labels of the contact block, the contact details (`contact`, see "The help page"), the check of a step list (`stepFaults`), and the page-not-found page, which stands outside the path
 (`notFoundPage`, `onPath()`). Chapter
 tree, page links, page head, language switch and head data read it. A page
 name stands there and in no other file; rename a page there.
@@ -182,7 +186,7 @@ description: "The description of the page for search engines and shared links."
   results, "middle" and "Durchlauf" for How DeltaRecon works, "launcher" and
   "Umgebungsvariable" for Single commands, "yardstick" and "Maßstab" for
   What your engine must provide, "lookup" and "Kleinbuchstaben" for Build an
-  adapter step by step): only that page of its language holds it, and the search of the
+  adapter step by step, "phone" and "Telefon" for When something goes wrong): only that page of its language holds it, and the search of the
   other language finds nothing for it. The search falls back to the
   beginning of a word, so "decrement" finds German pages by "de"; try a word
   in both languages before it is set. For the same reason a page keeps a
@@ -240,6 +244,8 @@ Text.
 </Callout>
 </div>
 
+<HintLink slot="hint" step="check" />
+
 </StepCard>
 </Steps>
 
@@ -247,8 +253,9 @@ Text.
 ```
 
 The content of a card is its text column. `slot="figure"` is the right
-column; `slot="wide"` stands below both at the full card width. A card
-without a figure has one column. Text between blank lines is a paragraph.
+column; `slot="wide"` stands below both at the full card width;
+`slot="hint"` is the hint link of the step, the last line of the card (see
+"The help page"). A card without a figure has one column. Text between blank lines is a paragraph.
 A wide part that holds several blocks one below the other (row list, code
 excerpt, callout, text) is written `<div slot="wide" class="step-parts">`,
 which sets them 16 px apart.
@@ -271,6 +278,7 @@ which sets them 16 px apart.
 | `SummaryList` | Sub-steps as a numbered list; the second line of a row is output from a capture, and `lineLang` names its language where that is not the language of the page. |
 | `ResultTable` | The table of the demo's search, from the capture; the content is what the page says before the caption of the program. |
 | `Callout` | A term or an expected outcome in plain words, or a hint. `quote` is a message of the program from a capture, and `quoteLang` names its language where that is not the language of the page. |
+| `HintLink` | The hint link of a step, in the slot `hint` of its card (`step`: the anchor of the step): one line that leads to the group of the step on "When something goes wrong". Only a step that has a group in the register of the hint groups carries one; see "The help page". |
 | `PathEnd` | The marker under the last step and the closing line. The page links follow by themselves. |
 
 A component that names its step ("Command, step 2", "Copy command, step 2")
@@ -419,6 +427,94 @@ without one; a place that differs by language is written per language,
 figure the titles of its boxes, the title of the box that is built and the
 label of its trace, per language; the numbers of yardstick boxes, code
 excerpts and sub-headings, and of the rows with a code name and with a tag).
+"When something goes wrong" needs no entry typed there: the script builds it
+from the register of the hint groups.
+
+## The help page
+
+"When something goes wrong" is the last page of the path: hints for what
+looks like an error, grouped by page and step in the order of the path, and
+at its end the contact block. `src/pages/en/when-something-goes-wrong.mdx`
+is the pattern.
+
+```
+<HintGroup id="quick-start-result">
+
+<Hint title="A block “Not resolved” follows the table" quote={notResolved('en')}>
+<p slot="before">A sentence that stands before the quoted message.</p>
+
+What it means and what to do.
+
+</Hint>
+
+</HintGroup>
+
+<SectionHeading id={contactAnchor}>If none of this helps</SectionHeading>
+
+<ContactBlock tag="Contact" title="Write to us or call">
+
+So that we can help, please tell us:
+
+- the release, for example {tag}
+
+</ContactBlock>
+```
+
+**The register of the hint groups**, `src/hints.ts`, names every group: its
+anchor on the help page (the same in both languages; `<page>-<step>`), the
+page it belongs to, and the step or the section of that page by its anchor.
+Its order is the order of the groups on the help page: the pages in path
+order, the steps or sections of a page in their order. Both directions read
+it, so they cannot differ: `HintGroup` builds a group from its entry, and
+`HintLink` gives a step or a section the link to its group. The words of
+both stand in `texts` of `src/site.ts` (`hintLinkStep`, `hintToStep` and so
+on).
+
+**The components**, all under `src/components/`; their looks are in
+`src/styles/global.css` under "Help".
+
+| Component | What it is |
+|---|---|
+| `HintGroup` | One group: the label with page and step ("Quick start · step 1"; for a section "Single commands · section"), which stands outside the heading; the title as a section heading with the anchor of the group; the hints; and a link to the step or section by its title. `id` is the anchor of the entry in the register. The title of a step is read from the step list in the frontmatter of its page. A page of prose names its sections in its text only, so the group of a section takes its title from the slot `title` (`<span slot="title"><code translate="no">run</code>: compute a request</span>`), and the check holds it against the heading of the section. The build fails on a group the register does not hold, on a page the page register does not hold, on a step its page does not hold, on a group of a section without the slot `title`, and on a group without hints. |
+| `Hint` | One hint: what the reader sees as a level-3 heading (`title`, or the slot `title` for a title with inline code), and what it means and what to do as its content. Two columns from 600 px, the left 260 px wide; one column on the phone. `quote` is a message of the program from a capture, in the white mono box of the callout above the text, and `quoteLang` names its language where that is not the language of the page; the slot `before` holds a sentence that stands before the message. A page types no message. |
+| `HintLink` | The hint link: `<HintLink slot="hint" step="download" />` as the last line of a step card, `<HintLink section="start" />` at the end of a section of a page of prose. The build fails on a step or a section without a group in the register, and on a hint link in the card of another step. The line is kept out of the search index. |
+| `ContactBlock` | The contact block with its navy border: a mono tag (`tag`), the title as a level-3 heading (`title`), e-mail, phone and address, and as its content the short list of what to tell. The e-mail is a link; phone and address are text. On the phone each label stands above its value. |
+
+**The contact details** are those of the imprint of the company website
+(`outside.imprint`): provider and address, e-mail and phone, exactly as the
+imprint states them. The build cannot read the repository of the website, so
+they are typed once, in `contact` of `src/site.ts`, from
+`src/config/site.ts` of that repository, which its page
+`src/pages/impressum.astro` shows. When the imprint changes, change them
+there and nowhere else. The page states no other contact detail and promises
+no time of an answer.
+
+**What a hint may say.** A hint says what the reader sees, then what it
+means and what to do, and says so where the case is expected and no error.
+It states only what the page of its step, the README of the release
+(`git show v<version>:README.md`), the guides of the package, the release
+notes or the program at the tag say; the plan of the page lists every hint
+with its source. A quoted message comes from a capture (`notResolved` of
+`src/captures.ts`, `refusal` of `src/ownCalculations.ts`). The first
+occurrence of a glossary term is a `<Term>`; a message from a capture cannot
+hold one, so the slot `before` links a term that the message names.
+
+**Adding a group or a hint.** A hint of a step that has a group goes into
+that group on the page of both languages. A new group needs an entry in
+`hintGroups` of `src/hints.ts` at its place in the order, a `<HintGroup>`
+with at least one hint on the help page of both languages at the same
+place, and the hint link in the step (`slot="hint"`) or at the end of the
+section, in both languages. `scripts/check-hints.mjs` names what is missing:
+a group whose step is not there, a group without a hint link in its step, a
+hint link without a group, and a group or a hint link that one language
+lacks (see "Checks"). When a step is renamed or moved, the label and the
+heading of its group follow by themselves; when its anchor changes, change
+`target` in the register.
+
+**Keeping it true to a new release**, after the captures are renewed: read
+every hint against its source as the plan of the page lists it, and the
+traceback faults against the callout of the known limits on "Build an
+adapter step by step".
 
 ## Code of the repository on a page
 

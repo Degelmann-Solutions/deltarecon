@@ -6,6 +6,7 @@ lead: "Every command of the package on its own, beside the guided demo: what it 
 description: "The nine single commands of the DeltaRecon package, from request to quickstart: what each does, an example for Windows and Linux, its options and its files."
 ---
 import Callout from '../../components/Callout.astro';
+import HintLink from '../../components/HintLink.astro';
 import PlatformSwitch from '../../components/PlatformSwitch.astro';
 import Prose from '../../components/Prose.astro';
 import Row from '../../components/Row.astro';
@@ -118,6 +119,8 @@ Every command ends with an <Term id="exit-status">exit status</Term>, a number t
   <Row name="The command could not start" code="2">For example: an output exists already, the selected engine cannot be loaded, the file of a tolerance or the target of a search is faulty, or a <Term id="record">record</Term> is not that of a run that succeeded.</Row>
 </RowList>
 
+<HintLink section="start" />
+
 <SectionHeading id="request" command="request"><code translate="no">request</code>: say what is to be computed</SectionHeading>
 
 <Prose>
@@ -197,6 +200,8 @@ The files of `run`:
   <Row name="The results" code="results.csv" tag="writes">The export of the run, per model point. Only a run that succeeded has it.</Row>
   <Row name="The record" code="run-record.json" tag="writes">What was computed with what. The commands that follow read this file.</Row>
 </RowList>
+
+<HintLink section="run" />
 
 <SectionHeading id="replay" command="replay"><code translate="no">replay</code>: repeat a recorded run</SectionHeading>
 
@@ -482,6 +487,8 @@ The files of `quickstart`:
   <Row name="The change manifest" code="changes.json" tag="writes">What `derive` writes.</Row>
   <Row name="The search" code="search/" tag="writes">What `search` writes.</Row>
 </RowList>
+
+<HintLink section="quickstart" />
 
 <SectionHeading id="shared-options">{sharedName}</SectionHeading>
 

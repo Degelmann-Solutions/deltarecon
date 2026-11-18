@@ -1,0 +1,44 @@
+---
+// The hint link of a step or of a section: one line that leads to the group
+// of its hints on "When something goes wrong", in the language of the page.
+//
+//   <HintLink slot="hint" step="download" />     in a step card
+//   <HintLink section="start" />                 at the end of a section
+//
+// The link is read from the register of the hint groups (src/hints.ts), the
+// same the help page builds its groups from. The build fails, with the page,
+// on a step or a section that has no group there. The line is kept out of
+// the search index, so that the search finds the help page by its words.
+import { groupOf, helpPage } from '../hints';
+import { pageLanguage } from '../markup';
+import { findPage, pageAddress, pageAt, texts } from '../site';
+
+interface Props {
+  /** Anchor of the step the link stands in. */
+  step?: string;
+  /** Anchor of the section the link stands in. */
+  section?: string;
+}
+
+const { step, section } = Astro.props;
+const where = Astro.url.pathname;
+const lang = pageLanguage(where);
+const page = pageAt(where);
+if (!page) {
+  throw new Error(`${where}: a hint link stands on a page that is not on the path.`);
+}
+if ((step === undefined) === (section === undefined)) {
+  throw new Error(`${where}: a hint link names either "step" or "section".`);
+}
+const kind = step !== undefined ? 'step' : 'section';
+const target = (step ?? section) as string;
+const group = groupOf(page.id, kind, target);
+if (!group) {
+  throw new Error(
+    `${where}: the ${kind} "${target}" carries a hint link, but the register of the hint groups (src/hints.ts) holds no group for it.`,
+  );
+}
+const address = `${pageAddress(findPage(helpPage), lang)}#${group.anchor}`;
+---
+
+<p class="hint-link prose-links" data-hint-link={group.anchor} data-hint-of={target} data-pagefind-ignore><a href={address}>{kind === 'step' ? texts[lang].hintLinkStep : texts[lang].hintLinkSection}</a></p>

@@ -2216,6 +2216,204 @@
     clip-path: inset(50%);
     white-space: nowrap;
   }
+
+  /* ---- Help (DESIGN.md, Components: Help) ---- */
+
+  /* The hint list of "When something goes wrong": groups of hints, one per
+     step or section. The group label names page and step and stands outside
+     the heading; the group title is a section heading in its smaller size. */
+  .hint-group-label {
+    margin-top: 48px;
+    color: var(--color-text-secondary);
+    font-family: var(--font-mono);
+    font-size: var(--text-label);
+    letter-spacing: var(--text-label--letter-spacing);
+    text-transform: uppercase;
+  }
+
+  .hint-group-label + .section-heading {
+    margin-top: 4px;
+    font-size: 1.25rem;
+  }
+
+  .hint-list {
+    max-width: 900px;
+    margin-top: 16px;
+    border-bottom: 1px solid var(--color-border);
+  }
+
+  /* One hint: what the reader sees, then what it means. One column on the
+     phone, two from the phone breakpoint. */
+  .hint {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    row-gap: 6px;
+    padding: 16px 0;
+    border-top: 1px solid var(--color-border);
+  }
+
+  .hint-title {
+    font-size: var(--text-callout-title);
+    font-weight: var(--text-callout-title--font-weight);
+    line-height: 1.45;
+  }
+
+  .hint-title code {
+    font-weight: 400;
+  }
+
+  .hint-text {
+    min-width: 0;
+  }
+
+  .hint-text > * + * {
+    margin-top: 10px;
+  }
+
+  /* A quoted message of the program: the white mono box of the callout. */
+  .hint-text > .callout-quote {
+    padding: 8px 12px;
+    overflow-wrap: anywhere;
+  }
+
+  .hint-text > .callout-quote:first-child {
+    margin-top: 0;
+  }
+
+  /* The link of a group to its step or section. */
+  .hint-back {
+    max-width: 900px;
+    margin-top: 12px;
+    color: var(--color-text-secondary);
+    font-size: var(--text-body-small);
+    line-height: var(--text-body-small--line-height);
+  }
+
+  /* The hint link of a step or a section, which leads to its group. */
+  .hint-link {
+    max-width: var(--spacing-block-max);
+    margin-top: 16px;
+    font-size: var(--text-body-small);
+    line-height: var(--text-body-small--line-height);
+  }
+
+  @media (min-width: 37.5rem) {
+    .hint-group-label + .section-heading {
+      font-size: 1.375rem;
+    }
+
+    .hint {
+      grid-template-columns: 260px minmax(0, 1fr);
+      column-gap: 36px;
+    }
+  }
+
+  /* The contact block. Its navy border marks it as the box that carries the
+     main fact of its page. On the phone each label stands above its value. */
+  .contact-block {
+    max-width: var(--spacing-text-max);
+    margin-top: 20px;
+    padding: 16px;
+    border: 1px solid var(--color-navy);
+    border-radius: var(--radius-sm);
+  }
+
+  .contact-tag {
+    color: var(--color-teal-text);
+    font-family: var(--font-mono);
+    font-size: var(--text-label);
+    letter-spacing: var(--text-label--letter-spacing);
+    text-transform: uppercase;
+  }
+
+  .contact-title {
+    margin-top: 4px;
+    font-size: var(--text-sub-heading);
+    font-weight: var(--text-sub-heading--font-weight);
+    line-height: var(--text-sub-heading--line-height);
+  }
+
+  .contact-list {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 2px;
+    align-items: baseline;
+    margin-top: 16px;
+  }
+
+  .contact-list dt {
+    color: var(--color-text-secondary);
+    font-family: var(--font-mono);
+    font-size: var(--text-label-small);
+    letter-spacing: var(--text-label-small--letter-spacing);
+    text-transform: uppercase;
+  }
+
+  .contact-list dd {
+    margin: 0 0 10px;
+    font-family: var(--font-mono);
+    font-size: 1rem;
+    font-variant-ligatures: none;
+    overflow-wrap: anywhere;
+  }
+
+  .contact-list dd.contact-address {
+    color: var(--color-text-secondary);
+    font-family: var(--font-sans);
+    font-size: 0.875rem;
+  }
+
+  /* The padding makes the link at least 24 px high as a target. */
+  .contact-list a {
+    padding-block: 5px;
+    color: var(--color-teal-text);
+    text-decoration-line: underline;
+    text-decoration-thickness: 1px;
+    text-underline-offset: 3px;
+  }
+
+  .contact-list a:hover,
+  .contact-list a:active {
+    color: var(--color-navy);
+  }
+
+  /* What to tell: a short list below a hairline. */
+  .contact-tell {
+    margin-top: 10px;
+    padding-top: 16px;
+    border-top: 1px solid var(--color-border);
+    font-size: var(--text-body-small);
+    line-height: var(--text-body-small--line-height);
+  }
+
+  .contact-tell > * + * {
+    margin-top: 6px;
+  }
+
+  .contact-tell ul {
+    padding-left: 20px;
+    list-style: disc;
+  }
+
+  @media (min-width: 37.5rem) {
+    .contact-block {
+      padding: 24px;
+    }
+
+    .contact-list {
+      grid-template-columns: auto minmax(0, 1fr);
+      gap: 8px 20px;
+    }
+
+    .contact-list dd {
+      margin-bottom: 0;
+      font-size: 1.125rem;
+    }
+
+    .contact-tell {
+      margin-top: 20px;
+    }
+  }
 }
 
 /* The look of the search result list stands in the components layer above.

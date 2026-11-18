@@ -16,6 +16,7 @@ steps:
 import Callout from '../../components/Callout.astro';
 import CommandSession from '../../components/CommandSession.astro';
 import FileList from '../../components/FileList.astro';
+import HintLink from '../../components/HintLink.astro';
 import PathEnd from '../../components/PathEnd.astro';
 import PlatformPart from '../../components/PlatformPart.astro';
 import PlatformSwitch from '../../components/PlatformSwitch.astro';
@@ -158,6 +159,8 @@ Ihr Ordner trägt die Uhrzeit, zu der Ihre Vorführung begonnen hat; sein Name i
 </div>
 </div>
 
+<HintLink slot="hint" step="folder" />
+
 </StepCard>
 
 <StepCard steps={frontmatter.steps} anchor="other-quantity">
@@ -212,6 +215,8 @@ Wenn Sie einen Befehl ein zweites Mal starten, endet er sofort mit dem <Term id=
 
 </Callout>
 </div>
+
+<HintLink slot="hint" step="other-quantity" />
 
 </StepCard>
 
@@ -333,6 +338,8 @@ Die erste Zeile zählt die Werte, die abweichen; die Ausgabe nennt einen Wert �
 </div>
 </div>
 
+<HintLink slot="hint" step="newer-revision" />
+
 </StepCard>
 
 <StepCard steps={frontmatter.steps} anchor="changes">
@@ -414,6 +421,8 @@ Die Suche hat {own.run} der {own.walk} Stände gerechnet. Die erste Zeile jeder 
   ]}
 />
 </div>
+
+<HintLink slot="hint" step="search" />
 
 </StepCard>
 

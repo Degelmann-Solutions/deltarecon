@@ -6,6 +6,7 @@ lead: "Jeder Befehl des Pakets für sich, neben der geführten Vorführung: was 
 description: "Die neun einzelnen Befehle des DeltaRecon-Pakets, von request bis quickstart: was jeder tut, ein Beispiel für Windows und Linux, seine Optionen und seine Dateien."
 ---
 import Callout from '../../components/Callout.astro';
+import HintLink from '../../components/HintLink.astro';
 import PlatformSwitch from '../../components/PlatformSwitch.astro';
 import Prose from '../../components/Prose.astro';
 import Row from '../../components/Row.astro';
@@ -118,6 +119,8 @@ Jeder Befehl endet mit einem <Term id="exit-status">Exit-Status</Term>, einer Za
   <Row name="Der Befehl konnte nicht starten" code="2">Zum Beispiel: Eine Ausgabe gibt es schon, die gewählte Engine lässt sich nicht laden, die Datei einer Toleranz oder das Ziel einer Suche ist fehlerhaft, oder ein <Term id="record">Nachweis</Term> ist nicht der eines gelungenen Laufs.</Row>
 </RowList>
 
+<HintLink section="start" />
+
 <SectionHeading id="request" command="request"><code translate="no">request</code>: festlegen, was gerechnet werden soll</SectionHeading>
 
 <Prose>
@@ -197,6 +200,8 @@ Die Dateien von `run`:
   <Row name="Die Ergebnisse" code="results.csv" tag="schreibt">Der Export des Laufs, je Modellpunkt. Nur ein gelungener Lauf hat ihn.</Row>
   <Row name="Der Nachweis" code="run-record.json" tag="schreibt">Womit was gerechnet wurde. Die folgenden Befehle lesen diese Datei.</Row>
 </RowList>
+
+<HintLink section="run" />
 
 <SectionHeading id="replay" command="replay"><code translate="no">replay</code>: einen aufgezeichneten Lauf wiederholen</SectionHeading>
 
@@ -482,6 +487,8 @@ Die Dateien von `quickstart`:
   <Row name="Das Änderungsverzeichnis" code="changes.json" tag="schreibt">Was `derive` schreibt.</Row>
   <Row name="Die Suche" code="search/" tag="schreibt">Was `search` schreibt.</Row>
 </RowList>
+
+<HintLink section="quickstart" />
 
 <SectionHeading id="shared-options">{sharedName}</SectionHeading>
 

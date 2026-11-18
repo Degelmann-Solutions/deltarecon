@@ -17,6 +17,7 @@ import Callout from '../../components/Callout.astro';
 import CodeBlock from '../../components/CodeBlock.astro';
 import CodeExcerpt from '../../components/CodeExcerpt.astro';
 import FileList from '../../components/FileList.astro';
+import HintLink from '../../components/HintLink.astro';
 import PathEnd from '../../components/PathEnd.astro';
 import PlatformPart from '../../components/PlatformPart.astro';
 import PlatformSwitch from '../../components/PlatformSwitch.astro';
@@ -319,6 +320,8 @@ The history that your connection gives breaks the protocol: its kind is not a na
 </Callout>
 </div>
 
+<HintLink slot="hint" step="select" />
+
 </StepCard>
 
 <StepCard steps={frontmatter.steps} anchor="first-run">
@@ -382,6 +385,8 @@ The smallest compare request:
 `compare` takes the path of this file and nothing else. “<a href={`${pageAddress(singleCommands, 'en')}#compare`}>{singleCommands.name.en}</a>” describes what it writes.
 
 </div>
+
+<HintLink slot="hint" step="first-run" />
 
 </StepCard>
 

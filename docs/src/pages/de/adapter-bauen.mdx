@@ -17,6 +17,7 @@ import Callout from '../../components/Callout.astro';
 import CodeBlock from '../../components/CodeBlock.astro';
 import CodeExcerpt from '../../components/CodeExcerpt.astro';
 import FileList from '../../components/FileList.astro';
+import HintLink from '../../components/HintLink.astro';
 import PathEnd from '../../components/PathEnd.astro';
 import PlatformPart from '../../components/PlatformPart.astro';
 import PlatformSwitch from '../../components/PlatformSwitch.astro';
@@ -319,6 +320,8 @@ Die Versionsgeschichte, die Ihre Anbindung liefert, verletzt das Protokoll: Ihre
 </Callout>
 </div>
 
+<HintLink slot="hint" step="select" />
+
 </StepCard>
 
 <StepCard steps={frontmatter.steps} anchor="first-run">
@@ -382,6 +385,8 @@ Die kleinste Vergleichsanfrage:
 `compare` erhält den Pfad dieser Datei und sonst nichts. „<a href={`${pageAddress(singleCommands, 'de')}#compare`}>{singleCommands.name.de}</a>“ beschreibt, was es schreibt.
 
 </div>
+
+<HintLink slot="hint" step="first-run" />
 
 </StepCard>
 

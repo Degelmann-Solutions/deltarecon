@@ -16,6 +16,7 @@ steps:
 import Callout from '../../components/Callout.astro';
 import CommandSession from '../../components/CommandSession.astro';
 import FileList from '../../components/FileList.astro';
+import HintLink from '../../components/HintLink.astro';
 import PathEnd from '../../components/PathEnd.astro';
 import PlatformPart from '../../components/PlatformPart.astro';
 import PlatformSwitch from '../../components/PlatformSwitch.astro';
@@ -158,6 +159,8 @@ Your folder carries the time at which your demo started, so its name differs fro
 </div>
 </div>
 
+<HintLink slot="hint" step="folder" />
+
 </StepCard>
 
 <StepCard steps={frontmatter.steps} anchor="other-quantity">
@@ -212,6 +215,8 @@ If you start a command a second time, it ends at once with <Term id="exit-status
 
 </Callout>
 </div>
+
+<HintLink slot="hint" step="other-quantity" />
 
 </StepCard>
 
@@ -333,6 +338,8 @@ The first line counts the values that differ; the output calls a value a coordin
 </div>
 </div>
 
+<HintLink slot="hint" step="newer-revision" />
+
 </StepCard>
 
 <StepCard steps={frontmatter.steps} anchor="changes">
@@ -413,6 +420,8 @@ The search computed {own.run} of the {own.walk} states. The first line of each o
   ]}
 />
 </div>
+
+<HintLink slot="hint" step="search" />
 
 </StepCard>
 
