@@ -42,16 +42,18 @@ const CHECKOUT = ['uv', 'run', 'deltarecon'];
 /**
  * What stands in the place of each word of the page: the engine of
  * `examples/toy_engine/`, its stage and two of its revisions. `<output>` is
- * the folder of a run in the temporary folder.
+ * the folder of a run in the temporary folder. The German page writes some
+ * of the words in German; both forms stand here.
  */
 const ENGINE = {
   '<module>:<class>': 'toy_engine:ToyEngine',
   '<folder>': 'examples/toy_engine',
   '<stage>': 'toy_premium',
+  '<Stufe>': 'toy_premium',
 };
 const RUNS = [
-  { name: 'older', '<revision>': 'r1', '<label>': 'r1', '<run-id>': 'run-r1' },
-  { name: 'newer', '<revision>': 'r2', '<label>': 'r2', '<run-id>': 'run-r2' },
+  { name: 'older', '<revision>': 'r1', '<label>': 'r1', '<run-id>': 'run-r1', '<Revision>': 'r1', '<Bezeichnung>': 'r1', '<Lauf-ID>': 'run-r1' },
+  { name: 'newer', '<revision>': 'r2', '<label>': 'r2', '<run-id>': 'run-r2', '<Revision>': 'r2', '<Bezeichnung>': 'r2', '<Lauf-ID>': 'run-r2' },
 ];
 /** A word of the page that names the engine of this script. */
 const NAMED = /\btoy/i;
@@ -115,7 +117,7 @@ async function checkPage(name, shown, folder) {
     const output = path.join(folder, runName);
     outputs.push(output);
     for (const line of shown.linux) {
-      const { filled, left } = fill(line, { ...ENGINE, ...words, '<output>': output });
+      const { filled, left } = fill(line, { ...ENGINE, ...words, '<output>': output, '<Ausgabe>': output });
       if (left.length > 0) {
         failures.push(`${name}, step "${STEP}": the script has nothing to put in the place of ${left.join(', ')} in "${line}"`);
         return;
@@ -136,7 +138,7 @@ async function checkPage(name, shown, folder) {
   const sums = await Promise.all(
     outputs.map(async (output) => createHash('sha256').update(await readFile(path.join(output, 'response.json'))).digest('hex')),
   );
-  let request = fill(shown.document, { '<stage>': ENGINE['<stage>'], '<id>': 'first-run', '<older>': RUNS[0].name, '<newer>': RUNS[1].name }).filled;
+  let request = fill(shown.document, { '<stage>': ENGINE['<stage>'], '<Stufe>': ENGINE['<stage>'], '<id>': 'first-run', '<ID>': 'first-run', '<older>': RUNS[0].name, '<älter>': RUNS[0].name, '<newer>': RUNS[1].name, '<neuer>': RUNS[1].name }).filled;
   for (const sum of sums) request = request.replace('<sha256>', sum);
   const left = request.match(/<[^<>\s]*>/g) ?? [];
   expect(shown.document !== '' && left.length === 0, `${name}, step "${STEP}": no compare request, or the script has nothing to put in the place of ${left.join(', ')}`);

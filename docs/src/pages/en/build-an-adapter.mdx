@@ -107,9 +107,9 @@ The {cls} first says four things about itself. They are attributes, not operatio
 
 <StepCard steps={frontmatter.steps} anchor="releases">
 
-DeltaRecon knows no file and no repository of your engine. It names a release by a release identity: a label and a set of references that only your connection reads. Four operations deal with it. None of them restores or writes anything.
+DeltaRecon knows no file and no repository of your engine. It names a release by a release identity: a label and a set of references that only your connection reads. Four operations belong to this. None of them restores or writes anything.
 
-The reference model keeps its history in a Git repository, as most companies do. From such a history a connection needs four things: to name a revision, to read the files of a revision, to list the revisions between two releases on the main line, and to say what each of them touches. This step needs the first two; step 5 needs the other two.
+The reference model keeps its history in a Git repository. From such a history a connection needs four things: to name a revision, to read the files of a revision, to list the revisions between two releases on the main line, and to say what each of them touches. This step needs the first two; step 5 needs the other two.
 
 The connection of the reference model reads the repository with a library, `dulwich`, and starts no Git program, so none has to be installed. An engine whose history is not in Git answers the same four questions in its own way.
 
@@ -133,7 +133,7 @@ The connection of the reference model reads the repository with a library, `dulw
 </RowList>
 
 <CodeExcerpt id="repositories-folder">
-  <p slot="caption">How the reference model finds its folder: the given one, else the one that a variable names, else the nearest folder `repositories/` that holds its repository, in the working directory or one of its parents.</p>
+  <p slot="caption">How the reference model finds its folder: the given one, else the one that a variable names, else the nearest folder `repositories/` that holds its repository, in the working directory or one of its parents, and where there is none, `repositories/` in the working directory.</p>
 </CodeExcerpt>
 
 <CodeExcerpt id="locate-release">
@@ -192,7 +192,7 @@ A revision of another history than its own is a change your engine cannot apply:
 </RowList>
 
 <CodeExcerpt id="open-scratch">
-  <p slot="caption">The reference model creates the scratch folder, writes the files of the revision into it, applies the text patches there, reads the model from it and hands the opened release to the run.</p>
+  <p slot="caption">The reference model creates the scratch folder, writes the files of the revision into it, applies the text patches there, reads the model from it and hands the opened release to the run. The excerpt shows one of the two computation paths of the reference model.</p>
 </CodeExcerpt>
 </div>
 

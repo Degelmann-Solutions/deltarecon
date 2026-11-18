@@ -30,17 +30,18 @@ import { findPage, pageAddress } from '../../site';
 
 export const singleCommands = findPage('single-commands');
 // The two commands of the first run. The words between `<` and `>` stand for
-// what the reader puts in; they are the words of the program and stay
-// English. scripts/check-first-run.mjs puts an engine of the repository in
+// what the reader puts in; those of the engine selection
+// (`<module>:<class>`, `<folder>`) are the words of the program and stay
+// English, the others are German. scripts/check-first-run.mjs puts an engine of the repository in
 // their place and runs both commands.
 export const firstRun = {
   windows: [
-    String.raw`.\deltarecon.cmd request --revision <revision> --stage <stage> --label <label> --run-id <run-id> --output <output>\request.json --engine <module>:<class> --engine-path <folder>`,
-    String.raw`.\deltarecon.cmd run <output>\request.json --engine <module>:<class> --engine-path <folder>`,
+    String.raw`.\deltarecon.cmd request --revision <Revision> --stage <Stufe> --label <Bezeichnung> --run-id <Lauf-ID> --output <Ausgabe>\request.json --engine <module>:<class> --engine-path <folder>`,
+    String.raw`.\deltarecon.cmd run <Ausgabe>\request.json --engine <module>:<class> --engine-path <folder>`,
   ],
   linux: [
-    './deltarecon request --revision <revision> --stage <stage> --label <label> --run-id <run-id> --output <output>/request.json --engine <module>:<class> --engine-path <folder>',
-    './deltarecon run <output>/request.json --engine <module>:<class> --engine-path <folder>',
+    './deltarecon request --revision <Revision> --stage <Stufe> --label <Bezeichnung> --run-id <Lauf-ID> --output <Ausgabe>/request.json --engine <module>:<class> --engine-path <folder>',
+    './deltarecon run <Ausgabe>/request.json --engine <module>:<class> --engine-path <folder>',
   ],
 };
 // The smallest compare request (contracts/v3/compare.md at the tag of the
@@ -50,10 +51,10 @@ export const compareRequest = [
   '{',
   '  "document": "compare_request",',
   '  "contract_version": "3.3",',
-  '  "stage": "<stage>",',
-  '  "compare_id": "<id>",',
-  '  "left": { "response": { "path": "<older>/response.json", "sha256": "<sha256>" } },',
-  '  "right": { "response": { "path": "<newer>/response.json", "sha256": "<sha256>" } },',
+  '  "stage": "<Stufe>",',
+  '  "compare_id": "<ID>",',
+  '  "left": { "response": { "path": "<älter>/response.json", "sha256": "<sha256>" } },',
+  '  "right": { "response": { "path": "<neuer>/response.json", "sha256": "<sha256>" } },',
   '  "tolerance": { "per_quantity": {} }',
   '}',
 ];
@@ -106,9 +107,9 @@ Zuerst sagt die Klasse vier Dinge über sich selbst. Das sind Attribute, keine O
 
 <StepCard steps={frontmatter.steps} anchor="releases">
 
-DeltaRecon kennt keine Datei und kein Repository Ihrer Engine. Es benennt ein Release durch dessen Beschreibung: eine Bezeichnung und einen Satz von Verweisen, die nur Ihre Anbindung liest. Vier Operationen gehen damit um. Keine von ihnen stellt etwas wieder her oder schreibt etwas.
+DeltaRecon kennt keine Datei und kein Repository Ihrer Engine. Es benennt ein Release durch dessen Beschreibung: eine Bezeichnung und einen Satz von Verweisen, die nur Ihre Anbindung liest. Vier Operationen gehören dazu. Keine von ihnen stellt etwas wieder her oder schreibt etwas.
 
-Das Referenzmodell führt seine Versionsgeschichte in einem Git-Repository, wie die meisten Unternehmen. Aus einer solchen Versionsgeschichte braucht eine Anbindung vier Dinge: eine Revision benennen, die Dateien einer Revision lesen, die Revisionen zwischen zwei Releases auf der Hauptlinie auflisten und sagen, was jede von ihnen berührt. Dieser Schritt braucht die ersten beiden, Schritt 5 die anderen beiden.
+Das Referenzmodell führt seine Versionsgeschichte in einem Git-Repository. Aus einer solchen Versionsgeschichte braucht eine Anbindung vier Dinge: eine Revision benennen, die Dateien einer Revision lesen, die Revisionen zwischen zwei Releases auf der Hauptlinie auflisten und sagen, was jede von ihnen berührt. Dieser Schritt braucht die ersten beiden, Schritt 5 die anderen beiden.
 
 Die Anbindung des Referenzmodells liest das Repository mit einer Bibliothek, `dulwich`, und startet kein Git-Programm; es muss also keines installiert sein. Eine Engine, deren Versionsgeschichte nicht in Git liegt, beantwortet dieselben vier Fragen auf ihre Weise.
 
@@ -132,7 +133,7 @@ Die Anbindung des Referenzmodells liest das Repository mit einer Bibliothek, `du
 </RowList>
 
 <CodeExcerpt id="repositories-folder">
-  <p slot="caption">Wie das Referenzmodell seinen Ordner findet: den übergebenen, sonst den, den eine Variable nennt, sonst den nächsten Ordner `repositories/`, der sein Repository enthält, im Arbeitsverzeichnis oder in einem der Ordner darüber.</p>
+  <p slot="caption">Wie das Referenzmodell seinen Ordner findet: den übergebenen, sonst den, den eine Variable nennt, sonst den nächsten Ordner `repositories/`, der sein Repository enthält, im Arbeitsverzeichnis oder in einem der Ordner darüber, und wenn es keinen gibt, `repositories/` im Arbeitsverzeichnis.</p>
 </CodeExcerpt>
 
 <CodeExcerpt id="locate-release">
@@ -153,7 +154,7 @@ Die Anbindung des Referenzmodells führt keinen dieser Befehle aus. Jede Zeile n
 
 {git('git show <commit>:<path>')} Eine Datei einer Revision lesen. Die Anbindung schreibt jede Datei der Revision in einen neuen Ordner, Byte für Byte; sie nutzt kein Archiv und kein Arbeitsverzeichnis des Repositorys.
 
-{git('git log --first-parent --reverse <older>..<newer>')} Die Revisionen zwischen zwei Releases auf der Hauptlinie auflisten, die älteste zuerst. Die Anbindung lehnt zwei Revisionen ab, von denen die ältere nicht auf der Hauptlinie der neueren liegt.
+{git('git log --first-parent --reverse <älter>..<neuer>')} Die Revisionen zwischen zwei Releases auf der Hauptlinie auflisten, die älteste zuerst. Die Anbindung lehnt zwei Revisionen ab, von denen die ältere nicht auf der Hauptlinie der neueren liegt.
 
 {git('git diff --name-only --no-renames <parent> <commit>')} Sagen, welche Pfade eine Revision berührt, gegenüber der Revision vor ihr.
 
@@ -191,7 +192,7 @@ Eine Revision aus einer anderen Versionsgeschichte als ihrer eigenen ist eine Ä
 </RowList>
 
 <CodeExcerpt id="open-scratch">
-  <p slot="caption">Das Referenzmodell legt den Arbeitsordner an, schreibt die Dateien der Revision hinein, wendet dort die Textpatches an, liest das Modell daraus und übergibt das geöffnete Release an den Lauf.</p>
+  <p slot="caption">Das Referenzmodell legt den Arbeitsordner an, schreibt die Dateien der Revision hinein, wendet dort die Textpatches an, liest das Modell daraus und übergibt das geöffnete Release an den Lauf. Der Auszug zeigt einen der beiden Rechenwege des Referenzmodells.</p>
 </CodeExcerpt>
 </div>
 
@@ -342,13 +343,13 @@ Setzen Sie an den Stellen zwischen `<` und `>` Ihre eigenen Angaben ein:
 
 <div class="step-after">
 
-`<revision>` ist eine Revision, wie Ihre Engine sie benennt. `<stage>` ist eine Stufe, die Ihre Engine anbietet; Sie können `--stage` weglassen, wenn sie nur eine Stufe anbietet. `<label>` und `<run-id>` sind Namen, die Sie diesem Release und diesem Lauf geben. `<output>` ist ein Ordner für die Dateien des Laufs. Findet Ihre Engine den Ordner ihrer Versionsgeschichten nicht von selbst, ergänzen Sie in beiden Befehlen `--repositories` mit diesem Ordner.
+`<Revision>` ist eine Revision, wie Ihre Engine sie benennt. `<Stufe>` ist eine Stufe, die Ihre Engine anbietet; Sie können `--stage` weglassen, wenn sie nur eine Stufe anbietet. `<Bezeichnung>` und `<Lauf-ID>` sind Namen, die Sie diesem Release und diesem Lauf geben. `<Ausgabe>` ist ein Ordner für die Dateien des Laufs. Findet Ihre Engine den Ordner ihrer Versionsgeschichten nicht von selbst, ergänzen Sie in beiden Befehlen `--repositories` mit diesem Ordner.
 
 </div>
 
 <StepFigure slot="figure">
   <FileList
-    label="Im Ordner <output>"
+    label="Im Ordner <Ausgabe>"
     files={[
       { name: 'request.json', note: 'was gerechnet werden soll' },
       { name: 'response.json', note: 'wie der Lauf geendet hat' },
