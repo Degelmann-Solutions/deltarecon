@@ -55,7 +55,7 @@ export const typed = {
 
 <Prose>
 
-Der Quick Start läuft am <Term id="reference-model">Referenzmodell</Term>. In seinem zweiten Schritt rechnet die <Term id="regression">Regression</Term> den Stand N+1 auf denselben Bestandsdaten und für dieselben Modellpunkte wie Release N und vergleicht beide Ergebnisse <Term id="value">Wert</Term> für Wert. Ihre Tabelle sagt, wo sie eine <Term id="deviation">Abweichung</Term> gefunden hat: eine Zeile je Größe, zum Beispiel für den <Term id="bruttobeitrag" />.
+Der Quick Start läuft am <Term id="reference-model">Referenzmodell</Term>. In seinem zweiten Schritt rechnet die <Term id="regression">Regression</Term> den <Term id="state">Stand</Term> N+1 auf denselben <Term id="input-data">Bestandsdaten</Term> und für dieselben <Term id="model-point">Modellpunkte</Term> wie <Term id="release">Release</Term> N und vergleicht beide Ergebnisse <Term id="value">Wert</Term> für Wert. Ihre Tabelle sagt, wo sie eine <Term id="deviation">Abweichung</Term> gefunden hat: eine Zeile je <Term id="quantity">Größe</Term>, zum Beispiel für den <Term id="bruttobeitrag" />.
 
 </Prose>
 
@@ -64,7 +64,7 @@ Der Quick Start läuft am <Term id="reference-model">Referenzmodell</Term>. In s
 <SubHeading>Die Spalten</SubHeading>
 
 <RowList>
-  <Row name={regression.head[0]}>Ein Ergebnis, das das Referenzmodell für jeden Modellpunkt und jede Periode ausgibt.</Row>
+  <Row name={regression.head[0]}>Ein Ergebnis, das das Referenzmodell für jeden Modellpunkt und jede <Term id="period">Periode</Term> ausgibt.</Row>
   <Row name={regression.head[1]}>In wie vielen der {facts.modelPoints} Modellpunkte mindestens ein Wert der Größe abweicht.</Row>
   <Row name={regression.head[2]}>Wie viele Werte der Größe abweichen. Ein Wert ist eine Größe eines Modellpunkts in einer Periode.</Row>
   <Row name={regression.head[3]}>Die erste und die letzte Periode, in der ein Wert abweicht. Eine Periode ist ein Projektionsmonat, gezählt ab 0 am Bewertungsstichtag.</Row>
@@ -100,7 +100,7 @@ Die Zahl der Modellpunkte ist von Zeile zu Zeile verschieden, weil jede Größe 
 
 <Prose>
 
-Der dritte Schritt liest die Versionsgeschichte des Modells zwischen Release N und dem Stand N+1 und listet jede Änderung einzeln auf, in der Reihenfolge, in der sie gemacht wurde. Jede Änderung ist eine <Term id="revision">Revision</Term> und bekommt eine <Term id="class">Einordnung</Term>.
+Der dritte Schritt liest die <Term id="history">Versionsgeschichte</Term> des Modells zwischen Release N und dem Stand N+1 und listet jede Änderung einzeln auf, in der Reihenfolge, in der sie gemacht wurde. Jede Änderung ist eine <Term id="revision">Revision</Term> und bekommt eine <Term id="class">Einordnung</Term>.
 
 </Prose>
 
@@ -130,7 +130,7 @@ Der dritte Schritt liest die Versionsgeschichte des Modells zwischen Release N u
 
 DeltaRecon beurteilt nicht den Inhalt einer Änderung und liest dafür auch nicht die Beschreibung: Die Beschreibung ist das, was der Autor geschrieben hat, kein Befund. Es betrachtet die Dateien. Für jede Revision nimmt es die Dateien, die sie gegenüber der Revision davor hinzufügt, entfernt oder ändert; bei einer Zusammenführung ist das der Stand, bevor der Seitenzweig hinzukam. Die Revision erhält die Einordnung jeder dieser Dateien. Deshalb kann eine Revision zwei Einordnungen haben, und eine Revision, die keine solche Datei berührt, hat keine.
 
-Welche Datei welche Einordnung hat, weiß DeltaRecon nicht von sich aus. Das sagt der <Term id="adapter">Adapter</Term> der Engine. Der Adapter liest auch die Historie und nennt die Dateien jeder Revision. Für das Referenzmodell legt sein Adapter fest:
+Welche Datei welche Einordnung hat, weiß DeltaRecon nicht von sich aus. Das sagt der <Term id="adapter">Adapter</Term> der <Term id="engine">Engine</Term>. Der Adapter liest auch die Historie und nennt die Dateien jeder Revision. Für das Referenzmodell legt sein Adapter fest:
 
 </Prose>
 
@@ -153,7 +153,7 @@ Bei Ihrer eigenen Engine legt Ihr Adapter fest, welche Dateien Daten, Parameter 
 
 <Prose>
 
-Änderung {change('8f81933').number}, „<span lang="en">{change('8f81933').description}</span>“, ist eine Zusammenführung: Sie bringt die Arbeit eines Seitenzweigs in die Hauptlinie. Die Tabelle führt sie als eine Revision.
+Änderung {change('8f81933').number}, „<span lang="en">{change('8f81933').description}</span>“, ist eine Zusammenführung: Sie bringt die Arbeit eines Seitenzweigs in die <Term id="main-line">Hauptlinie</Term>. Die Tabelle führt sie als eine Revision.
 
 Änderung {change('29c4a03').number} ist eine Rücknahme: Sie nimmt Änderung {change('e23137a').number} zurück. Beide bleiben in der Liste, jede als eigene Revision.
 
@@ -209,7 +209,7 @@ Die Zeile über der Tabelle sagt „{counts.computed} von {counts.states}“. {c
 
 <Prose>
 
-Die vier Summen ergeben zusammen {typed.sumOfFour}. Die ganze Abweichung des Bruttobeitrags zwischen N und N+1, über dieselben Modellpunkte und Monate, beträgt {typed.whole}. Der Rest von {typed.remainder} ist das, was unter der Toleranz bleibt, einschließlich des Abschnitts, der nicht aufgelöst ist.
+Die vier Summen ergeben zusammen {typed.sumOfFour}. Die ganze Abweichung des Bruttobeitrags zwischen N und N+1, über dieselben Modellpunkte und Monate, beträgt {typed.whole}. Der <span data-no-term>Rest</span> von {typed.remainder} ist das, was unter der Toleranz bleibt, einschließlich des <Term id="interval">Abschnitts</Term>, der nicht aufgelöst ist.
 
 </Prose>
 

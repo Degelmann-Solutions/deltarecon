@@ -118,7 +118,7 @@ export const shared = (options) => (
 
 <Prose>
 
-The <a href={pageAddress(quickStart, 'en')}>{quickStart.name.en}</a> runs several of these commands for you. This page describes every command of the package on its own, in the order in which the package lists them. You start a single command in the package folder.
+The <a href={pageAddress(quickStart, 'en')}>{quickStart.name.en}</a> <span data-no-term>runs</span> several of these commands for you. This page describes every command of the package on its own, in the order in which the package lists them. You start a single command in the <Term id="package-folder">package folder</Term>.
 
 </Prose>
 
@@ -138,7 +138,7 @@ Open a terminal in the package folder. Every command begins with the launcher `.
 
 <Prose>
 
-The examples of this page are the commands that the guide `README.txt` in the package folder lists; the examples of `compare` and `walk` are the exceptions, the guide does not list them. They write to the folder `runs` in the package folder, and they build on each other in the order of this page: `request` writes what `run` reads, and so on. The folder `runs` is a free choice; the files of a run may lie in any folder.
+The examples of this page are the commands that the guide `README.txt` in the package folder lists; the examples of `compare` and `walk` are the exceptions, the guide does not list them. They write to the folder `runs` in the package folder, and they build on each other in the order of this page: `request` writes what `run` reads, and so on. The folder `runs` is a free choice; the files of <Term id="run">a run</Term> may lie in any folder.
 
 No command overwrites an existing file. A command whose output exists already does not start. To repeat a calculation, give it an output that does not exist yet.
 
@@ -159,7 +159,7 @@ Every command ends with an <Term id="exit-status">exit status</Term>, a number t
 <RowList plain>
   <Row name="Status 0: Done, and nothing to report">A run that succeeded, a replay that is reproduced, a comparison or a <Term id="regression">regression</Term> without a <Term id="deviation">deviation</Term>, a request or a <Term id="change-manifest">change manifest</Term> that was written, a walk that attributes every <Term id="revision">revision</Term>, a search whose two ends are reproduced.</Row>
   <Row name="Status 1: Something to look at, or a refusal">A run that failed, was rejected or ended with an error; a replay that is not reproduced; a comparison or a regression with a deviation; a change manifest that cannot be derived; a walk or a search that is refused or stops. The regression of the quick start ends with status 1 by design: it reports the deviation between the two revisions, and the next commands run all the same.</Row>
-  <Row name="Status 2: The command could not start">For example: an output exists already, the selected engine cannot be loaded, the file of a tolerance or the target of a search is faulty, or a <Term id="record">record</Term> is not that of a run that succeeded.</Row>
+  <Row name="Status 2: The command could not start">For example: an output exists already, the selected <Term id="engine">engine</Term> cannot be loaded, the file of a tolerance or the <Term id="target">target</Term> of a search is faulty, or a <Term id="record">record</Term> is not that of a run that succeeded.</Row>
 </RowList>
 
 <HintLink section="start" />
@@ -170,7 +170,7 @@ Every command ends with an <Term id="exit-status">exit status</Term>, a number t
 
 <Prose>
 
-<code translate="no">request</code> writes a run request: the file that says what is to be computed. It names the release completely, that is the code, the parameters and the input data, each by the full name of its revision, and the version of the core of the engine, which is not part of the history: for the <Term id="reference-model">reference model</Term> the libraries modelx, pandas and numpy, and Python itself. It also names the model points to run. <code translate="no">request</code> computes nothing; `run` does.
+<code translate="no">request</code> writes a <Term id="run-request">run request</Term>: the file that says what is to be computed. It names the <Term id="release">release</Term> completely, that is the code, the parameters and the <Term id="input-data">input data</Term>, each by the full name of its revision, and the version of the core of the engine, which is not part of the <Term id="history">history</Term>: for the <Term id="reference-model">reference model</Term> the libraries modelx, pandas and numpy, and Python itself. It also names the <Term id="model-point">model points</Term> to run. <code translate="no">request</code> computes nothing; `run` does.
 
 For the reference model a release is a revision of the history that the package holds in the folder `delib-history`. You name it by its full or abbreviated hash, by a branch, by a tag or by `HEAD`; a suffix such as `HEAD~1` is not read. The request then holds the full hash.
 
@@ -221,7 +221,7 @@ The files of <code translate="no">request</code>:
 
 <code translate="no">run</code> checks the request, restores the files of the named revision to a scratch folder, projects the selected model points and evaluates the five built-in checks of the model for each. It writes its files beside the request.
 
-A run ends with one of four outcomes. `succeeded`: there are results. `failed`: a model point raised an error, a check is false, or a result is not a finite number; there are no results. `error`: the request was accepted, but the engine could not restore or read the state; there are no results. `rejected`: the request broke a rule, and nothing ran. The record is written for every outcome, except for a file that cannot be read as a run request.
+A run ends with one of four outcomes. `succeeded`: there are results. `failed`: a model point raised an error, a check is false, or a result is not a finite number; there are no results. `error`: the request was accepted, but the engine could not restore or read the <Term id="state">state</Term>; there are no results. `rejected`: the request broke a rule, and nothing ran. The record is written for every outcome, except for a file that cannot be read as a run request.
 
 </Prose>
 
@@ -305,7 +305,7 @@ The files of <code translate="no">replay</code>:
 
 <Prose>
 
-<code translate="no">compare</code> compares the two runs that a compare request names, value by value, under the tolerance profile of that request. When the two runs can be compared, it writes the values that deviate and a <Term id="signature-table">signature table</Term>, which has one row per quantity that deviates.
+<code translate="no">compare</code> compares the two runs that a compare request names, value by value, under the tolerance profile of that request. When the two runs can be compared, it writes the values that deviate and a <Term id="signature-table">signature table</Term>, which has one row per <Term id="quantity">quantity</Term> that deviates.
 
 You will rarely start it yourself: `replay`, `regression`, `walk` and `search` write and run their compare requests themselves. The file `replay-compare.request.json` that `replay` writes is such a request; the example runs it once more. <a href={`${pageAddress(adapterPage, 'en')}#first-run`}>{adapterPage.name.en}</a> shows how to write a compare request yourself.
 
@@ -328,7 +328,7 @@ The files of <code translate="no">compare</code>:
 <RowList label="Writes">
   <Row name="The result" code="compare.result.json">Written beside the request. It lists the model points that deviate.</Row>
   <Row name="The values that deviate" code="compare.deviations.csv">One row per value above the tolerance. Written when the two runs are compared.</Row>
-  <Row name="The signature table" code="signature-table.json">Per quantity that deviates: in how many model points and values, in which periods, and the largest increase and decrease. Written when the two runs are compared.</Row>
+  <Row name="The signature table" code="signature-table.json">Per quantity that deviates: in how many model points and values, in which <Term id="period">periods</Term>, and the largest increase and decrease. Written when the two runs are compared.</Row>
   <Row name="The record of the comparison" code="compare.run-record.json">Written when the release of both runs can be read.</Row>
 </RowList>
 
@@ -385,9 +385,9 @@ The files of <code translate="no">regression</code>:
 
 <Prose>
 
-<code translate="no">derive</code> starts from the records of two runs that succeeded, both full runs without enabled changes, the older one first. It reads the history of the model between their two revisions and writes the change manifest: one change per revision on the main line of the history, after the older revision and up to the newer one, in the order of the history. A branch that was merged is one change, the merge.
+<code translate="no">derive</code> starts from the records of two runs that succeeded, both full runs without enabled changes, the older one first. It reads the history of the model between their two revisions and writes the change manifest: one change per revision on the <Term id="main-line">main line</Term> of the history, after the older revision and up to the newer one, in the order of the history. A branch that was merged is one change, the merge.
 
-Each change carries its <Term id="class">class</Term>: data, parameter, code, several of them or none. What differs between the two records and belongs to no revision, another version of the core of the engine, is named as the remainder and belongs to no change. The command prints the changes and the remainder.
+Each change carries its <Term id="class">class</Term>: data, parameter, code, several of them or none. What differs between the two records and belongs to no revision, another version of the core of the engine, is named as the <Term id="remainder">remainder</Term> and belongs to no change. The command prints the changes and the remainder.
 
 Two revisions that do not lie on one main line, also two records in the wrong order, are refused, and nothing is written. The same two records give the same file, byte for byte.
 
@@ -475,7 +475,7 @@ The files of <code translate="no">walk</code>:
 
 <Prose>
 
-<code translate="no">search</code> takes the same two records as `walk` and makes the same checks before it computes. It needs no walk. It computes state 0 and the last state, checks them against the two records, and then halves the history: it judges a stretch of the history by comparing the states at its two ends, does not divide a stretch whose ends agree, and attributes a deviation to a stretch that holds a single change. <a href={pageAddress(works, 'en')}>{works.name.en}</a> explains the method and its limits.
+<code translate="no">search</code> takes the same two records as `walk` and makes the same checks before it computes. It needs no walk. It computes state 0 and the last state, checks them against the two records, and then halves the history: it judges a <Term id="interval">stretch</Term> of the history by comparing the states at its two ends, does not divide a stretch whose ends agree, and attributes a deviation to a stretch that holds a single change. <a href={pageAddress(works, 'en')}>{works.name.en}</a> explains the method and its limits.
 
 You can narrow the search to a target with `--quantity` and `--periods`. Only the values of the target are then judged and summed. The example searches in the <Term id="bruttobeitrag" /> in the periods 0 to 59, the first five projection years.
 
@@ -531,7 +531,7 @@ The files of <code translate="no">search</code>:
 
 <code translate="no">quickstart</code> is the command behind the guided demo of the <a href={pageAddress(quickStart, 'en')}>{quickStart.name.en}</a>. It runs `request`, `run`, `regression`, `derive` and `search` on the two revisions of the examples above, without `replay`, explains each of its four steps and waits for Enter before each. It always computes with the reference model. Its search compares under the tolerance profile `tolerance-bruttobeitrag.json` of the package; its regression compares exactly.
 
-You start it through its starter, which changes to the package folder, hands its options on to <code translate="no">quickstart</code> and ends with its exit status:
+You start it through its <Term id="starter">starter</Term>, which changes to the package folder, hands its options on to <code translate="no">quickstart</code> and ends with its exit status:
 
 </Prose>
 

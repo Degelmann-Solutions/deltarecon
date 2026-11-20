@@ -885,6 +885,19 @@ A <Term id="deviation">deviation</Term> between two releases.
   shown counts like content that is: with JavaScript off it may be visible.
 - A word that equals a term and is not meant as it is marked as exempt:
   `It <span data-no-term>records</span> which state is computed.`
+  Several entries are everyday words with a second sense ("run" as a verb,
+  "Abschnitt" for a section of the page, the release on GitHub): mark that
+  sense as exempt, and link the first occurrence in the sense of the entry.
+  A link on a very short word is too small a target for the accessibility
+  check; take the word before it into the link ("a run").
+- Some components exempt their text themselves, because it is a label or
+  shows what the program prints and cannot hold a link: the name of a row
+  (`Row`), a file list, the mono line of a flow box, a summary list, the
+  tables of the demo and of the search, the quoted message of a callout, and
+  the words "To the step" of a hint group.
+- An entry may name the page that says more about its term (`more` in the
+  register, the id of the page); the Glossary then links to it in a line
+  "More on this", and the check holds the link.
 - The Glossary lists under "Appears in" the pages whose source holds a
   `<Term>` for the entry; nothing is to be kept by hand.
 - A reader who came to an entry from a page of the documentation finds a

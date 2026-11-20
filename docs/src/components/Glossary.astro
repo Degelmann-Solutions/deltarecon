@@ -16,10 +16,13 @@
 // word that begins with it ("DE" for "derive"). The tag of the linked state
 // is kept out as well.
 //
+// An entry that names a page that says more (`more` in the register) links
+// to it, in a line of its own before "Appears in".
+//
 // "Appears in" is read from the page sources: a page appears under an entry
 // when it writes the glossary link `<Term id="…">` for it.
 import { letterAnchor, lettersOf, termLanguage, termsUsed, type Entry } from '../glossary';
-import { languageOf, otherLanguage, pageAddress, pages, texts, type Page } from '../site';
+import { findPage, languageOf, otherLanguage, pageAddress, pages, texts, type Page } from '../site';
 
 const lang = languageOf(Astro.url.pathname);
 if (!lang) {
@@ -96,6 +99,12 @@ const appearsIn = (entry: Entry): Page[] =>
               </dt>
               <dd class="mt-1.5">
                 <p set:html={entry[lang].explanation} />
+                {entry.more && (
+                  <p class="mt-2 text-caption text-text-secondary" data-more>
+                    {t.moreOn}:{' '}
+                    <a class="inline-link py-[5px]" href={pageAddress(findPage(entry.more), lang)}>{findPage(entry.more).name[lang]}</a>
+                  </p>
+                )}
                 {on.length > 0 && (
                   <p class="mt-2 text-caption text-text-secondary" data-appears-in>
                     {t.appearsIn}:{' '}

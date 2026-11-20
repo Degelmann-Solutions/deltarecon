@@ -30,7 +30,7 @@ export const command = (name) => (
 
 <Prose>
 
-A <Term id="tolerance-profile">tolerance profile</Term> sets for each quantity how far a <Term id="value">value</Term> of the newer result may lie above and below the value of the older one before the difference counts as a <Term id="deviation">deviation</Term>. It is a file in JSON. You hand it with the option `--tolerance` to one of the commands {command('replay')}, {command('regression')}, {command('walk')} and {command('search')}.
+A <Term id="tolerance-profile">tolerance profile</Term> sets for each <Term id="quantity">quantity</Term> how far a <Term id="value">value</Term> of the newer result may lie above and below the value of the older one before the difference counts as a <Term id="deviation">deviation</Term>. It is a file in JSON. You hand it with the option `--tolerance` to one of the commands {command('replay')}, {command('regression')}, {command('walk')} and {command('search')}.
 
 There is no general tolerance and no profile that holds by itself. Without `--tolerance` each of these commands compares exactly, and a quantity that has no entry in the profile is compared exactly.
 
@@ -68,7 +68,7 @@ The members of the file:
 
 Every entry needs both bounds, and every bound both parts; a part that is not to hold is `0`. No part is negative. Numbers are written with a point as the decimal mark.
 
-For `replay` and `regression` the older value is that of the recorded run, and the newer one that of the run the command computes. `walk` and `search` compare two states of the history; the older one is the earlier state.
+For `replay` and `regression` the older value is that of the <Term id="run">recorded run</Term>, and the newer one that of the run the command computes. `walk` and `search` compare two <Term id="state">states</Term> of the <Term id="history">history</Term>; the older one is the earlier state.
 
 </Prose>
 
@@ -88,14 +88,14 @@ Each bound is the larger of its two parts: the absolute part, or the relative pa
   <Row name="The relative part grows with the value">With a relative part of `0.001`, 1201 does not deviate from 1200: the bound is 0.001 times 1201, that is 1.201.</Row>
   <Row name="Rounding does not hide a rounding step">With two decimal places, 0.6972 and 0.6974 both give 0.70 and do not deviate. 0.6949 and 0.6951 give 0.69 and 0.70 and deviate, although they lie closer together.</Row>
   <Row name="Round first, then compare exactly">For a quantity with defined decimal places the first choice is to round and to compare exactly: `decimals` with both bounds at zero. A bound above zero is for what remains after that.</Row>
-  <Row name="Per quantity, and no finer">A tolerance holds for every value of its quantity. There is no tolerance per model point, per period or per tariff.</Row>
+  <Row name="Per quantity, and no finer">A tolerance holds for every value of its quantity. There is no tolerance per <Term id="model-point">model point</Term>, per <Term id="period">period</Term> or per tariff.</Row>
 </RowList>
 
 <SectionHeading id="write">Write a profile of your own</SectionHeading>
 
 <Prose>
 
-Create a new text file, for example `mein-profil.json` in the folder `profiles` of the package folder. Place and name are a free choice. The example rounds the commissions, <code lang="de" translate="no">Provisionen</code>, to two decimal places and then compares them exactly:
+Create a new text file, for example `mein-profil.json` in the folder `profiles` of the <Term id="package-folder">package folder</Term>. Place and name are a free choice. The example rounds the commissions, <code lang="de" translate="no">Provisionen</code>, to two decimal places and then compares them exactly:
 
 </Prose>
 

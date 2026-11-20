@@ -93,6 +93,6 @@ const address = `${pageAddress(target, lang)}#${group.target}`;
   <SectionHeading id={group.anchor}><Fragment set:html={title} /></SectionHeading>
   <div class="hint-list" data-hint-list><slot /></div>
   <p class="hint-back prose-links" data-hint-back>
-    {group.kind === 'step' ? t.hintToStep : t.hintToSection}: <a href={address}><Fragment set:html={title} /></a>
+    <span data-no-term>{group.kind === 'step' ? t.hintToStep : t.hintToSection}</span>: <a href={address}><Fragment set:html={title} /></a>
   </p>
 </div>

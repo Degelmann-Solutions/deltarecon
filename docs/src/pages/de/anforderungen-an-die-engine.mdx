@@ -35,9 +35,9 @@ export const components = { code: (props) => <code translate="no" {...props} /> 
 
 <Prose>
 
-DeltaRecon rechnet selbst nichts. Es stellt einer Rechen-Engine eine feste Reihe von Fragen, das Protokoll, und arbeitet mit den Antworten. Um Ihre Engine anzubinden, bauen Sie eine Anbindung, den <Term id="adapter">Adapter</Term>, der diese Fragen für Ihre Engine beantwortet. Der Adapter ist eine Klasse in Python. Ihre Engine selbst bleibt unverändert.
+DeltaRecon rechnet selbst nichts. Es stellt einer Rechen-<Term id="engine">Engine</Term> eine feste Reihe von Fragen, das <Term id="protocol">Protokoll</Term>, und arbeitet mit den Antworten. Um Ihre Engine anzubinden, bauen Sie eine Anbindung, den <Term id="adapter">Adapter</Term>, der diese Fragen für Ihre Engine beantwortet. Der Adapter ist eine Klasse in Python. Ihre Engine selbst bleibt unverändert.
 
-Dafür muss Ihre Engine drei Dinge liefern können. Zu einem Release: seine Modellpunkte und die Projektion jedes Modellpunkts, mit einem <Term id="value">Wert</Term> je Größe und Periode, und seine Parameter. Zu zwei Releases: die Versionsgeschichte zwischen ihnen als einzelne <Term id="revision">Revisionen</Term>, jede mit dem, was sie berührt: Daten, Parameter oder Code. Und zu jeder Revision dieser Versionsgeschichte: den Stand des Modells nach ihr, damit DeltaRecon diesen Stand rechnen lassen kann.
+Dafür muss Ihre Engine drei Dinge liefern können. Zu einem <Term id="release">Release</Term>: seine <Term id="model-point">Modellpunkte</Term> und die Projektion jedes Modellpunkts, mit einem <Term id="value">Wert</Term> je <Term id="quantity">Größe</Term> und <Term id="period">Periode</Term>, und seine Parameter. Zu zwei Releases: die <Term id="history">Versionsgeschichte</Term> zwischen ihnen als einzelne <Term id="revision">Revisionen</Term>, jede mit dem, was sie berührt: Daten, Parameter oder Code. Und zu jeder Revision dieser Versionsgeschichte: den <Term id="state">Stand</Term> des Modells nach ihr, damit DeltaRecon diesen Stand rechnen lassen kann.
 
 Der Maßstab für die Größe einer solchen Anbindung ist die Anbindung des <Term id="reference-model">Referenzmodells</Term>, die zum Paket gehört: eine Datei mit {lines(files.connection)} Zeilen, Kommentare und Leerzeilen mitgezählt.
 
@@ -58,7 +58,7 @@ Der Maßstab für die Größe einer solchen Anbindung ist die Anbindung des <Ter
 
 <Prose>
 
-Zu einem Release, das für einen Lauf geöffnet ist, muss die Anbindung liefern können:
+Zu einem Release, das für einen <Term id="run">Lauf</Term> geöffnet ist, muss die Anbindung liefern können:
 
 </Prose>
 
@@ -83,8 +83,8 @@ Eine Klasse mit vier Angaben über sich selbst und sieben Operationen, und eine 
 <RowList>
   <Row name="Die Stufen, die sie anbietet, mit ihren Größen" code="stages" member="Engine">Je Stufe die fachliche Beschreibung, also der Text, der sagt, was ihre Größen bedeuten, und die Namen der Größen in der Reihenfolge dieses Textes.</Row>
   <Row name="Die Arten von Änderungen, die sie anwenden kann" code="realisations" member="Engine">Zum Beispiel eine Revision ihrer eigenen Versionsgeschichte.</Row>
-  <Row name="Was eine Revision festlegt" code="determines" member="Engine">Die Teile eines Release, die eine Revision bestimmt. Beim Referenzmodell sind das der Code, die Parameter und die Bestandsdaten.</Row>
-  <Row name="Was sie festhalten kann, während Revisionen angewendet werden" code="holdable" member="Engine">Die Teile eines Release, die so bleiben können, wie die Anfrage sie nennt, während Revisionen angewendet werden. Beim Referenzmodell sind das die Bestandsdaten.</Row>
+  <Row name="Was eine Revision festlegt" code="determines" member="Engine">Die Teile eines Release, die eine Revision bestimmt. Beim Referenzmodell sind das der Code, die Parameter und die <Term id="input-data">Bestandsdaten</Term>.</Row>
+  <Row name="Was sie festhalten kann, während Revisionen angewendet werden" code="holdable" member="Engine">Die Teile eines Release, die so bleiben können, wie die <Term id="run-request">Anfrage</Term> sie nennt, während Revisionen angewendet werden. Beim Referenzmodell sind das die Bestandsdaten.</Row>
 </RowList>
 
 <SubHeading>Was die Engine kann</SubHeading>
@@ -106,7 +106,7 @@ Eine Klasse mit vier Angaben über sich selbst und sieben Operationen, und eine 
   <Row name="Einen Modellpunkt projizieren" code="project" member="Session">Einen Modellpunkt, der sich nicht rechnen lässt, meldet es als solchen.</Row>
   <Row name="Seine Parameter liefern" code="parameters" member="Session">Wie in der ersten Liste dieser Seite.</Row>
   <Row name="Mehrere Modellpunkte auf einmal projizieren" code="project_many" member="Session" tag="optional">Ohne diese Operation projiziert DeltaRecon Modellpunkt für Modellpunkt.</Row>
-  <Row name="Nur ein Ziel projizieren" code="project_target" member="Session" tag="optional">Ausgewählte Größen in ausgewählten Perioden. Ohne diese Operation kann die Engine keinen Lauf nur auf einem Ziel rechnen, wie ihn eine Suche mit `--target-only` braucht.</Row>
+  <Row name="Nur ein Ziel projizieren" code="project_target" member="Session" tag="optional">Ausgewählte Größen in ausgewählten Perioden. Ohne diese Operation kann die Engine keinen Lauf nur auf einem <Term id="target">Ziel</Term> rechnen, wie ihn eine Suche mit `--target-only` braucht.</Row>
 </RowList>
 
 <SectionHeading id="size">Wie groß ist das?</SectionHeading>

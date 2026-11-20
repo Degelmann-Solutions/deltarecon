@@ -60,7 +60,7 @@ Erwartet. Die Datei enthält eine Zeile je Archiv. Unter Linux lässt `--ignore-
 <Hint>
 <span slot="title">Sie finden <code translate="no">quickstart.cmd</code> nicht</span>
 
-„Alle extrahieren“ im Explorer legt zusätzlich einen Ordner mit dem Namen der zip-Datei an, in dem dann der Paketordner liegt. Der Paketordner ist der Ordner, in dem `quickstart.cmd` und `deltarecon.cmd` liegen.
+„Alle extrahieren“ im Explorer legt zusätzlich einen Ordner mit dem Namen der zip-Datei an, in dem dann der <Term id="package-folder">Paketordner</Term> liegt. Der Paketordner ist der Ordner, in dem `quickstart.cmd` und `deltarecon.cmd` liegen.
 
 </Hint>
 
@@ -104,7 +104,7 @@ Der Quick Start schreibt in einen neuen Ordner, der nach der Uhrzeit seines Star
 
 <Hint title="Schritt 2 des Quick Starts endet mit dem Exit-Status 1">
 
-Erwartet. `regression` meldet 0, wenn die beiden Ergebnisse übereinstimmen, und 1, wenn sie sich unterscheiden. Release N und N+1 unterscheiden sich absichtlich; 1 ist hier also das richtige Ergebnis und kein Fehler: Der Befehl meldet die <Term id="deviation">Abweichung</Term> zwischen den beiden <Term id="revision">Revisionen</Term>. Der Quick Start geht weiter.
+Erwartet. `regression` meldet 0, wenn die beiden Ergebnisse übereinstimmen, und 1, wenn sie sich unterscheiden. <Term id="release">Release</Term> N und N+1 unterscheiden sich absichtlich; 1 ist hier also das richtige Ergebnis und kein Fehler: Der Befehl meldet die <Term id="deviation">Abweichung</Term> zwischen den beiden <Term id="revision">Revisionen</Term>. Der Quick Start geht weiter.
 
 </Hint>
 
@@ -122,7 +122,7 @@ Der Quick Start wurde mit Strg+C abgebrochen. Er endet mit dem Exit-Status 130.
 <Hint title="Nach der Tabelle folgt ein Block „Nicht aufgelöst“" quote={notResolved('de')}>
 <p slot="before">Das ist ein Ergebnis und kein Fehler. Das Glossar erklärt den Begriff: <Term id="not-resolved">Nicht aufgelöst</Term>.</p>
 
-Manche Änderungen sind so klein, dass jede einzelne den <Term id="bruttobeitrag" /> um weniger als die Toleranz von einem Cent je Modellpunkt und Monat bewegt. Zusammen überschreiten sie die Toleranz. DeltaRecon rät nicht, welche von ihnen die Ursache ist: Es nennt die Gruppe und ordnet diesen Teil der Abweichung keiner Änderung zu.
+Manche Änderungen sind so klein, dass jede einzelne den <Term id="bruttobeitrag" /> um weniger als die Toleranz von einem Cent je <Term id="model-point">Modellpunkt</Term> und Monat bewegt. Zusammen überschreiten sie die Toleranz. DeltaRecon rät nicht, welche von ihnen die Ursache ist: Es nennt die Gruppe und ordnet diesen Teil der Abweichung keiner Änderung zu.
 
 </Hint>
 
@@ -177,7 +177,7 @@ Sie haben einen Befehl ein zweites Mal gestartet. Er endet sofort mit dem Exit-S
 
 <Hint title={`Der Befehl endet mit dem Exit-Status ${statusOf('newer-revision')}`}>
 
-Erwartet, und kein Fehler: Die beiden Stände unterscheiden sich, und der Status sagt das. Der nächste Befehl läuft trotzdem.
+Erwartet, und kein Fehler: Die beiden <Term id="state">Stände</Term> unterscheiden sich, und der Status sagt das. Der nächste Befehl läuft trotzdem.
 
 </Hint>
 
@@ -187,7 +187,7 @@ Erwartet, und kein Fehler: Die beiden Stände unterscheiden sich, und der Status
 
 <Hint title="Der Name der Größe enthält ein Leerzeichen">
 
-Der Name einer Größe mit einem Leerzeichen steht in Anführungszeichen, wie im Befehl des Schritts: `--quantity "garantierte Todesfallleistung"`.
+Der Name einer <Term id="quantity">Größe</Term> mit einem Leerzeichen steht in Anführungszeichen, wie im Befehl des Schritts: `--quantity "garantierte Todesfallleistung"`.
 
 </Hint>
 
@@ -204,7 +204,7 @@ Kein Befehl überschreibt eine vorhandene Datei. Ein Befehl, dessen Ausgabe es s
 
 <Hint title="Ein Befehl endet mit dem Exit-Status 1">
 
-Es gibt etwas anzusehen, oder der Befehl hat abgelehnt: ein Lauf, der fehlgeschlagen ist, abgelehnt wurde oder mit einem Fehler geendet hat; ein `replay`, das den Lauf nicht wieder ergibt; ein Vergleich oder eine <Term id="regression">Regression</Term> mit einer Abweichung; ein <Term id="change-manifest">Änderungsverzeichnis</Term>, das sich nicht ableiten lässt; ein `walk` oder eine Suche, die abgelehnt wird oder anhält.
+Es gibt etwas anzusehen, oder der Befehl hat abgelehnt: ein <Term id="run">Lauf</Term>, der fehlgeschlagen ist, abgelehnt wurde oder mit einem Fehler geendet hat; ein `replay`, das den Lauf nicht wieder ergibt; ein Vergleich oder eine <Term id="regression">Regression</Term> mit einer Abweichung; ein <Term id="change-manifest">Änderungsverzeichnis</Term>, das sich nicht ableiten lässt; ein `walk` oder eine Suche, die abgelehnt wird oder anhält.
 
 Bei der Regression des Quick Starts ist der Status 1 erwartet: Sie meldet die Abweichung zwischen den beiden Revisionen, und die folgenden Befehle laufen trotzdem.
 
@@ -212,7 +212,7 @@ Bei der Regression des Quick Starts ist der Status 1 erwartet: Sie meldet die Ab
 
 <Hint title="Ein Befehl endet mit dem Exit-Status 2">
 
-Der Befehl konnte nicht starten. Zum Beispiel: Eine Ausgabe gibt es schon, die gewählte Engine lässt sich nicht laden, die Datei einer Toleranz oder das Ziel einer Suche ist fehlerhaft, oder ein <Term id="record">Nachweis</Term> ist nicht der eines gelungenen Laufs.
+Der Befehl konnte nicht starten. Zum Beispiel: Eine Ausgabe gibt es schon, die gewählte <Term id="engine">Engine</Term> lässt sich nicht laden, die Datei einer Toleranz oder das <Term id="target">Ziel</Term> einer Suche ist fehlerhaft, oder ein <Term id="record">Nachweis</Term> ist nicht der eines gelungenen Laufs.
 
 </Hint>
 
@@ -224,7 +224,7 @@ Der Befehl konnte nicht starten. Zum Beispiel: Eine Ausgabe gibt es schon, die g
 <Hint>
 <span slot="title">Ein Lauf endet mit <code translate="no">failed</code>, <code translate="no">error</code> oder <code translate="no">rejected</code></span>
 
-Dann gibt es keine Ergebnisse. `failed`: Ein Modellpunkt hat einen Fehler ausgelöst, eine Prüfung ist falsch, oder ein Ergebnis ist keine endliche Zahl. `error`: Die Anfrage wurde angenommen, aber die Engine konnte den Stand nicht wiederherstellen oder nicht lesen. `rejected`: Die Anfrage hat eine Regel verletzt, und nichts ist gelaufen.
+Dann gibt es keine Ergebnisse. `failed`: Ein Modellpunkt hat einen Fehler ausgelöst, eine Prüfung ist falsch, oder ein Ergebnis ist keine endliche Zahl. `error`: Die <Term id="run-request">Anfrage</Term> wurde angenommen, aber die Engine konnte den Stand nicht wiederherstellen oder nicht lesen. `rejected`: Die Anfrage hat eine Regel verletzt, und nichts ist gelaufen.
 
 Der Nachweis wird bei jedem Ausgang geschrieben, außer bei einer Datei, die sich nicht als Anfrage für einen Lauf lesen lässt.
 
@@ -257,8 +257,8 @@ In diesem Release beantwortet DeltaRecon vier Fehler einer Anbindung mit einem T
 
 - Das Modul Ihrer Anbindung löst beim Laden einen anderen Fehler aus als einen fehlgeschlagenen Import, zum Beispiel einen Syntaxfehler.
 - Ihre Klasse löst selbst einen Fehler aus, wenn sie mit der Zahl der Arbeitsprozesse aufgerufen wird.
-- Ihrer Klasse fehlt ein Teil des Protokolls.
-- Die Versionsgeschichte, die Ihre Anbindung liefert, verletzt das Protokoll.
+- Ihrer Klasse fehlt ein Teil des <Term id="protocol">Protokolls</Term>.
+- Die <Term id="history">Versionsgeschichte</Term>, die Ihre Anbindung liefert, verletzt das Protokoll.
 
 Sagt Ihnen die letzte Zeile nicht, was zu ändern ist, schicken Sie uns die letzten Zeilen des Tracebacks. Die Kontaktdaten stehen am Ende dieser Seite.
 

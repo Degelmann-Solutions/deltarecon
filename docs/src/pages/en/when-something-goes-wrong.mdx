@@ -62,7 +62,7 @@ Expected. The file holds one line per archive. On Linux, `--ignore-missing` in t
 <Hint>
 <span slot="title">You cannot find <code translate="no">quickstart.cmd</code></span>
 
-“Extract All” in Explorer adds a folder named after the zip, which then holds the package folder. The package folder is the one that holds `quickstart.cmd` and `deltarecon.cmd`.
+“Extract All” in Explorer adds a folder named after the zip, which then holds the <Term id="package-folder">package folder</Term>. The package folder is the one that holds `quickstart.cmd` and `deltarecon.cmd`.
 
 </Hint>
 
@@ -106,7 +106,7 @@ The demo writes into a new folder that is named after the time of its start, to 
 
 <Hint title="Step 2 of the demo ends with exit status 1">
 
-Expected. `regression` reports 0 when the two results agree and 1 when they differ. Release N and N+1 differ on purpose, so 1 is the correct outcome here and not an error: it reports the <Term id="deviation">deviation</Term> between the two <Term id="revision">revisions</Term>. The demo goes on.
+Expected. `regression` reports 0 when the two results agree and 1 when they differ. <Term id="release">Release</Term> N and N+1 differ on purpose, so 1 is the correct outcome here and not an error: it reports the <Term id="deviation">deviation</Term> between the two <Term id="revision">revisions</Term>. The demo goes on.
 
 </Hint>
 
@@ -124,7 +124,7 @@ The demo was stopped with Ctrl+C. It ends with exit status 130.
 <Hint title="A block “Not resolved” follows the table" quote={notResolved('en')}>
 <p slot="before">This is a result and not an error. The Glossary explains the term: <Term id="not-resolved">Not resolved</Term>.</p>
 
-Some changes are so small that each one alone moves the <Term id="bruttobeitrag" /> by less than the tolerance of one cent per model point and month. Together they exceed it. DeltaRecon does not guess which of them is the cause: it names the group and leaves this part of the deviation unattributed.
+Some changes are so small that each one alone moves the <Term id="bruttobeitrag" /> by less than the tolerance of one cent per <Term id="model-point">model point</Term> and month. Together they exceed it. DeltaRecon does not guess which of them is the cause: it names the group and leaves this part of the deviation unattributed.
 
 </Hint>
 
@@ -135,7 +135,7 @@ Some changes are so small that each one alone moves the <Term id="bruttobeitrag"
 <Hint>
 <span slot="title">A command of the page does not run in the command prompt <code translate="no">cmd</code></span>
 
-The commands of that page are written for PowerShell; they do not run in `cmd`. Open PowerShell in the package folder and type them there.
+The commands of that page are written for PowerShell; they do not <span data-no-term>run</span> in `cmd`. Open PowerShell in the package folder and type them there.
 
 </Hint>
 
@@ -169,7 +169,7 @@ Expected. The single commands print English only, and they print numbers with mo
 
 <Hint title="The command ends at once and says that its folder exists already" quote={[refusal('repeat')]}>
 
-You started a command a second time. It ends at once with exit status {statusOf('repeat')} and this message; “…” stands for the full path of the folder. No command overwrites a file. To run a calculation again, give it a name after `--output` that does not exist yet, for example `search-provisionen-2` in place of `search-provisionen`.
+You started a command a second time. It ends at once with exit status {statusOf('repeat')} and this message; “…” stands for the full path of the folder. No command overwrites a file. To <span data-no-term>run</span> a calculation again, give it a name after `--output` that does not exist yet, for example `search-provisionen-2` in place of `search-provisionen`.
 
 </Hint>
 
@@ -179,7 +179,7 @@ You started a command a second time. It ends at once with exit status {statusOf(
 
 <Hint title={`The command ends with exit status ${statusOf('newer-revision')}`}>
 
-Expected, and not an error: the two states differ, and the status says so. The next command runs all the same.
+Expected, and not an error: the two <Term id="state">states</Term> differ, and the status says so. The next command <span data-no-term>runs</span> all the same.
 
 </Hint>
 
@@ -189,7 +189,7 @@ Expected, and not an error: the two states differ, and the status says so. The n
 
 <Hint title="The name of the quantity holds a space">
 
-A quantity name with a space stands in quotation marks, as in the command of the step: `--quantity "garantierte Todesfallleistung"`.
+A <Term id="quantity">quantity</Term> name with a space stands in quotation marks, as in the command of the step: `--quantity "garantierte Todesfallleistung"`.
 
 </Hint>
 
@@ -206,15 +206,15 @@ No command overwrites an existing file. A command whose output exists already do
 
 <Hint title="A command ends with exit status 1">
 
-There is something to look at, or the command refused: a run that failed, was rejected or ended with an error; a replay that is not reproduced; a comparison or a <Term id="regression">regression</Term> with a deviation; a <Term id="change-manifest">change manifest</Term> that cannot be derived; a walk or a search that is refused or stops.
+There is something to look at, or the command refused: <Term id="run">a run</Term> that failed, was rejected or ended with an error; a replay that is not reproduced; a comparison or a <Term id="regression">regression</Term> with a deviation; a <Term id="change-manifest">change manifest</Term> that cannot be derived; a walk or a search that is refused or stops.
 
-For the regression of the quick start, status 1 is expected: it reports the deviation between the two revisions, and the next commands run all the same.
+For the regression of the quick start, status 1 is expected: it reports the deviation between the two revisions, and the next commands <span data-no-term>run</span> all the same.
 
 </Hint>
 
 <Hint title="A command ends with exit status 2">
 
-The command could not start. For example: an output exists already, the selected engine cannot be loaded, the file of a tolerance or the target of a search is faulty, or a <Term id="record">record</Term> is not that of a run that succeeded.
+The command could not start. For example: an output exists already, the selected <Term id="engine">engine</Term> cannot be loaded, the file of a tolerance or the <Term id="target">target</Term> of a search is faulty, or a <Term id="record">record</Term> is not that of a run that succeeded.
 
 </Hint>
 
@@ -228,7 +228,7 @@ The command could not start. For example: an output exists already, the selected
 
 Then there are no results. `failed`: a model point raised an error, a check is false, or a result is not a finite number. `error`: the request was accepted, but the engine could not restore or read the state. `rejected`: the request broke a rule, and nothing ran.
 
-The record is written for every outcome, except for a file that cannot be read as a run request.
+The record is written for every outcome, except for a file that cannot be read as a <Term id="run-request">run request</Term>.
 
 </Hint>
 
@@ -259,8 +259,8 @@ In this release DeltaRecon answers four faults of a connection with a traceback 
 
 - The module of your connection raises another error than a failed import while it is loaded, for example a syntax error.
 - Your {cls} raises an error of its own when it is called with the number of worker processes.
-- Your {cls} lacks a member of the protocol.
-- The history that your connection gives breaks the protocol.
+- Your {cls} lacks a member of the <Term id="protocol">protocol</Term>.
+- The <Term id="history">history</Term> that your connection gives breaks the protocol.
 
 If the last line does not tell you what to change, send us the last lines of the traceback. The contact details stand at the end of this page.
 

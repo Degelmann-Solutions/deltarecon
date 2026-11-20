@@ -42,7 +42,7 @@ export const after = afterLines('en');
 
 <StepCard steps={frontmatter.steps} anchor="download">
 
-Open the release <OutsideLink href={releasePage} hreflang="en">{tag}</OutsideLink> on GitHub and download the archive for your platform.
+Open the <span data-no-term>release</span> <OutsideLink href={releasePage} hreflang="en">{tag}</OutsideLink> on GitHub and download the archive for your platform.
 
 <PlatformSwitch>
   <div slot="after-windows">
@@ -69,7 +69,7 @@ If you want to check the download in step 2, download <code translate="no">{sums
       { name: sumsFile, note: 'for step 2' },
     ]}
   />
-  <p slot="caption">What you download from the release page.</p>
+  <p slot="caption">What you download from the <span data-no-term>release</span> page.</p>
 </StepFigure>
 
 <HintLink slot="hint" step="download" />
@@ -78,7 +78,7 @@ If you want to check the download in step 2, download <code translate="no">{sums
 
 <StepCard steps={frontmatter.steps} anchor="check">
 
-This step shows that the archive arrived unchanged. Run the command in the folder that holds the archive and <code translate="no">{sumsFile}</code>.
+This step shows that the archive arrived unchanged. <span data-no-term>Run</span> the command in the folder that holds the archive and <code translate="no">{sumsFile}</code>.
 
 <PlatformSwitch
   windows={[`Get-FileHash -Algorithm SHA256 ${zip.file}`]}
@@ -109,7 +109,7 @@ The command compares the archive with its line in <code translate="no">{sumsFile
 
 <StepCard steps={frontmatter.steps} anchor="unpack">
 
-Nothing is installed: the package holds its own Python, DeltaRecon, the <Term id="reference-model">reference model</Term> with its history, and the <Term id="tolerance-profile">tolerance profiles</Term>. Unpacking gives one folder, the package folder.
+Nothing is installed: the package holds its own Python, DeltaRecon, the <Term id="reference-model">reference model</Term> with its <Term id="history">history</Term>, and the <Term id="tolerance-profile">tolerance profiles</Term>. Unpacking gives one folder, the <Term id="package-folder">package folder</Term>.
 
 <PlatformSwitch
   windows={[`Expand-Archive ${zip.file} -DestinationPath .`]}
@@ -189,7 +189,7 @@ At the end the demo waits for you to press a key.
 
 <div class="step-after">
 
-The demo explains each step before it runs and waits for Enter.
+The demo explains each step before it <span data-no-term>runs</span> and waits for Enter.
 
 </div>
 
@@ -229,7 +229,7 @@ The Windows package is not signed, so SmartScreen may warn when you start the de
 
 <StepCard steps={frontmatter.steps} anchor="demo">
 
-Before each step the demo says what the command does and shows it in full. Press Enter to run it. Afterwards it sums up what the step wrote. The four steps find a <Term id="deviation">deviation</Term> between two releases, where every <Term id="value">value</Term> that differs counts, list every <Term id="revision">revision</Term> between them with its <Term id="class">class</Term>, and search for the revisions that cause the deviation.
+Before each step the demo says what the command does and shows it in full. Press Enter to <span data-no-term>run</span> it. Afterwards it sums up what the step wrote. The four steps find a <Term id="deviation">deviation</Term> between two <Term id="release">releases</Term>, where every <Term id="value">value</Term> that differs counts, list every <Term id="revision">revision</Term> between them with its <Term id="class">class</Term>, and search for the revisions that cause the deviation.
 
 <FlowDiagram end="search result">
   <FlowBox code="request · run" writes="release-n/">Compute release N</FlowBox>
@@ -272,7 +272,7 @@ Step 4 of the demo ends with this table: one row per revision that deviates in t
 <div slot="wide">
 <Callout tag="A term in plain words" title="What “Not resolved” means" quote={notResolved('en')}>
 
-Some changes are so small that each one alone moves the <span lang="de">Bruttobeitrag</span> by less than the tolerance of one cent per model point and month. Together they exceed it. DeltaRecon does not guess which of them is the cause: it names the group and leaves this part of the deviation unattributed.
+Some changes are so small that each one alone moves the <span lang="de">Bruttobeitrag</span> by less than the tolerance of one cent per <Term id="model-point">model point</Term> and month. Together they exceed it. DeltaRecon does not guess which of them is the cause: it names the group and leaves this part of the deviation unattributed.
 
 </Callout>
 

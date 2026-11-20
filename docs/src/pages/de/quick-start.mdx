@@ -42,7 +42,7 @@ export const after = afterLines('de');
 
 <StepCard steps={frontmatter.steps} anchor="download">
 
-Öffnen Sie das Release <OutsideLink href={releasePage} hreflang="en">{tag}</OutsideLink> auf GitHub und laden Sie das Archiv für Ihr Betriebssystem herunter.
+Öffnen Sie das <span data-no-term>Release</span> <OutsideLink href={releasePage} hreflang="en">{tag}</OutsideLink> auf GitHub und laden Sie das Archiv für Ihr Betriebssystem herunter.
 
 <PlatformSwitch>
   <div slot="after-windows">
@@ -69,7 +69,7 @@ Wenn Sie den Download in Schritt 2 prüfen möchten, laden Sie auch <code transl
       { name: sumsFile, note: 'für Schritt 2' },
     ]}
   />
-  <p slot="caption">Was Sie von der Seite des Release herunterladen.</p>
+  <p slot="caption">Was Sie von der Seite des <span data-no-term>Release</span> herunterladen.</p>
 </StepFigure>
 
 <HintLink slot="hint" step="download" />
@@ -109,7 +109,7 @@ Der Befehl vergleicht das Archiv mit seiner Zeile in <code translate="no">{sumsF
 
 <StepCard steps={frontmatter.steps} anchor="unpack">
 
-Installiert wird nichts: Das Paket enthält sein eigenes Python, DeltaRecon, das <Term id="reference-model">Referenzmodell</Term> mit seiner Versionsgeschichte und die <Term id="tolerance-profile">Toleranzprofile</Term>. Beim Entpacken entsteht ein Ordner, der Paketordner.
+Installiert wird nichts: Das Paket enthält sein eigenes Python, DeltaRecon, das <Term id="reference-model">Referenzmodell</Term> mit seiner <Term id="history">Versionsgeschichte</Term> und die <Term id="tolerance-profile">Toleranzprofile</Term>. Beim Entpacken entsteht ein Ordner, der <Term id="package-folder">Paketordner</Term>.
 
 <PlatformSwitch
   windows={[`Expand-Archive ${zip.file} -DestinationPath .`]}
@@ -229,7 +229,7 @@ Das Windows-Paket ist nicht signiert; SmartScreen kann deshalb warnen, wenn Sie 
 
 <StepCard steps={frontmatter.steps} anchor="demo">
 
-Vor jedem Schritt sagt der Quick Start, was der Befehl tut, und zeigt ihn vollständig. Mit der Eingabetaste starten Sie ihn. Danach fasst der Quick Start zusammen, was der Schritt geschrieben hat. Die vier Schritte finden eine <Term id="deviation">Abweichung</Term> zwischen zwei Releases, bei der jeder abweichende <Term id="value">Wert</Term> zählt, listen jede <Term id="revision">Revision</Term> dazwischen mit ihrer <Term id="class">Einordnung</Term> auf und suchen die Revisionen, die die Abweichung verursachen.
+Vor jedem Schritt sagt der Quick Start, was der Befehl tut, und zeigt ihn vollständig. Mit der Eingabetaste starten Sie ihn. Danach fasst der Quick Start zusammen, was der Schritt geschrieben hat. Die vier Schritte finden eine <Term id="deviation">Abweichung</Term> zwischen zwei <Term id="release">Releases</Term>, bei der jeder abweichende <Term id="value">Wert</Term> zählt, listen jede <Term id="revision">Revision</Term> dazwischen mit ihrer <Term id="class">Einordnung</Term> auf und suchen die Revisionen, die die Abweichung verursachen.
 
 <FlowDiagram end="Suchergebnis">
   <FlowBox code="request · run" writes="release-n/">Release N rechnen</FlowBox>
@@ -272,7 +272,7 @@ Schritt 4 des Quick Starts endet mit dieser Tabelle: eine Zeile je Revision, die
 <div slot="wide">
 <Callout tag="Ein Begriff in einfachen Worten" title="Was „Nicht aufgelöst“ bedeutet" quote={notResolved('de')}>
 
-Manche Änderungen sind so klein, dass jede einzelne den Bruttobeitrag um weniger als die Toleranz von einem Cent je Modellpunkt und Monat bewegt. Zusammen überschreiten sie die Toleranz. DeltaRecon rät nicht, welche von ihnen die Ursache ist: Es nennt die Gruppe und ordnet diesen Teil der Abweichung keiner Änderung zu.
+Manche Änderungen sind so klein, dass jede einzelne den Bruttobeitrag um weniger als die Toleranz von einem Cent je <Term id="model-point">Modellpunkt</Term> und Monat bewegt. Zusammen überschreiten sie die Toleranz. DeltaRecon rät nicht, welche von ihnen die Ursache ist: Es nennt die Gruppe und ordnet diesen Teil der Abweichung keiner Änderung zu.
 
 </Callout>
 

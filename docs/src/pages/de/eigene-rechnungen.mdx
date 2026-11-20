@@ -112,7 +112,7 @@ export const firstLine = (step) => outputOf(step)[0];
 
 <StepCard steps={frontmatter.steps} anchor="folder">
 
-Der Quick Start hat seine Dateien in einen eigenen Ordner unterhalb des Paketordners geschrieben, `runs/quickstart-<UTC-Zeit>`. Dieser Ordner enthält die beiden Ergebnisse, die die <Term id="regression">Regression</Term> des Quick Starts verglichen hat, die Liste der Änderungen und die Suche. Jede Rechnung dieser Seite liest aus diesem Ordner und schreibt in ihn.
+Der Quick Start hat seine Dateien in einen eigenen Ordner unterhalb des <Term id="package-folder">Paketordners</Term> geschrieben, `runs/quickstart-<UTC-Zeit>`. Dieser Ordner enthält die beiden Ergebnisse, die die <Term id="regression">Regression</Term> des Quick Starts verglichen hat, die Liste der Änderungen und die Suche. Jede Rechnung dieser Seite liest aus diesem Ordner und schreibt in ihn.
 
 <PlatformPart os="windows">
 
@@ -165,7 +165,7 @@ Ihr Ordner trägt die Uhrzeit, zu der Ihr Quick Start begonnen hat; sein Name is
 
 <StepCard steps={frontmatter.steps} anchor="other-quantity">
 
-Der Quick Start hat die Ursache der <Term id="deviation">Abweichung</Term> im <Term id="bruttobeitrag" /> gesucht. Dieselbe Suche läuft für jede andere Größe, die das <Term id="reference-model">Referenzmodell</Term> ausgibt. Diese hier nimmt die Provisionen in den ersten fünf Projektionsjahren, also die Perioden 0 bis 59. Sie liest die beiden <Term id="record">Nachweise</Term>, die der Quick Start geschrieben hat, den von Release N und den des Stands N+1, und schreibt in den neuen Ordner `search-provisionen`.
+Der Quick Start hat die Ursache der <Term id="deviation">Abweichung</Term> im <Term id="bruttobeitrag" /> gesucht. Dieselbe Suche läuft für jede andere <Term id="quantity">Größe</Term>, die das <Term id="reference-model">Referenzmodell</Term> ausgibt. Diese hier nimmt die Provisionen in den ersten fünf Projektionsjahren, also die <Term id="period">Perioden</Term> 0 bis 59. Sie liest die beiden <Term id="record">Nachweise</Term>, die der Quick Start geschrieben hat, den von <Term id="release">Release</Term> N und den des <Term id="state">Stands</Term> N+1, und schreibt in den neuen Ordner `search-provisionen`.
 
 Das <Term id="tolerance-profile">Toleranzprofil</Term> des Quick Starts legt nur für den Bruttobeitrag eine Toleranz fest. Dieser Befehl nennt deshalb keines: Bei den Provisionen zählt jede Differenz.
 
@@ -199,7 +199,7 @@ Der Befehl rechnet eine Weile und gibt erst etwas aus, wenn er fertig ist. Die e
 
 `state 0`, <code>state {provisionen.walk - 1}</code> Die Suche hat beide Enden noch einmal gerechnet, und jedes hat das aufgezeichnete Ergebnis geliefert.
 
-<code lang="en">held: input_data</code> Die Bestandsdaten bleiben in jedem Stand bei Release N. Eine <Term id="revision">Revision</Term> ändert die Tabelle der Modellpunkte; ihre Wirkung zeigt die Suche nicht.
+<code lang="en">held: input_data</code> Die <Term id="input-data">Bestandsdaten</Term> bleiben in jedem Stand bei Release N. Eine <Term id="revision">Revision</Term> ändert die Tabelle der <Term id="model-point">Modellpunkte</Term>; ihre Wirkung zeigt die Suche nicht.
 
 <code lang="en">contribution from state …</code> Eine Revision, die für sich allein die Provisionen ändert. Die Zeile nennt die Revision vollständig; die Tabellen des Quick Starts zeigen ihre ersten sieben Zeichen. Der Stand nach der Revision hat die Nummer der Änderung in der Tabelle der Änderungen: Die größte Summe gehört hier zur Änderung {change(largest.short).number}, „<span lang="en">{change(largest.short).description}</span>“.
 
@@ -249,7 +249,7 @@ Vergleichen Sie die Ausgabe mit der Tabelle am Ende des Quick Starts.
 
 <div class="step-after">
 
-Die Revisionen aus der Tabelle des Quick Starts sind wieder da, mit denselben Summen, jetzt mit mehr Stellen. {more.length === 2 ? 'Zwei' : more.length} weitere sind dazugekommen: {more.map((entry, index) => <>{index > 0 && ' und '}Änderung {change(entry.short).number}, <code translate="no">{entry.short}</code></>)}. Im Quick Start lagen sie in dem Abschnitt, den er als „<Term id="not-resolved">Nicht aufgelöst</Term>“ gemeldet hat: Mit der Toleranz überschritten mehrere Änderungen sie nur zusammen. Ohne Toleranz teilt die Suche diesen Abschnitt bis zur einzelnen Änderung.
+Die Revisionen aus der Tabelle des Quick Starts sind wieder da, mit denselben Summen, jetzt mit mehr Stellen. {more.length === 2 ? 'Zwei' : more.length} weitere sind dazugekommen: {more.map((entry, index) => <>{index > 0 && ' und '}Änderung {change(entry.short).number}, <code translate="no">{entry.short}</code></>)}. Im Quick Start lagen sie in dem <Term id="interval">Abschnitt</Term>, den er als „<Term id="not-resolved">Nicht aufgelöst</Term>“ gemeldet hat: Mit der Toleranz überschritten mehrere Änderungen sie nur zusammen. Ohne Toleranz teilt die Suche diesen Abschnitt bis zur einzelnen Änderung.
 
 Diese Suche hat {exact.run} Stände gerechnet; die Suche des Quick Starts hat {demo.computed} gerechnet.
 
@@ -268,7 +268,7 @@ Diese Seite nimmt die Änderung {older.number}, <code translate="no">{older.revi
 
 <div class="step-after">
 
-`--label` und `--run-id` sind Namen, die Sie diesem Stand und diesem Lauf geben.
+`--label` und `--run-id` sind Namen, die Sie diesem Stand und diesem <Term id="run">Lauf</Term> geben.
 
 </div>
 
@@ -344,7 +344,7 @@ Die erste Zeile zählt die Werte, die abweichen; die Ausgabe nennt einen Wert �
 
 <StepCard steps={frontmatter.steps} anchor="changes">
 
-`derive` liest die Versionsgeschichte des Modells zwischen den beiden aufgezeichneten Ständen und listet jede Änderung einzeln auf, in der Reihenfolge, in der sie gemacht wurde. Die Liste schreibt es nach `changes.json`, das <Term id="change-manifest">Änderungsverzeichnis</Term>.
+`derive` liest die <Term id="history">Versionsgeschichte</Term> des Modells zwischen den beiden aufgezeichneten Ständen und listet jede Änderung einzeln auf, in der Reihenfolge, in der sie gemacht wurde. Die Liste schreibt es nach `changes.json`, das <Term id="change-manifest">Änderungsverzeichnis</Term>.
 
 <PlatformSwitch windows={commands.changes.windows} linux={commands.changes.linux} />
 
@@ -380,7 +380,7 @@ Das sind die Änderungen {older.number + 1} bis {newer.number} aus der Tabelle d
 
 <StepCard steps={frontmatter.steps} anchor="search">
 
-Die Suche läuft jetzt zwischen Ihren beiden Ständen. Ihr Ziel ist hier die garantierte Todesfallleistung im ersten Projektionsjahr, also die Perioden 0 bis 11. Ein Name einer Größe, der ein Leerzeichen enthält, steht in Anführungszeichen.
+Die Suche läuft jetzt zwischen Ihren beiden Ständen. Ihr <Term id="target">Ziel</Term> ist hier die garantierte Todesfallleistung im ersten Projektionsjahr, also die Perioden 0 bis 11. Ein Name einer Größe, der ein Leerzeichen enthält, steht in Anführungszeichen.
 
 <PlatformSwitch windows={commands.search.windows} linux={commands.search.linux} />
 

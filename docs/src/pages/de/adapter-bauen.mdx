@@ -72,11 +72,11 @@ export const components = { code: (props) => <code translate="no" {...props} /> 
 
 <StepCard steps={frontmatter.steps} anchor="class">
 
-Ihre Anbindung, der <Term id="adapter">Adapter</Term>, ist eine Klasse in einem Python-Modul. Das Modul liegt in einem Ordner Ihrer Wahl; es muss kein Teil von DeltaRecon sein. Das Protokoll ist die Datei `degelmann/deltarecon/protocol.py`. Sie braucht nur die Standardbibliothek von Python, sodass Ihr Modul die Typen des Protokolls von dort importieren kann.
+Ihre Anbindung, der <Term id="adapter">Adapter</Term>, ist eine Klasse in einem Python-Modul. Das Modul liegt in einem Ordner Ihrer Wahl; es muss kein Teil von DeltaRecon sein. Das <Term id="protocol">Protokoll</Term> ist die Datei `degelmann/deltarecon/protocol.py`. Sie braucht nur die Standardbibliothek von Python, sodass Ihr Modul die Typen des Protokolls von dort importieren kann.
 
 In jedem Schritt zeigt diese Seite, wie die Anbindung des <Term id="reference-model">Referenzmodells</Term> das Teil löst, mit Zeilen aus `degelmann/deltarecon/engines/reference_model.py`.
 
-DeltaRecon ruft Ihre Klasse mit der Zahl der Arbeitsprozesse als einzigem, optionalem Argument auf: ohne Argument, wenn der Befehl kein `--workers` nennt, mit `N` bei `--workers N` und mit 1 bei `request` und `derive`, die keinen Modellpunkt projizieren. Eine Engine, die mit Arbeitsprozessen nichts anfangen kann, nimmt das Argument an und beachtet es nicht.
+DeltaRecon ruft Ihre Klasse mit der Zahl der Arbeitsprozesse als einzigem, optionalem Argument auf: ohne Argument, wenn der Befehl kein `--workers` nennt, mit `N` bei `--workers N` und mit 1 bei `request` und `derive`, die keinen <Term id="model-point">Modellpunkt</Term> projizieren. Eine <Term id="engine">Engine</Term>, die mit Arbeitsprozessen nichts anfangen kann, nimmt das Argument an und beachtet es nicht.
 
 Zuerst sagt die Klasse vier Dinge über sich selbst. Das sind Attribute, keine Operationen.
 
@@ -93,9 +93,9 @@ Zuerst sagt die Klasse vier Dinge über sich selbst. Das sind Attribute, keine O
 
 <div slot="wide" class="step-parts">
 <RowList>
-  <Row name="Die Stufen, die sie anbietet, mit ihren Größen" code="stages" member="Engine">Je Stufe die fachliche Beschreibung, also der Text, der sagt, was ihre Größen bedeuten, und die Namen der Größen in der Reihenfolge dieses Textes. DeltaRecon nimmt eine Anfrage nur für eine Stufe an, die hier genannt ist.</Row>
-  <Row name="Die Arten von Änderungen, die sie anwenden kann" code="realisations" member="Engine">Zum Beispiel eine <Term id="revision">Revision</Term> ihrer eigenen Versionsgeschichte.</Row>
-  <Row name="Was eine Revision festlegt" code="determines" member="Engine">Die Arten von Verweisen eines Release, die eine Revision bestimmt. Beim Referenzmodell sind das der Code, die Parameter und die Bestandsdaten.</Row>
+  <Row name="Die Stufen, die sie anbietet, mit ihren Größen" code="stages" member="Engine">Je Stufe die fachliche Beschreibung, also der Text, der sagt, was ihre <Term id="quantity">Größen</Term> bedeuten, und die Namen der Größen in der Reihenfolge dieses Textes. DeltaRecon nimmt eine <Term id="run-request">Anfrage</Term> nur für eine Stufe an, die hier genannt ist.</Row>
+  <Row name="Die Arten von Änderungen, die sie anwenden kann" code="realisations" member="Engine">Zum Beispiel eine <Term id="revision">Revision</Term> ihrer eigenen <Term id="history">Versionsgeschichte</Term>.</Row>
+  <Row name="Was eine Revision festlegt" code="determines" member="Engine">Die Arten von Verweisen eines <Term id="release">Release</Term>, die eine Revision bestimmt. Beim Referenzmodell sind das der Code, die Parameter und die <Term id="input-data">Bestandsdaten</Term>.</Row>
   <Row name="Was sie festhalten kann, während Revisionen angewendet werden" code="holdable" member="Engine">Die Arten, die so bleiben können, wie die Anfrage sie nennt, während Revisionen angewendet werden, jede mit der Art von Pfad, die sie trägt. Beim Referenzmodell sind das die Bestandsdaten.</Row>
 </RowList>
 
@@ -110,7 +110,7 @@ Zuerst sagt die Klasse vier Dinge über sich selbst. Das sind Attribute, keine O
 
 DeltaRecon kennt keine Datei und kein Repository Ihrer Engine. Es benennt ein Release durch dessen Beschreibung: eine Bezeichnung und einen Satz von Verweisen, die nur Ihre Anbindung liest. Vier Operationen gehören dazu. Keine von ihnen stellt etwas wieder her oder schreibt etwas.
 
-Das Referenzmodell führt seine Versionsgeschichte in einem Git-Repository. Aus einer solchen Versionsgeschichte braucht eine Anbindung vier Dinge: eine Revision benennen, die Dateien einer Revision lesen, die Revisionen zwischen zwei Releases auf der Hauptlinie auflisten und sagen, was jede von ihnen berührt. Dieser Schritt braucht die ersten beiden, Schritt 5 die anderen beiden.
+Das Referenzmodell führt seine Versionsgeschichte in einem Git-Repository. Aus einer solchen Versionsgeschichte braucht eine Anbindung vier Dinge: eine Revision benennen, die Dateien einer Revision lesen, die Revisionen zwischen zwei Releases auf der <Term id="main-line">Hauptlinie</Term> auflisten und sagen, was jede von ihnen berührt. Dieser Schritt braucht die ersten beiden, Schritt 5 die anderen beiden.
 
 Die Anbindung des Referenzmodells liest das Repository mit einer Bibliothek, `dulwich`, und startet kein Git-Programm; es muss also keines installiert sein. Eine Engine, deren Versionsgeschichte nicht in Git liegt, beantwortet dieselben vier Fragen auf ihre Weise.
 
@@ -128,7 +128,7 @@ Die Anbindung des Referenzmodells liest das Repository mit einer Bibliothek, `du
 <div slot="wide" class="step-parts">
 <RowList>
   <Row name="Den Ordner der Versionsgeschichten finden" code="repositories_folder" member="Engine">Der Ordner, der enthält, woraus die Engine ein Release wiederherstellt. DeltaRecon übergibt den Ordner, den `--repositories` nennt; ohne ihn nimmt Ihre Engine ihre eigene Voreinstellung. Über das Nachschlagen hinaus wird nichts gelesen, und den Ordner muss es nicht geben.</Row>
-  <Row name="Prüfen, ob sich ein Release wiederherstellen lässt" code="resolve" member="Engine">Sagt, ob die Beschreibung eines Release einen Stand der Stufe benennt, den die Engine wiederherstellen kann. Wenn nicht, lehnt die Operation sie mit `unknown_reference` ab.</Row>
+  <Row name="Prüfen, ob sich ein Release wiederherstellen lässt" code="resolve" member="Engine">Sagt, ob die Beschreibung eines Release einen <Term id="state">Stand</Term> der Stufe benennt, den die Engine wiederherstellen kann. Wenn nicht, lehnt die Operation sie mit `unknown_reference` ab.</Row>
   <Row name="Ein Release durch seine Revision beschreiben" code="describe" member="Engine">Die Beschreibung des Release zu einer Revision: die Bezeichnung und der vollständige Satz von Verweisen, der ihren Stand benennt. Wie eine Revision benannt wird, ist Sache Ihrer Engine, zum Beispiel durch einen Hash, einen Branch oder ein Tag. `request` schreibt diese Beschreibung in die Anfrage.</Row>
   <Row name="Die Revision der Bestandsdaten nennen" code="input_revision" member="Engine">Die Revision, aus der die aufgezeichnete Beschreibung eines Release ihre Bestandsdaten nimmt. `regression` fragt danach und lässt dann die neuere Revision mit diesen Bestandsdaten beschreiben.</Row>
 </RowList>
@@ -168,7 +168,7 @@ Die Anbindung des Referenzmodells führt keinen dieser Befehle aus. Jede Zeile n
 
 <StepCard steps={frontmatter.steps} anchor="open">
 
-`open` leistet die Arbeit eines Laufs. Es stellt den Stand des Release in einem Arbeitsordner wieder her, wendet dort die eingeschalteten Änderungen an und gibt das geöffnete Release zurück. DeltaRecon nutzt das Ergebnis in einer `with`-Anweisung von Python und liest darin das geöffnete Release.
+`open` leistet die Arbeit eines <Term id="run">Laufs</Term>. Es stellt den Stand des Release in einem Arbeitsordner wieder her, wendet dort die eingeschalteten Änderungen an und gibt das geöffnete Release zurück. DeltaRecon nutzt das Ergebnis in einer `with`-Anweisung von Python und liest darin das geöffnete Release.
 
 Was der Ordner der Versionsgeschichten enthält, wird nie verändert. Der Arbeitsordner entsteht im temporären Ordner des Systems, und sein Name beginnt mit `deltarecon-`.
 
@@ -193,7 +193,7 @@ Eine Revision aus einer anderen Versionsgeschichte als ihrer eigenen ist eine Ä
 </RowList>
 
 <CodeExcerpt id="open-scratch">
-  <p slot="caption">Das Referenzmodell legt den Arbeitsordner an, schreibt die Dateien der Revision hinein, wendet dort die Textpatches an, liest das Modell daraus und übergibt das geöffnete Release an den Lauf. Der Auszug zeigt einen der beiden Rechenwege des Referenzmodells.</p>
+  <p slot="caption">Das Referenzmodell legt den Arbeitsordner an, schreibt die Dateien der Revision hinein, wendet dort die Textpatches an, liest das Modell daraus und übergibt das geöffnete Release an den Lauf. Der Auszug zeigt einen der beiden <Term id="computation-path">Rechenwege</Term> des Referenzmodells.</p>
 </CodeExcerpt>
 </div>
 
@@ -201,7 +201,7 @@ Eine Revision aus einer anderen Versionsgeschichte als ihrer eigenen ist eine Ä
 
 <StepCard steps={frontmatter.steps} anchor="session">
 
-Das geöffnete Release ist eine zweite, kleine Klasse. Sie steht für einen Stand des Modells und beantwortet, was ein Lauf fragt: welche Modellpunkte es gibt, und die Projektion jedes Modellpunkts, mit einem <Term id="value">Wert</Term> je Größe und Periode. Sie liefert außerdem die Parameter des Release, die der <Term id="record">Nachweis</Term> eines Laufs enthält.
+Das geöffnete Release ist eine zweite, kleine Klasse. Sie steht für einen Stand des Modells und beantwortet, was ein Lauf fragt: welche Modellpunkte es gibt, und die Projektion jedes Modellpunkts, mit einem <Term id="value">Wert</Term> je Größe und <Term id="period">Periode</Term>. Sie liefert außerdem die Parameter des Release, die der <Term id="record">Nachweis</Term> eines Laufs enthält.
 
 Sie hat zwei Attribute und drei Operationen. Zwei weitere Operationen sind optional. Die Namen der Größen müssen die sein, die Ihre Engine in Schritt 1 für die Stufe nennt: DeltaRecon prüft sie.
 
@@ -224,7 +224,7 @@ Sie hat zwei Attribute und drei Operationen. Zwei weitere Operationen sind optio
   <Row name="Einen Modellpunkt projizieren" code="project" member="Session">Die Perioden eines Modellpunkts, mit einem Wert je Größe. Lässt sich der Modellpunkt nicht rechnen, löst die Operation `ModelPointFailure` aus, einen Fehler des Protokolls.</Row>
   <Row name="Die Parameter liefern" code="parameters" member="Session">Die Parameter des Release, in der Form, in der der Nachweis eines Laufs sie enthält. Ihre Reihenfolge hat keine Bedeutung.</Row>
   <Row name="Mehrere Modellpunkte auf einmal projizieren" code="project_many" member="Session" tag="optional">Das Ergebnis zu jeder Kennung in der übergebenen Reihenfolge. Ohne diese Operation projiziert DeltaRecon Modellpunkt für Modellpunkt.</Row>
-  <Row name="Nur ein Ziel projizieren" code="project_target" member="Session" tag="optional">Ausgewählte Größen in ausgewählten Perioden. Ohne diese Operation kann die Engine keinen Lauf nur auf einem Ziel rechnen, wie ihn eine Suche mit `--target-only` braucht.</Row>
+  <Row name="Nur ein Ziel projizieren" code="project_target" member="Session" tag="optional">Ausgewählte Größen in ausgewählten Perioden. Ohne diese Operation kann die Engine keinen Lauf nur auf einem <Term id="target">Ziel</Term> rechnen, wie ihn eine Suche mit `--target-only` braucht.</Row>
 </RowList>
 
 <CodeExcerpt id="quantities">
@@ -330,7 +330,7 @@ Jetzt rechnet DeltaRecon ein Release mit Ihrer Engine. `request` schreibt auf, w
 
 <PlatformPart os="windows">
 
-Öffnen Sie PowerShell im Paketordner.
+Öffnen Sie PowerShell im <Term id="package-folder">Paketordner</Term>.
 
 </PlatformPart>
 

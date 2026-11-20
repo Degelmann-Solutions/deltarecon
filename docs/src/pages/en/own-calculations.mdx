@@ -112,11 +112,11 @@ export const firstLine = (step) => outputOf(step)[0];
 
 <StepCard steps={frontmatter.steps} anchor="folder">
 
-The guided demo of the quick start wrote its files into a folder of its own below the package folder, `runs/quickstart-<UTC time>`. It holds the two results that the <Term id="regression">regression</Term> of the demo compared, the list of the changes and the search. Every calculation of this page reads from that folder and writes into it.
+The guided demo of the quick start wrote its files into a folder of its own below the <Term id="package-folder">package folder</Term>, `runs/quickstart-<UTC time>`. It holds the two results that the <Term id="regression">regression</Term> of the demo compared, the list of the changes and the search. Every calculation of this page reads from that folder and writes into it.
 
 <PlatformPart os="windows">
 
-Open PowerShell in the package folder. The commands of this page are written for PowerShell; they do not run in the command prompt `cmd`.
+Open PowerShell in the package folder. The commands of this page are written for PowerShell; they do not <span data-no-term>run</span> in the command prompt `cmd`.
 
 </PlatformPart>
 
@@ -165,7 +165,7 @@ Your folder carries the time at which your demo started, so its name differs fro
 
 <StepCard steps={frontmatter.steps} anchor="other-quantity">
 
-The demo searched for the cause of the <Term id="deviation">deviation</Term> in the <Term id="bruttobeitrag" />. The same search runs for every other quantity that the <Term id="reference-model">reference model</Term> writes. This one takes the <span lang="de">Provisionen</span>, the commissions, in the first five projection years, periods 0 to 59. It reads the two <Term id="record">records</Term> that the demo wrote, of release N and of the state N+1, and writes into the new folder `search-provisionen`.
+The demo searched for the cause of the <Term id="deviation">deviation</Term> in the <Term id="bruttobeitrag" />. The same search <span data-no-term>runs</span> for every other <Term id="quantity">quantity</Term> that the <Term id="reference-model">reference model</Term> writes. This one takes the <span lang="de">Provisionen</span>, the commissions, in the first five projection years, <Term id="period">periods</Term> 0 to 59. It reads the two <Term id="record">records</Term> that the demo wrote, of <Term id="release">release</Term> N and of the <Term id="state">state</Term> N+1, and writes into the new folder `search-provisionen`.
 
 The <Term id="tolerance-profile">tolerance profile</Term> of the demo sets a tolerance for the <span lang="de">Bruttobeitrag</span> alone. This command therefore names none: in the <span lang="de">Provisionen</span> every difference counts.
 
@@ -199,9 +199,9 @@ The command computes for a while and prints nothing until it is done. The single
 
 `state 0`, <code>state {provisionen.walk - 1}</code> The search computed both ends again, and each gave the recorded result.
 
-`held: input_data` The portfolio data stay at release N in every state. One <Term id="revision">revision</Term> changes the table of the model points; the search does not show its effect.
+`held: input_data` The <Term id="input-data">portfolio data</Term> stay at release N in every state. One <Term id="revision">revision</Term> changes the table of the <Term id="model-point">model points</Term>; the search does not show its effect.
 
-`contribution from state …` A revision that changes the <span lang="de">Provisionen</span> on its own. The line names the revision in full; the tables of the demo show its first seven characters. The state after the revision has the number of the change in the table of the changes: the largest sum here belongs to change {change(largest.short).number}, “{change(largest.short).description}”.
+`contribution from state …` A revision that changes the <span lang="de">Provisionen</span> on its own. The line names the revision in full; the tables of the demo show its first seven characters. The state after the revision has the number of the change in the table of the changes: the largest sum here belongs to change {change(largest.short).number}, “<span data-no-term>{change(largest.short).description}</span>”.
 
 `sum` The signed sum of “state after the revision minus state before it” over all model points and the periods 0 to 59, as in the table of the demo. `absolute sum` adds the same differences without their sign.
 
@@ -211,7 +211,7 @@ The command computes for a while and prints nothing until it is done. The single
 
 <Callout tag="Hint" title="A command writes its folder only once" quote={[refusal('repeat')]}>
 
-If you start a command a second time, it ends at once with <Term id="exit-status">exit status</Term> {statusOf('repeat')} and this message; “…” stands for the full path of the folder. No command overwrites a file. To run a calculation again, give it a name after `--output` that does not exist yet, for example `search-provisionen-2` in place of `search-provisionen`.
+If you start a command a second time, it ends at once with <Term id="exit-status">exit status</Term> {statusOf('repeat')} and this message; “…” stands for the full path of the folder. No command overwrites a file. To <span data-no-term>run</span> a calculation again, give it a name after `--output` that does not exist yet, for example `search-provisionen-2` in place of `search-provisionen`.
 
 </Callout>
 </div>
@@ -222,7 +222,7 @@ If you start a command a second time, it ends at once with <Term id="exit-status
 
 <StepCard steps={frontmatter.steps} anchor="without-tolerance">
 
-In the demo the search compared under the tolerance profile: a change of the <span lang="de">Bruttobeitrag</span> of at most one cent per model point and month did not count. Run the same search without `--tolerance`. The comparison is then exact, and every difference counts.
+In the demo the search compared under the tolerance profile: a change of the <span lang="de">Bruttobeitrag</span> of at most one cent per model point and month did not count. <span data-no-term>Run</span> the same search without `--tolerance`. The comparison is then exact, and every difference counts.
 
 <PlatformSwitch windows={commands.withoutTolerance.windows} linux={commands.withoutTolerance.linux} />
 
@@ -249,7 +249,7 @@ Compare the output with the table at the end of the demo.
 
 <div class="step-after">
 
-The revisions of the demo’s table are there again, with the same sums, now with more digits. {more.length === 2 ? 'Two' : more.length} more have joined them: {more.map((entry, index) => <>{index > 0 && ' and '}change {change(entry.short).number}, <code translate="no">{entry.short}</code></>)}. In the demo they lay in the interval that it reported as “<Term id="not-resolved">Not resolved</Term>”: under the tolerance, several changes exceeded it only together. Without a tolerance the search divides that interval down to the single change.
+The revisions of the demo’s table are there again, with the same sums, now with more digits. {more.length === 2 ? 'Two' : more.length} more have joined them: {more.map((entry, index) => <>{index > 0 && ' and '}change {change(entry.short).number}, <code translate="no">{entry.short}</code></>)}. In the demo they lay in the <Term id="interval">interval</Term> that it reported as “<Term id="not-resolved">Not resolved</Term>”: under the tolerance, several changes exceeded it only together. Without a tolerance the search divides that interval down to the single change.
 
 This search computed {exact.run} states; the search of the demo computed {demo.computed}.
 
@@ -268,7 +268,7 @@ This page takes change {older.number}, <code translate="no">{older.revision}</co
 
 <div class="step-after">
 
-`--label` and `--run-id` are names that you give to this state and to this run.
+`--label` and `--run-id` are names that you give to this state and to <Term id="run">this run</Term>.
 
 </div>
 
@@ -344,7 +344,7 @@ The first line counts the values that differ; the output calls a value a coordin
 
 <StepCard steps={frontmatter.steps} anchor="changes">
 
-`derive` reads the history of the model between the two recorded states and lists every change on its own, in the order in which it was made. It writes the list to `changes.json`, the <Term id="change-manifest">change manifest</Term>.
+`derive` reads the <Term id="history">history</Term> of the model between the two recorded states and lists every change on its own, in the order in which it was made. It writes the list to `changes.json`, the <Term id="change-manifest">change manifest</Term>.
 
 <PlatformSwitch windows={commands.changes.windows} linux={commands.changes.linux} />
 
@@ -380,7 +380,7 @@ These are the changes {older.number + 1} to {newer.number} of the demo’s table
 
 <StepCard steps={frontmatter.steps} anchor="search">
 
-The search now runs between your two states. Its target here is the <span lang="de">garantierte Todesfallleistung</span>, the guaranteed death benefit, in the first projection year, periods 0 to 11. A quantity name with a space stands in quotation marks.
+The search now runs between your two states. Its <Term id="target">target</Term> here is the <span lang="de">garantierte Todesfallleistung</span>, the guaranteed death benefit, in the first projection year, periods 0 to 11. A quantity name with a space stands in quotation marks.
 
 <PlatformSwitch windows={commands.search.windows} linux={commands.search.linux} />
 

@@ -72,11 +72,11 @@ export const components = { code: (props) => <code translate="no" {...props} /> 
 
 <StepCard steps={frontmatter.steps} anchor="class">
 
-Your connection, the <Term id="adapter">adapter</Term>, is one {cls} in a Python module. The module lies in a folder of your choice; it need not be a part of DeltaRecon. The protocol is the file `degelmann/deltarecon/protocol.py`. It needs the standard library of Python alone, so your module can import the types of the protocol from it.
+Your connection, the <Term id="adapter">adapter</Term>, is one {cls} in a Python module. The module lies in a folder of your choice; it need not be a part of DeltaRecon. The <Term id="protocol">protocol</Term> is the file `degelmann/deltarecon/protocol.py`. It needs the standard library of Python alone, so your module can import the types of the protocol from it.
 
 In every step this page shows how the connection of the <Term id="reference-model">reference model</Term> solves the part, with lines of `degelmann/deltarecon/engines/reference_model.py`.
 
-DeltaRecon calls your {cls} with the number of worker processes as its one optional argument: with no argument when the command gives no `--workers`, with `N` for `--workers N`, and with 1 for `request` and `derive`, which project no model point. An engine that has no use for worker processes accepts the argument and ignores it.
+DeltaRecon calls your {cls} with the number of worker processes as its one optional argument: with no argument when the command gives no `--workers`, with `N` for `--workers N`, and with 1 for `request` and `derive`, which project no <Term id="model-point">model point</Term>. An <Term id="engine">engine</Term> that has no use for worker processes accepts the argument and ignores it.
 
 The {cls} first says four things about itself. They are attributes, not operations.
 
@@ -93,9 +93,9 @@ The {cls} first says four things about itself. They are attributes, not operatio
 
 <div slot="wide" class="step-parts">
 <RowList>
-  <Row name="The stages it supports, with their quantities" code="stages" member="Engine">For each stage the domain reference, the text that says what its quantities mean, and the names of the quantities in the order of that text. DeltaRecon accepts a request only for a stage named here.</Row>
-  <Row name="The kinds of change it can apply" code="realisations" member="Engine">For example a <Term id="revision">revision</Term> of its own history.</Row>
-  <Row name="What one revision fixes" code="determines" member="Engine">The kinds of reference of a release that one revision determines. For the reference model these are the code, the parameters and the input data.</Row>
+  <Row name="The stages it supports, with their quantities" code="stages" member="Engine">For each stage the domain reference, the text that says what its <Term id="quantity">quantities</Term> mean, and the names of the quantities in the order of that text. DeltaRecon accepts a request only for a stage named here.</Row>
+  <Row name="The kinds of change it can apply" code="realisations" member="Engine">For example a <Term id="revision">revision</Term> of its own <Term id="history">history</Term>.</Row>
+  <Row name="What one revision fixes" code="determines" member="Engine">The kinds of reference of a <Term id="release">release</Term> that one revision determines. For the reference model these are the code, the parameters and the <Term id="input-data">input data</Term>.</Row>
   <Row name="What it can hold while revisions are applied" code="holdable" member="Engine">The kinds that can stay as the request names them while revisions are applied, each with the kind of path that carries it. For the reference model this is the input data.</Row>
 </RowList>
 
@@ -110,7 +110,7 @@ The {cls} first says four things about itself. They are attributes, not operatio
 
 DeltaRecon knows no file and no repository of your engine. It names a release by a release identity: a label and a set of references that only your connection reads. Four operations belong to this. None of them restores or writes anything.
 
-The reference model keeps its history in a Git repository. From such a history a connection needs four things: to name a revision, to read the files of a revision, to list the revisions between two releases on the main line, and to say what each of them touches. This step needs the first two; step 5 needs the other two.
+The reference model keeps its history in a Git repository. From such a history a connection needs four things: to name a revision, to read the files of a revision, to list the revisions between two releases on the <Term id="main-line">main line</Term>, and to say what each of them touches. This step needs the first two; step 5 needs the other two.
 
 The connection of the reference model reads the repository with a library, `dulwich`, and starts no Git program, so none has to be installed. An engine whose history is not in Git answers the same four questions in its own way.
 
@@ -128,7 +128,7 @@ The connection of the reference model reads the repository with a library, `dulw
 <div slot="wide" class="step-parts">
 <RowList>
   <Row name="Find the folder of the histories" code="repositories_folder" member="Engine">The folder that holds what the engine restores a release from. DeltaRecon hands over the folder that `--repositories` names; without it your engine takes its own default. Nothing is read beyond the lookup, and the folder need not exist.</Row>
-  <Row name="Check that a release can be restored" code="resolve" member="Engine">Says whether a release identity names a state of the stage that the engine can restore. If it does not, the operation rejects it with `unknown_reference`.</Row>
+  <Row name="Check that a release can be restored" code="resolve" member="Engine">Says whether a release identity names a <Term id="state">state</Term> of the stage that the engine can restore. If it does not, the operation rejects it with `unknown_reference`.</Row>
   <Row name="Describe a release by its revision" code="describe" member="Engine">The release identity of a revision: the label and the complete set of references that names its state. How a revision is named is the matter of your engine, for example a hash, a branch or a tag. `request` writes this identity into the request.</Row>
   <Row name="Name the revision of the input data" code="input_revision" member="Engine">The revision that a recorded release identity takes its input data from. `regression` asks for it and then has the newer revision described with that input data.</Row>
 </RowList>
@@ -147,7 +147,7 @@ The connection of the reference model reads the repository with a library, `dulw
 
 <Callout tag="If you know Git" title="The same questions as Git commands">
 
-The connection of the reference model runs none of these commands. Each line names the command that answers the same question, and where the connection differs from it.
+The connection of the reference model <span data-no-term>runs</span> none of these commands. Each line names the command that answers the same question, and where the connection differs from it.
 
 {git('git rev-parse --verify <name>^{commit}')} Name a revision: the full hash of the commit that a hash, a branch, a tag or `HEAD` names. The connection takes no suffix such as `HEAD~1`.
 
@@ -168,7 +168,7 @@ The connection of the reference model runs none of these commands. Each line nam
 
 <StepCard steps={frontmatter.steps} anchor="open">
 
-`open` does the work of a run. It restores the state of the release into a scratch folder, applies the enabled changes there, and gives back the opened release. DeltaRecon uses the result in a `with` statement of Python and reads the opened release inside it.
+`open` does the work of <Term id="run">a run</Term>. It restores the state of the release into a scratch folder, applies the enabled changes there, and gives back the opened release. DeltaRecon uses the result in a `with` statement of Python and reads the opened release inside it.
 
 What the folder of the histories holds is never altered. The scratch folder is created in the temporary folder of the system, and its name starts with `deltarecon-`.
 
@@ -193,7 +193,7 @@ A revision of another history than its own is a change your engine cannot apply:
 </RowList>
 
 <CodeExcerpt id="open-scratch">
-  <p slot="caption">The reference model creates the scratch folder, writes the files of the revision into it, applies the text patches there, reads the model from it and hands the opened release to the run. The excerpt shows one of the two computation paths of the reference model.</p>
+  <p slot="caption">The reference model creates the scratch folder, writes the files of the revision into it, applies the text patches there, reads the model from it and hands the opened release to the run. The excerpt shows one of the two <Term id="computation-path">computation paths</Term> of the reference model.</p>
 </CodeExcerpt>
 </div>
 
@@ -201,7 +201,7 @@ A revision of another history than its own is a change your engine cannot apply:
 
 <StepCard steps={frontmatter.steps} anchor="session">
 
-The opened release is a second, small {cls}. It stands for one state of the model and answers what a run asks: which model points there are, and the projection of each, with one <Term id="value">value</Term> per quantity and period. It also gives the parameters of the release, which the <Term id="record">record</Term> of a run holds.
+The opened release is a second, small {cls}. It stands for one state of the model and answers what a run asks: which model points there are, and the projection of each, with one <Term id="value">value</Term> per quantity and <Term id="period">period</Term>. It also gives the parameters of the release, which the <Term id="record">record</Term> of a run holds.
 
 It has two attributes and three operations. Two more operations are optional. The names of the quantities must be those that your engine names for the stage in step 1: DeltaRecon checks them.
 
@@ -224,7 +224,7 @@ It has two attributes and three operations. Two more operations are optional. Th
   <Row name="Project one model point" code="project" member="Session">The periods of one model point, with one value per quantity. When the model point cannot be calculated, the operation raises `ModelPointFailure`, an error of the protocol.</Row>
   <Row name="Give the parameters" code="parameters" member="Session">The parameters of the release, in the form in which the record of a run holds them. Their order carries no meaning.</Row>
   <Row name="Project several model points at once" code="project_many" member="Session" tag="optional">The outcome of each id in the given order. Without it DeltaRecon projects point by point.</Row>
-  <Row name="Project a target only" code="project_target" member="Session" tag="optional">Chosen quantities in chosen periods. Without it the engine cannot compute a run on a target alone, which a search with `--target-only` needs.</Row>
+  <Row name="Project a target only" code="project_target" member="Session" tag="optional">Chosen quantities in chosen periods. Without it the engine cannot compute a run on a <Term id="target">target</Term> alone, which a search with `--target-only` needs.</Row>
 </RowList>
 
 <CodeExcerpt id="quantities">
@@ -330,7 +330,7 @@ Now DeltaRecon computes one release with your engine. `request` writes down what
 
 <PlatformPart os="windows">
 
-Open PowerShell in the package folder.
+Open PowerShell in the <Term id="package-folder">package folder</Term>.
 
 </PlatformPart>
 

@@ -46,7 +46,7 @@ if (member && selection) {
 
 <li class="row" data-row>
   <div class="row-text">
-    <p class="row-name">
+    <p class="row-name" data-no-term>
       <span set:html={outputHtml(name, lang)} />{code && <code translate="no" data-option={option ? code : undefined} data-member={member ? `${member}.${code}` : undefined} data-selection={selection ? '' : undefined}>{code}</code>}
     </p>
     {Astro.slots.has('default') && <p class="row-line prose-links"><slot /></p>}

@@ -243,6 +243,8 @@ export interface FrameTexts {
   letters: string;
   linkedTerm: string;
   appearsIn: string;
+  /** Before the link of a Glossary entry to the page that says more. */
+  moreOn: string;
   /** The step page: the counter "Step n of m" and the tag of a step that may be skipped. */
   step: string;
   stepOf: string;
@@ -311,6 +313,7 @@ export const texts: Record<Lang, FrameTexts> = {
     letters: 'Letters',
     linkedTerm: 'Linked term',
     appearsIn: 'Appears in',
+    moreOn: 'More on this',
     step: 'Step',
     stepOf: 'of',
     optional: 'optional',
@@ -364,6 +367,7 @@ export const texts: Record<Lang, FrameTexts> = {
     letters: 'Buchstaben',
     linkedTerm: 'Verlinkter Begriff',
     appearsIn: 'Kommt vor in',
+    moreOn: 'Mehr dazu',
     step: 'Schritt',
     stepOf: 'von',
     optional: 'optional',
