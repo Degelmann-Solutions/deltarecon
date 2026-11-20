@@ -15,6 +15,10 @@
 // A card with content of one platform (PlatformPart, a file list) needs a
 // switch, or the reader cannot get to the other platform there.
 //
+// A switch names its step ("Command, step 2, Windows"). Outside a step card,
+// on a page of prose, `place` says in its stead where the command stands:
+// `place="request"` gives "Command, request, Windows".
+//
 // The delivered page holds two labelled parts one after the other, without
 // tab roles; that is what a reader without JavaScript gets. scripts/
 // platform.ts turns the labels into tabs, and the stylesheet shows the part
@@ -27,9 +31,11 @@ import { platforms, type Platform } from '../release';
 interface Props {
   windows?: string[];
   linux?: string[];
+  /** Where the command stands, on a page without steps. */
+  place?: string;
 }
 
-const { windows, linux } = Astro.props;
+const { windows, linux, place } = Astro.props;
 const lines: Record<Platform, string[] | undefined> = { windows, linux };
 if (Boolean(windows) !== Boolean(linux)) {
   throw new Error(
@@ -60,7 +66,7 @@ for (const platform of platforms) {
   data-platform-switch
   data-label={t.operatingSystem}
   data-plain={plain || undefined}
-  data-copy-label={plain ? undefined : `${t.copyCommand}, ${stepPlace(STEP_MARK, lang)}`}
+  data-copy-label={plain ? undefined : `${t.copyCommand}, ${place ?? stepPlace(STEP_MARK, lang)}`}
 >
   {
     platforms.map((platform) => (
@@ -69,7 +75,7 @@ for (const platform of platforms) {
           {t[platform]}
           {platform === 'windows' && !plain && <small>{t.windowsShell}</small>}
         </p>
-        {lines[platform] && <CodeBlock lines={lines[platform]} platform={platform} />}
+        {lines[platform] && <CodeBlock lines={lines[platform]} platform={platform} place={place && `${place}, ${t[platform]}`} />}
         {after[platform] && <div class={plain ? 'platform-text' : 'step-after'} set:html={after[platform]} />}
       </div>
     ))

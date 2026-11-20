@@ -2,6 +2,9 @@
 // One row of a row list: its number (from the list), its name in plain
 // words, a code name after it where it has one, a second line (the
 // content), and a tag at the right end, for example "optional".
+//
+// `option` marks the row as the row of the option its `code` names
+// (`data-option`), for the release check (scripts/check-release.mjs).
 import { outputHtml, pageLanguage } from '../markup';
 
 interface Props {
@@ -11,16 +14,21 @@ interface Props {
   code?: string;
   /** A tag at the right end; on the phone below the text. */
   tag?: string;
+  /** The row describes the option of a command that `code` names. */
+  option?: boolean;
 }
 
-const { name, code, tag } = Astro.props;
+const { name, code, tag, option } = Astro.props;
 const lang = pageLanguage(Astro.url.pathname);
+if (option && !code) {
+  throw new Error(`${Astro.url.pathname}: the row "${name}" is marked as an option and names none in "code".`);
+}
 ---
 
 <li class="row" data-row>
   <div class="row-text">
     <p class="row-name">
-      <span set:html={outputHtml(name, lang)} />{code && <code translate="no">{code}</code>}
+      <span set:html={outputHtml(name, lang)} />{code && <code translate="no" data-option={option ? code : undefined}>{code}</code>}
     </p>
     {Astro.slots.has('default') && <p class="row-line prose-links"><slot /></p>}
   </div>
