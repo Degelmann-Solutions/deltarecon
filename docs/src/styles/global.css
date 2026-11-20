@@ -766,6 +766,18 @@
     color: var(--color-text-on-dark);
   }
 
+  /* The mark of a cut: text of the page in the place of lines of output that
+     are left out. The typeface of the text and a dashed rule above and below
+     set it apart from the output; it stands on a line of its own. */
+  .terminal-cut {
+    display: inline-block;
+    margin: 6px 0;
+    padding: 3px 0;
+    border-block: 1px dashed rgb(255 255 255 / 0.75);
+    color: var(--color-text-on-dark);
+    font-family: var(--font-sans);
+  }
+
   .terminal .copy-button {
     color: var(--color-teal);
   }

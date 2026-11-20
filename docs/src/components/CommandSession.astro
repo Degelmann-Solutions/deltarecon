@@ -1,0 +1,41 @@
+---
+// The terminal session of a step of single commands, once per platform:
+// prompt, the commands of the step and what the released package printed
+// for them, read from the captures of the step (src/ownCalculations.ts).
+// `commands` are the command lines the page types, the same it gives the
+// platform switch of the step; the build fails when they are not those of
+// the capture. `cut` leaves a run of lines out and puts a line of page text
+// in its place.
+//
+//   <CommandSession step="search" commands={commands.search} />
+//   <CommandSession step="newer-revision" commands={commands.regression}
+//     cut={{ lines: /^deviation: /, words: (count) => `${count} lines left out` }} />
+import PlatformPart from './PlatformPart.astro';
+import TerminalBlock from './TerminalBlock.astro';
+import { cut as withCut, sessionOf } from '../ownCalculations';
+import { packageFolder, platforms, type Platform } from '../release';
+
+interface Props {
+  step: string;
+  commands: Record<Platform, string[]>;
+  cut?: { lines: RegExp; words: (count: number) => string };
+}
+
+const { step, commands, cut } = Astro.props;
+const prompts: Record<Platform, string> = {
+  windows: `PS C:\\deltarecon\\${packageFolder('windows')}>`,
+  linux: '$',
+};
+const sessions = platforms.map((platform) => {
+  const session = sessionOf(step, platform, commands[platform]);
+  return { platform, entries: cut ? withCut(session, cut.lines, cut.words) : session };
+});
+---
+
+{
+  sessions.map(({ platform, entries }) => (
+    <PlatformPart os={platform}>
+      <TerminalBlock platform={platform} prompt={prompts[platform]} entries={entries} />
+    </PlatformPart>
+  ))
+}

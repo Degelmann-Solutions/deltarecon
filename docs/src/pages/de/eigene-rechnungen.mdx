@@ -2,6 +2,421 @@
 layout: ../../layouts/Page.astro
 lang: de
 page: own-calculations
-lead: "Diese Seite ist noch nicht geschrieben; sie wird zeigen, wie Sie eigene Rechnungen am Referenzmodell ausprobieren."
-description: "Probieren Sie nach dem Quick Start Schritt für Schritt eigene Rechnungen am Referenzmodell aus."
+lead: "Nach dem Quick Start probieren Sie im selben Paketordner drei eigene Rechnungen aus: eine Suche nach einer anderen Größe, die Suche der Vorführung ohne ihre Toleranz und einen Vergleich zweier Revisionen, die Sie selbst wählen."
+description: "Sieben Schritte nach dem Quick Start: nach einer anderen Größe des Referenzmodells suchen, ohne Toleranzprofil suchen und zwei selbst gewählte Revisionen vergleichen, für Windows und Linux."
+steps:
+  - { anchor: folder, title: "Den Ordner der Vorführung finden" }
+  - { anchor: other-quantity, title: "Nach einer anderen Größe suchen" }
+  - { anchor: without-tolerance, title: "Ohne das Toleranzprofil suchen" }
+  - { anchor: older-revision, title: "Einen älteren Stand Ihrer Wahl rechnen" }
+  - { anchor: newer-revision, title: "Ihn mit einem neueren Stand vergleichen" }
+  - { anchor: changes, title: "Die Änderungen dazwischen auflisten" }
+  - { anchor: search, title: "In diesen Änderungen die Ursache suchen" }
 ---
+import Callout from '../../components/Callout.astro';
+import CommandSession from '../../components/CommandSession.astro';
+import FileList from '../../components/FileList.astro';
+import PathEnd from '../../components/PathEnd.astro';
+import PlatformPart from '../../components/PlatformPart.astro';
+import PlatformSwitch from '../../components/PlatformSwitch.astro';
+import StepCard from '../../components/StepCard.astro';
+import StepFigure from '../../components/StepFigure.astro';
+import Steps from '../../components/Steps.astro';
+import SummaryList from '../../components/SummaryList.astro';
+import Term from '../../components/Term.astro';
+import { changeOf, searchCounts, searchTable } from '../../captures';
+import { beyondDemo, contributionsOf, outputOf, refusal, runsOf, statusOf } from '../../ownCalculations';
+import { findPage, pageAddress } from '../../site';
+
+export const commands = {
+  // The command lines of each step. The build holds them against the
+  // captures of the step (src/ownCalculations.ts).
+  folder: {
+    windows: [
+      String.raw`$Q = "runs\" + (Get-ChildItem runs -Directory -Filter quickstart-* | Sort-Object Name | Select-Object -Last 1).Name`,
+      'echo $Q',
+    ],
+    linux: ['Q=$(ls --directory runs/quickstart-* | tail -n 1)', 'echo $Q'],
+  },
+  otherQuantity: {
+    windows: [
+      String.raw`.\deltarecon.cmd search $Q\release-n\run-record.json $Q\regression\run\run-record.json --quantity Provisionen --periods 0-59 --target-only --output $Q\search-provisionen`,
+    ],
+    linux: [
+      './deltarecon search $Q/release-n/run-record.json $Q/regression/run/run-record.json --quantity Provisionen --periods 0-59 --target-only --output $Q/search-provisionen',
+    ],
+  },
+  withoutTolerance: {
+    windows: [
+      String.raw`.\deltarecon.cmd search $Q\release-n\run-record.json $Q\regression\run\run-record.json --quantity Bruttobeitrag --periods 0-59 --target-only --output $Q\search-bruttobeitrag-exact`,
+    ],
+    linux: [
+      './deltarecon search $Q/release-n/run-record.json $Q/regression/run/run-record.json --quantity Bruttobeitrag --periods 0-59 --target-only --output $Q/search-bruttobeitrag-exact',
+    ],
+  },
+  olderRevision: {
+    windows: [
+      String.raw`.\deltarecon.cmd request --revision d61b1ed --label change-16 --run-id run-change-16 --output $Q\own\older\request.json`,
+      String.raw`.\deltarecon.cmd run $Q\own\older\request.json`,
+    ],
+    linux: [
+      './deltarecon request --revision d61b1ed --label change-16 --run-id run-change-16 --output $Q/own/older/request.json',
+      './deltarecon run $Q/own/older/request.json',
+    ],
+  },
+  newerRevision: {
+    windows: [
+      String.raw`.\deltarecon.cmd regression $Q\own\older\run-record.json --revision 6a117fc --label change-24 --output $Q\own\regression`,
+    ],
+    linux: [
+      './deltarecon regression $Q/own/older/run-record.json --revision 6a117fc --label change-24 --output $Q/own/regression',
+    ],
+  },
+  changes: {
+    windows: [
+      String.raw`.\deltarecon.cmd derive $Q\own\older\run-record.json $Q\own\regression\run\run-record.json --output $Q\own\changes.json`,
+    ],
+    linux: [
+      './deltarecon derive $Q/own/older/run-record.json $Q/own/regression/run/run-record.json --output $Q/own/changes.json',
+    ],
+  },
+  search: {
+    windows: [
+      String.raw`.\deltarecon.cmd search $Q\own\older\run-record.json $Q\own\regression\run\run-record.json --quantity "garantierte Todesfallleistung" --periods 0-11 --target-only --output $Q\own\search`,
+    ],
+    linux: [
+      './deltarecon search $Q/own/older/run-record.json $Q/own/regression/run/run-record.json --quantity "garantierte Todesfallleistung" --periods 0-11 --target-only --output $Q/own/search',
+    ],
+  },
+};
+export const results = findPage('understand-the-results');
+export const singleCommands = findPage('single-commands');
+export const change = (revision) => changeOf('de', revision);
+export const demo = searchCounts('de');
+// The search of step 2: its counts, and the contribution with the largest sum.
+export const provisionen = runsOf('other-quantity');
+export const largest = contributionsOf('other-quantity').reduce((first, second) =>
+  Math.abs(second.sum) > Math.abs(first.sum) ? second : first,
+);
+// The search of step 3: its counts, and what it finds beyond the table of the demo.
+export const exact = runsOf('without-tolerance');
+export const more = beyondDemo('without-tolerance', searchTable('de').rows);
+// The two revisions of steps 4 to 7, by the short names the commands type.
+export const older = change('d61b1ed');
+export const newer = change('6a117fc');
+export const own = runsOf('search');
+export const firstLine = (step) => outputOf(step)[0];
+
+<Steps>
+
+<StepCard steps={frontmatter.steps} anchor="folder">
+
+Die geführte Vorführung des Quick Starts hat ihre Dateien in einen eigenen Ordner unterhalb des Paketordners geschrieben, `runs/quickstart-<UTC-Zeit>`. Er enthält die beiden Ergebnisse, die die <Term id="regression">Regression</Term> der Vorführung verglichen hat, die Liste der Änderungen und die Suche. Jede Rechnung dieser Seite liest aus diesem Ordner und schreibt in ihn.
+
+<PlatformPart os="windows">
+
+Öffnen Sie PowerShell im Paketordner. Die Befehle dieser Seite sind für PowerShell geschrieben; in der Eingabeaufforderung `cmd` laufen sie nicht.
+
+</PlatformPart>
+
+<PlatformPart os="linux">
+
+Öffnen Sie ein Terminal und wechseln Sie in den Paketordner.
+
+</PlatformPart>
+
+Die erste Zeile legt den Ordner Ihrer letzten Vorführung in die Variable `Q`, die zweite gibt ihn aus:
+
+<PlatformSwitch windows={commands.folder.windows} linux={commands.folder.linux} />
+
+<div class="step-after">
+
+Die Variable gilt, solange dieses Fenster offen bleibt. Jeder spätere Befehl dieser Seite verwendet sie; Sie können also jeden Befehl so kopieren, wie er dasteht.
+
+</div>
+
+<StepFigure slot="figure">
+  <FileList
+    label="Im Ordner der Vorführung"
+    files={[
+      { name: 'release-n/', note: 'Release N' },
+      { name: 'regression/', note: 'Stand N+1, verglichen' },
+      { name: 'changes.json', note: 'die Änderungen' },
+      { name: 'search/', note: 'die Suche' },
+    ]}
+  />
+  <p slot="caption">Was die vier Schritte der Vorführung in ihren Ordner geschrieben haben.</p>
+</StepFigure>
+
+<div slot="wide">
+<CommandSession step="folder" commands={commands.folder} />
+
+<div class="step-after">
+
+Ihr Ordner trägt die Uhrzeit, zu der Ihre Vorführung begonnen hat; sein Name ist deshalb ein anderer als der hier gezeigte.
+
+</div>
+</div>
+
+</StepCard>
+
+<StepCard steps={frontmatter.steps} anchor="other-quantity">
+
+Die Vorführung hat die Ursache der <Term id="deviation">Abweichung</Term> im <Term id="bruttobeitrag" /> gesucht. Dieselbe Suche läuft für jede andere Größe, die das <Term id="reference-model">Referenzmodell</Term> ausgibt. Diese hier nimmt die Provisionen in den ersten fünf Projektionsjahren, also die Perioden 0 bis 59. Sie liest die beiden <Term id="record">Nachweise</Term>, die die Vorführung geschrieben hat, den von Release N und den des Stands N+1, und schreibt in den neuen Ordner `search-provisionen`.
+
+Das <Term id="tolerance-profile">Toleranzprofil</Term> der Vorführung legt nur für den Bruttobeitrag eine Toleranz fest. Dieser Befehl nennt deshalb keines: Bei den Provisionen zählt jede Differenz.
+
+<PlatformSwitch windows={commands.otherQuantity.windows} linux={commands.otherQuantity.linux} />
+
+<div class="step-after">
+
+Der Befehl rechnet eine Weile und gibt erst etwas aus, wenn er fertig ist. Die einzelnen Befehle geben ihre Meldungen nur auf Englisch aus, auch auf dieser Seite, und Zahlen mit mehr Stellen als die Tabellen der Vorführung.
+
+</div>
+
+<StepFigure slot="figure">
+  <FileList
+    label="Im Ordner search-provisionen"
+    files={[
+      { name: 'search.result.json', note: 'das vollständige Ergebnis' },
+      { name: 'search.run-record.json', note: 'der Nachweis der Suche' },
+      { name: 'changes.json', note: 'die Änderungen' },
+      { name: 'state-00/', note: 'ein Ordner je gerechnetem Stand' },
+    ]}
+  />
+  <p slot="caption">Ein Teil dessen, was eine Suche in ihren Ordner schreibt.</p>
+</StepFigure>
+
+<div slot="wide">
+<CommandSession step="other-quantity" commands={commands.otherQuantity} />
+
+<Callout tag="Die Ausgabe in einfachen Worten" title="So lesen Sie die Ausgabe einer Suche">
+
+<code lang="en">search: searched</code> Die Suche hat {provisionen.run} der {provisionen.walk} Stände gerechnet: Release N und einen Stand nach jeder Änderung. Die übrigen {provisionen.saved} hat sie nicht gebraucht.
+
+`state 0`, <code>state {provisionen.walk - 1}</code> Die Suche hat beide Enden noch einmal gerechnet, und jedes hat das aufgezeichnete Ergebnis geliefert.
+
+<code lang="en">held: input_data</code> Die Bestandsdaten bleiben in jedem Stand bei Release N. Eine <Term id="revision">Revision</Term> ändert die Tabelle der Modellpunkte; ihre Wirkung zeigt die Suche nicht.
+
+<code lang="en">contribution from state …</code> Eine Revision, die für sich allein die Provisionen ändert. Die Zeile nennt die Revision vollständig; die Tabellen der Vorführung zeigen ihre ersten sieben Zeichen. Der Stand nach der Revision hat die Nummer der Änderung in der Tabelle der Änderungen: Die größte Summe gehört hier zur Änderung {change(largest.short).number}, „<span lang="en">{change(largest.short).description}</span>“.
+
+<code lang="en">sum</code> Die Summe mit Vorzeichen von „Stand nach der Revision minus Stand davor“ über alle Modellpunkte und die Perioden 0 bis 59, wie in der Tabelle der Vorführung. <code lang="en">absolute sum</code> addiert dieselben Differenzen ohne ihr Vorzeichen.
+
+<a href={pageAddress(results, 'de')}>{results.name.de}</a> erklärt die Tabellen der Vorführung und mit ihnen die Tabelle der Änderungen.
+
+</Callout>
+
+<Callout tag="Hinweis" title="Ein Befehl schreibt seinen Ordner nur einmal" quote={[refusal('repeat')]} quoteLang="en">
+
+Wenn Sie einen Befehl ein zweites Mal starten, endet er sofort mit dem <Term id="exit-status">Exit-Status</Term> {statusOf('repeat')} und dieser Meldung; „…“ steht für den vollständigen Pfad des Ordners. Kein Befehl überschreibt eine Datei. Um eine Rechnung zu wiederholen, geben Sie ihr nach `--output` einen Namen, den es noch nicht gibt, zum Beispiel `search-provisionen-2` statt `search-provisionen`.
+
+</Callout>
+</div>
+
+</StepCard>
+
+<StepCard steps={frontmatter.steps} anchor="without-tolerance">
+
+In der Vorführung hat die Suche mit dem Toleranzprofil verglichen: Eine Änderung des Bruttobeitrags um höchstens einen Cent je Modellpunkt und Monat zählte nicht. Starten Sie dieselbe Suche ohne `--tolerance`. Der Vergleich ist dann exakt, und jede Differenz zählt.
+
+<PlatformSwitch windows={commands.withoutTolerance.windows} linux={commands.withoutTolerance.linux} />
+
+<div class="step-after">
+
+Vergleichen Sie die Ausgabe mit der Tabelle am Ende der Vorführung.
+
+</div>
+
+<StepFigure slot="figure">
+  <FileList
+    label="Suchen im Ordner der Vorführung"
+    files={[
+      { name: 'search/', note: 'Bruttobeitrag, mit der Toleranz' },
+      { name: 'search-bruttobeitrag-exact/', note: 'Bruttobeitrag, exakt' },
+      { name: 'search-provisionen/', note: 'Provisionen, exakt' },
+    ]}
+  />
+  <p slot="caption">Jede Suche hat ihren eigenen Ordner.</p>
+</StepFigure>
+
+<div slot="wide">
+<CommandSession step="without-tolerance" commands={commands.withoutTolerance} />
+
+<div class="step-after">
+
+Die Revisionen aus der Tabelle der Vorführung sind wieder da, mit denselben Summen, jetzt mit mehr Stellen. {more.length === 2 ? 'Zwei' : more.length} weitere sind dazugekommen: {more.map((entry, index) => <>{index > 0 && ' und '}Änderung {change(entry.short).number}, <code translate="no">{entry.short}</code></>)}. In der Vorführung lagen sie in dem Abschnitt, den sie als „<Term id="not-resolved">Nicht aufgelöst</Term>“ gemeldet hat: Mit der Toleranz überschritten mehrere Änderungen sie nur zusammen. Ohne Toleranz teilt die Suche diesen Abschnitt bis zur einzelnen Änderung.
+
+Diese Suche hat {exact.run} Stände gerechnet; die Suche der Vorführung hat {demo.computed} gerechnet.
+
+</div>
+</div>
+
+</StepCard>
+
+<StepCard steps={frontmatter.steps} anchor="older-revision">
+
+Bisher kamen beide Enden aus der Vorführung: Release N und der Stand N+1. Jetzt wählen Sie die beiden Enden selbst. Nehmen Sie zwei beliebige Revisionen aus der Tabelle der Änderungen, die die Vorführung in ihrem dritten Schritt ausgegeben hat; die mit der kleineren Nummer ist der ältere Stand. Dieselben Revisionen stehen in `changes.json` im Ordner der Vorführung. Die ersten sieben Zeichen genügen, um eine Revision zu benennen.
+
+Diese Seite nimmt die Änderung {older.number}, <code translate="no">{older.revision}</code>, als älteren Stand. `request` schreibt auf, was gerechnet werden soll, und `run` rechnet es.
+
+<PlatformSwitch windows={commands.olderRevision.windows} linux={commands.olderRevision.linux} />
+
+<div class="step-after">
+
+`--label` und `--run-id` sind Namen, die Sie diesem Stand und diesem Lauf geben.
+
+</div>
+
+<StepFigure slot="figure">
+  <FileList
+    label="Im Ordner own/older"
+    files={[
+      { name: 'request.json', note: 'was gerechnet werden soll' },
+      { name: 'response.json', note: 'wie der Lauf geendet hat' },
+      { name: 'results.csv', note: 'die Ergebnisse' },
+      { name: 'run-record.json', note: 'der Nachweis' },
+    ]}
+  />
+  <p slot="caption">Was die beiden Befehle schreiben.</p>
+</StepFigure>
+
+<div slot="wide">
+<CommandSession step="older-revision" commands={commands.olderRevision} />
+
+<div class="step-after">
+
+Die letzten drei Zeilen nennen die Dateien des Laufs. Die letzte davon, `run-record.json`, ist der Nachweis, den die nächsten Befehle lesen.
+
+</div>
+</div>
+
+</StepCard>
+
+<StepCard steps={frontmatter.steps} anchor="newer-revision">
+
+`regression` rechnet eine neuere Revision auf denselben Bestandsdaten und für dieselben Modellpunkte wie der aufgezeichnete Lauf und vergleicht beide Ergebnisse <Term id="value">Wert</Term> für Wert. Der neuere Stand ist hier die Änderung {newer.number}, <code translate="no">{newer.revision}</code>. Das ist die Regression der Vorführung, zwischen zwei Ständen Ihrer Wahl.
+
+<PlatformSwitch windows={commands.newerRevision.windows} linux={commands.newerRevision.linux} />
+
+<div class="step-after">
+
+Der Befehl endet mit dem Exit-Status {statusOf('newer-revision')}. Das ist das erwartete Ergebnis und kein Fehler: Die beiden Stände unterscheiden sich, und der Status sagt das. Der nächste Befehl läuft trotzdem.
+
+</div>
+
+<StepFigure slot="figure">
+  <FileList
+    label="Im Ordner own/regression"
+    files={[
+      { name: 'recorded/', note: 'Kopie des älteren Laufs' },
+      { name: 'run/', note: 'der neuere Lauf' },
+      { name: 'compare.result.json', note: 'der Vergleich' },
+      { name: 'signature-table.json', note: 'die Signaturtabelle' },
+    ]}
+  />
+  <p slot="caption">Ein Teil dessen, was die Regression schreibt.</p>
+</StepFigure>
+
+<div slot="wide">
+<CommandSession
+  step="newer-revision"
+  commands={commands.newerRevision}
+  cut={{ lines: /^deviation: /, words: (count) => `Hier sind ${count} Zeilen ausgelassen: eine Zeile je Modellpunkt` }}
+/>
+
+<div class="step-after">
+
+Die erste Zeile zählt die Werte, die abweichen; die Ausgabe nennt einen Wert „<span lang="en">coordinate</span>“. Die Signaturtabelle („<span lang="en">signature table</span>“) hat einen Eintrag je Größe, die abweicht: in wie vielen Modellpunkten, in wie vielen Werten und in welchen Perioden sie abweicht, wie viele Werte des neueren Stands über und wie viele unter denen des älteren liegen, dazu den größten Anstieg und den größten Rückgang. Nach der Tabelle gibt der Befehl eine Zeile je Modellpunkt aus, die diese Seite auslässt, und die Dateien, die er geschrieben hat.
+
+<a href={pageAddress(results, 'de')}>{results.name.de}</a> erklärt die Tabelle, die die Vorführung für einen solchen Vergleich ausgibt.
+
+</div>
+</div>
+
+</StepCard>
+
+<StepCard steps={frontmatter.steps} anchor="changes">
+
+`derive` liest die Versionsgeschichte des Modells zwischen den beiden aufgezeichneten Ständen und listet jede Änderung einzeln auf, in der Reihenfolge, in der sie gemacht wurde. Die Liste schreibt es nach `changes.json`, das <Term id="change-manifest">Änderungsverzeichnis</Term>.
+
+<PlatformSwitch windows={commands.changes.windows} linux={commands.changes.linux} />
+
+<div class="step-after">
+
+Jede Zeile nennt eine Revision vollständig, ihre <Term id="class">Einordnung</Term> zwischen `[` und `]` und ihre Beschreibung.
+
+</div>
+
+<StepFigure slot="figure">
+  <FileList
+    label="Im Ordner own"
+    files={[
+      { name: 'older/', note: `Änderung ${older.number}` },
+      { name: 'regression/', note: `Änderung ${newer.number}, verglichen` },
+      { name: 'changes.json', note: 'die Änderungen dazwischen' },
+    ]}
+  />
+  <p slot="caption">Ihr eigener Vergleich bis hierher.</p>
+</StepFigure>
+
+<div slot="wide">
+<CommandSession step="changes" commands={commands.changes} />
+
+<div class="step-after">
+
+Das sind die Änderungen {older.number + 1} bis {newer.number} aus der Tabelle der Änderungen der Vorführung. <code lang="en">remainder: none</code> sagt, dass sich die beiden Läufe nur durch diese Änderungen unterscheiden.
+
+</div>
+</div>
+
+</StepCard>
+
+<StepCard steps={frontmatter.steps} anchor="search">
+
+Die Suche läuft jetzt zwischen Ihren beiden Ständen. Ihr Ziel ist hier die garantierte Todesfallleistung im ersten Projektionsjahr, also die Perioden 0 bis 11. Ein Name einer Größe, der ein Leerzeichen enthält, steht in Anführungszeichen.
+
+<PlatformSwitch windows={commands.search.windows} linux={commands.search.linux} />
+
+<div class="step-after">
+
+Die Ausgabe lesen Sie wie in Schritt 2, mit zwei Unterschieden. Stand 0 ist Ihr älterer Stand und der letzte Stand Ihr neuerer; die Stände zählen also die Änderungen aus Schritt 6: Der Stand nach der ersten Änderung dieser Liste ist Stand 1. Und die Bestandsdaten bleiben bei Ihrem älteren Stand, nicht bei Release N.
+
+</div>
+
+<StepFigure slot="figure">
+  <FileList
+    label="Im Ordner own"
+    files={[
+      { name: 'older/', note: `Änderung ${older.number}` },
+      { name: 'regression/', note: `Änderung ${newer.number}, verglichen` },
+      { name: 'changes.json', note: 'die Änderungen dazwischen' },
+      { name: 'search/', note: 'die Suche' },
+    ]}
+  />
+  <p slot="caption">Ihr eigener Vergleich, vollständig.</p>
+</StepFigure>
+
+<div slot="wide">
+<CommandSession step="search" commands={commands.search} />
+
+<div class="step-after">
+
+Die Suche hat {own.run} der {own.walk} Stände gerechnet. Die erste Zeile jeder Ihrer drei Suchen fasst es zusammen:
+
+</div>
+
+<SummaryList
+  lineLang="en"
+  items={[
+    { name: 'Eine andere Größe', code: ['search'], line: firstLine('other-quantity') },
+    { name: 'Ohne das Toleranzprofil', code: ['search'], line: firstLine('without-tolerance') },
+    { name: 'Zwei Revisionen Ihrer Wahl', code: ['request', 'run', 'regression', 'derive', 'search'], line: firstLine('search') },
+  ]}
+/>
+</div>
+
+</StepCard>
+
+</Steps>
+
+<PathEnd>Sie haben drei eigene Rechnungen durchgeführt. „{singleCommands.name.de}“ beschreibt jeden Befehl.</PathEnd>

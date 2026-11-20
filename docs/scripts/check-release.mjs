@@ -43,6 +43,31 @@
 //     message; the two terminal sessions are those of the two platforms;
 //     table and bar figure show the revisions and sums of
 //     `search.result.json`.
+//
+// The page "Your own calculations on the reference model" has captures of
+// its own (src/captures/v<version>/own-calculations/, one file per step and
+// platform) and its commands stand in no guide. For it the check holds,
+// before the build:
+//   - `order.txt` names the steps of the captures, and each has a Windows
+//     and a Linux file of the shape `command: …`, output, `exit status: n`;
+//     the two agree in the number of commands, in every exit status and in
+//     every line of output once path separators, the time stamp of the demo
+//     folder and the folder of the package are set aside; a command that
+//     starts the launcher is the same on both platforms apart from the name
+//     of the launcher and the separators;
+// and on the built page of both languages:
+//   - every command that starts the launcher names a command of the
+//     released `deltarecon`, and every option it gives stands in the help of
+//     that command (`deltarecon --help`, `deltarecon <command> --help` of
+//     the unpacked Linux package of the release folder, which this check
+//     runs, so it needs Linux on x86-64);
+//   - the commands of the platform switch and of the terminal session of a
+//     step are the commands of the capture of that step and platform, and
+//     the session shows the output of the capture line by line, where a
+//     mark of a cut stands for as many lines as it names;
+//   - every other output of the page (a quoted message, a line of the
+//     summary list) stands in a capture of the page; "…" in it stands for a
+//     part that is left out.
 // Exits non-zero and names what differs or what is missing: a file of the
 // release folder, the pin, a search result of another shape, a build that
 // does not start.
@@ -333,6 +358,104 @@ for (const lang of LANGUAGES) {
     });
   }
 }
+// ---- The captures of the page of own calculations ----
+
+const OWN = 'own-calculations';
+const ownFolder = path.join(captureFolder, OWN);
+/** The names of the launcher, per platform. */
+const LAUNCHER = { windows: '.\\deltarecon.cmd', linux: './deltarecon' };
+
+/** A line of such a capture without what varies by run and by platform. */
+const neutralOwn = (line) => {
+  let text = neutral(line);
+  // The folder the package was unpacked into: the path up to the package folder.
+  for (const platform of PLATFORMS) {
+    text = text.replace(
+      new RegExp(`(?:[A-Za-z]:)?/\\S*/${folders[platform].replaceAll('.', '\\.')}(?=/)`, 'g'),
+      '<package folder>',
+    );
+  }
+  return text;
+};
+
+/** The commands of a capture file: as typed, the lines printed, the exit status. */
+function parseOwn(file, text) {
+  const commands = [];
+  let open;
+  text
+    .replace(/\n$/, '')
+    .split('\n')
+    .forEach((line, index) => {
+      const status = /^exit status: (-?\d+)$/.exec(line);
+      if (line.startsWith('command: ')) {
+        expect(!open, `${file}:${index + 1}: a command begins before the exit status of the command before it`);
+        open = { command: line.slice('command: '.length), lines: [], first: index + 2 };
+      } else if (!open) {
+        failures.push(`${file}:${index + 1}: the line stands before a line "command: …"`);
+      } else if (status) {
+        commands.push({ ...open, status: Number(status[1]) });
+        open = undefined;
+      } else {
+        open.lines.push(line);
+      }
+    });
+  expect(!open, `${file}: no exit status after the last command`);
+  expect(commands.length > 0, `${file}: the capture holds no command`);
+  return commands;
+}
+
+const own = {};
+let ownSteps = [];
+try {
+  ownSteps = (await read(path.join(root, ownFolder, 'order.txt'))).split('\n').filter((step) => step.trim() !== '');
+} catch {
+  failures.push(`docs/${path.join(ownFolder, 'order.txt')}: the file that names the steps of the captures is missing`);
+}
+for (const step of ownSteps) {
+  own[step] = {};
+  for (const platform of PLATFORMS) {
+    const file = path.join('docs', ownFolder, `${step}-${platform}.txt`);
+    try {
+      const text = await read(path.join(repository, file));
+      expect(!text.includes('\r'), `${file}: the capture holds a carriage return; captures have LF line ends`);
+      own[step][platform] = { file, commands: parseOwn(file, text) };
+    } catch {
+      failures.push(`${file}: the capture file is missing`);
+    }
+  }
+  const { windows, linux } = own[step];
+  if (!windows || !linux) continue;
+  expect(
+    windows.commands.length === linux.commands.length,
+    `${windows.file} holds ${windows.commands.length} commands, ${linux.file} holds ${linux.commands.length}`,
+  );
+  windows.commands.forEach((command, index) => {
+    const twin = linux.commands[index];
+    if (!twin) return;
+    expect(
+      command.status === twin.status,
+      `${windows.file} and ${linux.file}: command ${index + 1} ends with exit status ${command.status} on Windows and ${twin.status} on Linux`,
+    );
+    if (command.command.startsWith(`${LAUNCHER.windows} `) || twin.command.startsWith(`${LAUNCHER.linux} `)) {
+      expect(
+        command.command.replaceAll('\\', '/').replace('./deltarecon.cmd ', './deltarecon ') === twin.command,
+        `${windows.file} and ${linux.file}: command ${index + 1} differs beyond the name of the launcher and the path separators: "${command.command}" and "${twin.command}"`,
+      );
+    }
+    expect(
+      command.lines.length === twin.lines.length,
+      `${windows.file} and ${linux.file}: command ${index + 1} printed ${command.lines.length} lines on Windows and ${twin.lines.length} on Linux`,
+    );
+    for (let at = 0; at < Math.min(command.lines.length, twin.lines.length); at += 1) {
+      expect(
+        neutralOwn(command.lines[at]) === neutralOwn(twin.lines[at]),
+        `${windows.file}:${command.first + at} and ${linux.file}:${twin.first + at} differ beyond path separators, the time stamp and the folder of the package: "${command.lines[at]}" and "${twin.lines[at]}"`,
+      );
+    }
+  });
+}
+expect(ownSteps.length > 0, `docs/${path.join(ownFolder, 'order.txt')} names no step`);
+
 // A capture that differs fails here, with file and line, before the build.
 if (failures.length > 0) report('');
 
@@ -399,10 +522,34 @@ function sourceOf(command, { step, platform, terminal }, lang) {
   return guides[lang][platform].has(command) ? 'guide' : notes.blocks.has(command) ? 'release notes' : undefined;
 }
 
-const stepPages = (await loadPages()).filter((entry) => entry.id === 'quick-start');
+/** The help of the released `deltarecon`: of the program, or of one of its commands. */
+function helpOf(...command) {
+  const launcher = path.join(releaseFolder, folders.linux, 'deltarecon');
+  const help = spawnSync(launcher, [...command, '--help'], { encoding: 'utf8' });
+  if (help.error || help.status !== 0) {
+    failures.push(
+      `${relative(launcher)} ${[...command, '--help'].join(' ')} failed; the check reads the help of the released package, on Linux: ${help.error?.message ?? help.stderr.trim()}`,
+    );
+    report('');
+  }
+  return help.stdout;
+}
+/** The commands the released `deltarecon` has, and the options each takes. */
+const released = new Map();
+for (const command of (/\{([\w,]+)\}/.exec(helpOf())?.[1] ?? '').split(',').filter(Boolean)) {
+  released.set(command, new Set([...helpOf(command).matchAll(/--[a-z][a-z-]*/g)].map(([option]) => option)));
+}
+expect(released.size > 0, `the help of the released deltarecon names no command`);
+
+/** The words of a command line; a part in quotation marks is one word. */
+const wordsOf = (line) => [...line.matchAll(/"[^"]*"|\S+/g)].map(([word]) => word);
+
+const allPages = await loadPages();
+const stepPages = allPages.filter((entry) => entry.id === 'quick-start');
+const ownPages = allPages.filter((entry) => entry.id === OWN);
 const { origin: reported, stop } = startPreview();
 let browser;
-const found = { 'release notes': 0, README: 0, guide: 0 };
+const found = { 'release notes': 0, README: 0, guide: 0, help: 0, lines: 0 };
 try {
   const origin = await reported;
   browser = await chromium.launch();
@@ -544,6 +691,152 @@ try {
     }
   }
   expect(stepPages.length === LANGUAGES.length, `the Quick start is not in the page register once per language`);
+
+  // ---- The page of own calculations ----
+  const everyOwnLine = squash(
+    Object.values(own)
+      .flatMap((step) => Object.values(step))
+      .flatMap((capture) => capture.commands.flatMap((command) => command.lines))
+      .join(' '),
+  );
+  for (const entry of ownPages) {
+    const name = entry.address;
+    await page.goto(`${origin}${entry.address}`);
+    const shown = await page.evaluate(() => {
+      const place = (block) => ({
+        step: block.closest('[data-step]')?.id,
+        platform: block.closest('[data-platform-part]')?.dataset.platformPart,
+      });
+      return {
+        steps: [...document.querySelectorAll('main [data-step]')].map((step) => step.id),
+        blocks: [...document.querySelectorAll('main [data-copy]')].map((block) => ({
+          ...place(block),
+          terminal: block.matches('[data-terminal]'),
+          commands: block.dataset.copy.split('\n'),
+          typed: [...block.querySelectorAll('[data-terminal-command]')].map((command) => command.textContent),
+          // What each command of a session printed: its lines, a mark of a
+          // cut as the number of lines it stands for.
+          outputs: [...block.querySelectorAll('[data-terminal-command]')].map((command) => {
+            const output = command.nextElementSibling;
+            if (!output?.matches('[data-capture="command-output"]')) return [];
+            const lines = [];
+            let line = '';
+            for (const node of output.childNodes) {
+              // The mark of a cut stands on a line of its own, in the
+              // place of the lines it names; `null`: that line is taken.
+              if (node.nodeType === Node.ELEMENT_NODE && node.matches('[data-cut]')) {
+                lines.push({ cut: Number(node.dataset.cut) });
+                line = null;
+                continue;
+              }
+              for (const [index, part] of node.textContent.split('\n').entries()) {
+                if (index > 0) {
+                  if (line !== null) lines.push(line);
+                  line = '';
+                }
+                if (line !== null) line += part;
+              }
+            }
+            if (line !== null) lines.push(line);
+            return lines;
+          }),
+        })),
+        output: [...document.querySelectorAll('main [data-capture]:not([data-capture="command-output"])')].map(
+          (element) => ({ kind: element.dataset.capture, text: element.textContent }),
+        ),
+      };
+    });
+
+    // Every step of the page has its captures, and every capture is shown
+    // or quoted: a capture that is no step of the page is a quoted message.
+    for (const step of shown.steps) {
+      expect(Boolean(own[step]), `${name}: the step "${step}" has no capture in docs/${ownFolder} (order.txt)`);
+    }
+    expect(shown.blocks.length > 0, `${name}: the page holds no command`);
+    for (const block of shown.blocks) {
+      const at = `${name}, step "${block.step}", ${block.platform}`;
+      const capture = own[block.step]?.[block.platform];
+      if (!capture) {
+        failures.push(`${at}: a command of no captured step or platform`);
+        continue;
+      }
+      // The commands are those of the capture.
+      const captured = capture.commands.map((command) => command.command);
+      expect(
+        block.commands.join('\n') === captured.join('\n'),
+        `${at}: the ${block.terminal ? 'terminal session' : 'platform switch'} shows the command "${block.commands.join(' | ')}", ${capture.file} holds "${captured.join(' | ')}"`,
+      );
+      // A command that starts the launcher: its command and options are in the help.
+      for (const command of block.commands) {
+        const [launcher, sub, ...rest] = wordsOf(command);
+        if (!/deltarecon/.test(launcher)) continue;
+        expect(launcher === LAUNCHER[block.platform], `${at}: the command starts "${launcher}", expected the launcher "${LAUNCHER[block.platform]}"`);
+        const options = released.get(sub);
+        expect(Boolean(options), `${at}: "${sub}" is no command of the released deltarecon (${[...released.keys()].join(', ')})`);
+        for (const option of rest.filter((word) => word.startsWith('--'))) {
+          expect(
+            Boolean(options?.has(option)),
+            `${at}: the option "${option}" does not stand in the help of "deltarecon ${sub}" of the release`,
+          );
+          if (options?.has(option)) found.help += 1;
+        }
+      }
+      if (!block.terminal) continue;
+      // The session: every command as typed, and its output line by line.
+      expect(
+        block.typed.join('\n') === captured.join('\n'),
+        `${at}: the terminal session types "${block.typed.join(' | ')}", ${capture.file} holds "${captured.join(' | ')}"`,
+      );
+      capture.commands.forEach((command, index) => {
+        const lines = block.outputs[index] ?? [];
+        let line = 0;
+        for (const part of lines) {
+          if (typeof part === 'object') {
+            line += part.cut;
+            continue;
+          }
+          expect(
+            part === command.lines[line],
+            `${at}: line ${line + 1} of the output of "${command.command.slice(0, 40)}…" is "${part}", ${capture.file}:${command.first + line} is "${command.lines[line]}"`,
+          );
+          line += 1;
+        }
+        expect(
+          line === command.lines.length,
+          `${at}: the session shows or leaves out ${line} lines of the output of "${command.command.slice(0, 40)}…", ${capture.file} holds ${command.lines.length}`,
+        );
+        found.lines += line;
+      });
+    }
+    // Each step holds the commands of both platforms twice: switch and session.
+    for (const step of shown.steps) {
+      for (const platform of PLATFORMS) {
+        const kinds = shown.blocks.filter((block) => block.step === step && block.platform === platform).map((block) => block.terminal);
+        expect(
+          kinds.length === 2 && kinds.includes(true) && kinds.includes(false),
+          `${name}, step "${step}", ${platform}: not one platform switch and one terminal session with the commands of the step`,
+        );
+      }
+    }
+    // Every other output stands in a capture; "…" stands for a part left out.
+    expect(shown.output.length > 0, `${name}: the page quotes no output beside its sessions`);
+    for (const part of shown.output) {
+      const pieces = squash(part.text).split('…').map((piece) => piece.trim()).filter(Boolean);
+      expect(
+        pieces.length > 0 && pieces.every((piece) => everyOwnLine.includes(piece)),
+        `${name}: the output "${squash(part.text)}" (${part.kind}) does not stand in a capture of docs/${ownFolder}`,
+      );
+    }
+    // A capture that is no step of the page is quoted on it.
+    for (const step of ownSteps.filter((candidate) => !shown.steps.includes(candidate))) {
+      const lines = own[step].linux.commands.flatMap((command) => command.lines).map(squash);
+      expect(
+        shown.output.some((part) => squash(part.text).split('…').every((piece) => lines.some((line) => line.includes(piece.trim())))),
+        `${name}: the capture "${step}" is neither a step of the page nor quoted on it`,
+      );
+    }
+  }
+  expect(ownPages.length === LANGUAGES.length, `the page "${OWN}" is not in the page register once per language`);
 } catch (error) {
   failures.push(error.stack ?? error.message);
 } finally {
@@ -552,5 +845,5 @@ try {
 }
 
 report(
-  `release ${version}: the four captures agree with each other and with the search result of the pin; on the Quick start of both languages ${found['release notes']} command lines stand in the release notes, ${found.README} in the README of the release and ${found.guide} in the package guides; file names, sums and output are those of the release`,
+  `release ${version}: the four captures agree with each other and with the search result of the pin; on the Quick start of both languages ${found['release notes']} command lines stand in the release notes, ${found.README} in the README of the release and ${found.guide} in the package guides; file names, sums and output are those of the release; on the page of own calculations of both languages the commands are those of the ${ownSteps.length} captured steps, ${found.help} options stand in the help of the released deltarecon and ${found.lines} lines of output are those of the captures`,
 );
