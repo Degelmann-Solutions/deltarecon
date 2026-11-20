@@ -235,11 +235,11 @@ class ReferenceModelSession:
     quantities = [(name, unit) for name, unit, _, _ in QUANTITIES]
 `,
   },
-  // `project_many` and `project_target` of the reference model.
+  // `project_many` of the reference model.
   'project-many': {
     file: 'degelmann/deltarecon/engines/reference_model.py',
     first: 878,
-    last: 891,
+    last: 884,
     code: lines`
     def project_many(self, model_point_ids: list[str]) -> list:
         """The outcome of each id in the given order: its periods or its :class:${'`'}ModelPointFailure${'`'}.
@@ -248,7 +248,14 @@ class ReferenceModelSession:
         or the message of a failure, so a message is the same on every worker count.
         """
         return self._project_rows(model_point_ids, "_project_index")
-
+`,
+  },
+  // `project_target` of the reference model.
+  'project-target': {
+    file: 'degelmann/deltarecon/engines/reference_model.py',
+    first: 886,
+    last: 891,
+    code: lines`
     def project_target(self, model_point_ids: list[str], quantities: list[str],
                        periods: tuple[int, int] | None) -> list:
         """The outcome of each id in the given order: the periods of its target window, with one value

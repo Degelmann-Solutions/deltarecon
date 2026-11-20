@@ -688,6 +688,13 @@
     border-radius: 0 0 var(--radius-sm) var(--radius-sm);
   }
 
+  /* A document to copy may be long (the skeleton of an adapter): it keeps to
+     a height that fits a window and scrolls inside its box. */
+  .code-block[data-document] .code {
+    max-height: 26rem;
+    overflow-y: auto;
+  }
+
   /* A code block that stands alone: the copy button in a row above it. */
   .code-head {
     display: flex;
@@ -1945,7 +1952,7 @@
     margin-top: 6px;
   }
 
-  /* ---- Member card, its parts, sample, fold ---- */
+  /* ---- Member card, its parts, fold ---- */
 
   /* One member of the protocol: a hairline above, the heading with the name
      in the code, the signature, the content. */
@@ -1985,8 +1992,7 @@
     margin-top: 12px;
   }
 
-  .member-part .list-label,
-  .sample .list-label {
+  .member-part .list-label {
     margin-top: 0;
   }
 
@@ -2006,10 +2012,6 @@
 
   .member-part-text li + li {
     margin-top: 4px;
-  }
-
-  .sample .code {
-    margin-top: 6px;
   }
 
   /* The fold: a line that opens it, with a mark that turns; what it holds

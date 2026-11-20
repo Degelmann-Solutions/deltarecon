@@ -26,11 +26,11 @@ import PlatformPart from '../../components/PlatformPart.astro';
 import PlatformSwitch from '../../components/PlatformSwitch.astro';
 import Row from '../../components/Row.astro';
 import RowList from '../../components/RowList.astro';
-import Sample from '../../components/Sample.astro';
 import StepCard from '../../components/StepCard.astro';
 import StepFigure from '../../components/StepFigure.astro';
 import Steps from '../../components/Steps.astro';
 import Term from '../../components/Term.astro';
+import { skeleton, skeletonFile, skeletonSelection } from '../../adapterSkeleton';
 import { findPage, pageAddress } from '../../site';
 
 export const singleCommands = findPage('single-commands');
@@ -88,7 +88,7 @@ Ihre Anbindung, der <Term id="adapter">Adapter</Term>, ist eine Klasse in einem 
 
 Ihr Modul braucht zwei Klassen: die Klasse der <Term id="engine">Engine</Term> mit vier Angaben und sieben Operationen (Schritte 1 bis 3 und 5) und eine kleine Klasse für ein geöffnetes <Term id="release">Release</Term> (Schritt 4).
 
-Diese Seite geht jedes Teil einzeln durch. Zu jedem Teil sehen Sie seine Signatur aus dem Protokoll, was DeltaRecon Ihnen übergibt, was Sie zurückgeben und welche Fehler Sie melden. Ein Bereich zum Aufklappen zeigt, wie die Anbindung des <Term id="reference-model">Referenzmodells</Term> das Teil löst: mit Zeilen aus `degelmann/deltarecon/engines/reference_model.py` und mit dem Ergebnis eines Aufrufs am Referenzmodell.
+Diese Seite geht jedes Teil einzeln durch. Zu jedem Teil sehen Sie seine Signatur aus dem Protokoll, was DeltaRecon Ihnen übergibt, was Sie zurückgeben und welche Fehler Sie melden. Ein Bereich zum Aufklappen zeigt, wie die Anbindung des <Term id="reference-model">Referenzmodells</Term> das Teil löst, mit Zeilen aus `degelmann/deltarecon/engines/reference_model.py`.
 
 <StepFigure slot="figure">
   <FileList
@@ -102,6 +102,16 @@ Diese Seite geht jedes Teil einzeln durch. Zu jedem Teil sehen Sie seine Signatu
 </StepFigure>
 
 <div slot="wide" class="step-parts">
+
+<div class="prose-links">
+
+Beginnen Sie mit diesem Gerüst. Es enthält beide Klassen mit jedem Teil des Protokolls; jede Operation ist noch zu schreiben und löst bis dahin `NotImplementedError` aus. Speichern Sie es als <code translate="no">{skeletonFile}</code> in einem Ordner Ihrer Wahl; in Schritt 6 nennen Sie dann <code translate="no">{skeletonSelection}</code>. Die Namen der beiden Klassen und der Datei sind frei gewählt.
+
+<CodeBlock lines={skeleton('de')} label="Gerüst eines Adapters" />
+
+Die Karten unten gehen das Gerüst von oben nach unten durch, in der Reihenfolge der Schritte.
+
+</div>
 
 <Member name="Die Klasse aufrufen" code="__init__" signature="constructor">
 
@@ -120,8 +130,6 @@ Merken Sie sich die Zahl, wenn Ihre Engine Modellpunkte in mehreren Prozessen pr
 </Part>
 
 <Fold summary={REF}>
-
-<Sample id="constructor" label="Die drei Aufrufe: ohne --workers, mit --workers 4, bei request und derive" />
 
 <CodeExcerpt id="constructor">
   <p slot="caption">Das Referenzmodell merkt sich die Zahl. Ohne Argument nimmt `worker_count` die Zahl, die die Variable `DELTARECON_WORKERS` nennt, sonst einen Prozess je Prozessor.</p>
@@ -152,7 +160,9 @@ DeltaRecon nimmt eine Anfrage nur für eine Stufe an, die hier genannt ist. Es p
 
 <Fold summary={REF}>
 
-<Sample id="stages" label="Der Wert beim Referenzmodell" />
+<CodeExcerpt id="class-statements">
+  <p slot="caption">Die vier Angaben des Referenzmodells: eine Stufe mit ihrer fachlichen Beschreibung und ihren Größen; zwei Arten von Änderungen, ein Textpatch und eine <Term id="revision">Revision</Term>; die drei Arten von Verweisen, die eine Revision festlegt, nämlich Code, Parameter und <Term id="input-data">Bestandsdaten</Term>; und die Bestandsdaten als die eine Art, die es festhalten kann.</p>
+</CodeExcerpt>
 
 Das Referenzmodell bietet eine Stufe an, `liability_cashflow`. Ihre fachliche Beschreibung ist die Datei `contracts/v3/domain/liability_cashflow.md` des Repositorys.
 
@@ -166,7 +176,7 @@ Ein Attribut der Klasse: eine Menge von Namen.
 
 <Part label={SET}>
 
-- `revision`, wenn Ihre Engine eine <Term id="revision">Revision</Term> ihrer eigenen <Term id="history">Versionsgeschichte</Term> anwenden kann. Das brauchen `walk` und `search`, die jeden <Term id="state">Stand</Term> als Release mit eingeschalteten Revisionen rechnen.
+- `revision`, wenn Ihre Engine eine Revision ihrer eigenen <Term id="history">Versionsgeschichte</Term> anwenden kann. Das brauchen `walk` und `search`, die jeden <Term id="state">Stand</Term> als Release mit eingeschalteten Revisionen rechnen.
 - `text_patch`, wenn sie einen Textpatch anwenden kann, den ein <Term id="change-manifest">Änderungsverzeichnis</Term> als Datei mitbringt.
 
 </Part>
@@ -179,7 +189,7 @@ Jede eingeschaltete Änderung, die `open` erhält (Schritt 3), ist von einer Art
 
 <Fold summary={REF}>
 
-<Sample id="realisations" label="Der Wert beim Referenzmodell" />
+Das Referenzmodell nennt beide Arten, `text_patch` und `revision`. Die Zeile steht im Auszug bei `stages`.
 
 </Fold>
 
@@ -191,13 +201,13 @@ Ein Attribut der Klasse: die Arten von Verweisen eines Release, die eine Revisio
 
 <Part label={SET}>
 
-Die Namen der Arten, wie sie in der Beschreibung eines Release stehen (Schritt 2, `describe`). Beim Referenzmodell legt eine Revision den Code fest (`code_state`), die Parameter (`parameter_set`) und die <Term id="input-data">Bestandsdaten</Term> (`input_data`).
+Die Namen der Arten, wie sie in der Beschreibung eines Release stehen (Schritt 2, `describe`). Beim Referenzmodell legt eine Revision den Code fest (`code_state`), die Parameter (`parameter_set`) und die Bestandsdaten (`input_data`).
 
 </Part>
 
 <Fold summary={REF}>
 
-<Sample id="determines" label="Der Wert beim Referenzmodell" />
+Das Referenzmodell nennt die drei Arten `code_state`, `parameter_set` und `input_data`. Die Zeile steht im Auszug bei `stages`.
 
 </Fold>
 
@@ -222,11 +232,7 @@ Eine <Term id="regression">Regression</Term> rechnet die neuere Revision auf den
 
 <Fold summary={REF}>
 
-<Sample id="holdable" label="Der Wert beim Referenzmodell" />
-
-<CodeExcerpt id="class-statements">
-  <p slot="caption">Die vier Angaben des Referenzmodells: eine Stufe mit ihrer fachlichen Beschreibung und ihren Größen; zwei Arten von Änderungen, ein Textpatch und eine Revision; die drei Arten von Verweisen, die eine Revision festlegt, nämlich Code, Parameter und Bestandsdaten; und die Bestandsdaten als die eine Art, die es festhalten kann.</p>
-</CodeExcerpt>
+Das Referenzmodell kann die Bestandsdaten festhalten: `input_data` mit der Einordnung `data`, der Tabelle der Modellpunkte. Die Zeile steht im Auszug bei `stages`.
 
 </Fold>
 
@@ -313,11 +319,7 @@ Ein `dict` mit zwei Schlüsseln: `label`, die übergebene Bezeichnung, und `refe
 
 <Fold summary={REF}>
 
-<Sample id="describe" label="Aufruf und Ergebnis für Release N des Quick Starts" />
-
-Das Referenzmodell schreibt vier Verweise: je einen für Code, Parameter und Bestandsdaten, alle mit dem vollen Hash der Revision, und einen für die Version des Kerns der Engine. Mit `input_revision` nennt nur der Verweis der Bestandsdaten die andere Revision; so beschreibt eine Regression den Stand N+1 auf den Bestandsdaten von Release N:
-
-<Sample id="describe-input" label="Aufruf und Ergebnis mit input_revision" />
+Das Referenzmodell schreibt vier Verweise: je einen für Code, Parameter und Bestandsdaten, alle mit dem vollen Hash der Revision, und einen für die Version des Kerns der Engine. Mit `input_revision` nennt nur der Verweis der Bestandsdaten die andere Revision; so beschreibt eine Regression den Stand N+1 auf den Bestandsdaten von Release N.
 
 <CodeExcerpt id="describe-release">
   <p slot="caption">Die drei Zeilen von `describe`: die Optionen prüfen, den vollen Hash der Revision finden und daraus die Verweise bilden.</p>
@@ -352,8 +354,6 @@ Nichts. Die Operation endet ohne Fehler, wenn die Beschreibung einen Stand der S
 </Part>
 
 <Fold summary={REF}>
-
-<Sample id="resolve" label="Aufruf und Ergebnis" />
 
 <CodeExcerpt id="resolve-release">
   <p slot="caption">`resolve` des Referenzmodells ruft `_locate` auf und gibt nichts zurück.</p>
@@ -390,8 +390,6 @@ Eine Zeichenkette: die Kennung der Revision, aus der das Release seine Bestandsd
 </Part>
 
 <Fold summary={REF}>
-
-<Sample id="input_revision" label="Aufruf und Ergebnis für Release N" />
 
 <CodeExcerpt id="input-revision">
   <p slot="caption">Das Referenzmodell liest die Revision aus dem Verweis der Bestandsdaten.</p>
@@ -480,8 +478,6 @@ Das geöffnete Release: ein Objekt Ihrer zweiten Klasse (Schritt 4).
 
 <Fold summary={REF}>
 
-<Sample id="open" label="Was open bei einem Stand einer Suche erhält: eine eingeschaltete Revision, festgehaltene Bestandsdaten" />
-
 <CodeExcerpt id="open-foreign">
   <p slot="caption">Zuerst lehnt das Referenzmodell eine Revision aus einer anderen Versionsgeschichte ab.</p>
 </CodeExcerpt>
@@ -533,7 +529,9 @@ Einen Namen, den die fachliche Beschreibung der Stufe erklärt. Zwei Läufe lass
 
 <Fold summary={REF}>
 
-<Sample id="time_basis" label="Der Wert beim Referenzmodell" />
+<CodeExcerpt id="session-attributes">
+  <p slot="caption">Die beiden Attribute des geöffneten Release des Referenzmodells.</p>
+</CodeExcerpt>
 
 </Fold>
 
@@ -550,12 +548,6 @@ Eine Liste von Paaren `(Name, Einheit)`. Jeder Name muss einer der Namen sein, d
 </Part>
 
 <Fold summary={REF}>
-
-<Sample id="quantities" label="Der Wert beim Referenzmodell" />
-
-<CodeExcerpt id="session-attributes">
-  <p slot="caption">Die beiden Attribute des geöffneten Release des Referenzmodells.</p>
-</CodeExcerpt>
 
 <CodeExcerpt id="quantities">
   <p slot="caption">Die Größen des Referenzmodells: Name, Einheit und woher die Anbindung jede aus dem Modell liest. Namen und Einheiten werden zu `quantities` des geöffneten Release, in dieser Reihenfolge.</p>
@@ -574,8 +566,6 @@ Eine Liste von Zeichenketten: die öffentliche Kennung jedes Modellpunkts des Re
 </Part>
 
 <Fold summary={REF}>
-
-<Sample id="model_point_ids" label="Aufruf und Ergebnis für Release N: 350 Kennungen" />
 
 <CodeExcerpt id="session-questions">
   <p slot="caption">Die Kennungen kommen aus der Tabelle der Modellpunkte des Modells; die Projektion eines Modellpunkts wird über seine Kennung nachgeschlagen.</p>
@@ -607,8 +597,6 @@ Eine Liste mit einem Eintrag je Periode des Modellpunkts. Jeder Eintrag ist ein 
 
 <Fold summary={REF}>
 
-<Sample id="project" label="Aufruf und Ergebnis für Release N: 300 Perioden mit je 10 Werten" />
-
 <CodeExcerpt id="project-index">
   <p slot="caption">Die Projektion eines Modellpunkts im Referenzmodell: das Ergebnis des Modells rechnen, die eingebauten Prüfungen des Modells auswerten und je Periode die Werte in der Reihenfolge der Größen zusammenstellen. Ein Fehler oder eine Prüfung, die falsch ist, wird zu `ModelPointFailure`.</p>
 </CodeExcerpt>
@@ -629,8 +617,6 @@ Eine Liste mit einem `dict` je Parameter des Release, in der Form, in der der Na
 </Part>
 
 <Fold summary={REF}>
-
-<Sample id="parameters" label="Aufruf und Ergebnis für Release N: 33 Parameter" />
 
 <CodeExcerpt id="parameters" unindexed>
   <p slot="caption">Das Referenzmodell sammelt die einzelnen Werte des Modells und seine Tabellen und gibt sie nach Namen sortiert zurück.</p>
@@ -658,10 +644,8 @@ Eine Liste mit einem Eintrag je Kennung, in der übergebenen Reihenfolge: die Pe
 
 <Fold summary={REF}>
 
-<Sample id="project_many" label="Aufruf und Ergebnis für zwei Modellpunkte" />
-
 <CodeExcerpt id="project-many">
-  <p slot="caption">Beide optionalen Operationen des Referenzmodells verteilen die Modellpunkte auf die Arbeitsprozesse.</p>
+  <p slot="caption">`project_many` des Referenzmodells verteilt die Modellpunkte auf die Arbeitsprozesse.</p>
 </CodeExcerpt>
 
 </Fold>
@@ -694,7 +678,9 @@ Werten Sie dabei keine Prüfung des Modells aus: Ein Modellpunkt schlägt nur fe
 
 <Fold summary={REF}>
 
-<Sample id="project_target" label="Aufruf und Ergebnis: der Bruttobeitrag zweier Modellpunkte in den Projektionsperioden 0 und 1" />
+<CodeExcerpt id="project-target">
+  <p slot="caption">`project_target` des Referenzmodells verteilt die Modellpunkte wie `project_many` auf die Arbeitsprozesse und rechnet je Modellpunkt nur die Werte des Ziels.</p>
+</CodeExcerpt>
 
 </Fold>
 
@@ -755,8 +741,6 @@ Jede Revision ist ein `Revision(id, message, classes)`: ihre vollständige Kennu
 
 <Fold summary={REF}>
 
-<Sample id="history" label="Das Ergebnis für Release N und den Stand N+1: 32 Revisionen" />
-
 <CodeExcerpt id="history-revisions">
   <p slot="caption">Das Ende von `history` des Referenzmodells: die Revisionen nach der älteren, die älteste zuerst, jede mit ihrer Nachricht und mit den Einordnungen der Pfade, die sie gegenüber der Revision vor ihr berührt.</p>
 </CodeExcerpt>
@@ -795,8 +779,6 @@ Die Beschreibung des Release für den Stand nach `revision`, in der Form von `de
 </Part>
 
 <Fold summary={REF}>
-
-<Sample id="state_release" label="Aufruf und Ergebnis: der Stand nach der ersten Revision, mit den Bestandsdaten von Release N" />
 
 <CodeExcerpt id="state-release">
   <p slot="caption">Die Zeilen von `state_release`: Der Stand ist der der Revision, und die Bestandsdaten bleiben die des aufgezeichneten Release, wenn sie festgehalten werden.</p>

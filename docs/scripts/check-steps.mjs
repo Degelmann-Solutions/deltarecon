@@ -138,10 +138,11 @@ const stepPages = {
     switches: ['first-run'],
     // The number of code excerpts in each step that holds one; a page
     // without `excerpts` must hold none.
-    excerpts: { class: 2, releases: 5, open: 3, session: 6, history: 3 },
+    excerpts: { class: 2, releases: 5, open: 3, session: 7, history: 3 },
     // A code block that is no command: its step and its name per language.
     // A page without `documents` must hold none.
     documents: [
+      { step: 'class', en: 'Skeleton of an adapter', de: 'Gerüst eines Adapters' },
       { step: 'first-run', en: 'Compare request, smallest example', de: 'Vergleichsanfrage, kleinstes Beispiel' },
     ],
     closing: {
@@ -423,7 +424,7 @@ async function checkRegions(page, name, entry, expected, cards) {
   const w = words[entry.lang];
   const regions = await page.evaluate(() =>
     // The code of an excerpt is checked with its figure (checkExcerpts).
-    [...document.querySelectorAll('main pre')].filter((block) => !block.closest('[data-code-excerpt], [data-signature], [data-sample]')).map((block) => ({
+    [...document.querySelectorAll('main pre')].filter((block) => !block.closest('[data-code-excerpt], [data-signature]')).map((block) => ({
       step: block.closest('[data-step]')?.id,
       part: block.closest('[data-platform-part]')?.dataset.platformPart,
       terminal: block.closest('[data-terminal]') !== null,
@@ -966,8 +967,10 @@ async function checkCopy(browser, origin, entry, expected, cards) {
           ...(expected.terminal.includes(step) ? [step] : []),
         ])
       : [...withCommand, ...expected.terminal];
-    // A code block that is no command stands after the commands of its page.
+    // A code block that is no command stands in its step, after the commands
+    // of that step; the documents are named in the order of the page.
     steps.push(...expected.documents.map((entry) => entry.step));
+    steps.sort((first, second) => expected.anchors.indexOf(first) - expected.anchors.indexOf(second));
     let documents = 0;
     expect(
       buttons.map((button) => button.step).join() === steps.join(),

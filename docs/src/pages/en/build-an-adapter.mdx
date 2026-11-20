@@ -26,11 +26,11 @@ import PlatformPart from '../../components/PlatformPart.astro';
 import PlatformSwitch from '../../components/PlatformSwitch.astro';
 import Row from '../../components/Row.astro';
 import RowList from '../../components/RowList.astro';
-import Sample from '../../components/Sample.astro';
 import StepCard from '../../components/StepCard.astro';
 import StepFigure from '../../components/StepFigure.astro';
 import Steps from '../../components/Steps.astro';
 import Term from '../../components/Term.astro';
+import { skeleton, skeletonFile, skeletonSelection } from '../../adapterSkeleton';
 import { findPage, pageAddress } from '../../site';
 
 export const singleCommands = findPage('single-commands');
@@ -88,7 +88,7 @@ Your connection, the <Term id="adapter">adapter</Term>, is a {cls} in a Python m
 
 Your module needs two <span data-no-term>classes</span>: that of the <Term id="engine">engine</Term>, with four statements and seven operations (steps 1 to 3 and 5), and a small one for an opened <Term id="release">release</Term> (step 4).
 
-This page goes through each part on its own. For each part you see its signature from the protocol, what DeltaRecon hands to you, what you give back and which errors you report. A part to unfold shows how the connection of the <Term id="reference-model">reference model</Term> does it: with lines of `degelmann/deltarecon/engines/reference_model.py` and with the result of a call of the reference model.
+This page goes through each part on its own. For each part you see its signature from the protocol, what DeltaRecon hands to you, what you give back and which errors you report. A part to unfold shows how the connection of the <Term id="reference-model">reference model</Term> does it, with lines of `degelmann/deltarecon/engines/reference_model.py`.
 
 <StepFigure slot="figure">
   <FileList
@@ -102,6 +102,16 @@ This page goes through each part on its own. For each part you see its signature
 </StepFigure>
 
 <div slot="wide" class="step-parts">
+
+<div class="prose-links">
+
+Begin with this skeleton. It holds both {cls}es with every part of the protocol; each operation is still to be written and raises `NotImplementedError` until then. Save it as <code translate="no">{skeletonFile}</code> in a folder of your choice; in step 6 you then name <code translate="no">{skeletonSelection}</code>. The names of the two {cls}es and of the file are a free choice.
+
+<CodeBlock lines={skeleton('en')} label="Skeleton of an adapter" />
+
+The cards below go through the skeleton from top to bottom, in the order of the steps.
+
+</div>
 
 <Member name="Call the class" code="__init__" signature="constructor">
 
@@ -120,8 +130,6 @@ Keep the number when your engine can project model points in several processes. 
 </Part>
 
 <Fold summary={REF}>
-
-<Sample id="constructor" label="The three calls: without --workers, with --workers 4, for request and derive" />
 
 <CodeExcerpt id="constructor">
   <p slot="caption">The reference model keeps the number. Without an argument `worker_count` takes the number that the variable `DELTARECON_WORKERS` names, else one process per processor.</p>
@@ -152,7 +160,9 @@ DeltaRecon accepts a request only for a stage named here. It checks the names of
 
 <Fold summary={REF}>
 
-<Sample id="stages" label="The value at the reference model" />
+<CodeExcerpt id="class-statements">
+  <p slot="caption">The four statements of the reference model: one stage with its domain reference and its quantities; two kinds of change, a text patch and a <Term id="revision">revision</Term>; the three kinds of reference that one revision fixes, namely code, parameters and <Term id="input-data">input data</Term>; and the input data as the one kind it can hold.</p>
+</CodeExcerpt>
 
 The reference model offers one stage, `liability_cashflow`. Its domain reference is the file `contracts/v3/domain/liability_cashflow.md` of the repository.
 
@@ -166,7 +176,7 @@ An attribute of the {cls}: a set of names.
 
 <Part label={SET}>
 
-- `revision`, when your engine can apply a <Term id="revision">revision</Term> of its own <Term id="history">history</Term>. `walk` and `search` need it: they compute each <Term id="state">state</Term> as a release with enabled revisions.
+- `revision`, when your engine can apply a revision of its own <Term id="history">history</Term>. `walk` and `search` need it: they compute each <Term id="state">state</Term> as a release with enabled revisions.
 - `text_patch`, when it can apply a text patch that a <Term id="change-manifest">change manifest</Term> brings along as a file.
 
 </Part>
@@ -179,7 +189,7 @@ Every enabled change that `open` is given (step 3) is of a kind that stands here
 
 <Fold summary={REF}>
 
-<Sample id="realisations" label="The value at the reference model" />
+The reference model names both kinds, `text_patch` and `revision`. The line stands in the excerpt at `stages`.
 
 </Fold>
 
@@ -191,13 +201,13 @@ An attribute of the {cls}: the kinds of reference of a release that one revision
 
 <Part label={SET}>
 
-The names of the kinds, as they stand in a release identity (step 2, `describe`). For the reference model one revision fixes the code (`code_state`), the parameters (`parameter_set`) and the <Term id="input-data">input data</Term> (`input_data`).
+The names of the kinds, as they stand in a release identity (step 2, `describe`). For the reference model one revision fixes the code (`code_state`), the parameters (`parameter_set`) and the input data (`input_data`).
 
 </Part>
 
 <Fold summary={REF}>
 
-<Sample id="determines" label="The value at the reference model" />
+The reference model names the three kinds `code_state`, `parameter_set` and `input_data`. The line stands in the excerpt at `stages`.
 
 </Fold>
 
@@ -222,11 +232,7 @@ A <Term id="regression">regression</Term> computes the newer revision on the inp
 
 <Fold summary={REF}>
 
-<Sample id="holdable" label="The value at the reference model" />
-
-<CodeExcerpt id="class-statements">
-  <p slot="caption">The four statements of the reference model: one stage with its domain reference and its quantities; two kinds of change, a text patch and a revision; the three kinds of reference that one revision fixes, namely code, parameters and input data; and the input data as the one kind it can hold.</p>
-</CodeExcerpt>
+The reference model can hold the input data: `input_data` with the class `data`, the model point table. The line stands in the excerpt at `stages`.
 
 </Fold>
 
@@ -313,11 +319,7 @@ A `dict` with two keys: `label`, the label given, and `references`, a list of re
 
 <Fold summary={REF}>
 
-<Sample id="describe" label="Call and result for release N of the quick start" />
-
-The reference model writes four references: one each for code, parameters and input data, all with the full hash of the revision, and one for the version of the core of the engine. With `input_revision` only the reference of the input data names the other revision; that is how a regression describes the state N+1 on the input data of release N:
-
-<Sample id="describe-input" label="Call and result with input_revision" />
+The reference model writes four references: one each for code, parameters and input data, all with the full hash of the revision, and one for the version of the core of the engine. With `input_revision` only the reference of the input data names the other revision; that is how a regression describes the state N+1 on the input data of release N.
 
 <CodeExcerpt id="describe-release">
   <p slot="caption">The three lines of `describe`: check the options, find the full hash of the revision, and build the references from it.</p>
@@ -352,8 +354,6 @@ Nothing. The operation ends without an error when the release identity names a s
 </Part>
 
 <Fold summary={REF}>
-
-<Sample id="resolve" label="Call and result" />
 
 <CodeExcerpt id="resolve-release">
   <p slot="caption">`resolve` of the reference model calls `_locate` and gives nothing back.</p>
@@ -390,8 +390,6 @@ A string: the identifier of the revision that the release takes its input data f
 </Part>
 
 <Fold summary={REF}>
-
-<Sample id="input_revision" label="Call and result for release N" />
 
 <CodeExcerpt id="input-revision">
   <p slot="caption">The reference model reads the revision from the reference of the input data.</p>
@@ -480,8 +478,6 @@ The opened release: an object of your second {cls} (step 4).
 
 <Fold summary={REF}>
 
-<Sample id="open" label="What open is given for one state of a search: one enabled revision, input data held" />
-
 <CodeExcerpt id="open-foreign">
   <p slot="caption">First the reference model refuses a revision of another history.</p>
 </CodeExcerpt>
@@ -533,7 +529,9 @@ A name that the domain reference of the stage explains. Two runs can be compared
 
 <Fold summary={REF}>
 
-<Sample id="time_basis" label="The value at the reference model" />
+<CodeExcerpt id="session-attributes">
+  <p slot="caption">The two attributes of the opened release of the reference model.</p>
+</CodeExcerpt>
 
 </Fold>
 
@@ -550,12 +548,6 @@ A list of pairs `(name, unit)`. Each name must be one of the names that your eng
 </Part>
 
 <Fold summary={REF}>
-
-<Sample id="quantities" label="The value at the reference model" />
-
-<CodeExcerpt id="session-attributes">
-  <p slot="caption">The two attributes of the opened release of the reference model.</p>
-</CodeExcerpt>
 
 <CodeExcerpt id="quantities">
   <p slot="caption">The quantities of the reference model: name, unit, and where the connection reads each from the model. Names and units become `quantities` of the opened release, in this order.</p>
@@ -574,8 +566,6 @@ A list of strings: the public id of every model point of the release, in the ord
 </Part>
 
 <Fold summary={REF}>
-
-<Sample id="model_point_ids" label="Call and result for release N: 350 ids" />
 
 <CodeExcerpt id="session-questions">
   <p slot="caption">The ids come from the model point table of the model; the projection of a model point is looked up by its id.</p>
@@ -607,8 +597,6 @@ A list with one entry per period of the model point. Each entry is a pair: the n
 
 <Fold summary={REF}>
 
-<Sample id="project" label="Call and result for release N: 300 periods with 10 values each" />
-
 <CodeExcerpt id="project-index">
   <p slot="caption">The projection of one model point in the reference model: compute the result of the model, evaluate the built-in checks of the model, and put together the values of each period in the order of the quantities. An error, or a check that is false, becomes a `ModelPointFailure`.</p>
 </CodeExcerpt>
@@ -629,8 +617,6 @@ A list with one `dict` per parameter of the release, in the form in which the re
 </Part>
 
 <Fold summary={REF}>
-
-<Sample id="parameters" label="Call and result for release N: 33 parameters" />
 
 <CodeExcerpt id="parameters" unindexed>
   <p slot="caption">The reference model collects the single values of the model and its tables and gives them back sorted by name.</p>
@@ -658,10 +644,8 @@ A list with one entry per id, in the order given: the periods as `project` gives
 
 <Fold summary={REF}>
 
-<Sample id="project_many" label="Call and result for two model points" />
-
 <CodeExcerpt id="project-many">
-  <p slot="caption">Both optional operations of the reference model spread the model points over the worker processes.</p>
+  <p slot="caption">`project_many` of the reference model spreads the model points over the worker processes.</p>
 </CodeExcerpt>
 
 </Fold>
@@ -694,7 +678,9 @@ Evaluate no check of the model here: a model point fails only when a value of th
 
 <Fold summary={REF}>
 
-<Sample id="project_target" label="Call and result: the Bruttobeitrag of two model points in the projection periods 0 and 1" />
+<CodeExcerpt id="project-target">
+  <p slot="caption">`project_target` of the reference model spreads the model points over the worker processes as `project_many` does, and computes for each model point the values of the target alone.</p>
+</CodeExcerpt>
 
 </Fold>
 
@@ -755,8 +741,6 @@ Each revision is a `Revision(id, message, classes)`: its full identifier; its me
 
 <Fold summary={REF}>
 
-<Sample id="history" label="The result for release N and the state N+1: 32 revisions" />
-
 <CodeExcerpt id="history-revisions">
   <p slot="caption">The end of `history` of the reference model: the revisions after the older one, the oldest first, each with its message and with the classes of the paths it touches against the revision before it.</p>
 </CodeExcerpt>
@@ -795,8 +779,6 @@ The release identity of the state after `revision`, in the form of `describe`, a
 </Part>
 
 <Fold summary={REF}>
-
-<Sample id="state_release" label="Call and result: the state after the first revision, with the input data of release N" />
 
 <CodeExcerpt id="state-release">
   <p slot="caption">The lines of `state_release`: the state is that of the revision, and the input data stay those of the recorded release when they are held.</p>
