@@ -254,9 +254,22 @@ async function checkSize(page, name, part, selector, { height, width = 0, count 
   for (const box of found) {
     expect(
       box.height >= height && box.width >= width,
-      `${name}: ${part} ${box.description} is ${box.width} × ${box.height} px, below ${width || 24} × ${height}`,
+      `${name}: ${part} ${box.description} is ${box.width} × ${box.height} px, below ${width > 0 ? `${width} × ${height}` : `a height of ${height}`} px`,
     );
   }
+}
+
+/** The sizes of the controls of the top bar at desktop width. */
+async function checkTopBarSizes(page, name) {
+  await checkSize(page, name, 'the search field', 'body > header input[type="search"]', {
+    height: SIZES.fieldInBar,
+    count: 1,
+  });
+  await checkSize(page, name, 'the language links', 'body > header [role="group"] a', {
+    height: SIZES.language,
+    width: SIZES.language,
+    count: 2,
+  });
 }
 
 /**
@@ -886,6 +899,7 @@ async function checkNotFound(browser, origin, entry) {
     await checkHelpLink(page, name, entry.lang);
     await checkNoSidewaysScroll(page, name);
     await checkAxe(page, name);
+    await checkTopBarSizes(page, name);
     await checkFloor(page, name, entry.lang);
     await page.screenshot({ path: shot('desktop'), fullPage: true });
     await checkSkipLink(page, name);
@@ -989,15 +1003,7 @@ async function checkEntry(browser, origin, entry) {
       );
     }
     await checkAxe(page, name);
-    await checkSize(page, name, 'the search field', 'body > header input[type="search"]', {
-      height: SIZES.fieldInBar,
-      count: 1,
-    });
-    await checkSize(page, name, 'the language links', 'body > header [role="group"] a', {
-      height: SIZES.language,
-      width: SIZES.language,
-      count: 2,
-    });
+    await checkTopBarSizes(page, name);
     await checkFloor(page, name, entry.lang);
     if (entry.isRoot) await page.screenshot({ path: shot('desktop'), fullPage: true });
     await checkSkipLink(page, name);

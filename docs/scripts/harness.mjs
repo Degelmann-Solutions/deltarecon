@@ -270,7 +270,7 @@ function lostText() {
     if (!x && !y) continue;
     const box = element.getBoundingClientRect();
     if (box.width <= 1 && box.height <= 1) continue;
-    if (style.textOverflow === 'ellipsis' && style.whiteSpace === 'nowrap') continue;
+    if (element.matches('.search-hit-excerpt')) continue;
     const inner = {
       left: box.left + element.clientLeft,
       top: box.top + element.clientTop,
@@ -337,7 +337,8 @@ const FONT_SIZES_200 = { standard: 32, fixed: 26 };
  *     "Bruttobeitrag" carries its language, wherever it is not part of a
  *     command or of code (`code`, the command of a terminal session), which
  *     are marked as not to be translated and carry no language
- *     (EXPERIENCE.md, Accessibility Floor, Language).
+ *     (EXPERIENCE.md, Accessibility Floor, Language), and stands in no
+ *     attribute a reader hears (`aria-label`, `alt`, `title`).
  * `checkFloor` runs the last five in a row and leaves the page as it was;
  * with `resize: false` it leaves the text at 200 % out, which is looked at
  * at desktop width only.
@@ -409,11 +410,16 @@ export function pageChecks({ failures, expect }) {
         await expectNothingLost(page, `${name}, text at 200 %`);
       } catch (error) {
         failures.push(`${name}, text at 200 %: ${error.message}`);
-      } finally {
-        await session.send('Page.setFontSizes', { fontSizes: FONT_SIZES });
-        await settle(FONT_SIZES.standard).catch(() => {});
-        await session.detach();
       }
+      // The setting outlives the page; a restore that fails is named, since
+      // every check after it would run with text at 200 %.
+      try {
+        await session.send('Page.setFontSizes', { fontSizes: FONT_SIZES });
+        await settle(FONT_SIZES.standard);
+      } catch (error) {
+        failures.push(`${name}, text at 200 %: the font sizes were not set back: ${error.message}`);
+      }
+      await session.detach().catch(() => {});
     },
     async checkTextSpacing(page, name) {
       const style = await page.addStyleTag({ content: TEXT_SPACING });
@@ -445,6 +451,16 @@ export function pageChecks({ failures, expect }) {
           if (parent.closest('code, [data-terminal-command]')) continue;
           if (parent.closest('[lang]')?.getAttribute('lang') !== 'de') {
             found.push(parent.outerHTML.replace(/\s+/g, ' ').slice(0, 100));
+          }
+        }
+        // An attribute a reader hears cannot carry a second language.
+        for (const element of document.body.querySelectorAll('[aria-label], [alt], [title]')) {
+          if (
+            ['aria-label', 'alt', 'title'].some((attribute) =>
+              (element.getAttribute(attribute) ?? '').includes('Bruttobeitrag'),
+            )
+          ) {
+            found.push(`in an attribute of ${element.outerHTML.replace(/\s+/g, ' ').slice(0, 100)}`);
           }
         }
         return found;

@@ -195,8 +195,14 @@ async function checkReadable(page, name, withScript) {
   );
   const unseen = headings.filter((heading) => !heading.visible).map((heading) => heading.text);
   expect(unseen.length === 0, `${name}: headings that are not visible: ${unseen.join(' | ')}`);
-  const shown = new Set(await shownText(page));
-  const missing = withScript.filter((text) => !shown.has(text));
+  // Every occurrence counts: a piece that stands twice must stand twice.
+  const shown = new Map();
+  for (const text of await shownText(page)) shown.set(text, (shown.get(text) ?? 0) + 1);
+  const missing = withScript.filter((text) => {
+    const left = shown.get(text) ?? 0;
+    shown.set(text, left - 1);
+    return left <= 0;
+  });
   expect(
     missing.length === 0,
     `${name}: ${missing.length} pieces of text that the content shows with JavaScript on are missing: ${missing.slice(0, 5).join(' | ')}`,
@@ -432,6 +438,9 @@ async function checkEntry(browser, origin, entry) {
         (await page.getAttribute('html', 'data-platform')) === 'linux',
         `${name}: a click on "Linux" does not choose the platform`,
       );
+      // What only the parts of Linux show is content too.
+      const seen = new Set(withScript);
+      withScript.push(...(await shownText(page)).filter((text) => !seen.has(text)));
       await checkNoCookie(context, page, `${name}, Linux chosen`);
       await page.reload({ waitUntil: 'networkidle' });
       await checkNoCookie(context, page, `${name}, Linux chosen, loaded again`);
