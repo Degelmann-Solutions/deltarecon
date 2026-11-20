@@ -1,6 +1,6 @@
 // The page register of the documentation: the four stages, the ten pages in
 // path order with their names and addresses per language, the texts of the
-// page frame, of the Glossary and of the step components, `languageOf`, the language of a page
+// page frame, of the Glossary, of the step components and of the code excerpt, `languageOf`, the language of a page
 // address, and the page-not-found page, which stands outside the path
 // (`notFoundPage`, `onPath`). Chapter tree, page links, page head, language switch and head
 // data read it, and so do the Glossary (components/Glossary.astro), the
@@ -230,6 +230,10 @@ export interface FrameTexts {
   newTab: string;
   /** The Glossary: the link back to the page the reader came from. */
   backToPage: string;
+  /** The code excerpt: the words of its head row, "lines 871 to 876". */
+  excerptLine: string;
+  excerptLines: string;
+  excerptTo: string;
 }
 
 export const texts: Record<Lang, FrameTexts> = {
@@ -272,6 +276,9 @@ export const texts: Record<Lang, FrameTexts> = {
     copyFailed: 'Not copied. Please select the command by hand.',
     newTab: 'opens in a new tab',
     backToPage: 'Back to the previous page',
+    excerptLine: 'line',
+    excerptLines: 'lines',
+    excerptTo: 'to',
   },
   de: {
     documentation: 'DeltaRecon-Dokumentation',
@@ -312,6 +319,9 @@ export const texts: Record<Lang, FrameTexts> = {
     copyFailed: 'Nicht kopiert. Bitte markieren Sie den Befehl von Hand.',
     newTab: 'öffnet in neuem Tab',
     backToPage: 'Zurück zur vorherigen Seite',
+    excerptLine: 'Zeile',
+    excerptLines: 'Zeilen',
+    excerptTo: 'bis',
   },
 };
 

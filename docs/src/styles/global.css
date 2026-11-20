@@ -1951,6 +1951,191 @@
     }
   }
 
+  /* ---- Connection figure ---- */
+
+  /* Three outlined boxes on one trace, inside the frame of a wide figure
+     (the figure also carries `wide-figure`). Title and lower line of a box
+     are those of a flow box. As a stack the trace runs down from a box to
+     the next and its label stands beside it. */
+  .connection-boxes {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    row-gap: 30px;
+  }
+
+  .connection-box {
+    position: relative;
+    padding: 14px 16px;
+    border: 1.5px solid var(--color-navy);
+    border-radius: var(--radius-sm);
+    background: var(--color-bg);
+  }
+
+  /* The box the reader builds: dashed, a cue beside the words of the box. */
+  .connection-built {
+    border-style: dashed;
+  }
+
+  .connection-state {
+    color: var(--color-text-secondary);
+    font-family: var(--font-mono);
+    font-size: var(--text-label-small);
+    line-height: 1.5;
+  }
+
+  /* The trace to the next box, and the 7 px square it ends in. */
+  .connection-box:not(:last-child)::after {
+    content: "";
+    position: absolute;
+    top: calc(100% + 1.5px);
+    left: 24px;
+    height: 30px;
+    border-left: var(--spacing-trace-width) solid var(--color-teal-text);
+  }
+
+  .connection-box:not(:last-child)::before {
+    content: "";
+    position: absolute;
+    top: calc(100% + 24.5px);
+    left: calc(24px + var(--spacing-trace-width) / 2 - 3.5px);
+    border: 3.5px solid var(--color-teal-text);
+  }
+
+  /* The label of the first trace. */
+  .connection-label {
+    position: absolute;
+    top: calc(100% + 8.5px);
+    left: 38px;
+    color: var(--color-teal-text);
+    font-family: var(--font-mono);
+    font-size: var(--text-label-small);
+    line-height: 1.4;
+  }
+
+  /* From the tree breakpoint up the boxes stand side by side; the first
+     trace is the longer one and carries its label above it. */
+  @media (min-width: 80rem) {
+    .connection-boxes {
+      grid-template-columns: minmax(0, 1fr) 128px minmax(0, 1fr) 56px minmax(0, 1fr);
+      row-gap: 0;
+    }
+
+    .connection-box:nth-child(1) {
+      --connection-trace: 128px;
+      grid-column: 1;
+    }
+
+    .connection-box:nth-child(2) {
+      --connection-trace: 56px;
+      grid-column: 3;
+    }
+
+    .connection-box:nth-child(3) {
+      grid-column: 5;
+    }
+
+    .connection-box:not(:last-child)::after {
+      top: calc(50% - var(--spacing-trace-width) / 2);
+      left: calc(100% + 1.5px);
+      width: var(--connection-trace);
+      height: 0;
+      border-top: var(--spacing-trace-width) solid var(--color-teal-text);
+      border-left: 0;
+    }
+
+    .connection-box:not(:last-child)::before {
+      top: calc(50% - 3.5px);
+      left: calc(100% + var(--connection-trace) - 5.5px);
+    }
+
+    .connection-label {
+      top: calc(50% - 22px);
+      left: calc(100% + 1.5px);
+      width: 128px;
+      text-align: center;
+    }
+  }
+
+  /* ---- Yardstick box ---- */
+
+  /* The size of the connection of the reference model. Its navy border
+     marks it as the box that carries the main fact of its page. */
+  .yardstick {
+    max-width: var(--spacing-block-max);
+    margin-top: 20px;
+    padding: 16px;
+    border: 1px solid var(--color-navy);
+    border-radius: var(--radius-sm);
+  }
+
+  .yardstick-tag {
+    color: var(--color-teal-text);
+    font-family: var(--font-mono);
+    font-size: var(--text-label);
+    letter-spacing: var(--text-label--letter-spacing);
+    text-transform: uppercase;
+  }
+
+  .yardstick-size {
+    margin-top: 4px;
+    font-size: 1.375rem;
+    font-weight: 600;
+    line-height: 1.35;
+  }
+
+  .yardstick-text {
+    font-size: var(--text-body-small);
+    line-height: var(--text-body-small--line-height);
+  }
+
+  .yardstick-text > * {
+    margin-top: 8px;
+  }
+
+  @media (min-width: 37.5rem) {
+    .yardstick {
+      padding: 20px 24px;
+    }
+  }
+
+  /* ---- Code excerpt ---- */
+
+  /* A head row with the origin, the code below it without a top border, a
+     caption below. The code is a code block: uncoloured, it scrolls
+     sideways inside its box. */
+  .code-excerpt {
+    max-width: var(--spacing-block-max);
+    margin: 20px 0 0;
+  }
+
+  .code-excerpt-head {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    gap: 4px 16px;
+    padding: 8px 16px;
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-sm) var(--radius-sm) 0 0;
+    background: var(--color-bg-subtle);
+    color: var(--color-text-secondary);
+    font-family: var(--font-mono);
+    font-size: var(--text-label);
+    font-variant-ligatures: none;
+    overflow-wrap: anywhere;
+  }
+
+  .code-excerpt .code {
+    border-top: 0;
+    border-radius: 0 0 var(--radius-sm) var(--radius-sm);
+  }
+
+  .code-excerpt-caption {
+    margin-top: 10px;
+    color: var(--color-text-secondary);
+    font-size: var(--text-caption);
+    line-height: var(--text-caption--line-height);
+  }
+
   /* ---- Path block ---- */
 
   /* The four stages as in the chapter tree: a trace with square pads, both

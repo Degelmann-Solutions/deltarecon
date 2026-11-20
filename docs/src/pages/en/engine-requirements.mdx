@@ -2,6 +2,154 @@
 layout: ../../layouts/Page.astro
 lang: en
 page: engine-requirements
-lead: "This page is not written yet; it will list what your engine must provide."
+lead: "What a calculation engine must be able to give so that DeltaRecon can work with it, what you build to connect it, and how large that connection is for the reference model."
 description: "What your calculation engine must provide so that it can be connected to DeltaRecon, and what has to be built for the connection."
 ---
+import CodeExcerpt from '../../components/CodeExcerpt.astro';
+import ConnectionFigure from '../../components/ConnectionFigure.astro';
+import PlatformSwitch from '../../components/PlatformSwitch.astro';
+import Prose from '../../components/Prose.astro';
+import Row from '../../components/Row.astro';
+import RowList from '../../components/RowList.astro';
+import SectionHeading from '../../components/SectionHeading.astro';
+import SubHeading from '../../components/SubHeading.astro';
+import Term from '../../components/Term.astro';
+import YardstickBox from '../../components/YardstickBox.astro';
+import { files, inWords, lineCount } from '../../excerpts';
+import { findPage, pageAddress } from '../../site';
+
+export const adapterPage = findPage('build-an-adapter');
+// The number of lines of a file at the tag of the release, marked for
+// scripts/check-excerpts.mjs. The page types no such number.
+export const lines = (file) => <span data-lines-of={file}>{inWords(lineCount(file), 'en')}</span>;
+// The form of a command that names an engine; `<command>` and the other
+// words in angle brackets stand for what the reader puts in.
+export const form = {
+  windows: [String.raw`.\deltarecon.cmd <command> --engine <module>:<class> --engine-path <folder>`],
+  linux: ['./deltarecon <command> --engine <module>:<class> --engine-path <folder>'],
+};
+// Inline code of this page names members of the protocol, options, variables
+// and paths: none of it is to be translated.
+export const components = { code: (props) => <code translate="no" {...props} /> };
+
+<Prose>
+
+DeltaRecon does not calculate anything itself. It asks a calculation engine a fixed set of questions, the protocol, and works with the answers. To connect your engine you build one connection, the <Term id="adapter">adapter</Term>, which answers these questions for your engine. The adapter is a <span data-no-term>class</span> in Python. Your engine itself stays unchanged.
+
+For this, your engine must be able to give three things. For a release: its model points and the projection of each, with one <Term id="value">value</Term> per quantity and period, and its parameters. For two releases: the history between them as single <Term id="revision">revisions</Term>, each with what it touches: data, parameters or code. And for each revision of that history: the state of the model after it, so that DeltaRecon can have that state computed.
+
+The yardstick for the size of such a connection is the connection of the <Term id="reference-model">reference model</Term>, which is part of the package: one file of {lines(files.connection)} lines, comments and blank lines included.
+
+</Prose>
+
+<ConnectionFigure
+  trace="protocol"
+  boxes={[
+    { state: 'exists', title: 'DeltaRecon', sub: 'comparison · walk · search' },
+    { state: 'you build', title: 'Your connection', sub: 'the adapter, in Python', built: true },
+    { state: 'exists, unchanged', title: 'Your engine', sub: 'with the history of its releases' },
+  ]}
+>
+  <p slot="caption">Where the connection sits. DeltaRecon speaks through the protocol to your connection, and your connection speaks to your engine. The two boxes with a solid outline exist already; the box with the dashed outline, your connection, is what you build. Only the connection knows your engine: comparison, walk and search know no engine.</p>
+</ConnectionFigure>
+
+<SectionHeading id="answers">What your engine must be able to answer</SectionHeading>
+
+<Prose>
+
+For one release, opened for a run, the connection must be able to give:
+
+</Prose>
+
+<RowList>
+  <Row name="The ids of all model points" code="model_point_ids" member="Session">The public id of every model point of the release.</Row>
+  <Row name="A projection per model point" code="project" member="Session">The periods of one model point, with one value per quantity.</Row>
+  <Row name="The parameters" code="parameters" member="Session">The parameters of the release, in the form in which the <Term id="record">record</Term> of a run holds them.</Row>
+  <Row name="The time basis" code="time_basis" member="Session">The name of the time basis: what a period counts.</Row>
+  <Row name="The quantities" code="quantities" member="Session">Name and unit of each quantity, in the order of the result columns.</Row>
+</RowList>
+
+<SectionHeading id="to-build">What has to be built</SectionHeading>
+
+<Prose>
+
+One <span data-no-term>class</span> with four statements about itself and seven operations, and a second, small <span data-no-term>class</span> for an opened release. Each part is named here in plain words first; the name in the protocol follows.
+
+</Prose>
+
+<SubHeading>What the engine says about itself</SubHeading>
+
+<RowList>
+  <Row name="The stages it supports, with their quantities" code="stages" member="Engine">For each stage the domain reference, the text that says what its quantities mean, and the names of the quantities in the order of that text.</Row>
+  <Row name="The kinds of change it can apply" code="realisations" member="Engine">For example a revision of its own history.</Row>
+  <Row name="What one revision fixes" code="determines" member="Engine">The parts of a release that one revision determines. For the reference model these are the code, the parameters and the input data.</Row>
+  <Row name="What it can hold while revisions are applied" code="holdable" member="Engine">The parts of a release that can stay as the request names them while revisions are applied. For the reference model this is the input data.</Row>
+</RowList>
+
+<SubHeading>What the engine can do</SubHeading>
+
+<RowList>
+  <Row name="Find the folder of its histories" code="repositories_folder" member="Engine">The folder that holds what the engine restores a release from.</Row>
+  <Row name="Check that a release can be restored" code="resolve" member="Engine">Nothing is restored and nothing is written.</Row>
+  <Row name="Describe a release by its revision" code="describe" member="Engine">The complete set of references that names the state of a revision.</Row>
+  <Row name="Name the revision of the input data" code="input_revision" member="Engine">The revision that a recorded run takes its input data from.</Row>
+  <Row name="Open a release for a run" code="open" member="Engine">Restore the release, apply the enabled changes, and open it for reading.</Row>
+  <Row name="List the revisions between two releases" code="history" member="Engine">Each with its message and its <Term id="class">classes</Term>: data, parameter, code.</Row>
+  <Row name="Name the state after a revision" code="state_release" member="Engine">The release as the engine would record it after that revision.</Row>
+</RowList>
+
+<SubHeading>What an opened release can do</SubHeading>
+
+<RowList>
+  <Row name="Give the ids of its model points" code="model_point_ids" member="Session">As in the first list of this page.</Row>
+  <Row name="Project one model point" code="project" member="Session">It reports a model point that cannot be calculated as such.</Row>
+  <Row name="Give its parameters" code="parameters" member="Session">As in the first list of this page.</Row>
+  <Row name="Project several model points at once" code="project_many" member="Session" tag="optional">Without it DeltaRecon projects point by point.</Row>
+  <Row name="Project a target only" code="project_target" member="Session" tag="optional">Chosen quantities in chosen periods. Without it the engine cannot compute a run on a target alone, which a search with `--target-only` needs.</Row>
+</RowList>
+
+<SectionHeading id="size">How large is that?</SectionHeading>
+
+<YardstickBox tag="Yardstick" files={[files.connection]} unit="lines in one file">
+
+That is the connection of the reference model, `degelmann/deltarecon/engines/reference_model.py`, comments and blank lines included. It holds every part of the lists above for one stage and one model, and it is part of the package. The protocol itself is one file of {lines(files.protocol)} lines, `degelmann/deltarecon/protocol.py`.
+
+</YardstickBox>
+
+<Prose>
+
+The excerpt shows how the reference model answers the first two questions of an opened release.
+
+</Prose>
+
+<CodeExcerpt id="session-questions">
+  <p slot="caption">The ids come from the model point table of the model; the projection of one model point is looked up by its id.</p>
+</CodeExcerpt>
+
+<SectionHeading id="selection">How DeltaRecon finds your engine</SectionHeading>
+
+<Prose>
+
+Seven of the nine commands let you choose the engine: all but `compare`, which computes nothing, and `quickstart`, which always takes the reference model. Each of the seven takes the engine from one of three places, in this order:
+
+</Prose>
+
+<RowList>
+  <Row name="The option of the command" code="--engine <module>:<class>" selection>Names the module and, in it, the <span data-no-term>class</span> of your connection.</Row>
+  <Row name="The environment variable" code="DELTARECON_ENGINE" selection>Used when the command names no engine.</Row>
+  <Row name="Neither">DeltaRecon takes the reference model.</Row>
+</RowList>
+
+<Prose>
+
+`--engine-path <folder>` names the folder in which the module of your connection lies. Without `--engine`, the variable `DELTARECON_ENGINE_PATH` names that folder. The form of a command with both options:
+
+</Prose>
+
+<PlatformSwitch place="engine selection" windows={form.windows} linux={form.linux} />
+
+<Prose>
+
+The next page walks through these parts one by one: <a href={pageAddress(adapterPage, 'en')}>{adapterPage.name.en}</a>.
+
+</Prose>

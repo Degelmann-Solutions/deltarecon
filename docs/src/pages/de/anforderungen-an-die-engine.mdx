@@ -2,6 +2,155 @@
 layout: ../../layouts/Page.astro
 lang: de
 page: engine-requirements
-lead: "Diese Seite ist noch nicht geschrieben; sie wird aufführen, was Ihre Engine mitbringen muss."
+lead: "Was eine Rechen-Engine liefern können muss, damit DeltaRecon mit ihr arbeiten kann, was Sie für die Anbindung bauen und wie groß diese Anbindung beim Referenzmodell ist."
 description: "Was Ihre Rechen-Engine mitbringen muss, damit sie sich an DeltaRecon anbinden lässt, und was für die Anbindung zu bauen ist."
 ---
+import CodeExcerpt from '../../components/CodeExcerpt.astro';
+import ConnectionFigure from '../../components/ConnectionFigure.astro';
+import PlatformSwitch from '../../components/PlatformSwitch.astro';
+import Prose from '../../components/Prose.astro';
+import Row from '../../components/Row.astro';
+import RowList from '../../components/RowList.astro';
+import SectionHeading from '../../components/SectionHeading.astro';
+import SubHeading from '../../components/SubHeading.astro';
+import Term from '../../components/Term.astro';
+import YardstickBox from '../../components/YardstickBox.astro';
+import { files, inWords, lineCount } from '../../excerpts';
+import { findPage, pageAddress } from '../../site';
+
+export const adapterPage = findPage('build-an-adapter');
+// The number of lines of a file at the tag of the release, marked for
+// scripts/check-excerpts.mjs. The page types no such number.
+export const lines = (file) => <span data-lines-of={file}>{inWords(lineCount(file), 'de')}</span>;
+// The form of a command that names an engine; `<command>` and the other
+// words in angle brackets stand for what the reader puts in. They are the
+// words of the program and stay English.
+export const form = {
+  windows: [String.raw`.\deltarecon.cmd <command> --engine <module>:<class> --engine-path <folder>`],
+  linux: ['./deltarecon <command> --engine <module>:<class> --engine-path <folder>'],
+};
+// Inline code of this page names members of the protocol, options, variables
+// and paths: none of it is to be translated.
+export const components = { code: (props) => <code translate="no" {...props} /> };
+
+<Prose>
+
+DeltaRecon rechnet selbst nichts. Es stellt einer Rechen-Engine eine feste Reihe von Fragen, das Protokoll, und arbeitet mit den Antworten. Um Ihre Engine anzubinden, bauen Sie eine Anbindung, den <Term id="adapter">Adapter</Term>, der diese Fragen für Ihre Engine beantwortet. Der Adapter ist eine Klasse in Python. Ihre Engine selbst bleibt unverändert.
+
+Dafür muss Ihre Engine drei Dinge liefern können. Zu einem Release: seine Modellpunkte und die Projektion jedes Modellpunkts, mit einem <Term id="value">Wert</Term> je Größe und Periode, und seine Parameter. Zu zwei Releases: die Versionsgeschichte zwischen ihnen als einzelne <Term id="revision">Revisionen</Term>, jede mit dem, was sie berührt: Daten, Parameter oder Code. Und zu jeder Revision dieser Versionsgeschichte: den Stand des Modells nach ihr, damit DeltaRecon diesen Stand rechnen lassen kann.
+
+Der Maßstab für die Größe einer solchen Anbindung ist die Anbindung des <Term id="reference-model">Referenzmodells</Term>, die zum Paket gehört: eine Datei mit {lines(files.connection)} Zeilen, Kommentare und Leerzeilen mitgezählt.
+
+</Prose>
+
+<ConnectionFigure
+  trace="Protokoll"
+  boxes={[
+    { state: 'vorhanden', title: 'DeltaRecon', sub: 'vergleichen · jeden Stand rechnen · suchen' },
+    { state: 'bauen Sie', title: 'Ihre Anbindung', sub: 'der Adapter, in Python', built: true },
+    { state: 'vorhanden, unverändert', title: 'Ihre Engine', sub: 'mit der Versionsgeschichte ihrer Releases' },
+  ]}
+>
+  <p slot="caption">Wo die Anbindung sitzt. DeltaRecon spricht über das Protokoll mit Ihrer Anbindung, und Ihre Anbindung spricht mit Ihrer Engine. Die beiden Kästen mit durchgezogenem Rand gibt es schon; den Kasten mit gestricheltem Rand, Ihre Anbindung, bauen Sie. Nur die Anbindung kennt Ihre Engine: Das Vergleichen, das Rechnen jedes Stands und die Suche kennen keine Engine.</p>
+</ConnectionFigure>
+
+<SectionHeading id="answers">Was Ihre Engine beantworten können muss</SectionHeading>
+
+<Prose>
+
+Zu einem Release, das für einen Lauf geöffnet ist, muss die Anbindung liefern können:
+
+</Prose>
+
+<RowList>
+  <Row name="Die Kennungen aller Modellpunkte" code="model_point_ids" member="Session">Die öffentliche Kennung jedes Modellpunkts des Release.</Row>
+  <Row name="Eine Projektion je Modellpunkt" code="project" member="Session">Die Perioden eines Modellpunkts, mit einem Wert je Größe.</Row>
+  <Row name="Die Parameter" code="parameters" member="Session">Die Parameter des Release, in der Form, in der der <Term id="record">Nachweis</Term> eines Laufs sie enthält.</Row>
+  <Row name="Die Zeitbasis" code="time_basis" member="Session">Der Name der Zeitbasis: was eine Periode zählt.</Row>
+  <Row name="Die Größen" code="quantities" member="Session">Name und Einheit jeder Größe, in der Reihenfolge der Ergebnisspalten.</Row>
+</RowList>
+
+<SectionHeading id="to-build">Was zu bauen ist</SectionHeading>
+
+<Prose>
+
+Eine Klasse mit vier Angaben über sich selbst und sieben Operationen, und eine zweite, kleine Klasse für ein geöffnetes Release. Jedes Teil ist hier zuerst in einfachen Worten genannt; der Name im Protokoll folgt.
+
+</Prose>
+
+<SubHeading>Was die Engine über sich sagt</SubHeading>
+
+<RowList>
+  <Row name="Die Stufen, die sie anbietet, mit ihren Größen" code="stages" member="Engine">Je Stufe die fachliche Beschreibung, also der Text, der sagt, was ihre Größen bedeuten, und die Namen der Größen in der Reihenfolge dieses Textes.</Row>
+  <Row name="Die Arten von Änderungen, die sie anwenden kann" code="realisations" member="Engine">Zum Beispiel eine Revision ihrer eigenen Versionsgeschichte.</Row>
+  <Row name="Was eine Revision festlegt" code="determines" member="Engine">Die Teile eines Release, die eine Revision bestimmt. Beim Referenzmodell sind das der Code, die Parameter und die Bestandsdaten.</Row>
+  <Row name="Was sie festhalten kann, während Revisionen angewendet werden" code="holdable" member="Engine">Die Teile eines Release, die so bleiben können, wie die Anfrage sie nennt, während Revisionen angewendet werden. Beim Referenzmodell sind das die Bestandsdaten.</Row>
+</RowList>
+
+<SubHeading>Was die Engine kann</SubHeading>
+
+<RowList>
+  <Row name="Den Ordner ihrer Versionsgeschichten finden" code="repositories_folder" member="Engine">Der Ordner, der enthält, woraus die Engine ein Release wiederherstellt.</Row>
+  <Row name="Prüfen, ob sich ein Release wiederherstellen lässt" code="resolve" member="Engine">Dabei wird nichts wiederhergestellt und nichts geschrieben.</Row>
+  <Row name="Ein Release durch seine Revision beschreiben" code="describe" member="Engine">Der vollständige Satz von Verweisen, der den Stand einer Revision benennt.</Row>
+  <Row name="Die Revision der Bestandsdaten nennen" code="input_revision" member="Engine">Die Revision, aus der ein aufgezeichneter Lauf seine Bestandsdaten nimmt.</Row>
+  <Row name="Ein Release für einen Lauf öffnen" code="open" member="Engine">Das Release wiederherstellen, die eingeschalteten Änderungen anwenden und es zum Lesen öffnen.</Row>
+  <Row name="Die Revisionen zwischen zwei Releases auflisten" code="history" member="Engine">Jede mit ihrer Nachricht und ihren <Term id="class">Einordnungen</Term>: Daten, Parameter, Code.</Row>
+  <Row name="Den Stand nach einer Revision benennen" code="state_release" member="Engine">Das Release, wie die Engine es nach dieser Revision aufzeichnen würde.</Row>
+</RowList>
+
+<SubHeading>Was ein geöffnetes Release kann</SubHeading>
+
+<RowList>
+  <Row name="Die Kennungen seiner Modellpunkte liefern" code="model_point_ids" member="Session">Wie in der ersten Liste dieser Seite.</Row>
+  <Row name="Einen Modellpunkt projizieren" code="project" member="Session">Einen Modellpunkt, der sich nicht rechnen lässt, meldet es als solchen.</Row>
+  <Row name="Seine Parameter liefern" code="parameters" member="Session">Wie in der ersten Liste dieser Seite.</Row>
+  <Row name="Mehrere Modellpunkte auf einmal projizieren" code="project_many" member="Session" tag="optional">Ohne diese Operation projiziert DeltaRecon Modellpunkt für Modellpunkt.</Row>
+  <Row name="Nur ein Ziel projizieren" code="project_target" member="Session" tag="optional">Ausgewählte Größen in ausgewählten Perioden. Ohne diese Operation kann die Engine keinen Lauf nur auf einem Ziel rechnen, wie ihn eine Suche mit `--target-only` braucht.</Row>
+</RowList>
+
+<SectionHeading id="size">Wie groß ist das?</SectionHeading>
+
+<YardstickBox tag="Maßstab" files={[files.connection]} unit="Zeilen in einer Datei">
+
+Das ist die Anbindung des Referenzmodells, `degelmann/deltarecon/engines/reference_model.py`, Kommentare und Leerzeilen mitgezählt. Sie enthält jedes Teil der Listen oben für eine Stufe und ein Modell, und sie gehört zum Paket. Das Protokoll selbst ist eine Datei mit {lines(files.protocol)} Zeilen, `degelmann/deltarecon/protocol.py`.
+
+</YardstickBox>
+
+<Prose>
+
+Der Ausschnitt zeigt, wie das Referenzmodell die ersten beiden Fragen an ein geöffnetes Release beantwortet.
+
+</Prose>
+
+<CodeExcerpt id="session-questions">
+  <p slot="caption">Die Kennungen kommen aus der Tabelle der Modellpunkte des Modells; die Projektion eines Modellpunkts wird über seine Kennung nachgeschlagen.</p>
+</CodeExcerpt>
+
+<SectionHeading id="selection">Wie DeltaRecon Ihre Engine findet</SectionHeading>
+
+<Prose>
+
+Bei sieben der neun Befehle wählen Sie die Engine: bei allen außer `compare`, das nichts rechnet, und `quickstart`, das immer das Referenzmodell nimmt. Jeder der sieben nimmt die Engine von einer von drei Stellen, in dieser Reihenfolge:
+
+</Prose>
+
+<RowList>
+  <Row name="Die Option des Befehls" code="--engine <module>:<class>" selection>Nennt das Modul und darin die Klasse Ihrer Anbindung.</Row>
+  <Row name="Die Variable der Umgebung" code="DELTARECON_ENGINE" selection>Gilt, wenn der Befehl keine Engine nennt.</Row>
+  <Row name="Keines von beiden">DeltaRecon nimmt das Referenzmodell.</Row>
+</RowList>
+
+<Prose>
+
+`--engine-path <folder>` nennt den Ordner, in dem das Modul Ihrer Anbindung liegt. Ohne `--engine` nennt die Variable `DELTARECON_ENGINE_PATH` diesen Ordner. Die Form eines Befehls mit beiden Optionen:
+
+</Prose>
+
+<PlatformSwitch place="Auswahl der Engine" windows={form.windows} linux={form.linux} />
+
+<Prose>
+
+Die nächste Seite geht diese Teile der Reihe nach durch: <a href={pageAddress(adapterPage, 'de')}>{adapterPage.name.de}</a>.
+
+</Prose>

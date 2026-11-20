@@ -5,6 +5,13 @@
 //
 // `option` marks the row as the row of the option its `code` names
 // (`data-option`), for the release check (scripts/check-release.mjs).
+//
+// `member` marks the row as the row of a member of the protocol
+// (degelmann/deltarecon/protocol.py): `member="Session"` with
+// `code="project"` gives `data-member="Session.project"`. `selection` marks
+// the row of a name of the engine selection
+// (degelmann/deltarecon/engine_selection.py), the first word of its `code`.
+// scripts/check-excerpts.mjs holds both against the tag of the release.
 import { outputHtml, pageLanguage } from '../markup';
 
 interface Props {
@@ -16,19 +23,31 @@ interface Props {
   tag?: string;
   /** The row describes the option of a command that `code` names. */
   option?: boolean;
+  /** The class of the protocol that `code` is a member of. */
+  member?: 'Session' | 'Engine';
+  /** The row describes a name of the engine selection, the first word of `code`. */
+  selection?: boolean;
 }
 
-const { name, code, tag, option } = Astro.props;
+const { name, code, tag, option, member, selection } = Astro.props;
 const lang = pageLanguage(Astro.url.pathname);
 if (option && !code) {
   throw new Error(`${Astro.url.pathname}: the row "${name}" is marked as an option and names none in "code".`);
+}
+if ((member || selection) && !code) {
+  throw new Error(
+    `${Astro.url.pathname}: the row "${name}" is marked as a member of the protocol or a name of the engine selection and names none in "code".`,
+  );
+}
+if (member && selection) {
+  throw new Error(`${Astro.url.pathname}: the row "${name}" is marked with both "member" and "selection".`);
 }
 ---
 
 <li class="row" data-row>
   <div class="row-text">
     <p class="row-name">
-      <span set:html={outputHtml(name, lang)} />{code && <code translate="no" data-option={option ? code : undefined}>{code}</code>}
+      <span set:html={outputHtml(name, lang)} />{code && <code translate="no" data-option={option ? code : undefined} data-member={member ? `${member}.${code}` : undefined} data-selection={selection ? '' : undefined}>{code}</code>}
     </p>
     {Astro.slots.has('default') && <p class="row-line prose-links"><slot /></p>}
   </div>
