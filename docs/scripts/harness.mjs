@@ -218,6 +218,7 @@ export const pageWords = {
   'how-deltarecon-works': { en: 'middle', de: 'Durchlauf' },
   'single-commands': { en: 'launcher', de: 'Umgebungsvariable' },
   'engine-requirements': { en: 'yardstick', de: 'Maßstab' },
+  'build-an-adapter': { en: 'lookup', de: 'Kleinbuchstaben' },
 };
 
 /**

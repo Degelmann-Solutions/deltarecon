@@ -18,6 +18,10 @@
 //     `selection`): the first word of its code name stands in
 //     degelmann/deltarecon/engine_selection.py at the tag. On a page that
 //     holds such rows, every code name of a row carries one of the two marks;
+//   - a page named as complete (`COMPLETE`, the page that walks through the
+//     protocol): every member of `Engine` and of `Session` at the tag, the
+//     operations their comments describe included, has exactly one row
+//     marked as that member;
 //   - a number of lines (`data-lines-of`) and the yardstick box
 //     (YardstickBox.astro): the number is that of the file at the tag, for
 //     the box the sum over its files, each of which the box names as inline
@@ -27,8 +31,9 @@
 //
 // First it proves itself on texts it sets itself: an altered excerpt, a
 // range that does not hold the code, a member the protocol does not hold, a
-// file that differs on `main`, a wrong number of lines and a tag the clone
-// does not hold must each fail and name what the message is to name.
+// member a complete page leaves out or names twice, a file that differs on
+// `main`, a wrong number of lines and a tag the clone does not hold must each
+// fail and name what the message is to name.
 //
 // Exits non-zero and names page and part of every failed expectation.
 import { execFileSync } from 'node:child_process';
@@ -39,6 +44,13 @@ import { expectations, loadPages, loadRelease, root, startPreview } from './harn
 const PROTOCOL = 'degelmann/deltarecon/protocol.py';
 const SELECTION = 'degelmann/deltarecon/engine_selection.py';
 const MAIN = 'main';
+/** The classes of the protocol an engine implements. */
+const CLASSES = ['Engine', 'Session'];
+/**
+ * The pages, by their id in the register, that walk through the protocol:
+ * each names every member of the classes above exactly once.
+ */
+const COMPLETE = ['build-an-adapter'];
 const repository = path.resolve(root, '..');
 
 const { failures, expect, report } = expectations('check-excerpts');
@@ -165,6 +177,30 @@ function memberFaults(found, tag, protocol) {
   return [`${which}: ${name} is no member of ${className} in ${PROTOCOL} at ${tag}`];
 }
 
+/**
+ * What a page that walks through the protocol leaves out or names twice.
+ * `members` are its rows marked as members, as `Class.name`.
+ */
+function completenessFaults(members, tag, protocol) {
+  const faults = [];
+  for (const className of CLASSES) {
+    const held = classMembers(protocol, className);
+    if (!held) {
+      faults.push(`${PROTOCOL} holds no class ${className} at ${tag}`);
+      continue;
+    }
+    for (const name of [...held.declared, ...held.described]) {
+      const rows = members.filter((member) => member === `${className}.${name}`).length;
+      if (rows === 0) {
+        faults.push(`no row names ${className}.${name}, a member of the protocol in ${PROTOCOL} at ${tag}; the page is to name every member`);
+      } else if (rows > 1) {
+        faults.push(`${rows} rows name ${className}.${name}; the page is to name every member of the protocol once`);
+      }
+    }
+  }
+  return faults;
+}
+
 /** What is wrong with a row marked as a name of the engine selection. */
 function selectionFaults(shown, tag, selection) {
   const [name] = shown.split(/\s+/);
@@ -243,6 +279,10 @@ function proveItself() {
     ['a class the protocol does not hold', memberFaults(member('Adapter.open'), tag, text), ['no class Adapter']],
     ['an operation the comment describes, on a row with a tag', memberFaults(member('Session.project_many', true), tag, text), null],
     ['an operation the comment describes, on a row without a tag', memberFaults(member('Session.project_many'), tag, text), ['project_many', 'no tag']],
+    ['a page that names every member once', completenessFaults(['Session.time_basis', 'Session.project', 'Session.project_many', 'Engine.stages', 'Engine.open'], tag, text), null],
+    ['a page that leaves a member out', completenessFaults(['Session.time_basis', 'Session.project', 'Session.project_many', 'Engine.stages'], tag, text), ['Engine.open', 'no row']],
+    ['a page that leaves out an operation the comment describes', completenessFaults(['Session.time_basis', 'Session.project', 'Engine.stages', 'Engine.open'], tag, text), ['Session.project_many', 'no row']],
+    ['a page that names a member twice', completenessFaults(['Session.time_basis', 'Session.project', 'Session.project', 'Session.project_many', 'Engine.stages', 'Engine.open'], tag, text), ['2 rows', 'Session.project;']],
     ['a name of the engine selection', selectionFaults('--engine <module>:<class>', tag, ['# ``--engine <module>:<class>``, else']), null],
     ['a name the engine selection does not hold', selectionFaults('--engine', tag, ['# ``--engine-path`` names a folder']), ['--engine']],
     ['the number of lines of a file', countFaults({ file, shown: String(text.length) }, tag, source), null],
@@ -307,7 +347,7 @@ function readPage(page) {
 const proved = proveItself();
 const release = await loadRelease();
 const tag = `v${release}`;
-const totals = { pages: 0, excerpts: 0, members: 0, selections: 0, counts: 0, yardsticks: 0 };
+const totals = { pages: 0, excerpts: 0, members: 0, selections: 0, counts: 0, yardsticks: 0, complete: 0 };
 
 const missing = tagFault(tag, (ref) => git('rev-parse', '--quiet', '--verify', `${ref}^{commit}`) !== null);
 if (missing) {
@@ -355,6 +395,10 @@ if (missing) {
           faults.push(`the row of "${name}" is marked neither as a member of the protocol nor as a name of the engine selection (Row with "member" or "selection")`);
         }
       }
+      if (protocol && COMPLETE.includes(entry.id)) {
+        faults.push(...completenessFaults(found.members.map((member) => member.member), tag, protocol));
+        totals.complete += 1;
+      }
       failures.push(...faults.map((fault) => `${entry.address}: ${fault}`));
       const held = found.excerpts.length + found.members.length + found.selections.length + found.counts.length + found.yardsticks.length;
       if (held > 0) totals.pages += 1;
@@ -367,6 +411,10 @@ if (missing) {
     await browser?.close();
     stop();
   }
+  // A page named as complete that the register does not hold is not checked.
+  for (const id of COMPLETE) {
+    expect(pages.some((entry) => entry.id === id), `the page "${id}", named as complete (COMPLETE), is no page of the register`);
+  }
   // A check that finds nothing to hold proves nothing.
   expect(
     totals.excerpts > 0 && totals.members > 0 && totals.yardsticks > 0,
@@ -375,5 +423,5 @@ if (missing) {
 }
 
 report(
-  `${proved} cases on its own texts; at ${tag}: ${totals.excerpts} excerpts, ${totals.members} members of the protocol, ${totals.selections} names of the engine selection, ${totals.counts} numbers of lines and ${totals.yardsticks} yardstick boxes on ${totals.pages} pages; ${PROTOCOL} and ${SELECTION} are the same on ${MAIN}`,
+  `${proved} cases on its own texts; at ${tag}: ${totals.excerpts} excerpts, ${totals.members} members of the protocol, ${totals.selections} names of the engine selection, ${totals.counts} numbers of lines and ${totals.yardsticks} yardstick boxes on ${totals.pages} pages; ${totals.complete} pages name every member of ${CLASSES.join(' and ')} once; ${PROTOCOL} and ${SELECTION} are the same on ${MAIN}`,
 );

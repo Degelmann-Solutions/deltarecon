@@ -529,6 +529,12 @@
     margin-top: 12px;
   }
 
+  /* Several blocks in the wide part of a card (row list, code excerpt,
+     callout, text, code block), one below the other. */
+  .step-wide > .step-parts > * + * {
+    margin-top: 16px;
+  }
+
   /* The path end: a square on the trace axis, the closing line. */
   .path-end {
     position: relative;
@@ -2122,6 +2128,11 @@
     font-size: var(--text-label);
     font-variant-ligatures: none;
     overflow-wrap: anywhere;
+  }
+
+  /* In a step card the excerpt takes the full card width. */
+  .step-wide .code-excerpt {
+    max-width: none;
   }
 
   .code-excerpt .code {
