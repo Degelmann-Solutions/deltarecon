@@ -87,10 +87,18 @@
 //   - an example command stands in the section of a command alone, once per
 //     platform; it starts that command (`quickstart` through its starter)
 //     and is a line of the guide of the page's language in the package of
-//     the platform. The example of `walk`, which no guide holds, starts the
-//     launcher of the platform, names only options of the help of `walk`,
-//     and is the same on both platforms apart from the launcher and the
-//     path separators. `compare` has no example.
+//     the platform. The examples of `walk` and `compare`, which no guide
+//     holds, start the launcher of the platform, name only options of the
+//     help of their command, and are the same on both platforms apart from
+//     the launcher and the path separators;
+//   - the synopsis of a command (`data-synopsis`) stands in its section,
+//     once, and is the usage line of its help, word for word, without
+//     `[-h]`.
+//
+// The page "Write a tolerance profile" shows the tolerance profile of the
+// package: on the built page of both languages the first document to copy
+// is the file `profiles/tolerance-bruttobeitrag.json` of the unpacked Linux
+// package, line for line.
 // Exits non-zero and names what differs or what is missing: a file of the
 // release folder, the pin, a search result of another shape, a build that
 // does not start.
@@ -573,15 +581,14 @@ const ownPages = allPages.filter((entry) => entry.id === OWN);
 /** The page that describes every command, and what stands in no guide there. */
 const SINGLE = 'single-commands';
 const SHARED_SECTION = 'shared-options';
-const NO_GUIDE = 'walk';
-const NO_EXAMPLE = 'compare';
+const NO_GUIDE = ['walk', 'compare'];
 /** The starter of the guided demo, per platform, as the guides write it. */
 const STARTER = { windows: '.\\quickstart.cmd', linux: './quickstart' };
 const singlePages = allPages.filter((entry) => entry.id === SINGLE);
 const { origin: reported, stop } = startPreview();
 let browser;
 const found = { 'release notes': 0, README: 0, guide: 0, help: 0, lines: 0 };
-const single = { commands: 0, options: 0, guide: 0, help: 0 };
+const single = { commands: 0, options: 0, synopses: 0, guide: 0, help: 0 };
 try {
   const origin = await reported;
   browser = await chromium.launch();
@@ -881,11 +888,11 @@ try {
     const sections = await page.evaluate((sharedSection) => {
       const list = [];
       const parts = document.querySelectorAll(
-        'main h2[data-section-heading], main [data-option], main [data-copy], main a[href]',
+        'main h2[data-section-heading], main [data-option], main [data-copy], main [data-synopsis], main a[href]',
       );
       for (const part of parts) {
         if (part.matches('h2')) {
-          list.push({ id: part.id, command: part.dataset.command, options: [], shared: [], blocks: [], links: 0 });
+          list.push({ id: part.id, command: part.dataset.command, options: [], shared: [], blocks: [], synopses: [], links: 0 });
           continue;
         }
         const section = list.at(-1);
@@ -893,6 +900,8 @@ try {
         if (part.matches('[data-option]')) {
           section.options.push(part.dataset.option);
           if (part.hasAttribute('data-shared')) section.shared.push(part.dataset.option);
+        } else if (part.matches('[data-synopsis]')) {
+          section.synopses.push({ command: part.dataset.synopsis, text: part.querySelector('pre')?.textContent ?? '' });
         } else if (part.matches('[data-copy]')) {
           section.blocks.push({
             platform: part.closest('[data-platform-part]')?.dataset.platformPart,
@@ -972,11 +981,15 @@ try {
         `${at}: its section names shared options and holds no link to the section "${SHARED_SECTION}"`,
       );
 
+      // The synopsis: the usage line of the help, without `[-h]`.
+      const usage = squash(helpOf(command).split(/\n\s*\n/)[0]).replace(/^usage: /, '').replace(/ ?\[-h\]/, '');
+      expect(
+        section.synopses.length === 1 && section.synopses[0].command === command && squash(section.synopses[0].text) === usage,
+        `${at}: its section does not hold the usage line of the help once ("${usage}"); it holds [${section.synopses.map((synopsis) => `"${squash(synopsis.text)}"`)}]`,
+      );
+      if (section.synopses.length === 1 && squash(section.synopses[0].text) === usage) single.synopses += 1;
+
       // The example command.
-      if (command === NO_EXAMPLE) {
-        expect(section.blocks.length === 0, `${at}: its section holds an example command; a compare request is written by other commands`);
-        continue;
-      }
       const lines = {};
       for (const platform of PLATFORMS) {
         const blocks = section.blocks.filter((block) => block.platform === platform);
@@ -997,7 +1010,7 @@ try {
           single.guide += 1;
           continue;
         }
-        if (command !== NO_GUIDE) {
+        if (!NO_GUIDE.includes(command)) {
           failures.push(`${at}, ${platform}: the example "${line}" does not stand in the guide ${GUIDES[lang]} of the ${platform} package`);
           continue;
         }
@@ -1008,7 +1021,7 @@ try {
         }
         if (options.every((option) => released.get(command).has(option))) single.help += 1;
       }
-      if (command === NO_GUIDE && lines.windows && lines.linux) {
+      if (NO_GUIDE.includes(command) && lines.windows && lines.linux) {
         expect(
           lines.windows.replaceAll('\\', '/').replace('./deltarecon.cmd ', './deltarecon ') === lines.linux,
           `${at}: the example differs between the platforms beyond the name of the launcher and the path separators: "${lines.windows}" and "${lines.linux}"`,
@@ -1018,9 +1031,24 @@ try {
     // No example outside the section of a command.
     for (const section of sections.filter((candidate) => candidate.command === undefined)) {
       expect(section.blocks.length === 0, `${name}, section "${section.id}": a command stands outside the section of a command`);
+      expect(section.synopses.length === 0, `${name}, section "${section.id}": a synopsis stands outside the section of a command`);
     }
   }
   expect(singlePages.length === LANGUAGES.length, `the page "${SINGLE}" is not in the page register once per language`);
+
+  // ---- The page of the tolerance profile ----
+  const profileFile = path.join(releaseFolder, folders.linux, 'profiles', 'tolerance-bruttobeitrag.json');
+  const profile = (await read(profileFile)).replace(/\n$/, '');
+  const profilePages = allPages.filter((entry) => entry.id === 'tolerance-profile');
+  for (const entry of profilePages) {
+    await page.goto(`${origin}${entry.address}`);
+    const shown = await page.evaluate(() => document.querySelector('main [data-document]')?.dataset.copy);
+    expect(
+      shown === profile,
+      `${entry.address}: the first document to copy is not the file ${relative(profileFile)} of the release, line for line`,
+    );
+  }
+  expect(profilePages.length === LANGUAGES.length, `the page "tolerance-profile" is not in the page register once per language`);
 } catch (error) {
   failures.push(error.stack ?? error.message);
 } finally {
@@ -1029,5 +1057,5 @@ try {
 }
 
 report(
-  `release ${version}: the four captures agree with each other and with the search result of the pin; on the Quick start of both languages ${found['release notes']} command lines stand in the release notes, ${found.README} in the README of the release and ${found.guide} in the package guides; file names, sums and output are those of the release; on the page of own calculations of both languages the commands are those of the ${ownSteps.length} captured steps, ${found.help} options stand in the help of the released deltarecon and ${found.lines} lines of output are those of the captures; on the page of single commands of both languages the ${single.commands} sections of commands are the ${released.size} commands of the released deltarecon in each language, ${single.options} options stand in the help of their command and no command and no option of the package is missing, ${single.guide} example commands stand in the package guides and ${single.help} use options of the help alone`,
+  `release ${version}: the four captures agree with each other and with the search result of the pin; on the Quick start of both languages ${found['release notes']} command lines stand in the release notes, ${found.README} in the README of the release and ${found.guide} in the package guides; file names, sums and output are those of the release; on the page of own calculations of both languages the commands are those of the ${ownSteps.length} captured steps, ${found.help} options stand in the help of the released deltarecon and ${found.lines} lines of output are those of the captures; on the page of single commands of both languages the ${single.commands} sections of commands are the ${released.size} commands of the released deltarecon in each language, ${single.options} options stand in the help of their command and no command and no option of the package is missing, ${single.synopses} synopses are the usage lines of the help, ${single.guide} example commands stand in the package guides and ${single.help} use options of the help alone`,
 );

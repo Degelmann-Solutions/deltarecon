@@ -95,7 +95,7 @@ reader, and zoom to 400 %.
 
 ## Page register
 
-`src/site.ts` is the register of the site: the four stages, the ten pages in
+`src/site.ts` is the register of the site: the four stages, the eleven pages in
 path order with their name and address per language, the addresses outside
 the documentation, the texts of the page frame, of the Glossary and of the
 step components in both languages (the components of a page of prose need
@@ -167,6 +167,12 @@ description: "The description of the page for search engines and shared links."
   `index.mdx`. The build fails when file and register disagree.
 - `description` is the page's own and differs from every other page.
 - A step page lists its steps in the frontmatter; see "Step pages".
+- A page of prose may list its sections in the frontmatter (`sections:`, each
+  with `anchor`, `title` and, for a title that is a name of the program,
+  `code: true`). The chapter tree then lists them under the page, as points
+  without numbers, in the column only. "Single commands" does so; the prose
+  check (`tree` in `prosePages`) holds the list against the section headings
+  and fails on a page of prose that lists sections without that entry.
 - A new page needs an entry in `pages` of `src/site.ts` (at its place on the
   path) and both files. `npm run check` fails when a page of the register is
   not built or a built page is not in the register.
@@ -183,7 +189,8 @@ description: "The description of the page for search engines and shared links."
   ("Tippfehler", "renamed"); no page of the path may hold the latter.
 - A page may have a word of its own as well (`pageWords` in
   `scripts/harness.mjs`; "bracket" and "Stornosatz" for Understand the
-  results, "middle" and "Durchlauf" for How DeltaRecon works, "launcher" and
+  results, "middle" and "Durchlauf" for How DeltaRecon works, "whoever" and
+  "kaufmännisch" for Write a tolerance profile, "launcher" and
   "Umgebungsvariable" for Single commands, "yardstick" and "Maßstab" for
   What your engine must provide, "lookup" and "Kleinbuchstaben" for Build an
   adapter step by step, "phone" and "Telefon" for When something goes wrong): only that page of its language holds it, and the search of the
@@ -369,7 +376,8 @@ A paragraph with a <Term id="record">record</Term>.
 | `DemoTable` | One of the two four-column tables of the demo, from the capture: `table="regression"` (step 2) or `table="changes"` (step 3). The content is what the page says before the sentence of the program. It shares the looks of `ResultTable`, the table of the search, which a page of prose uses as a step page does. Below the phone breakpoint a row is a record of two lines, and the head row has the same two lines, so that each column name stands above its values. A table that stands in a page of prose is at most 820 px wide. |
 | `FlowDiagram` with `wide` | A sequence of four parts as a wide figure: the flow diagram of a step card with the frame and the caption of a wide figure. It is a figure itself and does not stand inside `WideFigure`; the build fails without a caption. Its boxes stand for parts of an explanation and carry no mono line (`<FlowBox>Two recorded results</FlowBox>`). Horizontal from 1280 px, four boxes in one row, and a stack below; never scaled. A row list after it names the same parts in the same order and says what each is, so that the diagram stands as text beside itself; a page keeps the names in one list (`parts`) for both. |
 | `BarFigure` with `numbered` | The bars of the search table as the second part of that figure: each label begins with the number of its revision ("2 · 936e50d"). Without `numbered` it is the bar figure of a step card. |
-| `RowList`, `Row` | Numbered rows; the list gives the numbers. A row has a `name` in plain words, a `code` name after it, a `tag` at its right end (on the phone below the text), and its content as the second line. Write a row on one line, so that its content is no paragraph of its own. `option` marks the row as the row of the option its `code` names (`data-option`), for the release check; the build fails on such a row without `code`. `member="Session"` or `member="Engine"` marks the row as the row of the member of the protocol its `code` names (`data-member`), and `selection` as the row of a name of the engine selection, the first word of its `code`; the excerpt check holds both against the tag of the release (see "Code of the repository on a page"). |
+| `RowList`, `Row` | Numbered rows; the list gives the numbers. A row has a `name` in plain words, a `code` name after it, a `tag` at its right end (on the phone below the text), and its content as the second line. Write a row on one line, so that its content is no paragraph of its own. `option` marks the row as the row of the option its `code` names (`data-option`), for the release check; the build fails on such a row without `code`. `member="Session"` or `member="Engine"` marks the row as the row of the member of the protocol its `code` names (`data-member`), and `selection` as the row of a name of the engine selection, the first word of its `code`; the excerpt check holds both against the tag of the release (see "Code of the repository on a page"). On the list, `label` puts the kind of its rows above it as a small mono label, which is also the name of the list ("Reads", "Writes": the files of a command), and `plain` leaves the numbers out, for rows that name a number of their own (the exit statuses); the list is then an unordered list. |
+| `Synopsis` | The usage line of a command of the package under a small label, as the help of the command prints it: `<Synopsis command="request" />`. The lines stand in `src/synopsis.ts`, once for both languages. It is a pattern and no command to run: no copy button. The build fails on a command the file does not hold; the release check holds each against the released help. |
 | `PlatformSwitch` with `place` | The platform switch of a step page as a block of a page of prose, between prose and row lists and at most 820 px wide. With `windows` and `linux` it needs `place`, a word for where the command stands, which names the command and its copy button in the place of a step; without commands it holds the sentences of each platform alone. `PlatformPart` stays a part of a step card. |
 | `ConnectionFigure` | Where the adapter sits and what the reader builds: three outlined boxes on one trace, of which only the box marked `built` is dashed; the first trace carries the one label (`trace`). The page gives the words of each box (`state`, the small line above the title that says whether the box exists or is built; `title`; `sub`) and the caption (slot `caption`), which is the text alternative. It is a wide figure itself and does not stand inside `WideFigure`. Side by side from 1280 px and a stack below; never scaled. The build fails without a caption, with other than three boxes, with other than one box that is built, and without the label. |
 | `YardstickBox` | The size of the connection of the reference model: a box with a navy border, a mono tag (`tag`), the line with the number of lines, and one or two sentences (the content) that name each file as inline code. `files` are the paths of the files of the connection; the box adds up their lines (`lineCount` of `src/excerpts.ts`) and prints the sum, in the number format of the language, before `unit`, the words of the page ("lines in one file"). It states no effort. The build fails without files, `tag`, `unit` or content, and for a file `src/excerpts.ts` holds no number of lines for. |
@@ -772,7 +780,7 @@ released `deltarecon`: one section per command, in the order of the help,
 and a last section for the options several commands share. Its text comes
 from the README of the release (`git show v<version>:README.md`), the help
 of the released package and the guides of the package; the plan of the page
-names the source of each statement. The check reads the page by three
+names the source of each statement. The check reads the page by four
 marks, not by its wording:
 
 - `<SectionHeading id="request" command="request">` marks the section of a
@@ -782,7 +790,16 @@ marks, not by its wording:
   command that the last section describes, each marked `data-option` and
   `data-shared`, with the link to that section;
 - the example of a command is a `PlatformSwitch` with `place`, its lines
-  typed in `commands` at the top of each page file.
+  typed in `commands` at the top of each page file;
+- `<Synopsis command="request" />` under the heading of a command shows its
+  usage line.
+
+The name of a command, written in backticks, is a link to the section of
+that command: the page maps inline code so (`components` at the top of each
+page file). In its own section a command is written as
+`<code translate="no">request</code>`, which the map leaves alone, so that
+no section links to itself. The prose check holds both (`commands` in
+`prosePages`).
 
 On the built page of both languages `npm run check:release` asserts, against
 `deltarecon --help` and `deltarecon <command> --help` of the unpacked Linux
@@ -801,8 +818,20 @@ package:
   and is a line of the guide of the page's language in the package of the
   platform; the example of `walk`, which no guide holds, starts the launcher
   of the platform, gives only options of the help of `walk` and is the same
-  on both platforms apart from the launcher and the path separators;
-  `compare` has no example.
+  on both platforms apart from the launcher and the path separators; so
+  does the example of `compare`, which runs the compare request that the
+  example of `replay` wrote;
+- the synopsis of a command stands in its section, once, and is the usage
+  line of its help, word for word, without `[-h]`.
+
+**The page "Write a tolerance profile".** Its statements come from the
+contract of the comparison at the tag of the release
+(`contracts/v3/compare.md`: the members of a profile, the tolerance rule and
+its worked values) and from the messages of the released package. The
+profile of the package stands in `src/toleranceProfile.ts`, line for line;
+`npm run check:release` holds it against the file of the unpacked Linux
+package. The example profile and the command that uses it stand in the same
+file; no check runs them.
 
 The check does not read what a row says about an option, which options are
 tagged as required, or the file lists.

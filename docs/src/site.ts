@@ -1,4 +1,4 @@
-// The page register of the documentation: the four stages, the ten pages in
+// The page register of the documentation: the four stages, the eleven pages in
 // path order with their names and addresses per language, the texts of the
 // page frame, of the Glossary, of the step components and of the code excerpt, `languageOf`, the language of a page
 // address, and the page-not-found page, which stands outside the path
@@ -43,6 +43,18 @@ export interface Step {
   optional?: boolean;
 }
 
+/**
+ * A section of a page of prose that the chapter tree lists under the page,
+ * as the page names it in its frontmatter (`sections:`). `code` marks a
+ * title that is a name of the program, as the name of a command.
+ */
+export interface Section {
+  /** Anchor of the section heading, the same in both languages. */
+  anchor: string;
+  title: string;
+  code?: boolean;
+}
+
 /** What an anchor of a step looks like: small letters, digits and hyphens. */
 export const stepAnchor = /^[a-z][a-z0-9-]*$/;
 
@@ -79,7 +91,7 @@ export const stages: readonly Stage[] = [
   { number: 4, name: { en: 'Connect your engine', de: 'Ihre Engine anbinden' } },
 ];
 
-/** The ten pages in path order. */
+/** The eleven pages in path order. */
 export const pages: readonly Page[] = [
   {
     id: 'overview',
@@ -119,6 +131,12 @@ export const pages: readonly Page[] = [
       de: 'Eigene Rechnungen am Referenzmodell',
     },
     slug: { en: 'own-calculations', de: 'eigene-rechnungen' },
+  },
+  {
+    id: 'tolerance-profile',
+    stage: 3,
+    name: { en: 'Write a tolerance profile', de: 'Ein Toleranzprofil schreiben' },
+    slug: { en: 'tolerance-profile', de: 'toleranzprofil' },
   },
   {
     id: 'single-commands',
@@ -210,6 +228,10 @@ export interface FrameTexts {
   /** The page kind the stage line names on the page below the four stages. */
   helpKind: string;
   steps: string;
+  /** The name of the list of the sections of a page in the chapter tree. */
+  sections: string;
+  /** The label of the usage line of a command. */
+  synopsis: string;
   pageLinks: string;
   previous: string;
   next: string;
@@ -277,6 +299,8 @@ export const texts: Record<Lang, FrameTexts> = {
     stage: 'Stage',
     helpKind: 'Help',
     steps: 'Steps of this page',
+    sections: 'Sections of this page',
+    synopsis: 'Synopsis',
     pageLinks: 'Previous and next page',
     previous: 'Previous',
     next: 'Next',
@@ -328,6 +352,8 @@ export const texts: Record<Lang, FrameTexts> = {
     stage: 'Etappe',
     helpKind: 'Hilfe',
     steps: 'Schritte dieser Seite',
+    sections: 'Abschnitte dieser Seite',
+    synopsis: 'Aufbau des Befehls',
     pageLinks: 'Vorherige und nächste Seite',
     previous: 'Zurück',
     next: 'Weiter',

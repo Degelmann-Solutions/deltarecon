@@ -1920,6 +1920,46 @@
     font-size: var(--text-label);
   }
 
+  /* Rows without numbers: the name of a row carries a number of its own. */
+  .row-list-plain > .row {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .row-list-plain > .row::before {
+    content: none;
+  }
+
+  /* The kind of the rows of a list, or the name of a synopsis: a small
+     label above the block it names. */
+  .list-label {
+    max-width: var(--spacing-block-max);
+    margin-top: 20px;
+    color: var(--color-text-secondary);
+    font-family: var(--font-mono);
+    font-size: var(--text-label-small);
+    letter-spacing: var(--text-label-small--letter-spacing);
+    text-transform: uppercase;
+  }
+
+  .row-list-labelled {
+    margin-top: 6px;
+  }
+
+  /* ---- Synopsis ---- */
+
+  .synopsis {
+    max-width: var(--spacing-block-max);
+    margin-top: 16px;
+  }
+
+  .synopsis .list-label {
+    margin-top: 0;
+  }
+
+  .synopsis .code {
+    margin-top: 6px;
+  }
+
   .row-name {
     font-size: var(--text-callout-title);
     font-weight: var(--text-callout-title--font-weight);
@@ -1949,6 +1989,10 @@
   @media (min-width: 37.5rem) {
     .row {
       grid-template-columns: 28px minmax(0, 1fr) auto;
+    }
+
+    .row-list-plain > .row {
+      grid-template-columns: minmax(0, 1fr) auto;
     }
 
     .row-tag {

@@ -27,8 +27,15 @@
 //     anchor `prosePages` names, in its order, and is a link to itself; the
 //     page holds no "on this page" list: no other link leads to a section,
 //     apart from a section `prosePages` names as linked from the content
-//     (the options several commands share, on "Single commands"), which
-//     must then be linked;
+//     (the options several commands share and the sections of the commands,
+//     on "Single commands"), which must then be linked; where `prosePages`
+//     says so (`tree`), the chapter tree lists the sections under the page,
+//     each as a link to its anchor, in their order, and on no other page of
+//     prose does it list any;
+//   - where `prosePages` names the commands of a page: every inline code
+//     of the content that is the name of a command is a link to the section
+//     of that command, apart from the section of the command itself, which
+//     holds no link to itself but its heading;
 //   - no part of the content names a step that is not there (the mark a
 //     step card replaces);
 //   - the platform switches of a page of prose, which stand between its
@@ -55,7 +62,10 @@
 //     keep their size, stand apart and stay inside the figure;
 //   - the bars below it: one per revision of the search table, the label
 //     "number · revision", the sum as the capture of the language prints it;
-//   - a row list numbers its rows and closes with a hairline; the code name
+//   - a row list numbers its rows and closes with a hairline; a list
+//     without numbers (`plain`) is an unordered list whose rows carry none;
+//     a label above a list is a small mono label in capitals and the name
+//     of the list; the code name
 //     of a row follows its name as inline code that is not translated, in
 //     weight 400; the tag of a row is a small mono label in capitals with a
 //     hairline border, at 1280 px at the right end of the row and at 390 and
@@ -160,16 +170,31 @@ const prosePages = {
       },
     },
   },
+  'tolerance-profile': {
+    sections: ['what', 'file', 'rule', 'write', 'faults'],
+    counterpart: 'rule',
+    rows: 17,
+    codes: 7,
+    tags: 1,
+    switches: { places: ['search'], plain: 0 },
+  },
   'single-commands': {
     sections: ['start', 'request', 'run', 'replay', 'compare', 'regression', 'derive', 'walk', 'search', 'quickstart', 'shared-options'],
     counterpart: 'search',
     rows: 91,
-    // The section that the sections of the commands link to.
-    linked: ['shared-options'],
+    // The sections the content links to: the section the sections of the
+    // commands link to, and the section of each command, which the name of
+    // the command links to wherever the text names it.
+    linked: ['shared-options', 'request', 'run', 'replay', 'compare', 'regression', 'derive', 'walk', 'search', 'quickstart'],
+    // The chapter tree lists the sections of this page under the page.
+    tree: true,
+    // The sections of the commands: the name of a command in the text is a
+    // link to its section, apart from its own section.
+    commands: ['request', 'run', 'replay', 'compare', 'regression', 'derive', 'walk', 'search', 'quickstart'],
     // The platform switches: the place each switch with a command names, in
     // order, and the number of switches without a command.
     switches: {
-      places: ['request', 'run', 'replay', 'regression', 'derive', 'walk', 'search', 'quickstart'],
+      places: ['request', 'run', 'replay', 'compare', 'regression', 'derive', 'walk', 'search', 'quickstart'],
       plain: 1,
     },
   },
@@ -562,19 +587,61 @@ async function checkHeadings(page, name, listed) {
     (ids) =>
       [...document.querySelectorAll('a[href^="#"]')]
         .filter((link) => ids.includes(link.getAttribute('href').slice(1)) && !link.closest('h2'))
-        .map((link) => ({ href: link.getAttribute('href'), content: link.closest('main [data-row], main [data-prose], main [data-callout]') !== null })),
+        .map((link) => ({
+          href: link.getAttribute('href'),
+          content: link.closest('main [data-row], main [data-prose], main [data-callout]') !== null,
+          tree: link.closest('#chapters [data-tree-sections]') !== null,
+        })),
     anchors,
   );
-  const strangers = others.filter((link) => !(link.content && linked.includes(link.href.slice(1))));
+  // The chapter tree lists the sections where the entry says so, and only there.
+  const inTree = others.filter((link) => link.tree).map((link) => link.href.slice(1));
+  expect(
+    JSON.stringify(inTree) === JSON.stringify(listed.tree ? anchors : []),
+    `${name}: the chapter tree lists the sections [${inTree}], expected [${listed.tree ? anchors : []}] (prosePages in scripts/check-prose.mjs)`,
+  );
+  const strangers = others.filter((link) => !link.tree && !(link.content && linked.includes(link.href.slice(1))));
   expect(
     strangers.length === 0,
     `${name}: links to sections outside their headings: [${strangers.map((link) => link.href)}]`,
   );
   for (const anchor of linked) {
     expect(
-      others.some((link) => link.href === `#${anchor}`),
+      others.some((link) => !link.tree && link.href === `#${anchor}`),
       `${name}: no link of the content leads to the section "${anchor}", which prosePages names as linked`,
     );
+  }
+  // The name of a command in the text is a link to its section, apart from
+  // its own section.
+  if (listed.commands) {
+    const names = await page.evaluate((commands) => {
+      const found = [];
+      let section = '';
+      for (const part of document.querySelectorAll('main h2[data-section-heading], main code, main a[href^="#"]')) {
+        if (part.matches('h2')) {
+          section = part.id;
+        } else if (part.closest('h2, pre, [data-synopsis]')) {
+          continue;
+        } else if (part.matches('a')) {
+          const target = part.getAttribute('href').slice(1);
+          if (commands.includes(target)) found.push({ section, command: target, link: target, own: target === section });
+        } else if (commands.includes(part.textContent) && !part.closest('.row-name')) {
+          const link = part.closest('a')?.getAttribute('href')?.slice(1);
+          if (!link || !commands.includes(link)) found.push({ section, command: part.textContent, link, own: part.textContent === section });
+        }
+      }
+      return found;
+    }, listed.commands);
+    for (const found of names) {
+      if (found.own) {
+        expect(found.link === undefined, `${name}: the section "${found.section}" holds a link to itself beside its heading`);
+      } else {
+        expect(
+          found.link === found.command,
+          `${name}, section "${found.section}": the name of the command "${found.command}" is no link to its section`,
+        );
+      }
+    }
   }
   // A part that names its step stands in a step card, which a page of prose has not.
   const marked = await page.evaluate((mark) => document.querySelector('main').innerHTML.includes(mark), STEP_MARK);
@@ -1443,6 +1510,19 @@ async function checkRowLists(page, name, counts, stacked) {
   const lists = await page.evaluate(() =>
     [...document.querySelectorAll('main [data-row-list]')].map((list) => ({
       ordered: list.tagName === 'OL',
+      plain: list.hasAttribute('data-plain'),
+      label: (() => {
+        const label = list.previousElementSibling?.matches('[data-row-list-label]') ? list.previousElementSibling : null;
+        if (!label) return null;
+        const style = getComputedStyle(label);
+        return {
+          text: label.textContent.trim(),
+          name: list.getAttribute('aria-label'),
+          size: Number.parseFloat(style.fontSize),
+          upper: style.textTransform,
+          mono: style.fontFamily.includes('JetBrains Mono'),
+        };
+      })(),
       closed: getComputedStyle(list).borderBottomWidth,
       rows: [...list.querySelectorAll(':scope > [data-row]')].map((row) => {
         const box = (element) => {
@@ -1492,12 +1572,24 @@ async function checkRowLists(page, name, counts, stacked) {
     }
   }
   lists.forEach((list, at) => {
-    expect(list.ordered && list.closed === '1px', `${name}: row list ${at + 1} is no ordered list with a hairline below`);
+    expect(
+      list.ordered !== list.plain && list.closed === '1px',
+      `${name}: row list ${at + 1} is no ordered list, or no unordered list without numbers, with a hairline below`,
+    );
+    if (list.label) {
+      const { label } = list;
+      expect(
+        label.text !== '' && label.name === label.text && Math.abs(label.size - 11) < 0.1 && label.upper === 'uppercase' && label.mono,
+        `${name}: the label "${label.text}" of row list ${at + 1} is no small mono label in capitals that names its list (${label.size} px, ${label.upper}, name "${label.name}")`,
+      );
+    }
     list.rows.forEach((row, index) => {
       const which = `${name}: row ${index + 1} of row list ${at + 1}`;
       expect(
-        row.number.includes('counter(row)') || row.number === `"${index + 1}"`,
-        `${which} carries no number (${row.number})`,
+        list.plain
+          ? row.number === 'none'
+          : row.number.includes('counter(row)') || row.number === `"${index + 1}"`,
+        list.plain ? `${which} of a list without numbers carries one (${row.number})` : `${which} carries no number (${row.number})`,
       );
       expect(row.rule === '1px' && row.name !== '', `${which} has no hairline or no name`);
       if (row.code) {

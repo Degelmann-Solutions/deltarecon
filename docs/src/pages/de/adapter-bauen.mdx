@@ -367,7 +367,7 @@ Setzen Sie an den Stellen zwischen `<` und `>` Ihre eigenen Angaben ein:
 
 `request` gibt den Pfad der Anfrage aus, die es geschrieben hat. `run` gibt `outcome: succeeded` aus, die Zahl der Modellpunkte, die Zahl der Zeilen der Ergebnisse und deren SHA-256 sowie die Pfade der drei Dateien, die es geschrieben hat. Beide Befehle enden mit Exit-Status 0. Endet ein Befehl mit einem Traceback, sehen Sie bei den bekannten Grenzen in Schritt 6 nach.
 
-Mit einem zweiten Lauf, einer anderen Revision, können Sie zwei Ergebnisse vergleichen. `regression`, `replay`, `walk` und `search` schreiben ihre Vergleichsanfragen selbst und führen sie aus. Eine Vergleichsanfrage schreiben Sie nur für `compare` selbst, den Vergleich zweier Läufe von Hand. Sie ist eine JSON-Datei mit diesen Teilen:
+Mit einem zweiten Lauf, einer anderen Revision, können Sie zwei Ergebnisse vergleichen. `regression`, `replay`, `walk` und `search` schreiben ihre <Term id="compare-request">Vergleichsanfragen</Term> selbst und führen sie aus. Eine Vergleichsanfrage schreiben Sie nur für `compare` selbst, den Vergleich zweier Läufe von Hand. Sie ist eine JSON-Datei mit diesen Teilen:
 
 <RowList>
   <Row name="Die Art des Dokuments">`document` ist immer `compare_request`.</Row>

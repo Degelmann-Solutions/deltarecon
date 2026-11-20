@@ -12,6 +12,13 @@
 //     - { anchor: download, title: Download the package }
 //     - { anchor: check, title: Check the archive, optional: true }
 //
+// A page of prose may name its sections instead, for the chapter tree:
+//
+//   sections:
+//     - { anchor: request, title: request, code: true }
+//
+// scripts/check-prose.mjs holds them against the section headings.
+//
 // The step list feeds the chapter tree and the step cards of the page
 // (components/StepCard.astro). The build fails on a step without an anchor
 // or a title and on an anchor that stands twice, and names page and step.
@@ -41,6 +48,7 @@ import {
   stepFaults,
   texts,
   type Lang,
+  type Section,
   type Step,
 } from '../site';
 
@@ -51,13 +59,22 @@ interface Props {
     lead: string;
     description: string;
     steps?: Step[];
+    sections?: Section[];
   };
 }
 
-const { lang, page: id, lead, description, steps = [] } = Astro.props.frontmatter;
+const { lang, page: id, lead, description, steps = [], sections = [] } = Astro.props.frontmatter;
 const faults = stepFaults(steps);
 if (faults.length > 0) {
   throw new Error(`${Astro.url.pathname}: frontmatter "steps": ${faults.join('; ')}.`);
+}
+// A section is named like a step: an anchor of its own and a title.
+const sectionFaults = stepFaults(sections).map((fault) => fault.replaceAll('step', 'section'));
+if (sectionFaults.length > 0) {
+  throw new Error(`${Astro.url.pathname}: frontmatter "sections": ${sectionFaults.join('; ')}.`);
+}
+if (steps.length > 0 && sections.length > 0) {
+  throw new Error(`${Astro.url.pathname}: the frontmatter names "steps" and "sections"; a page has one of them.`);
 }
 if (!languages.includes(lang)) {
   throw new Error(`${Astro.url.pathname}: frontmatter "lang" must be "de" or "en".`);
@@ -101,7 +118,7 @@ if (Astro.url.pathname.replace(/\/?$/, '/') !== address) {
     <a class="skip-link menu-open:hidden" href="#main">{texts[lang].skipLink}</a>
     <TopBar lang={lang} page={page} />
     <div class="flex flex-1 flex-col tree:grid tree:grid-cols-[288px_minmax(0,1fr)]">
-      <ChapterTree lang={lang} page={page} steps={steps} />
+      <ChapterTree lang={lang} page={page} steps={steps} sections={sections} />
       <main
         id="main"
         class="mx-auto w-full max-w-content-max px-content-pad-x-phone pt-content-pad-top-phone pb-content-pad-bottom-phone tablet:px-content-pad-x tablet:pt-content-pad-top tablet:pb-content-pad-bottom tree:mx-0 menu-open:hidden"

@@ -2,8 +2,20 @@
 layout: ../../layouts/Page.astro
 lang: de
 page: single-commands
-lead: "Jeder Befehl des Pakets für sich, neben der geführten Vorführung: was er tut, ein Beispiel zum Kopieren, seine Optionen und die Dateien, die er liest und schreibt."
-description: "Die neun einzelnen Befehle des DeltaRecon-Pakets, von request bis quickstart: was jeder tut, ein Beispiel für Windows und Linux, seine Optionen und seine Dateien."
+lead: "Jeder Befehl von DeltaRecon erklärt: was er tut, ein Beispiel zum Kopieren, seine Optionen und die Dateien, die er liest und schreibt."
+description: "Die neun einzelnen Befehle des DeltaRecon-Pakets, von request bis quickstart: was jeder tut, sein Aufbau, ein Beispiel für Windows und Linux, seine Optionen und seine Dateien."
+sections:
+  - { anchor: start, title: "Einen Befehl starten" }
+  - { anchor: request, title: request, code: true }
+  - { anchor: run, title: run, code: true }
+  - { anchor: replay, title: replay, code: true }
+  - { anchor: compare, title: compare, code: true }
+  - { anchor: regression, title: regression, code: true }
+  - { anchor: derive, title: derive, code: true }
+  - { anchor: walk, title: walk, code: true }
+  - { anchor: search, title: search, code: true }
+  - { anchor: quickstart, title: quickstart, code: true }
+  - { anchor: shared-options, title: "Geteilte Optionen" }
 ---
 import Callout from '../../components/Callout.astro';
 import HintLink from '../../components/HintLink.astro';
@@ -12,14 +24,18 @@ import Prose from '../../components/Prose.astro';
 import Row from '../../components/Row.astro';
 import RowList from '../../components/RowList.astro';
 import SectionHeading from '../../components/SectionHeading.astro';
+import SubHeading from '../../components/SubHeading.astro';
+import Synopsis from '../../components/Synopsis.astro';
 import Term from '../../components/Term.astro';
 import { searchCounts } from '../../captures';
 import { findPage, pageAddress } from '../../site';
 
 export const commands = {
   // The example of each command, per platform: a line of the guide of the
-  // package (README.txt, LIESMICH.txt). `walk` stands in no guide; its
-  // example has the form of the guide's line of `search`.
+  // package (README.txt, LIESMICH.txt). `walk` and `compare` stand in no
+  // guide: the example of `walk` has the form of the guide's line of
+  // `search`, and that of `compare` runs the compare request that the
+  // example of `replay` wrote.
   // scripts/check-release.mjs holds them against the release.
   request: {
     windows: [String.raw`.\deltarecon.cmd request --revision fa368575a66d97c94e96dffc62b273ec95511b12 --label N --run-id run-n-full --output runs\n-full\request.json`],
@@ -32,6 +48,10 @@ export const commands = {
   replay: {
     windows: [String.raw`.\deltarecon.cmd replay runs\n-full\run-record.json`],
     linux: ['./deltarecon replay runs/n-full/run-record.json'],
+  },
+  compare: {
+    windows: [String.raw`.\deltarecon.cmd compare runs\n-full\replay-compare.request.json`],
+    linux: ['./deltarecon compare runs/n-full/replay-compare.request.json'],
   },
   regression: {
     windows: [String.raw`.\deltarecon.cmd regression runs\n-full\run-record.json --revision 887b7181d22550eda2fb52fa1a6bd77376d4eb2e --output runs\regression-n`],
@@ -59,10 +79,25 @@ export const own = findPage('own-calculations');
 export const results = findPage('understand-the-results');
 export const works = findPage('how-deltarecon-works');
 export const enginePage = findPage('engine-requirements');
+export const adapterPage = findPage('build-an-adapter');
 export const counts = searchCounts('de');
+// The commands of the package, in the order of the help: each has a
+// section under the anchor of its name.
+export const commandNames = ['request', 'run', 'replay', 'compare', 'regression', 'derive', 'walk', 'search', 'quickstart'];
 // Inline code of this page names commands, options, files and outcomes:
-// none of it is to be translated.
-export const components = { code: (props) => <code translate="no" {...props} /> };
+// none of it is to be translated. The name of a command, written in
+// backticks, is a link to the section of that command. In its own section a
+// command is written as `<code translate="no">` instead, which this map
+// leaves alone, so that no section links to itself.
+// scripts/check-prose.mjs holds both.
+export const components = {
+  code: (props) =>
+    commandNames.includes(String(props.children)) ? (
+      <a href={`#${props.children}`} data-command-link={String(props.children)}><code translate="no" {...props} /></a>
+    ) : (
+      <code translate="no" {...props} />
+    ),
+};
 // The name of the last section, for its heading and the links to it.
 export const sharedName = 'Optionen, die mehrere Befehle teilen';
 // The options of a command that the last section describes, each marked
@@ -83,7 +118,7 @@ export const shared = (options) => (
 
 <Prose>
 
-Die geführte Vorführung des <a href={pageAddress(quickStart, 'de')}>{quickStart.name.de}</a> führt die Befehle des Quick Starts für Sie aus, ohne `replay`. Diese Seite beschreibt jeden Befehl des Pakets für sich, in der Reihenfolge, in der das Paket sie auflistet. Einen einzelnen Befehl starten Sie im Paketordner.
+Der <a href={pageAddress(quickStart, 'de')}>{quickStart.name.de}</a> führt mehrere dieser Befehle für Sie aus. Diese Seite beschreibt jeden Befehl des Pakets für sich, in der Reihenfolge, in der das Paket sie auflistet. Einen einzelnen Befehl starten Sie im Paketordner.
 
 </Prose>
 
@@ -103,31 +138,41 @@ Die geführte Vorführung des <a href={pageAddress(quickStart, 'de')}>{quickStar
 
 <Prose>
 
-Die Beispiele dieser Seite sind die Befehle, die die Anleitung `LIESMICH.txt` im Paketordner auflistet; die eine Ausnahme ist das Beispiel zu `walk`, das die Anleitung nicht auflistet. Sie schreiben in den Ordner `runs` im Paketordner und bauen in der Reihenfolge dieser Seite aufeinander auf: `request` schreibt, was `run` liest, und so weiter. Der Ordner `runs` ist frei gewählt; die Dateien eines Laufs können in jedem Ordner liegen.
+Die Beispiele dieser Seite sind die Befehle, die die Anleitung `LIESMICH.txt` im Paketordner auflistet; die Ausnahmen sind die Beispiele zu `compare` und `walk`, die die Anleitung nicht auflistet. Sie schreiben in den Ordner `runs` im Paketordner und bauen in der Reihenfolge dieser Seite aufeinander auf: `request` schreibt, was `run` liest, und so weiter. Der Ordner `runs` ist frei gewählt; die Dateien eines Laufs können in jedem Ordner liegen.
 
 Kein Befehl überschreibt eine vorhandene Datei. Ein Befehl, dessen Ausgabe es schon gibt, startet nicht. Um eine Rechnung zu wiederholen, geben Sie ihr eine Ausgabe, die es noch nicht gibt.
 
-Diese Seite zeigt keine Ausgaben. <a href={pageAddress(own, 'de')}>{own.name.de}</a> zeigt Schritt für Schritt, was einzelne Befehle ausgeben, und <a href={pageAddress(results, 'de')}>{results.name.de}</a> erklärt, wie Sie die Tabellen der Vorführung lesen.
+Diese Seite zeigt keine Ausgaben. <a href={pageAddress(own, 'de')}>{own.name.de}</a> zeigt Schritt für Schritt, was einzelne Befehle ausgeben, und <a href={pageAddress(results, 'de')}>{results.name.de}</a> erklärt, wie Sie die Tabellen des Quick Starts lesen.
+
+Unter der Überschrift jedes Befehls steht sein Aufbau, wie ihn die Hilfe des Befehls ausgibt, zum Beispiel `./deltarecon request --help`. Was in eckigen Klammern steht, können Sie weglassen. Ein groß geschriebenes Wort steht für eine Angabe, die Sie einsetzen; `...` heißt, dass mehrere Angaben folgen können. Die klein geschriebenen Wörter am Ende sind die Pfade, die der Befehl erhält.
+
+</Prose>
+
+<SubHeading id="exit-status">Der Exit-Status eines Befehls</SubHeading>
+
+<Prose>
 
 Jeder Befehl endet mit einem <Term id="exit-status">Exit-Status</Term>, einer Zahl, die sagt, wie er geendet hat. Der Befehl `quickstart` zählt auf seine eigene Weise; sein Abschnitt sagt, wie.
 
 </Prose>
 
-<RowList>
-  <Row name="Fertig, und nichts zu melden" code="0">Ein Lauf, der gelungen ist, ein `replay`, das den Lauf wieder ergibt, ein Vergleich oder eine <Term id="regression">Regression</Term> ohne <Term id="deviation">Abweichung</Term>, eine Anfrage oder ein <Term id="change-manifest">Änderungsverzeichnis</Term>, das geschrieben wurde, ein `walk`, der jede <Term id="revision">Revision</Term> zuordnet, eine Suche, deren beide Enden sich wieder ergeben.</Row>
-  <Row name="Etwas zum Ansehen, oder eine Ablehnung" code="1">Ein Lauf, der fehlgeschlagen ist, abgelehnt wurde oder mit einem Fehler geendet hat; ein `replay`, das den Lauf nicht wieder ergibt; ein Vergleich oder eine Regression mit einer Abweichung; ein Änderungsverzeichnis, das sich nicht ableiten lässt; ein `walk` oder eine Suche, die abgelehnt wird oder anhält. Die Regression des Quick Starts endet absichtlich mit dem Status 1: Sie meldet die Abweichung zwischen den beiden Revisionen, und die folgenden Befehle laufen trotzdem.</Row>
-  <Row name="Der Befehl konnte nicht starten" code="2">Zum Beispiel: Eine Ausgabe gibt es schon, die gewählte Engine lässt sich nicht laden, die Datei einer Toleranz oder das Ziel einer Suche ist fehlerhaft, oder ein <Term id="record">Nachweis</Term> ist nicht der eines gelungenen Laufs.</Row>
+<RowList plain>
+  <Row name="Status 0: Fertig, und nichts zu melden">Ein Lauf, der gelungen ist, ein `replay`, das den Lauf wieder ergibt, ein Vergleich oder eine <Term id="regression">Regression</Term> ohne <Term id="deviation">Abweichung</Term>, eine Anfrage oder ein <Term id="change-manifest">Änderungsverzeichnis</Term>, das geschrieben wurde, ein `walk`, der jede <Term id="revision">Revision</Term> zuordnet, eine Suche, deren beide Enden sich wieder ergeben.</Row>
+  <Row name="Status 1: Etwas zum Ansehen, oder eine Ablehnung">Ein Lauf, der fehlgeschlagen ist, abgelehnt wurde oder mit einem Fehler geendet hat; ein `replay`, das den Lauf nicht wieder ergibt; ein Vergleich oder eine Regression mit einer Abweichung; ein Änderungsverzeichnis, das sich nicht ableiten lässt; ein `walk` oder eine Suche, die abgelehnt wird oder anhält. Die Regression des Quick Starts endet absichtlich mit dem Status 1: Sie meldet die Abweichung zwischen den beiden Revisionen, und die folgenden Befehle laufen trotzdem.</Row>
+  <Row name="Status 2: Der Befehl konnte nicht starten">Zum Beispiel: Eine Ausgabe gibt es schon, die gewählte Engine lässt sich nicht laden, die Datei einer Toleranz oder das Ziel einer Suche ist fehlerhaft, oder ein <Term id="record">Nachweis</Term> ist nicht der eines gelungenen Laufs.</Row>
 </RowList>
 
 <HintLink section="start" />
 
 <SectionHeading id="request" command="request"><code translate="no">request</code>: festlegen, was gerechnet werden soll</SectionHeading>
 
+<Synopsis command="request" />
+
 <Prose>
 
-`request` schreibt eine Anfrage für einen Lauf: die Datei, die sagt, was gerechnet werden soll. Sie nennt das Release vollständig, also den Code, die Parameter und die Bestandsdaten, jeweils mit dem vollen Namen ihrer Revision, und die Version der Engine. Sie nennt außerdem die Modellpunkte, die gerechnet werden. `request` rechnet nichts; das tut `run`.
+<code translate="no">request</code> schreibt eine Anfrage für einen Lauf: die Datei, die sagt, was gerechnet werden soll. Sie nennt das Release vollständig, also den Code, die Parameter und die Bestandsdaten, jeweils mit dem vollen Namen ihrer Revision, und die Version des Kerns der Engine, der nicht Teil der Versionsgeschichte ist: beim <Term id="reference-model">Referenzmodell</Term> die Bibliotheken modelx, pandas und numpy und Python selbst. Sie nennt außerdem die Modellpunkte, die gerechnet werden. <code translate="no">request</code> rechnet nichts; das tut `run`.
 
-Beim <Term id="reference-model">Referenzmodell</Term> ist ein Release eine Revision der Versionsgeschichte, die das Paket im Ordner `delib-history` enthält. Sie benennen sie mit ihrem vollständigen oder abgekürzten Hash, mit einem Zweig, mit einem Tag oder mit `HEAD`; ein Zusatz wie `HEAD~1` wird nicht gelesen. Die Anfrage enthält dann den vollständigen Hash.
+Beim Referenzmodell ist ein Release eine Revision der Versionsgeschichte, die das Paket im Ordner `delib-history` enthält. Sie benennen sie mit ihrem vollständigen oder abgekürzten Hash, mit einem Zweig, mit einem Tag oder mit `HEAD`; ein Zusatz wie `HEAD~1` wird nicht gelesen. Die Anfrage enthält dann den vollständigen Hash.
 
 Das Beispiel schreibt die Anfrage für Release N des Quick Starts.
 
@@ -137,7 +182,7 @@ Das Beispiel schreibt die Anfrage für Release N des Quick Starts.
 
 <Prose>
 
-Die Optionen von `request`:
+Die Optionen von <code translate="no">request</code>:
 
 </Prose>
 
@@ -155,21 +200,26 @@ Die Optionen von `request`:
 
 <Prose>
 
-Die Dateien von `request`:
+Die Dateien von <code translate="no">request</code>:
 
 </Prose>
 
-<RowList>
-  <Row name="Die Versionsgeschichte des Modells" code="delib-history/" tag="liest">Der Ordner des Pakets, aus dem jeder Befehl die Releases des Referenzmodells liest.</Row>
-  <Row name="Ein Änderungsverzeichnis" tag="liest">Die Datei, die `--manifest` nennt. Nur mit dieser Option.</Row>
-  <Row name="Die Anfrage" code="request.json" tag="schreibt">Die Datei, die `--output` nennt; im Beispiel `request.json` im neuen Ordner `n-full`.</Row>
+<RowList label="Liest">
+  <Row name="Die Versionsgeschichte des Modells" code="delib-history/">Der Ordner des Pakets, aus dem jeder Befehl die Releases des Referenzmodells liest.</Row>
+  <Row name="Ein Änderungsverzeichnis">Die Datei, die `--manifest` nennt. Nur mit dieser Option.</Row>
+</RowList>
+
+<RowList label="Schreibt">
+  <Row name="Die Anfrage" code="request.json">Die Datei, die `--output` nennt; im Beispiel `request.json` im neuen Ordner `n-full`.</Row>
 </RowList>
 
 <SectionHeading id="run" command="run"><code translate="no">run</code>: eine Anfrage rechnen</SectionHeading>
 
+<Synopsis command="run" />
+
 <Prose>
 
-`run` prüft die Anfrage, stellt die Dateien der genannten Revision in einem Arbeitsordner wieder her, projiziert die gewählten Modellpunkte und wertet für jeden die fünf eingebauten Prüfungen des Modells aus. Seine Dateien schreibt es neben die Anfrage.
+<code translate="no">run</code> prüft die Anfrage, stellt die Dateien der genannten Revision in einem Arbeitsordner wieder her, projiziert die gewählten Modellpunkte und wertet für jeden die fünf eingebauten Prüfungen des Modells aus. Seine Dateien schreibt es neben die Anfrage.
 
 Ein Lauf endet mit einem von vier Ausgängen. `succeeded`: Es gibt Ergebnisse. `failed`: Ein Modellpunkt hat einen Fehler ausgelöst, eine Prüfung ist falsch, oder ein Ergebnis ist keine endliche Zahl; es gibt keine Ergebnisse. `error`: Die Anfrage wurde angenommen, aber die Engine konnte den Stand nicht wiederherstellen oder nicht lesen; es gibt keine Ergebnisse. `rejected`: Die Anfrage hat eine Regel verletzt, und nichts ist gelaufen. Der Nachweis wird bei jedem Ausgang geschrieben, außer bei einer Datei, die sich nicht als Anfrage für einen Lauf lesen lässt.
 
@@ -179,7 +229,7 @@ Ein Lauf endet mit einem von vier Ausgängen. `succeeded`: Es gibt Ergebnisse. `
 
 <Prose>
 
-Die Optionen von `run`:
+Die Optionen von <code translate="no">run</code>:
 
 </Prose>
 
@@ -189,27 +239,32 @@ Die Optionen von `run`:
 
 <Prose>
 
-Die Dateien von `run`:
+Die Dateien von <code translate="no">run</code>:
 
 </Prose>
 
-<RowList>
-  <Row name="Die Anfrage" code="request.json" tag="liest">Der Pfad, den der Befehl erhält.</Row>
-  <Row name="Die Versionsgeschichte des Modells" code="delib-history/" tag="liest">Die Dateien der Revision, die die Anfrage nennt.</Row>
-  <Row name="Die Antwort" code="response.json" tag="schreibt">Wie der Lauf geendet hat: sein Ausgang.</Row>
-  <Row name="Die Ergebnisse" code="results.csv" tag="schreibt">Der Export des Laufs, je Modellpunkt. Nur ein gelungener Lauf hat ihn.</Row>
-  <Row name="Der Nachweis" code="run-record.json" tag="schreibt">Womit was gerechnet wurde. Die folgenden Befehle lesen diese Datei.</Row>
+<RowList label="Liest">
+  <Row name="Die Anfrage" code="request.json">Der Pfad, den der Befehl erhält.</Row>
+  <Row name="Die Versionsgeschichte des Modells" code="delib-history/">Die Dateien der Revision, die die Anfrage nennt.</Row>
+</RowList>
+
+<RowList label="Schreibt">
+  <Row name="Die Antwort" code="response.json">Wie der Lauf geendet hat: sein Ausgang.</Row>
+  <Row name="Die Ergebnisse" code="results.csv">Der Export des Laufs, je Modellpunkt. Nur ein gelungener Lauf hat ihn.</Row>
+  <Row name="Der Nachweis" code="run-record.json">Womit was gerechnet wurde. Die folgenden Befehle lesen diese Datei.</Row>
 </RowList>
 
 <HintLink section="run" />
 
 <SectionHeading id="replay" command="replay"><code translate="no">replay</code>: einen aufgezeichneten Lauf wiederholen</SectionHeading>
 
+<Synopsis command="replay" />
+
 <Prose>
 
-`replay` prüft einen Nachweis, wiederholt dessen Lauf im neuen Ordner `replay/` neben dem Nachweis und vergleicht den aufgezeichneten Lauf mit dem wiederholten. Es gibt aus, ob der Lauf sich wieder ergibt, wie viele <Term id="value">Werte</Term> abweichen, und die Pfade seiner Dateien.
+<code translate="no">replay</code> prüft einen Nachweis, wiederholt dessen Lauf im neuen Ordner `replay/` neben dem Nachweis und vergleicht den aufgezeichneten Lauf mit dem wiederholten. Es gibt aus, ob der Lauf sich wieder ergibt, wie viele <Term id="value">Werte</Term> abweichen, und die Pfade seiner Dateien.
 
-Der Ausgang ist `reproduced_exactly`, `reproduced_at_decimals` oder `reproduced_within_tolerances`, je nachdem, was das <Term id="tolerance-profile">Toleranzprofil</Term> enthält, oder `not_reproduced`. Wurde der Nachweis oder eine Datei, die er auflistet, nach dem Lauf verändert, wird das `replay` abgelehnt und schreibt nichts.
+Der Ausgang ist `reproduced_exactly`, `reproduced_at_decimals` oder `reproduced_within_tolerances`, je nachdem, was das <Term id="tolerance-profile">Toleranzprofil</Term> enthält, oder `not_reproduced`. Wurde der Nachweis oder eine Datei, die er auflistet, nach dem Lauf verändert, wird das <code translate="no">replay</code> abgelehnt und schreibt nichts.
 
 </Prose>
 
@@ -217,7 +272,7 @@ Der Ausgang ist `reproduced_exactly`, `reproduced_at_decimals` oder `reproduced_
 
 <Prose>
 
-Die Optionen von `replay`:
+Die Optionen von <code translate="no">replay</code>:
 
 </Prose>
 
@@ -227,47 +282,63 @@ Die Optionen von `replay`:
 
 <Prose>
 
-Die Dateien von `replay`:
+Die Dateien von <code translate="no">replay</code>:
 
 </Prose>
 
-<RowList>
-  <Row name="Der Nachweis" code="run-record.json" tag="liest">Der Pfad, den der Befehl erhält, und mit ihm die Dateien des Laufs, die der Nachweis auflistet.</Row>
-  <Row name="Die Versionsgeschichte des Modells" code="delib-history/" tag="liest">Die Dateien der Revision, die der Nachweis nennt, für den wiederholten Lauf.</Row>
-  <Row name="Ein Toleranzprofil" tag="liest">Die Datei, die `--tolerance` nennt. Nur mit dieser Option.</Row>
-  <Row name="Der wiederholte Lauf" code="replay/" tag="schreibt">Die Anfrage, die Antwort, die Ergebnisse und der Nachweis des wiederholten Laufs.</Row>
-  <Row name="Der Vergleich" code="replay-compare.request.json" tag="schreibt">Die Vergleichsanfrage, die `replay` selbst schreibt und ausführt, mit ihrem Ergebnis `replay-compare.result.json`.</Row>
-  <Row name="Die Werte, die abweichen" code="replay-compare.deviations.csv" tag="schreibt">Eine Zeile je Wert, der abweicht. Geschrieben, wenn die beiden Läufe verglichen werden.</Row>
-  <Row name="Der Nachweis des Wiederholens" code="replay-record.json" tag="schreibt">Listet die Dateien auf, die `replay` geschrieben hat.</Row>
+<RowList label="Liest">
+  <Row name="Der Nachweis" code="run-record.json">Der Pfad, den der Befehl erhält, und mit ihm die Dateien des Laufs, die der Nachweis auflistet.</Row>
+  <Row name="Die Versionsgeschichte des Modells" code="delib-history/">Die Dateien der Revision, die der Nachweis nennt, für den wiederholten Lauf.</Row>
+  <Row name="Ein Toleranzprofil">Die Datei, die `--tolerance` nennt. Nur mit dieser Option.</Row>
+</RowList>
+
+<RowList label="Schreibt">
+  <Row name="Der wiederholte Lauf" code="replay/">Die Anfrage, die Antwort, die Ergebnisse und der Nachweis des wiederholten Laufs.</Row>
+  <Row name="Der Vergleich" code="replay-compare.request.json">Die <Term id="compare-request">Vergleichsanfrage</Term>, die <code translate="no">replay</code> selbst schreibt und ausführt, mit ihrem Ergebnis `replay-compare.result.json`.</Row>
+  <Row name="Die Werte, die abweichen" code="replay-compare.deviations.csv">Eine Zeile je Wert, der abweicht. Geschrieben, wenn die beiden Läufe verglichen werden.</Row>
+  <Row name="Der Nachweis des Wiederholens" code="replay-record.json">Listet die Dateien auf, die <code translate="no">replay</code> geschrieben hat.</Row>
 </RowList>
 
 <SectionHeading id="compare" command="compare"><code translate="no">compare</code>: zwei Läufe vergleichen</SectionHeading>
 
+<Synopsis command="compare" />
+
 <Prose>
 
-`compare` vergleicht die beiden Läufe, die eine Vergleichsanfrage nennt, Wert für Wert, mit dem Toleranzprofil dieser Anfrage. Lassen sich die beiden Läufe vergleichen, schreibt es die Werte, die abweichen, und eine Signaturtabelle, die eine Zeile je Größe hat, die abweicht.
+<code translate="no">compare</code> vergleicht die beiden Läufe, die eine Vergleichsanfrage nennt, Wert für Wert, mit dem Toleranzprofil dieser Anfrage. Lassen sich die beiden Läufe vergleichen, schreibt es die Werte, die abweichen, und eine <Term id="signature-table">Signaturtabelle</Term>, die eine Zeile je Größe hat, die abweicht.
 
-Sie werden es selten selbst starten: `replay`, `regression`, `walk` und `search` schreiben ihre Vergleichsanfragen selbst und führen sie aus. Die Datei `replay-compare.request.json`, die `replay` schreibt, ist eine solche Anfrage. Diese Seite nennt deshalb keinen Beispielbefehl.
-
-`compare` hat keine Option, nur den Pfad der Vergleichsanfrage.
-
-Die Dateien von `compare`:
+Sie werden es selten selbst starten: `replay`, `regression`, `walk` und `search` schreiben ihre Vergleichsanfragen selbst und führen sie aus. Die Datei `replay-compare.request.json`, die `replay` schreibt, ist eine solche Anfrage; das Beispiel führt sie noch einmal aus. <a href={`${pageAddress(adapterPage, 'de')}#first-run`}>{adapterPage.name.de}</a> zeigt, wie Sie eine Vergleichsanfrage selbst schreiben.
 
 </Prose>
 
-<RowList>
-  <Row name="Die Vergleichsanfrage" tag="liest">Der Pfad, den der Befehl erhält, und mit ihm die beiden Läufe, die die Anfrage nennt.</Row>
-  <Row name="Das Ergebnis" code="compare.result.json" tag="schreibt">Neben die Anfrage geschrieben. Es listet die Modellpunkte auf, die abweichen.</Row>
-  <Row name="Die Werte, die abweichen" code="compare.deviations.csv" tag="schreibt">Eine Zeile je Wert über der Toleranz. Geschrieben, wenn die beiden Läufe verglichen werden.</Row>
-  <Row name="Die Signaturtabelle" code="signature-table.json" tag="schreibt">Je Größe, die abweicht: in wie vielen Modellpunkten und Werten, in welchen Perioden, dazu der größte Anstieg und der größte Rückgang. Geschrieben, wenn die beiden Läufe verglichen werden.</Row>
-  <Row name="Der Nachweis des Vergleichs" code="compare.run-record.json" tag="schreibt">Geschrieben, wenn sich das Release beider Läufe lesen lässt.</Row>
+<PlatformSwitch place="compare" windows={commands.compare.windows} linux={commands.compare.linux} />
+
+<Prose>
+
+<code translate="no">compare</code> hat keine Option, nur den Pfad der Vergleichsanfrage.
+
+Die Dateien von <code translate="no">compare</code>:
+
+</Prose>
+
+<RowList label="Liest">
+  <Row name="Die Vergleichsanfrage">Der Pfad, den der Befehl erhält, und mit ihm die beiden Läufe, die die Anfrage nennt.</Row>
+</RowList>
+
+<RowList label="Schreibt">
+  <Row name="Das Ergebnis" code="compare.result.json">Neben die Anfrage geschrieben. Es listet die Modellpunkte auf, die abweichen.</Row>
+  <Row name="Die Werte, die abweichen" code="compare.deviations.csv">Eine Zeile je Wert über der Toleranz. Geschrieben, wenn die beiden Läufe verglichen werden.</Row>
+  <Row name="Die Signaturtabelle" code="signature-table.json">Je Größe, die abweicht: in wie vielen Modellpunkten und Werten, in welchen Perioden, dazu der größte Anstieg und der größte Rückgang. Geschrieben, wenn die beiden Läufe verglichen werden.</Row>
+  <Row name="Der Nachweis des Vergleichs" code="compare.run-record.json">Geschrieben, wenn sich das Release beider Läufe lesen lässt.</Row>
 </RowList>
 
 <SectionHeading id="regression" command="regression"><code translate="no">regression</code>: einen aufgezeichneten Lauf gegen eine neuere Revision prüfen</SectionHeading>
 
+<Synopsis command="regression" />
+
 <Prose>
 
-`regression` nimmt den Nachweis eines gelungenen Laufs, eines vollständigen Laufs ohne eingeschaltete Änderungen. Es rechnet die neuere Revision, die Sie nennen, auf derselben Tabelle der Modellpunkte und für dieselben Modellpunkte wie der aufgezeichnete Lauf und vergleicht die beiden Läufe. Im neuen Lauf sind Code und Parameter die der neueren Revision, und die Bestandsdaten sind die des aufgezeichneten Laufs.
+<code translate="no">regression</code> nimmt als Ausgangspunkt den Nachweis eines gelungenen Laufs, eines vollständigen Laufs ohne eingeschaltete Änderungen. Es rechnet eine neuere Revision, die Sie nennen, für dieselben Modellpunkte wie der aufgezeichnete Lauf und vergleicht die beiden Läufe. Im neuen Lauf sind Code und Parameter die der neueren Revision, und die Bestandsdaten sind die des aufgezeichneten Laufs.
 
 Es meldet, dass nichts über der Toleranz abweicht, oder es gibt jeden Modellpunkt aus, der abweicht, und die Signaturtabelle. Schlägt der neue Lauf fehl, endet er mit einem Fehler oder wird er abgelehnt, wird nichts verglichen.
 
@@ -279,39 +350,44 @@ Im Beispiel ist die neuere Revision der Stand N+1 des Quick Starts. Der Befehl e
 
 <Prose>
 
-Die Optionen von `regression`:
+Die Optionen von <code translate="no">regression</code>:
 
 </Prose>
 
 <RowList>
   <Row name="Das neuere Release" code="--revision" tag="Pflicht" option>Das Release, das gerechnet und verglichen wird, benannt wie bei `request`.</Row>
   <Row name="Der Ordner, der geschrieben wird" code="--output" tag="Pflicht" option>Ein neuer Ordner; es darf ihn noch nicht geben.</Row>
-  <Row name="Eine Bezeichnung für das neuere Release" code="--label" option>Ein Name Ihrer Wahl für das Release, das gerechnet wird. Ohne die Option ist die Bezeichnung `regression`.</Row>
+  <Row name="Eine Bezeichnung für das neuere Release" code="--label" option>Ein Name Ihrer Wahl für das Release, das gerechnet wird. Ohne die Option ist die Bezeichnung <code translate="no">regression</code>.</Row>
   <Row name="Geteilte Optionen">{shared(['--tolerance', '--workers', '--engine', '--engine-path', '--engine-option', '--repositories'])}</Row>
 </RowList>
 
 <Prose>
 
-Die Dateien von `regression`:
+Die Dateien von <code translate="no">regression</code>:
 
 </Prose>
 
-<RowList>
-  <Row name="Der Nachweis des älteren Laufs" code="run-record.json" tag="liest">Der Pfad, den der Befehl erhält.</Row>
-  <Row name="Die Versionsgeschichte des Modells" code="delib-history/" tag="liest">Die Dateien der neueren Revision.</Row>
-  <Row name="Ein Toleranzprofil" tag="liest">Die Datei, die `--tolerance` nennt. Nur mit dieser Option.</Row>
-  <Row name="Eine Kopie des aufgezeichneten Laufs" code="recorded/" tag="schreibt">Im neuen Ordner, den `--output` nennt.</Row>
-  <Row name="Der neue Lauf" code="run/" tag="schreibt">Der Lauf der neueren Revision mit seinem eigenen `run-record.json`, den `derive`, `walk` und `search` als neueren Nachweis lesen.</Row>
-  <Row name="Der Vergleich" code="compare.request.json" tag="schreibt">Die Vergleichsanfrage, die `regression` selbst schreibt und ausführt, mit den Dateien, die `compare` schreibt: darunter `compare.result.json` und `signature-table.json`.</Row>
+<RowList label="Liest">
+  <Row name="Der Nachweis des älteren Laufs" code="run-record.json">Der Pfad, den der Befehl erhält.</Row>
+  <Row name="Die Versionsgeschichte des Modells" code="delib-history/">Die Dateien der neueren Revision.</Row>
+  <Row name="Ein Toleranzprofil">Die Datei, die `--tolerance` nennt. Nur mit dieser Option.</Row>
+</RowList>
+
+<RowList label="Schreibt">
+  <Row name="Eine Kopie des aufgezeichneten Laufs" code="recorded/">Im neuen Ordner, den `--output` nennt.</Row>
+  <Row name="Der neue Lauf" code="run/">Der Lauf der neueren Revision mit seinem eigenen `run-record.json`, den `derive`, `walk` und `search` als neueren Nachweis lesen.</Row>
+  <Row name="Der Vergleich" code="compare.request.json">Die Vergleichsanfrage, die <code translate="no">regression</code> selbst schreibt und ausführt, mit den Dateien, die `compare` schreibt: darunter `compare.result.json` und `signature-table.json`.</Row>
 </RowList>
 
 <SectionHeading id="derive" command="derive"><code translate="no">derive</code>: die Änderungen zwischen zwei aufgezeichneten Läufen auflisten</SectionHeading>
 
+<Synopsis command="derive" />
+
 <Prose>
 
-`derive` nimmt die Nachweise zweier gelungener Läufe, beide vollständig und ohne eingeschaltete Änderungen, den älteren zuerst. Es liest die Versionsgeschichte des Modells zwischen ihren beiden Revisionen und schreibt das Änderungsverzeichnis: eine Änderung je Revision auf der Hauptlinie der Versionsgeschichte, nach der älteren Revision und bis zur neueren, in der Reihenfolge der Versionsgeschichte. Ein Seitenzweig, der zusammengeführt wurde, ist eine Änderung, die Zusammenführung.
+<code translate="no">derive</code> nimmt als Ausgangspunkt die Nachweise zweier gelungener Läufe, beide vollständig und ohne eingeschaltete Änderungen, den älteren zuerst. Es liest die Versionsgeschichte des Modells zwischen ihren beiden Revisionen und schreibt das Änderungsverzeichnis: eine Änderung je Revision auf der Hauptlinie der Versionsgeschichte, nach der älteren Revision und bis zur neueren, in der Reihenfolge der Versionsgeschichte. Ein Seitenzweig, der zusammengeführt wurde, ist eine Änderung: die Zusammenführung, der Merge.
 
-Jede Änderung trägt ihre <Term id="class">Einordnung</Term>: Daten, Parameter, Code, mehrere davon oder keine. Was sich zwischen den beiden Nachweisen unterscheidet und zu keiner Revision gehört, die Version der Engine, wird als Rest genannt und gehört zu keiner Änderung. Der Befehl gibt die Änderungen und den Rest aus.
+Jede Änderung trägt ihre <Term id="class">Einordnung</Term>: Daten, Parameter, Code, mehrere davon oder keine. Was sich zwischen den beiden Nachweisen unterscheidet und zu keiner Revision gehört, eine andere Version des Kerns der Engine, wird als Rest genannt und gehört zu keiner Änderung. Der Befehl gibt die Änderungen und den Rest aus.
 
 Zwei Revisionen, die nicht auf einer Hauptlinie liegen, auch zwei Nachweise in der falschen Reihenfolge, werden abgelehnt, und nichts wird geschrieben. Dieselben zwei Nachweise ergeben dieselbe Datei, Byte für Byte.
 
@@ -321,7 +397,7 @@ Zwei Revisionen, die nicht auf einer Hauptlinie liegen, auch zwei Nachweise in d
 
 <Prose>
 
-Die Optionen von `derive`:
+Die Optionen von <code translate="no">derive</code>:
 
 </Prose>
 
@@ -332,27 +408,32 @@ Die Optionen von `derive`:
 
 <Prose>
 
-Die Dateien von `derive`:
+Die Dateien von <code translate="no">derive</code>:
 
 </Prose>
 
-<RowList>
-  <Row name="Die beiden Nachweise" code="run-record.json" tag="liest">Die beiden Pfade, die der Befehl erhält, der ältere Nachweis zuerst. Im Beispiel ist der neuere der Nachweis der Regression.</Row>
-  <Row name="Die Versionsgeschichte des Modells" code="delib-history/" tag="liest">Die Revisionen zwischen den beiden Nachweisen.</Row>
-  <Row name="Das Änderungsverzeichnis" code="changes.json" tag="schreibt">Die Datei, die `--output` nennt.</Row>
+<RowList label="Liest">
+  <Row name="Die beiden Nachweise" code="run-record.json">Die beiden Pfade, die der Befehl erhält, der ältere Nachweis zuerst. Im Beispiel ist der neuere der Nachweis der Regression.</Row>
+  <Row name="Die Versionsgeschichte des Modells" code="delib-history/">Die Revisionen zwischen den beiden Nachweisen.</Row>
+</RowList>
+
+<RowList label="Schreibt">
+  <Row name="Das Änderungsverzeichnis" code="changes.json">Die Datei, die `--output` nennt.</Row>
 </RowList>
 
 <SectionHeading id="walk" command="walk"><code translate="no">walk</code>: jeden Stand zwischen zwei aufgezeichneten Läufen rechnen</SectionHeading>
 
+<Synopsis command="walk" />
+
 <Prose>
 
-`walk` ordnet die Abweichung zwischen zwei aufgezeichneten Ergebnissen den Revisionen zwischen ihnen zu. Es nimmt dieselben zwei Nachweise wie `derive`, die dieselben Modellpunkte enthalten müssen, leitet das Änderungsverzeichnis ab und rechnet jeden Stand: Stand 0 ist die ältere Revision, und nach jeder Änderung folgt ein weiterer Stand. Es prüft Stand 0 gegen den älteren Nachweis und den letzten Stand gegen den neueren; jeder muss seinen Nachweis wieder ergeben, mit dem Toleranzprofil oder, ohne eines, exakt.
+<code translate="no">walk</code> ordnet die Abweichung zwischen zwei aufgezeichneten Ergebnissen den Revisionen zwischen ihnen zu. Es nimmt dieselben zwei Nachweise wie `derive`, die dieselben Modellpunkte enthalten müssen, leitet das Änderungsverzeichnis ab und rechnet jeden Stand: Stand 0 ist die ältere Revision, und nach jeder Änderung folgt ein weiterer Stand. Es prüft Stand 0 gegen den älteren Nachweis und den letzten Stand gegen den neueren; jeder muss seinen Nachweis wieder ergeben, mit dem Toleranzprofil oder, ohne eines, exakt.
 
-Dann vergleicht es jeden Stand mit dem Stand davor. Sein Ergebnis sagt für jede Änderung und jede Größe, ob die Änderung beiträgt, und nennt die Summe der Differenzen mit Vorzeichen und die Summe ihrer Beträge. Wo `walk` exakt vergleicht, ergeben die Summen mit Vorzeichen einer Größe zusammen genau die Abweichung zwischen den beiden Nachweisen.
+Dann vergleicht es jeden Stand mit dem Stand davor. Sein Ergebnis sagt für jede Änderung und jede Größe, ob die Änderung beiträgt, und nennt die Summe der Differenzen mit Vorzeichen und die Summe ihrer Beträge. Wo <code translate="no">walk</code> exakt vergleicht, ergeben die Summen mit Vorzeichen einer Größe zusammen genau die Abweichung zwischen den beiden Nachweisen.
 
 Die Bestandsdaten bewegen sich mit den Ständen, wenn jeder Nachweis seine eigene Revision als Bestandsdaten nennt. Sie bleiben bei der älteren Revision, wenn beide Nachweise dieselbe nennen, wie es der Nachweis einer `regression` tut; so ist es im Beispiel. Ein Stand, der nicht läuft, wird gemeldet, und der nächste Stand, der läuft, trägt dessen Änderung mit.
 
-Das Ergebnis von `walk` ist die Referenz, und `walk` rechnet am meisten: einen Stand je Änderung und einen dazu, im Beispiel {counts.states}. <a href={pageAddress(works, 'de')}>{works.name.de}</a> stellt es neben die Suche.
+Das Ergebnis von <code translate="no">walk</code> ist die Referenz, und <code translate="no">walk</code> rechnet am meisten: einen Stand je Änderung und einen dazu, im Beispiel {counts.states}. <a href={pageAddress(works, 'de')}>{works.name.de}</a> stellt es neben die Suche.
 
 </Prose>
 
@@ -360,7 +441,7 @@ Das Ergebnis von `walk` ist die Referenz, und `walk` rechnet am meisten: einen S
 
 <Prose>
 
-Die Optionen von `walk`:
+Die Optionen von <code translate="no">walk</code>:
 
 </Prose>
 
@@ -371,25 +452,30 @@ Die Optionen von `walk`:
 
 <Prose>
 
-Die Dateien von `walk`:
+Die Dateien von <code translate="no">walk</code>:
 
 </Prose>
 
-<RowList>
-  <Row name="Die beiden Nachweise" code="run-record.json" tag="liest">Die beiden Pfade, die der Befehl erhält, der ältere Nachweis zuerst.</Row>
-  <Row name="Die Versionsgeschichte des Modells" code="delib-history/" tag="liest">Die Revisionen zwischen den beiden Nachweisen, für jeden Stand.</Row>
-  <Row name="Ein Toleranzprofil" tag="liest">Die Datei, die `--tolerance` nennt. Nur mit dieser Option.</Row>
-  <Row name="Das Ergebnis" code="walk.result.json" tag="schreibt">Im neuen Ordner, den `--output` nennt. Dieselben zwei Nachweise ergeben dieselbe Datei, Byte für Byte.</Row>
-  <Row name="Der Nachweis zu diesem Ergebnis" code="walk.run-record.json" tag="schreibt">Womit das Ergebnis gerechnet wurde.</Row>
-  <Row name="Kopien der beiden aufgezeichneten Läufe" code="older/" tag="schreibt">Der ältere Lauf, und in `newer/` der neuere.</Row>
-  <Row name="Die Stände und ihre Vergleiche" code="state-00/" tag="schreibt">Ein Ordner je Stand, das Änderungsverzeichnis und der Vergleich jedes Schritts, der beiträgt.</Row>
+<RowList label="Liest">
+  <Row name="Die beiden Nachweise" code="run-record.json">Die beiden Pfade, die der Befehl erhält, der ältere Nachweis zuerst.</Row>
+  <Row name="Die Versionsgeschichte des Modells" code="delib-history/">Die Revisionen zwischen den beiden Nachweisen, für jeden Stand.</Row>
+  <Row name="Ein Toleranzprofil">Die Datei, die `--tolerance` nennt. Nur mit dieser Option.</Row>
+</RowList>
+
+<RowList label="Schreibt">
+  <Row name="Das Ergebnis" code="walk.result.json">Im neuen Ordner, den `--output` nennt. Dieselben zwei Nachweise ergeben dieselbe Datei, Byte für Byte.</Row>
+  <Row name="Der Nachweis zu diesem Ergebnis" code="walk.run-record.json">Womit das Ergebnis gerechnet wurde.</Row>
+  <Row name="Kopien der beiden aufgezeichneten Läufe" code="older/">Der ältere Lauf, und in `newer/` der neuere.</Row>
+  <Row name="Die Stände und ihre Vergleiche" code="state-00/">Ein Ordner je Stand, das Änderungsverzeichnis und der Vergleich jedes Schritts, der beiträgt.</Row>
 </RowList>
 
 <SectionHeading id="search" command="search"><code translate="no">search</code>: die abweichenden Änderungen mit weniger Rechnungen finden</SectionHeading>
 
+<Synopsis command="search" />
+
 <Prose>
 
-`search` nimmt dieselben zwei Nachweise wie `walk` und prüft dasselbe, bevor es rechnet. Es braucht keinen `walk`. Es rechnet Stand 0 und den letzten Stand, prüft sie gegen die beiden Nachweise und halbiert dann die Versionsgeschichte: Es beurteilt einen Abschnitt der Versionsgeschichte, indem es die Stände an seinen beiden Enden vergleicht, teilt einen Abschnitt nicht weiter, dessen Enden übereinstimmen, und ordnet einem Abschnitt, der nur eine Änderung enthält, eine Abweichung zu. <a href={pageAddress(works, 'de')}>{works.name.de}</a> erklärt das Verfahren und seine Grenzen.
+<code translate="no">search</code> nimmt dieselben zwei Nachweise wie `walk` und prüft dasselbe, bevor es rechnet. Es braucht keinen `walk`. Es rechnet Stand 0 und den letzten Stand, prüft sie gegen die beiden Nachweise und halbiert dann die Versionsgeschichte: Es beurteilt einen Abschnitt der Versionsgeschichte, indem es die Stände an seinen beiden Enden vergleicht, teilt einen Abschnitt nicht weiter, dessen Enden übereinstimmen, und ordnet einem Abschnitt, der nur eine Änderung enthält, eine Abweichung zu. <a href={pageAddress(works, 'de')}>{works.name.de}</a> erklärt das Verfahren und seine Grenzen.
 
 Mit `--quantity` und `--periods` grenzen Sie die Suche auf ein Ziel ein. Dann werden nur die Werte des Ziels beurteilt und summiert. Das Beispiel sucht im <Term id="bruttobeitrag" /> in den Perioden 0 bis 59, den ersten fünf Projektionsjahren.
 
@@ -401,7 +487,7 @@ Das Ergebnis nennt das Ziel, die beurteilten Abschnitte, die Änderungen, die be
 
 <Prose>
 
-Die Optionen von `search`:
+Die Optionen von <code translate="no">search</code>:
 
 </Prose>
 
@@ -417,30 +503,35 @@ Die Optionen von `search`:
 
 <Prose>
 
-Die Dateien von `search`:
+Die Dateien von <code translate="no">search</code>:
 
 </Prose>
 
-<RowList>
-  <Row name="Die beiden Nachweise" code="run-record.json" tag="liest">Die beiden Pfade, die der Befehl erhält, der ältere Nachweis zuerst.</Row>
-  <Row name="Die Versionsgeschichte des Modells" code="delib-history/" tag="liest">Die Revisionen zwischen den beiden Nachweisen, für jeden Stand, den die Suche rechnet.</Row>
-  <Row name="Ein Toleranzprofil" tag="liest">Die Datei, die `--tolerance` nennt. Nur mit dieser Option.</Row>
-  <Row name="Der Ordner eines walk" tag="liest">Der Ordner, den `--walk` nennt. Nur mit dieser Option.</Row>
-  <Row name="Das Ergebnis" code="search.result.json" tag="schreibt">Im neuen Ordner, den `--output` nennt.</Row>
-  <Row name="Der Nachweis der Suche" code="search.run-record.json" tag="schreibt">Womit die Suche gerechnet wurde.</Row>
-  <Row name="Das Änderungsverzeichnis" code="changes.json" tag="schreibt">Die Änderungen zwischen den beiden Nachweisen, wie `derive` sie schreibt.</Row>
-  <Row name="Kopien der beiden aufgezeichneten Läufe" code="older/" tag="schreibt">Der ältere Lauf, und in `newer/` der neuere.</Row>
-  <Row name="Die Stände und ihre Vergleiche" code="state-00/" tag="schreibt">Ein Ordner je Stand, den die Suche gerechnet hat, und der Vergleich jeder Änderung, die beiträgt.</Row>
-  <Row name="Die Kopie des Ordners eines walk" code="walk/" tag="schreibt">Nur mit `--walk`.</Row>
+<RowList label="Liest">
+  <Row name="Die beiden Nachweise" code="run-record.json">Die beiden Pfade, die der Befehl erhält, der ältere Nachweis zuerst.</Row>
+  <Row name="Die Versionsgeschichte des Modells" code="delib-history/">Die Revisionen zwischen den beiden Nachweisen, für jeden Stand, den die Suche rechnet.</Row>
+  <Row name="Ein Toleranzprofil">Die Datei, die `--tolerance` nennt. Nur mit dieser Option.</Row>
+  <Row name="Der Ordner eines walk">Der Ordner, den `--walk` nennt. Nur mit dieser Option.</Row>
 </RowList>
 
-<SectionHeading id="quickstart" command="quickstart"><code translate="no">quickstart</code>: die geführte Vorführung</SectionHeading>
+<RowList label="Schreibt">
+  <Row name="Das Ergebnis" code="search.result.json">Im neuen Ordner, den `--output` nennt.</Row>
+  <Row name="Der Nachweis der Suche" code="search.run-record.json">Womit die Suche gerechnet wurde.</Row>
+  <Row name="Das Änderungsverzeichnis" code="changes.json">Die Änderungen zwischen den beiden Nachweisen, wie `derive` sie schreibt.</Row>
+  <Row name="Kopien der beiden aufgezeichneten Läufe" code="older/">Der ältere Lauf, und in `newer/` der neuere.</Row>
+  <Row name="Die Stände und ihre Vergleiche" code="state-00/">Ein Ordner je Stand, den die Suche gerechnet hat, und der Vergleich jeder Änderung, die beiträgt.</Row>
+  <Row name="Die Kopie des Ordners eines walk" code="walk/">Nur mit `--walk`.</Row>
+</RowList>
+
+<SectionHeading id="quickstart" command="quickstart"><code translate="no">quickstart</code>: der geführte Quick Start</SectionHeading>
+
+<Synopsis command="quickstart" />
 
 <Prose>
 
-`quickstart` ist die geführte Vorführung des <a href={pageAddress(quickStart, 'de')}>{quickStart.name.de}</a>. Sie führt `request`, `run`, `regression`, `derive` und `search` auf den beiden Revisionen der Beispiele oben aus, ohne `replay`, erklärt jeden ihrer vier Schritte und wartet vor jedem auf Enter. Sie rechnet immer mit dem Referenzmodell. Ihre Suche vergleicht mit dem Toleranzprofil `tolerance-bruttobeitrag.json` des Pakets; ihre Regression vergleicht exakt.
+<code translate="no">quickstart</code> ist der Befehl hinter dem <a href={pageAddress(quickStart, 'de')}>{quickStart.name.de}</a>. Er führt `request`, `run`, `regression`, `derive` und `search` auf den beiden Revisionen der Beispiele oben aus, ohne `replay`, erklärt jeden seiner vier Schritte und wartet vor jedem auf Enter. Er rechnet immer mit dem Referenzmodell. Seine Suche vergleicht mit dem Toleranzprofil `tolerance-bruttobeitrag.json` des Pakets; seine Regression vergleicht exakt.
 
-Sie starten sie über ihre Startdatei, die in den Paketordner wechselt, ihre Optionen an `quickstart` weitergibt und mit dessen Exit-Status endet:
+Sie starten ihn über seine Startdatei, die in den Paketordner wechselt, ihre Optionen an <code translate="no">quickstart</code> weitergibt und mit dessen Exit-Status endet:
 
 </Prose>
 
@@ -460,32 +551,35 @@ Am Ende wartet die Startdatei nur dann auf Enter, wenn ihre Eingabe ein Terminal
 
 <Prose>
 
-Der Exit-Status ist 0, wenn jeder Schritt mit dem Status geendet hat, den die Vorführung erwartet, und 1, wenn ein Schritt mit einem anderen geendet hat. Er ist 2, wenn es den Ordner der Vorführung schon gibt, er sich nicht anlegen lässt oder ein Fehler des Betriebssystems einen Schritt beendet, und 130, wenn Sie die Vorführung mit Strg+C abbrechen.
+Der Exit-Status ist 0, wenn jeder Schritt mit dem Status geendet hat, den der Quick Start erwartet, und 1, wenn ein Schritt mit einem anderen geendet hat. Er ist 2, wenn es den Ordner des Quick Starts schon gibt, er sich nicht anlegen lässt oder ein Fehler des Betriebssystems einen Schritt beendet, und 130, wenn Sie den Quick Start mit Strg+C abbrechen.
 
-Die Optionen von `quickstart`:
+Die Optionen von <code translate="no">quickstart</code>:
 
 </Prose>
 
 <RowList>
-  <Row name="Ohne Warten" code="--no-pause" option>Die Vorführung wartet nicht vor jedem Schritt auf Enter.</Row>
-  <Row name="Die Sprache" code="--lang" option>Die Sprache der Texte, `de` oder `en`. Ohne die Option spricht die Vorführung die Sprache des Systems.</Row>
+  <Row name="Ohne Warten" code="--no-pause" option>Der Quick Start wartet nicht vor jedem Schritt auf Enter.</Row>
+  <Row name="Die Sprache" code="--lang" option>Die Sprache der Texte, `de` oder `en`. Ohne die Option spricht der Quick Start die Sprache des Systems.</Row>
   <Row name="Geteilte Optionen">{shared(['--repositories'])}</Row>
 </RowList>
 
 <Prose>
 
-Die Dateien von `quickstart`:
+Die Dateien von <code translate="no">quickstart</code>:
 
 </Prose>
 
-<RowList>
-  <Row name="Die Versionsgeschichte des Modells" code="delib-history/" tag="liest">Die beiden Revisionen des Quick Starts.</Row>
-  <Row name="Das Toleranzprofil" code="tolerance-bruttobeitrag.json" tag="liest">Im Ordner `profiles/` des Pakets.</Row>
-  <Row name="Der Ordner der Vorführung" code="quickstart-<UTC-Zeit>/" tag="schreibt">Ein neuer Ordner in `runs` im Paketordner. Die Vorführung nennt ihn am Anfang und am Ende.</Row>
-  <Row name="Der Lauf von Release N" code="release-n/" tag="schreibt">Im Ordner der Vorführung: was `request` und `run` schreiben.</Row>
-  <Row name="Die Regression" code="regression/" tag="schreibt">Was `regression` schreibt, mit dem Lauf des Stands N+1 in ihrem Ordner `run/`.</Row>
-  <Row name="Das Änderungsverzeichnis" code="changes.json" tag="schreibt">Was `derive` schreibt.</Row>
-  <Row name="Die Suche" code="search/" tag="schreibt">Was `search` schreibt.</Row>
+<RowList label="Liest">
+  <Row name="Die Versionsgeschichte des Modells" code="delib-history/">Die beiden Revisionen des Quick Starts.</Row>
+  <Row name="Das Toleranzprofil" code="tolerance-bruttobeitrag.json">Im Ordner `profiles/` des Pakets.</Row>
+</RowList>
+
+<RowList label="Schreibt">
+  <Row name="Der Ordner des Quick Starts" code="quickstart-<UTC-Zeit>/">Ein neuer Ordner in `runs` im Paketordner. Der Quick Start nennt ihn am Anfang und am Ende.</Row>
+  <Row name="Der Lauf von Release N" code="release-n/">Im Ordner des Quick Starts: was `request` und `run` schreiben.</Row>
+  <Row name="Die Regression" code="regression/">Was `regression` schreibt, mit dem Lauf des Stands N+1 in ihrem Ordner `run/`.</Row>
+  <Row name="Das Änderungsverzeichnis" code="changes.json">Was `derive` schreibt.</Row>
+  <Row name="Die Suche" code="search/">Was `search` schreibt.</Row>
 </RowList>
 
 <HintLink section="quickstart" />

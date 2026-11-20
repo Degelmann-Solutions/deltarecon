@@ -2,8 +2,20 @@
 layout: ../../layouts/Page.astro
 lang: en
 page: single-commands
-lead: "Every command of the package on its own, beside the guided demo: what it does, an example to copy, its options, and the files it reads and writes."
-description: "The nine single commands of the DeltaRecon package, from request to quickstart: what each does, an example for Windows and Linux, its options and its files."
+lead: "Every command of DeltaRecon explained: what it does, an example to copy, its options, and the files it reads and writes."
+description: "The nine single commands of the DeltaRecon package, from request to quickstart: what each does, its synopsis, an example for Windows and Linux, its options and its files."
+sections:
+  - { anchor: start, title: "Start a command" }
+  - { anchor: request, title: request, code: true }
+  - { anchor: run, title: run, code: true }
+  - { anchor: replay, title: replay, code: true }
+  - { anchor: compare, title: compare, code: true }
+  - { anchor: regression, title: regression, code: true }
+  - { anchor: derive, title: derive, code: true }
+  - { anchor: walk, title: walk, code: true }
+  - { anchor: search, title: search, code: true }
+  - { anchor: quickstart, title: quickstart, code: true }
+  - { anchor: shared-options, title: "Shared options" }
 ---
 import Callout from '../../components/Callout.astro';
 import HintLink from '../../components/HintLink.astro';
@@ -12,14 +24,18 @@ import Prose from '../../components/Prose.astro';
 import Row from '../../components/Row.astro';
 import RowList from '../../components/RowList.astro';
 import SectionHeading from '../../components/SectionHeading.astro';
+import SubHeading from '../../components/SubHeading.astro';
+import Synopsis from '../../components/Synopsis.astro';
 import Term from '../../components/Term.astro';
 import { searchCounts } from '../../captures';
 import { findPage, pageAddress } from '../../site';
 
 export const commands = {
   // The example of each command, per platform: a line of the guide of the
-  // package (README.txt, LIESMICH.txt). `walk` stands in no guide; its
-  // example has the form of the guide's line of `search`.
+  // package (README.txt, LIESMICH.txt). `walk` and `compare` stand in no
+  // guide: the example of `walk` has the form of the guide's line of
+  // `search`, and that of `compare` runs the compare request that the
+  // example of `replay` wrote.
   // scripts/check-release.mjs holds them against the release.
   request: {
     windows: [String.raw`.\deltarecon.cmd request --revision fa368575a66d97c94e96dffc62b273ec95511b12 --label N --run-id run-n-full --output runs\n-full\request.json`],
@@ -32,6 +48,10 @@ export const commands = {
   replay: {
     windows: [String.raw`.\deltarecon.cmd replay runs\n-full\run-record.json`],
     linux: ['./deltarecon replay runs/n-full/run-record.json'],
+  },
+  compare: {
+    windows: [String.raw`.\deltarecon.cmd compare runs\n-full\replay-compare.request.json`],
+    linux: ['./deltarecon compare runs/n-full/replay-compare.request.json'],
   },
   regression: {
     windows: [String.raw`.\deltarecon.cmd regression runs\n-full\run-record.json --revision 887b7181d22550eda2fb52fa1a6bd77376d4eb2e --output runs\regression-n`],
@@ -59,10 +79,25 @@ export const own = findPage('own-calculations');
 export const results = findPage('understand-the-results');
 export const works = findPage('how-deltarecon-works');
 export const enginePage = findPage('engine-requirements');
+export const adapterPage = findPage('build-an-adapter');
 export const counts = searchCounts('en');
+// The commands of the package, in the order of the help: each has a
+// section under the anchor of its name.
+export const commandNames = ['request', 'run', 'replay', 'compare', 'regression', 'derive', 'walk', 'search', 'quickstart'];
 // Inline code of this page names commands, options, files and outcomes:
-// none of it is to be translated.
-export const components = { code: (props) => <code translate="no" {...props} /> };
+// none of it is to be translated. The name of a command, written in
+// backticks, is a link to the section of that command. In its own section a
+// command is written as `<code translate="no">` instead, which this map
+// leaves alone, so that no section links to itself.
+// scripts/check-prose.mjs holds both.
+export const components = {
+  code: (props) =>
+    commandNames.includes(String(props.children)) ? (
+      <a href={`#${props.children}`} data-command-link={String(props.children)}><code translate="no" {...props} /></a>
+    ) : (
+      <code translate="no" {...props} />
+    ),
+};
 // The name of the last section, for its heading and the links to it.
 export const sharedName = 'Options that several commands share';
 // The options of a command that the last section describes, each marked
@@ -83,7 +118,7 @@ export const shared = (options) => (
 
 <Prose>
 
-The guided demo of the <a href={pageAddress(quickStart, 'en')}>{quickStart.name.en}</a> runs the commands of the quick start for you, apart from `replay`. This page describes every command of the package on its own, in the order in which the package lists them. You start a single command in the package folder.
+The <a href={pageAddress(quickStart, 'en')}>{quickStart.name.en}</a> runs several of these commands for you. This page describes every command of the package on its own, in the order in which the package lists them. You start a single command in the package folder.
 
 </Prose>
 
@@ -103,31 +138,41 @@ Open a terminal in the package folder. Every command begins with the launcher `.
 
 <Prose>
 
-The examples of this page are the commands that the guide `README.txt` in the package folder lists; the example of `walk` is the one exception, the guide does not list it. They write to the folder `runs` in the package folder, and they build on each other in the order of this page: `request` writes what `run` reads, and so on. The folder `runs` is a free choice; the files of a run may lie in any folder.
+The examples of this page are the commands that the guide `README.txt` in the package folder lists; the examples of `compare` and `walk` are the exceptions, the guide does not list them. They write to the folder `runs` in the package folder, and they build on each other in the order of this page: `request` writes what `run` reads, and so on. The folder `runs` is a free choice; the files of a run may lie in any folder.
 
 No command overwrites an existing file. A command whose output exists already does not start. To repeat a calculation, give it an output that does not exist yet.
 
 This page shows no output. <a href={pageAddress(own, 'en')}>{own.name.en}</a> shows step by step what single commands print, and <a href={pageAddress(results, 'en')}>{results.name.en}</a> explains how to read the tables of the demo.
 
+Under the heading of each command stands its synopsis, as the help of the command prints it, for example `./deltarecon request --help`. What stands between `[` and `]` may be left out. A word in capitals is a placeholder that you fill in; `...` means that it may be given several times. The words in small letters at the end are the paths that the command is given.
+
+</Prose>
+
+<SubHeading id="exit-status">The exit status of a command</SubHeading>
+
+<Prose>
+
 Every command ends with an <Term id="exit-status">exit status</Term>, a number that says how it ended. The command `quickstart` counts in its own way; its section says how.
 
 </Prose>
 
-<RowList>
-  <Row name="Done, and nothing to report" code="0">A run that succeeded, a replay that is reproduced, a comparison or a <Term id="regression">regression</Term> without a <Term id="deviation">deviation</Term>, a request or a <Term id="change-manifest">change manifest</Term> that was written, a walk that attributes every <Term id="revision">revision</Term>, a search whose two ends are reproduced.</Row>
-  <Row name="Something to look at, or a refusal" code="1">A run that failed, was rejected or ended with an error; a replay that is not reproduced; a comparison or a regression with a deviation; a change manifest that cannot be derived; a walk or a search that is refused or stops. The regression of the quick start ends with status 1 by design: it reports the deviation between the two revisions, and the next commands run all the same.</Row>
-  <Row name="The command could not start" code="2">For example: an output exists already, the selected engine cannot be loaded, the file of a tolerance or the target of a search is faulty, or a <Term id="record">record</Term> is not that of a run that succeeded.</Row>
+<RowList plain>
+  <Row name="Status 0: Done, and nothing to report">A run that succeeded, a replay that is reproduced, a comparison or a <Term id="regression">regression</Term> without a <Term id="deviation">deviation</Term>, a request or a <Term id="change-manifest">change manifest</Term> that was written, a walk that attributes every <Term id="revision">revision</Term>, a search whose two ends are reproduced.</Row>
+  <Row name="Status 1: Something to look at, or a refusal">A run that failed, was rejected or ended with an error; a replay that is not reproduced; a comparison or a regression with a deviation; a change manifest that cannot be derived; a walk or a search that is refused or stops. The regression of the quick start ends with status 1 by design: it reports the deviation between the two revisions, and the next commands run all the same.</Row>
+  <Row name="Status 2: The command could not start">For example: an output exists already, the selected engine cannot be loaded, the file of a tolerance or the target of a search is faulty, or a <Term id="record">record</Term> is not that of a run that succeeded.</Row>
 </RowList>
 
 <HintLink section="start" />
 
 <SectionHeading id="request" command="request"><code translate="no">request</code>: say what is to be computed</SectionHeading>
 
+<Synopsis command="request" />
+
 <Prose>
 
-`request` writes a run request: the file that says what is to be computed. It names the release completely, that is the code, the parameters and the input data, each by the full name of its revision, and the version of the engine. It also names the model points to run. `request` computes nothing; `run` does.
+<code translate="no">request</code> writes a run request: the file that says what is to be computed. It names the release completely, that is the code, the parameters and the input data, each by the full name of its revision, and the version of the core of the engine, which is not part of the history: for the <Term id="reference-model">reference model</Term> the libraries modelx, pandas and numpy, and Python itself. It also names the model points to run. <code translate="no">request</code> computes nothing; `run` does.
 
-For the <Term id="reference-model">reference model</Term> a release is a revision of the history that the package holds in the folder `delib-history`. You name it by its full or abbreviated hash, by a branch, by a tag or by `HEAD`; a suffix such as `HEAD~1` is not read. The request then holds the full hash.
+For the reference model a release is a revision of the history that the package holds in the folder `delib-history`. You name it by its full or abbreviated hash, by a branch, by a tag or by `HEAD`; a suffix such as `HEAD~1` is not read. The request then holds the full hash.
 
 The example writes the request for release N of the quick start.
 
@@ -137,7 +182,7 @@ The example writes the request for release N of the quick start.
 
 <Prose>
 
-The options of `request`:
+The options of <code translate="no">request</code>:
 
 </Prose>
 
@@ -155,21 +200,26 @@ The options of `request`:
 
 <Prose>
 
-The files of `request`:
+The files of <code translate="no">request</code>:
 
 </Prose>
 
-<RowList>
-  <Row name="The history of the model" code="delib-history/" tag="reads">The folder of the package from which every command reads the releases of the reference model.</Row>
-  <Row name="A change manifest" tag="reads">The file that `--manifest` names. Only with that option.</Row>
-  <Row name="The request" code="request.json" tag="writes">The file that `--output` names; in the example `request.json` in the new folder `n-full`.</Row>
+<RowList label="Reads">
+  <Row name="The history of the model" code="delib-history/">The folder of the package from which every command reads the releases of the reference model.</Row>
+  <Row name="A change manifest">The file that `--manifest` names. Only with that option.</Row>
+</RowList>
+
+<RowList label="Writes">
+  <Row name="The request" code="request.json">The file that `--output` names; in the example `request.json` in the new folder `n-full`.</Row>
 </RowList>
 
 <SectionHeading id="run" command="run"><code translate="no">run</code>: compute a request</SectionHeading>
 
+<Synopsis command="run" />
+
 <Prose>
 
-`run` checks the request, restores the files of the named revision to a scratch folder, projects the selected model points and evaluates the five built-in checks of the model for each. It writes its files beside the request.
+<code translate="no">run</code> checks the request, restores the files of the named revision to a scratch folder, projects the selected model points and evaluates the five built-in checks of the model for each. It writes its files beside the request.
 
 A run ends with one of four outcomes. `succeeded`: there are results. `failed`: a model point raised an error, a check is false, or a result is not a finite number; there are no results. `error`: the request was accepted, but the engine could not restore or read the state; there are no results. `rejected`: the request broke a rule, and nothing ran. The record is written for every outcome, except for a file that cannot be read as a run request.
 
@@ -179,7 +229,7 @@ A run ends with one of four outcomes. `succeeded`: there are results. `failed`: 
 
 <Prose>
 
-The options of `run`:
+The options of <code translate="no">run</code>:
 
 </Prose>
 
@@ -189,25 +239,30 @@ The options of `run`:
 
 <Prose>
 
-The files of `run`:
+The files of <code translate="no">run</code>:
 
 </Prose>
 
-<RowList>
-  <Row name="The request" code="request.json" tag="reads">The path that the command is given.</Row>
-  <Row name="The history of the model" code="delib-history/" tag="reads">The files of the revision that the request names.</Row>
-  <Row name="The response" code="response.json" tag="writes">How the run ended: its outcome.</Row>
-  <Row name="The results" code="results.csv" tag="writes">The export of the run, per model point. Only a run that succeeded has it.</Row>
-  <Row name="The record" code="run-record.json" tag="writes">What was computed with what. The commands that follow read this file.</Row>
+<RowList label="Reads">
+  <Row name="The request" code="request.json">The path that the command is given.</Row>
+  <Row name="The history of the model" code="delib-history/">The files of the revision that the request names.</Row>
+</RowList>
+
+<RowList label="Writes">
+  <Row name="The response" code="response.json">How the run ended: its outcome.</Row>
+  <Row name="The results" code="results.csv">The export of the run, per model point. Only a run that succeeded has it.</Row>
+  <Row name="The record" code="run-record.json">What was computed with what. The commands that follow read this file.</Row>
 </RowList>
 
 <HintLink section="run" />
 
 <SectionHeading id="replay" command="replay"><code translate="no">replay</code>: repeat a recorded run</SectionHeading>
 
+<Synopsis command="replay" />
+
 <Prose>
 
-`replay` checks a record, repeats its run in the new folder `replay/` beside the record, and compares the recorded run with the repeated one. It prints whether the run is reproduced, how many <Term id="value">values</Term> deviate, and the paths of its files.
+<code translate="no">replay</code> checks a record, repeats its run in the new folder `replay/` beside the record, and compares the recorded run with the repeated one. It prints whether the run is reproduced, how many <Term id="value">values</Term> deviate, and the paths of its files.
 
 The outcome is `reproduced_exactly`, `reproduced_at_decimals` or `reproduced_within_tolerances`, depending on what the <Term id="tolerance-profile">tolerance profile</Term> holds, or `not_reproduced`. If the record or a file that it lists was altered after the run, the replay is rejected and writes nothing.
 
@@ -217,7 +272,7 @@ The outcome is `reproduced_exactly`, `reproduced_at_decimals` or `reproduced_wit
 
 <Prose>
 
-The options of `replay`:
+The options of <code translate="no">replay</code>:
 
 </Prose>
 
@@ -227,47 +282,63 @@ The options of `replay`:
 
 <Prose>
 
-The files of `replay`:
+The files of <code translate="no">replay</code>:
 
 </Prose>
 
-<RowList>
-  <Row name="The record" code="run-record.json" tag="reads">The path that the command is given, and with it the files of the run that the record lists.</Row>
-  <Row name="The history of the model" code="delib-history/" tag="reads">The files of the revision that the record names, for the repeated run.</Row>
-  <Row name="A tolerance profile" tag="reads">The file that `--tolerance` names. Only with that option.</Row>
-  <Row name="The repeated run" code="replay/" tag="writes">The request, the response, the results and the record of the repeated run.</Row>
-  <Row name="The comparison" code="replay-compare.request.json" tag="writes">The compare request that `replay` writes and runs itself, with its result `replay-compare.result.json`.</Row>
-  <Row name="The values that deviate" code="replay-compare.deviations.csv" tag="writes">One row per value that deviates. Written when the two runs are compared.</Row>
-  <Row name="The record of the replay" code="replay-record.json" tag="writes">Lists the files of the replay.</Row>
+<RowList label="Reads">
+  <Row name="The record" code="run-record.json">The path that the command is given, and with it the files of the run that the record lists.</Row>
+  <Row name="The history of the model" code="delib-history/">The files of the revision that the record names, for the repeated run.</Row>
+  <Row name="A tolerance profile">The file that `--tolerance` names. Only with that option.</Row>
+</RowList>
+
+<RowList label="Writes">
+  <Row name="The repeated run" code="replay/">The request, the response, the results and the record of the repeated run.</Row>
+  <Row name="The comparison" code="replay-compare.request.json">The <Term id="compare-request">compare request</Term> that <code translate="no">replay</code> writes and runs itself, with its result `replay-compare.result.json`.</Row>
+  <Row name="The values that deviate" code="replay-compare.deviations.csv">One row per value that deviates. Written when the two runs are compared.</Row>
+  <Row name="The record of the replay" code="replay-record.json">Lists the files of the replay.</Row>
 </RowList>
 
 <SectionHeading id="compare" command="compare"><code translate="no">compare</code>: compare two runs</SectionHeading>
 
+<Synopsis command="compare" />
+
 <Prose>
 
-`compare` compares the two runs that a compare request names, value by value, under the tolerance profile of that request. When the two runs can be compared, it writes the values that deviate and a signature table, which has one row per quantity that deviates.
+<code translate="no">compare</code> compares the two runs that a compare request names, value by value, under the tolerance profile of that request. When the two runs can be compared, it writes the values that deviate and a <Term id="signature-table">signature table</Term>, which has one row per quantity that deviates.
 
-You will rarely start it yourself: `replay`, `regression`, `walk` and `search` write and run their compare requests themselves. The file `replay-compare.request.json` that `replay` writes is such a request. This page therefore gives no example command.
-
-`compare` takes no option, apart from the path of the compare request.
-
-The files of `compare`:
+You will rarely start it yourself: `replay`, `regression`, `walk` and `search` write and run their compare requests themselves. The file `replay-compare.request.json` that `replay` writes is such a request; the example runs it once more. <a href={`${pageAddress(adapterPage, 'en')}#first-run`}>{adapterPage.name.en}</a> shows how to write a compare request yourself.
 
 </Prose>
 
-<RowList>
-  <Row name="The compare request" tag="reads">The path that the command is given, and with it the two runs that the request names.</Row>
-  <Row name="The result" code="compare.result.json" tag="writes">Written beside the request. It lists the model points that deviate.</Row>
-  <Row name="The values that deviate" code="compare.deviations.csv" tag="writes">One row per value above the tolerance. Written when the two runs are compared.</Row>
-  <Row name="The signature table" code="signature-table.json" tag="writes">Per quantity that deviates: in how many model points and values, in which periods, and the largest increase and decrease. Written when the two runs are compared.</Row>
-  <Row name="The record of the comparison" code="compare.run-record.json" tag="writes">Written when the release of both runs can be read.</Row>
+<PlatformSwitch place="compare" windows={commands.compare.windows} linux={commands.compare.linux} />
+
+<Prose>
+
+<code translate="no">compare</code> takes no option, apart from the path of the compare request.
+
+The files of <code translate="no">compare</code>:
+
+</Prose>
+
+<RowList label="Reads">
+  <Row name="The compare request">The path that the command is given, and with it the two runs that the request names.</Row>
+</RowList>
+
+<RowList label="Writes">
+  <Row name="The result" code="compare.result.json">Written beside the request. It lists the model points that deviate.</Row>
+  <Row name="The values that deviate" code="compare.deviations.csv">One row per value above the tolerance. Written when the two runs are compared.</Row>
+  <Row name="The signature table" code="signature-table.json">Per quantity that deviates: in how many model points and values, in which periods, and the largest increase and decrease. Written when the two runs are compared.</Row>
+  <Row name="The record of the comparison" code="compare.run-record.json">Written when the release of both runs can be read.</Row>
 </RowList>
 
 <SectionHeading id="regression" command="regression"><code translate="no">regression</code>: check a recorded run against a newer revision</SectionHeading>
 
+<Synopsis command="regression" />
+
 <Prose>
 
-`regression` takes the record of a run that succeeded, a full run without enabled changes. It computes the newer revision that you name on the same model point table and for the same model points as the recorded run, and compares the two runs. In the new run the code and the parameters are those of the newer revision, and the input data are those of the recorded run.
+<code translate="no">regression</code> starts from the record of a run that succeeded, a full run without enabled changes. It computes a newer revision that you name for the same model points as the recorded run, and compares the two runs. In the new run the code and the parameters are those of the newer revision, and the input data are those of the recorded run.
 
 It reports that nothing deviates above the tolerance, or it prints every model point that deviates and the signature table. When the new run fails, ends with an error or is rejected, nothing is compared.
 
@@ -279,39 +350,44 @@ In the example the newer revision is the state N+1 of the quick start. The comma
 
 <Prose>
 
-The options of `regression`:
+The options of <code translate="no">regression</code>:
 
 </Prose>
 
 <RowList>
   <Row name="The newer release" code="--revision" tag="required" option>The release to compute and compare, named as for `request`.</Row>
   <Row name="The folder to write" code="--output" tag="required" option>A new folder; it must not exist.</Row>
-  <Row name="A label for the newer release" code="--label" option>A name of your choice for the release that is computed. Without it the label is `regression`.</Row>
+  <Row name="A label for the newer release" code="--label" option>A name of your choice for the release that is computed. Without it the label is <code translate="no">regression</code>.</Row>
   <Row name="Shared options">{shared(['--tolerance', '--workers', '--engine', '--engine-path', '--engine-option', '--repositories'])}</Row>
 </RowList>
 
 <Prose>
 
-The files of `regression`:
+The files of <code translate="no">regression</code>:
 
 </Prose>
 
-<RowList>
-  <Row name="The record of the older run" code="run-record.json" tag="reads">The path that the command is given.</Row>
-  <Row name="The history of the model" code="delib-history/" tag="reads">The files of the newer revision.</Row>
-  <Row name="A tolerance profile" tag="reads">The file that `--tolerance` names. Only with that option.</Row>
-  <Row name="A copy of the recorded run" code="recorded/" tag="writes">In the new folder that `--output` names.</Row>
-  <Row name="The new run" code="run/" tag="writes">The run of the newer revision with its own `run-record.json`, which `derive`, `walk` and `search` read as the newer record.</Row>
-  <Row name="The comparison" code="compare.request.json" tag="writes">The compare request that `regression` writes and runs itself, with the files that `compare` writes: among them `compare.result.json` and `signature-table.json`.</Row>
+<RowList label="Reads">
+  <Row name="The record of the older run" code="run-record.json">The path that the command is given.</Row>
+  <Row name="The history of the model" code="delib-history/">The files of the newer revision.</Row>
+  <Row name="A tolerance profile">The file that `--tolerance` names. Only with that option.</Row>
+</RowList>
+
+<RowList label="Writes">
+  <Row name="A copy of the recorded run" code="recorded/">In the new folder that `--output` names.</Row>
+  <Row name="The new run" code="run/">The run of the newer revision with its own `run-record.json`, which `derive`, `walk` and `search` read as the newer record.</Row>
+  <Row name="The comparison" code="compare.request.json">The compare request that <code translate="no">regression</code> writes and runs itself, with the files that `compare` writes: among them `compare.result.json` and `signature-table.json`.</Row>
 </RowList>
 
 <SectionHeading id="derive" command="derive"><code translate="no">derive</code>: list the changes between two recorded runs</SectionHeading>
 
+<Synopsis command="derive" />
+
 <Prose>
 
-`derive` takes the records of two runs that succeeded, both full runs without enabled changes, the older one first. It reads the history of the model between their two revisions and writes the change manifest: one change per revision on the main line of the history, after the older revision and up to the newer one, in the order of the history. A branch that was merged is one change, the merge.
+<code translate="no">derive</code> starts from the records of two runs that succeeded, both full runs without enabled changes, the older one first. It reads the history of the model between their two revisions and writes the change manifest: one change per revision on the main line of the history, after the older revision and up to the newer one, in the order of the history. A branch that was merged is one change, the merge.
 
-Each change carries its <Term id="class">class</Term>: data, parameter, code, several of them or none. What differs between the two records and belongs to no revision, the version of the engine, is named as the remainder and belongs to no change. The command prints the changes and the remainder.
+Each change carries its <Term id="class">class</Term>: data, parameter, code, several of them or none. What differs between the two records and belongs to no revision, another version of the core of the engine, is named as the remainder and belongs to no change. The command prints the changes and the remainder.
 
 Two revisions that do not lie on one main line, also two records in the wrong order, are refused, and nothing is written. The same two records give the same file, byte for byte.
 
@@ -321,7 +397,7 @@ Two revisions that do not lie on one main line, also two records in the wrong or
 
 <Prose>
 
-The options of `derive`:
+The options of <code translate="no">derive</code>:
 
 </Prose>
 
@@ -332,21 +408,26 @@ The options of `derive`:
 
 <Prose>
 
-The files of `derive`:
+The files of <code translate="no">derive</code>:
 
 </Prose>
 
-<RowList>
-  <Row name="The two records" code="run-record.json" tag="reads">The two paths that the command is given, the older record first. In the example the newer one is the record of the regression.</Row>
-  <Row name="The history of the model" code="delib-history/" tag="reads">The revisions between the two records.</Row>
-  <Row name="The change manifest" code="changes.json" tag="writes">The file that `--output` names.</Row>
+<RowList label="Reads">
+  <Row name="The two records" code="run-record.json">The two paths that the command is given, the older record first. In the example the newer one is the record of the regression.</Row>
+  <Row name="The history of the model" code="delib-history/">The revisions between the two records.</Row>
+</RowList>
+
+<RowList label="Writes">
+  <Row name="The change manifest" code="changes.json">The file that `--output` names.</Row>
 </RowList>
 
 <SectionHeading id="walk" command="walk"><code translate="no">walk</code>: compute every state between two recorded runs</SectionHeading>
 
+<Synopsis command="walk" />
+
 <Prose>
 
-`walk` attributes the deviation between two recorded results to the revisions between them. It takes the same two records as `derive`, which must hold the same model points, derives the change manifest and computes every state: state 0 is the older revision, and one further state follows after each change. It checks state 0 against the older record and the last state against the newer one; each must reproduce its record, under the tolerance profile or, without one, exactly.
+<code translate="no">walk</code> attributes the deviation between two recorded results to the revisions between them. It takes the same two records as `derive`, which must hold the same model points, derives the change manifest and computes every state: state 0 is the older revision, and one further state follows after each change. It checks state 0 against the older record and the last state against the newer one; each must reproduce its record, under the tolerance profile or, without one, exactly.
 
 It then compares each state with the state before it. Its result says for each change and each quantity whether the change contributes, and gives the signed sum of the differences and the sum of their absolute values. Where the walk compares exactly, the signed sums of a quantity add up exactly to the deviation between the two records.
 
@@ -360,7 +441,7 @@ The walk is the reference result, and it computes the most: one state per change
 
 <Prose>
 
-The options of `walk`:
+The options of <code translate="no">walk</code>:
 
 </Prose>
 
@@ -371,25 +452,30 @@ The options of `walk`:
 
 <Prose>
 
-The files of `walk`:
+The files of <code translate="no">walk</code>:
 
 </Prose>
 
-<RowList>
-  <Row name="The two records" code="run-record.json" tag="reads">The two paths that the command is given, the older record first.</Row>
-  <Row name="The history of the model" code="delib-history/" tag="reads">The revisions between the two records, for every state.</Row>
-  <Row name="A tolerance profile" tag="reads">The file that `--tolerance` names. Only with that option.</Row>
-  <Row name="The result" code="walk.result.json" tag="writes">In the new folder that `--output` names. The same two records give the same file, byte for byte.</Row>
-  <Row name="The record of the walk" code="walk.run-record.json" tag="writes">What the walk was computed with.</Row>
-  <Row name="Copies of the two recorded runs" code="older/" tag="writes">The older run, and in `newer/` the newer one.</Row>
-  <Row name="The states and their comparisons" code="state-00/" tag="writes">One folder per state, the change manifest, and the comparison of every step that contributes.</Row>
+<RowList label="Reads">
+  <Row name="The two records" code="run-record.json">The two paths that the command is given, the older record first.</Row>
+  <Row name="The history of the model" code="delib-history/">The revisions between the two records, for every state.</Row>
+  <Row name="A tolerance profile">The file that `--tolerance` names. Only with that option.</Row>
+</RowList>
+
+<RowList label="Writes">
+  <Row name="The result" code="walk.result.json">In the new folder that `--output` names. The same two records give the same file, byte for byte.</Row>
+  <Row name="The record of the walk" code="walk.run-record.json">What the walk was computed with.</Row>
+  <Row name="Copies of the two recorded runs" code="older/">The older run, and in `newer/` the newer one.</Row>
+  <Row name="The states and their comparisons" code="state-00/">One folder per state, the change manifest, and the comparison of every step that contributes.</Row>
 </RowList>
 
 <SectionHeading id="search" command="search"><code translate="no">search</code>: find the changes that deviate, with fewer computations</SectionHeading>
 
+<Synopsis command="search" />
+
 <Prose>
 
-`search` takes the same two records as `walk` and makes the same checks before it computes. It needs no walk. It computes state 0 and the last state, checks them against the two records, and then halves the history: it judges a stretch of the history by comparing the states at its two ends, does not divide a stretch whose ends agree, and attributes a deviation to a stretch that holds a single change. <a href={pageAddress(works, 'en')}>{works.name.en}</a> explains the method and its limits.
+<code translate="no">search</code> takes the same two records as `walk` and makes the same checks before it computes. It needs no walk. It computes state 0 and the last state, checks them against the two records, and then halves the history: it judges a stretch of the history by comparing the states at its two ends, does not divide a stretch whose ends agree, and attributes a deviation to a stretch that holds a single change. <a href={pageAddress(works, 'en')}>{works.name.en}</a> explains the method and its limits.
 
 You can narrow the search to a target with `--quantity` and `--periods`. Only the values of the target are then judged and summed. The example searches in the <Term id="bruttobeitrag" /> in the periods 0 to 59, the first five projection years.
 
@@ -401,7 +487,7 @@ The result names the target, the stretches that were judged, the changes that co
 
 <Prose>
 
-The options of `search`:
+The options of <code translate="no">search</code>:
 
 </Prose>
 
@@ -417,30 +503,35 @@ The options of `search`:
 
 <Prose>
 
-The files of `search`:
+The files of <code translate="no">search</code>:
 
 </Prose>
 
-<RowList>
-  <Row name="The two records" code="run-record.json" tag="reads">The two paths that the command is given, the older record first.</Row>
-  <Row name="The history of the model" code="delib-history/" tag="reads">The revisions between the two records, for every state that the search computes.</Row>
-  <Row name="A tolerance profile" tag="reads">The file that `--tolerance` names. Only with that option.</Row>
-  <Row name="The folder of a walk" tag="reads">The folder that `--walk` names. Only with that option.</Row>
-  <Row name="The result" code="search.result.json" tag="writes">In the new folder that `--output` names.</Row>
-  <Row name="The record of the search" code="search.run-record.json" tag="writes">What the search was computed with.</Row>
-  <Row name="The change manifest" code="changes.json" tag="writes">The changes between the two records, as `derive` writes them.</Row>
-  <Row name="Copies of the two recorded runs" code="older/" tag="writes">The older run, and in `newer/` the newer one.</Row>
-  <Row name="The states and their comparisons" code="state-00/" tag="writes">One folder per state that the search computed, and the comparison of every change that contributes.</Row>
-  <Row name="The copy of the walk" code="walk/" tag="writes">Only with `--walk`.</Row>
+<RowList label="Reads">
+  <Row name="The two records" code="run-record.json">The two paths that the command is given, the older record first.</Row>
+  <Row name="The history of the model" code="delib-history/">The revisions between the two records, for every state that the search computes.</Row>
+  <Row name="A tolerance profile">The file that `--tolerance` names. Only with that option.</Row>
+  <Row name="The folder of a walk">The folder that `--walk` names. Only with that option.</Row>
+</RowList>
+
+<RowList label="Writes">
+  <Row name="The result" code="search.result.json">In the new folder that `--output` names.</Row>
+  <Row name="The record of the search" code="search.run-record.json">What the search was computed with.</Row>
+  <Row name="The change manifest" code="changes.json">The changes between the two records, as `derive` writes them.</Row>
+  <Row name="Copies of the two recorded runs" code="older/">The older run, and in `newer/` the newer one.</Row>
+  <Row name="The states and their comparisons" code="state-00/">One folder per state that the search computed, and the comparison of every change that contributes.</Row>
+  <Row name="The copy of the walk" code="walk/">Only with `--walk`.</Row>
 </RowList>
 
 <SectionHeading id="quickstart" command="quickstart"><code translate="no">quickstart</code>: the guided demo</SectionHeading>
 
+<Synopsis command="quickstart" />
+
 <Prose>
 
-`quickstart` is the guided demo of the <a href={pageAddress(quickStart, 'en')}>{quickStart.name.en}</a>. It runs `request`, `run`, `regression`, `derive` and `search` on the two revisions of the examples above, without `replay`, explains each of its four steps and waits for Enter before each. It always computes with the reference model. Its search compares under the tolerance profile `tolerance-bruttobeitrag.json` of the package; its regression compares exactly.
+<code translate="no">quickstart</code> is the command behind the guided demo of the <a href={pageAddress(quickStart, 'en')}>{quickStart.name.en}</a>. It runs `request`, `run`, `regression`, `derive` and `search` on the two revisions of the examples above, without `replay`, explains each of its four steps and waits for Enter before each. It always computes with the reference model. Its search compares under the tolerance profile `tolerance-bruttobeitrag.json` of the package; its regression compares exactly.
 
-You start it through its starter, which changes to the package folder, hands its options on to `quickstart` and ends with its exit status:
+You start it through its starter, which changes to the package folder, hands its options on to <code translate="no">quickstart</code> and ends with its exit status:
 
 </Prose>
 
@@ -462,7 +553,7 @@ At the end the starter waits for Enter only when its input is a terminal.
 
 The exit status is 0 when every step ended with the status that the demo expects, and 1 when a step ended with another. It is 2 when the folder of the demo exists already or cannot be created, or when an error of the operating system ends a step, and 130 when you stop the demo with Ctrl+C.
 
-The options of `quickstart`:
+The options of <code translate="no">quickstart</code>:
 
 </Prose>
 
@@ -474,18 +565,21 @@ The options of `quickstart`:
 
 <Prose>
 
-The files of `quickstart`:
+The files of <code translate="no">quickstart</code>:
 
 </Prose>
 
-<RowList>
-  <Row name="The history of the model" code="delib-history/" tag="reads">The two revisions of the quick start.</Row>
-  <Row name="The tolerance profile" code="tolerance-bruttobeitrag.json" tag="reads">In the folder `profiles/` of the package.</Row>
-  <Row name="The folder of the demo" code="quickstart-<UTC time>/" tag="writes">A new folder in `runs` in the package folder. The demo names it at the start and at the end.</Row>
-  <Row name="The run of release N" code="release-n/" tag="writes">In the folder of the demo: what `request` and `run` write.</Row>
-  <Row name="The regression" code="regression/" tag="writes">What `regression` writes, with the run of the state N+1 in its folder `run/`.</Row>
-  <Row name="The change manifest" code="changes.json" tag="writes">What `derive` writes.</Row>
-  <Row name="The search" code="search/" tag="writes">What `search` writes.</Row>
+<RowList label="Reads">
+  <Row name="The history of the model" code="delib-history/">The two revisions of the quick start.</Row>
+  <Row name="The tolerance profile" code="tolerance-bruttobeitrag.json">In the folder `profiles/` of the package.</Row>
+</RowList>
+
+<RowList label="Writes">
+  <Row name="The folder of the demo" code="quickstart-<UTC time>/">A new folder in `runs` in the package folder. The demo names it at the start and at the end.</Row>
+  <Row name="The run of release N" code="release-n/">In the folder of the demo: what `request` and `run` write.</Row>
+  <Row name="The regression" code="regression/">What `regression` writes, with the run of the state N+1 in its folder `run/`.</Row>
+  <Row name="The change manifest" code="changes.json">What `derive` writes.</Row>
+  <Row name="The search" code="search/">What `search` writes.</Row>
 </RowList>
 
 <HintLink section="quickstart" />

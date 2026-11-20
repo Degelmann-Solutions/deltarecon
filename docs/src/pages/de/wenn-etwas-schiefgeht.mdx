@@ -74,13 +74,13 @@ Windows begrenzt die Länge eines Pfads. Entpacken Sie das Archiv in einen Ordne
 
 <HintGroup id="quick-start-start">
 
-<Hint title="SmartScreen warnt beim Start der Vorführung">
+<Hint title="SmartScreen warnt, wenn Sie den Quick Start starten">
 
 Bei diesem Paket erwartet: Es ist nicht signiert. Mit Schritt 2 stellen Sie sicher, dass Ihr Archiv das veröffentlichte ist.
 
 </Hint>
 
-<Hint title="Die Vorführung spricht die falsche Sprache">
+<Hint title="Der Quick Start spricht die falsche Sprache">
 
 Sie spricht die Sprache Ihres Systems. Starten Sie sie mit `--lang de` oder `--lang en`, um Deutsch oder Englisch zu wählen.
 
@@ -88,13 +88,13 @@ Sie spricht die Sprache Ihres Systems. Starten Sie sie mit `--lang de` oder `--l
 
 <Hint title="Das Fenster schließt sich am Ende">
 
-Erwartet. Ein Fenster, das ein Doppelklick geöffnet hat, bleibt am Ende offen, bis Sie eine Taste drücken. Wenn es sich schließt, geht nichts verloren: Die Vorführung hat ihre Dateien in einen neuen Ordner `runs\quickstart-<UTC-Zeit>` im Paketordner geschrieben und diesen Ordner am Anfang und am Ende genannt.
+Erwartet. Ein Fenster, das ein Doppelklick geöffnet hat, bleibt am Ende offen, bis Sie eine Taste drücken. Wenn es sich schließt, geht nichts verloren: Der Quick Start hat seine Dateien in einen neuen Ordner `runs\quickstart-<UTC-Zeit>` im Paketordner geschrieben und diesen Ordner am Anfang und am Ende genannt.
 
 </Hint>
 
-<Hint title="Die Vorführung endet sofort und meldet, dass es ihren Ordner schon gibt">
+<Hint title="Der Quick Start endet sofort und meldet, dass es seinen Ordner schon gibt">
 
-Die Vorführung schreibt in einen neuen Ordner, der nach der Uhrzeit ihres Starts benannt ist, auf die Sekunde genau, und sie überschreibt nichts. Gibt es diesen Ordner schon, endet sie mit dem <Term id="exit-status">Exit-Status</Term> 2. Starten Sie die Vorführung noch einmal.
+Der Quick Start schreibt in einen neuen Ordner, der nach der Uhrzeit seines Starts benannt ist, auf die Sekunde genau, und er überschreibt nichts. Gibt es diesen Ordner schon, endet er mit dem <Term id="exit-status">Exit-Status</Term> 2. Starten Sie den Quick Start noch einmal.
 
 </Hint>
 
@@ -102,16 +102,16 @@ Die Vorführung schreibt in einen neuen Ordner, der nach der Uhrzeit ihres Start
 
 <HintGroup id="quick-start-demo">
 
-<Hint title="Schritt 2 der Vorführung endet mit dem Exit-Status 1">
+<Hint title="Schritt 2 des Quick Starts endet mit dem Exit-Status 1">
 
-Erwartet. `regression` meldet 0, wenn die beiden Ergebnisse übereinstimmen, und 1, wenn sie sich unterscheiden. Release N und N+1 unterscheiden sich absichtlich; 1 ist hier also das richtige Ergebnis und kein Fehler: Der Befehl meldet die <Term id="deviation">Abweichung</Term> zwischen den beiden <Term id="revision">Revisionen</Term>. Die Vorführung geht weiter.
+Erwartet. `regression` meldet 0, wenn die beiden Ergebnisse übereinstimmen, und 1, wenn sie sich unterscheiden. Release N und N+1 unterscheiden sich absichtlich; 1 ist hier also das richtige Ergebnis und kein Fehler: Der Befehl meldet die <Term id="deviation">Abweichung</Term> zwischen den beiden <Term id="revision">Revisionen</Term>. Der Quick Start geht weiter.
 
 </Hint>
 
 <Hint>
-<span slot="title">Die Vorführung endet vorzeitig und meldet, dass sie abgebrochen wurde</span>
+<span slot="title">Der Quick Start endet vorzeitig und meldet, dass er abgebrochen wurde</span>
 
-Die Vorführung wurde mit Strg+C abgebrochen. Sie endet mit dem Exit-Status 130.
+Der Quick Start wurde mit Strg+C abgebrochen. Er endet mit dem Exit-Status 130.
 
 </Hint>
 
@@ -145,7 +145,7 @@ Die Variable `Q` gilt, solange das Fenster offen bleibt. Geben Sie in einem neue
 
 <Hint title="Ihr Ordner heißt anders als der, den die Seite zeigt">
 
-Erwartet. Der Ordner trägt die Uhrzeit, zu der Ihre Vorführung begonnen hat.
+Erwartet. Der Ordner trägt die Uhrzeit, zu der Ihr Quick Start begonnen hat.
 
 </Hint>
 
@@ -161,7 +161,7 @@ Erwartet. Er rechnet eine Weile und gibt erst etwas aus, wenn er fertig ist.
 
 <Hint title="Die Ausgabe ist englisch und zeigt mehr Stellen">
 
-Erwartet. Die einzelnen Befehle geben ihre Meldungen nur auf Englisch aus, und Zahlen mit mehr Stellen als die Tabellen der Vorführung.
+Erwartet. Die einzelnen Befehle geben ihre Meldungen nur auf Englisch aus, und Zahlen mit mehr Stellen als die Tabellen des Quick Starts.
 
 </Hint>
 
@@ -233,11 +233,11 @@ Der Nachweis wird bei jedem Ausgang geschrieben, außer bei einer Datei, die sic
 </HintGroup>
 
 <HintGroup id="single-commands-quickstart">
-<span slot="title"><code translate="no">quickstart</code>: die geführte Vorführung</span>
+<span slot="title"><code translate="no">quickstart</code>: der geführte Quick Start</span>
 
-<Hint title="Die Vorführung endet mit einem anderen Exit-Status als 0">
+<Hint title="Der Quick Start endet mit einem anderen Exit-Status als 0">
 
-Status 1: Ein Schritt hat mit einem anderen Status geendet, als die Vorführung erwartet. Status 2: Den Ordner der Vorführung gibt es schon, er lässt sich nicht anlegen, oder ein Fehler des Betriebssystems beendet einen Schritt. Status 130: Sie haben die Vorführung mit Strg+C abgebrochen.
+Status 1: Ein Schritt hat mit einem anderen Status geendet, als der Quick Start erwartet. Status 2: Den Ordner des Quick Starts gibt es schon, er lässt sich nicht anlegen, oder ein Fehler des Betriebssystems beendet einen Schritt. Status 130: Sie haben den Quick Start mit Strg+C abgebrochen.
 
 </Hint>
 

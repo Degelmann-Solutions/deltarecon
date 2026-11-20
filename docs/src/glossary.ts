@@ -100,6 +100,21 @@ export const entries: readonly Entry[] = [
     },
   },
   {
+    anchor: 'compare-request',
+    en: {
+      term: 'Compare request',
+      forms: ['compare requests'],
+      explanation:
+        'The file that says what a comparison compares: it names the two runs and holds the tolerance profile. The commands <code translate="no">replay</code>, <code translate="no">regression</code>, <code translate="no">walk</code> and <code translate="no">search</code> write theirs themselves; you write one by hand only for the command <code translate="no">compare</code>.',
+    },
+    de: {
+      term: 'Vergleichsanfrage',
+      forms: ['Vergleichsanfragen'],
+      explanation:
+        'Die Datei, die sagt, was ein Vergleich vergleicht: Sie nennt die beiden Läufe und enthält das Toleranzprofil. Die Befehle <code translate="no">replay</code>, <code translate="no">regression</code>, <code translate="no">walk</code> und <code translate="no">search</code> schreiben ihre selbst; von Hand schreiben Sie eine nur für den Befehl <code translate="no">compare</code>.',
+    },
+  },
+  {
     anchor: 'deviation',
     en: {
       term: 'Deviation',
@@ -214,6 +229,21 @@ export const entries: readonly Entry[] = [
       forms: ['Revisionen'],
       explanation:
         'Eine Änderung in der Historie des Modells. Jede Änderung ist eine Revision; der Stand N+1 des Quick Starts liegt 32 Revisionen nach Release N.',
+    },
+  },
+  {
+    anchor: 'signature-table',
+    en: {
+      term: 'Signature table',
+      forms: ['signature tables'],
+      explanation:
+        'The summary of a comparison, one row per quantity that deviates: in how many model points and values it deviates, in which periods, and the largest increase and the largest decrease. The first table of the quick start shows a part of it.',
+    },
+    de: {
+      term: 'Signaturtabelle',
+      forms: ['Signaturtabellen'],
+      explanation:
+        'Die Zusammenfassung eines Vergleichs, eine Zeile je Größe, die abweicht: in wie vielen Modellpunkten und Werten sie abweicht, in welchen Perioden, dazu der größte Anstieg und der größte Rückgang. Die erste Tabelle des Quick Starts zeigt einen Teil davon.',
     },
   },
   {

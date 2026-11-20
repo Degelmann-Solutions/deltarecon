@@ -221,6 +221,7 @@ export const searchTexts = {
 export const pageWords = {
   'understand-the-results': { en: 'bracket', de: 'Stornosatz' },
   'how-deltarecon-works': { en: 'middle', de: 'Durchlauf' },
+  'tolerance-profile': { en: 'whoever', de: 'kaufmännisch' },
   'single-commands': { en: 'launcher', de: 'Umgebungsvariable' },
   'engine-requirements': { en: 'yardstick', de: 'Maßstab' },
   'build-an-adapter': { en: 'lookup', de: 'Kleinbuchstaben' },

@@ -2,14 +2,14 @@
 layout: ../../layouts/Page.astro
 lang: de
 page: quick-start
-lead: "Sie laden ein Archiv herunter, entpacken es und starten einen Befehl. Installiert wird nichts. Die geführte Vorführung vergleicht dann zwei Stände des Referenzmodells delib-history, einer Risikolebensversicherung mit 350 Modellpunkten, und führt die Abweichung zwischen ihnen auf die Änderungen zurück, die sie verursachen."
-description: "In sechs Schritten vom Download des veröffentlichten Pakets zum ersten Suchergebnis der geführten Vorführung am Referenzmodell, für Windows und Linux."
+lead: "Sie laden ein Archiv herunter, entpacken es und starten einen Befehl. Installiert wird nichts. Der geführte Quick Start vergleicht dann zwei Stände des Referenzmodells delib-history, einer Risikolebensversicherung mit 350 Modellpunkten, und führt die Abweichung zwischen ihnen auf die Änderungen zurück, die sie verursachen."
+description: "In sechs Schritten vom Download des veröffentlichten Pakets zum ersten Suchergebnis des geführten Quick Starts am Referenzmodell, für Windows und Linux."
 steps:
   - { anchor: download, title: "Das Paket herunterladen" }
   - { anchor: check, title: "Das Archiv prüfen", optional: true }
   - { anchor: unpack, title: "Das Archiv entpacken" }
-  - { anchor: start, title: "Die geführte Vorführung starten" }
-  - { anchor: demo, title: "Den vier Schritten der Vorführung folgen" }
+  - { anchor: start, title: "Den geführten Quick Start starten" }
+  - { anchor: demo, title: "Den vier Schritten des Quick Starts folgen" }
   - { anchor: result, title: "Ihr erstes Suchergebnis lesen" }
 ---
 import ArchiveCheckFigure from '../../components/ArchiveCheckFigure.astro';
@@ -131,8 +131,8 @@ Der Paketordner ist <code translate="no">{packageFolder('linux')}</code>; in ihm
   <FileList
     label="Im Paketordner"
     files={[
-      { name: 'quickstart.cmd', note: 'geführte Vorführung', platform: 'windows' },
-      { name: 'quickstart', note: 'geführte Vorführung', platform: 'linux' },
+      { name: 'quickstart.cmd', note: 'geführter Quick Start', platform: 'windows' },
+      { name: 'quickstart', note: 'geführter Quick Start', platform: 'linux' },
       { name: 'deltarecon.cmd', note: 'einzelne Befehle', platform: 'windows' },
       { name: 'deltarecon', note: 'einzelne Befehle', platform: 'linux' },
       { name: 'README.txt', note: 'Anleitung, englisch' },
@@ -162,17 +162,17 @@ Windows begrenzt die Länge eines Pfads. Entpacken Sie das Archiv deshalb in ein
 
 <StepCard steps={frontmatter.steps} anchor="start">
 
-Starten Sie die Vorführung im Paketordner.
+Starten Sie den geführten Quick Start im Paketordner.
 
 <PlatformPart os="windows">
 
-Doppelklicken Sie im Paketordner auf `quickstart.cmd`. Oder öffnen Sie PowerShell im Paketordner und starten Sie die Vorführung dort:
+Doppelklicken Sie im Paketordner auf `quickstart.cmd`. Oder öffnen Sie PowerShell im Paketordner und starten Sie ihn dort:
 
 </PlatformPart>
 
 <PlatformPart os="linux">
 
-Öffnen Sie ein Terminal, wechseln Sie in den Paketordner und starten Sie die Vorführung dort:
+Öffnen Sie ein Terminal, wechseln Sie in den Paketordner und starten Sie ihn dort:
 
 </PlatformPart>
 
@@ -182,18 +182,18 @@ Doppelklicken Sie im Paketordner auf `quickstart.cmd`. Oder öffnen Sie PowerShe
 >
   <div slot="after-windows">
 
-Am Ende wartet die Vorführung, bis Sie eine Taste drücken.
+Am Ende wartet der Quick Start, bis Sie eine Taste drücken.
 
   </div>
 </PlatformSwitch>
 
 <div class="step-after">
 
-Die Vorführung erklärt jeden Schritt, bevor er läuft, und wartet auf die Eingabetaste.
+Der Quick Start erklärt jeden Schritt, bevor dieser läuft, und wartet auf die Eingabetaste.
 
 </div>
 
-<KeyCap slot="figure" name="Enter">Die Vorführung wartet vor jedem ihrer vier Schritte auf die Eingabetaste (Enter).</KeyCap>
+<KeyCap slot="figure" name="Enter">Der Quick Start wartet vor jedem seiner vier Schritte auf die Eingabetaste (Enter).</KeyCap>
 
 <div slot="wide">
 <PlatformPart os="windows">
@@ -210,14 +210,14 @@ Die Vorführung erklärt jeden Schritt, bevor er läuft, und wartet auf die Eing
 
 <div class="step-after">
 
-So beginnt die Vorführung, bis sie zum ersten Mal auf die Eingabetaste wartet.
+So beginnt der Quick Start, bis er zum ersten Mal auf die Eingabetaste wartet.
 
 </div>
 
 <PlatformPart os="windows">
 <Callout tag="Hinweis" title="Windows kann warnen">
 
-Das Windows-Paket ist nicht signiert; SmartScreen kann deshalb beim Start der Vorführung warnen. Bei diesem Paket ist die Warnung erwartet; mit Schritt 2 stellen Sie sicher, dass Ihr Archiv das veröffentlichte ist.
+Das Windows-Paket ist nicht signiert; SmartScreen kann deshalb warnen, wenn Sie den Quick Start starten. Bei diesem Paket ist die Warnung erwartet; mit Schritt 2 stellen Sie sicher, dass Ihr Archiv das veröffentlichte ist.
 
 </Callout>
 </PlatformPart>
@@ -229,14 +229,14 @@ Das Windows-Paket ist nicht signiert; SmartScreen kann deshalb beim Start der Vo
 
 <StepCard steps={frontmatter.steps} anchor="demo">
 
-Vor jedem Schritt sagt die Vorführung, was der Befehl tut, und zeigt ihn vollständig. Mit der Eingabetaste starten Sie ihn. Danach fasst sie zusammen, was der Schritt geschrieben hat. Die vier Schritte finden eine <Term id="deviation">Abweichung</Term> zwischen zwei Releases, bei der jeder abweichende <Term id="value">Wert</Term> zählt, listen jede <Term id="revision">Revision</Term> dazwischen mit ihrer <Term id="class">Einordnung</Term> auf und suchen die Revisionen, die die Abweichung verursachen.
+Vor jedem Schritt sagt der Quick Start, was der Befehl tut, und zeigt ihn vollständig. Mit der Eingabetaste starten Sie ihn. Danach fasst der Quick Start zusammen, was der Schritt geschrieben hat. Die vier Schritte finden eine <Term id="deviation">Abweichung</Term> zwischen zwei Releases, bei der jeder abweichende <Term id="value">Wert</Term> zählt, listen jede <Term id="revision">Revision</Term> dazwischen mit ihrer <Term id="class">Einordnung</Term> auf und suchen die Revisionen, die die Abweichung verursachen.
 
 <FlowDiagram end="Suchergebnis">
   <FlowBox code="request · run" writes="release-n/">Release N rechnen</FlowBox>
   <FlowBox code="regression" writes="regression/"><Term id="regression">Regression</Term> gegen N+1</FlowBox>
   <FlowBox code="derive" writes="changes.json">Die Änderungen zwischen N und N+1</FlowBox>
   <FlowBox code="search" writes="search/">Die Ursache im <Term id="bruttobeitrag" /> suchen</FlowBox>
-  <p slot="caption">Die vier Schritte der geführten Vorführung. Jeder Schritt schreibt seine Dateien in den Ordner der Vorführung, und die späteren Schritte lesen sie.</p>
+  <p slot="caption">Die vier Schritte des geführten Quick Starts. Jeder Schritt schreibt seine Dateien in den Ordner des Quick Starts, und die späteren Schritte lesen sie.</p>
 </FlowDiagram>
 
 <SummaryList
@@ -250,7 +250,7 @@ Vor jedem Schritt sagt die Vorführung, was der Befehl tut, und zeigt ihn vollst
 
 <Callout tag="Ein Begriff in einfachen Worten" title="Warum der Exit-Status 1 in Schritt 2 erwartet ist">
 
-Jeder Befehl meldet mit einer Zahl, seinem <Term id="exit-status">Exit-Status</Term>, wie er geendet hat. `regression` meldet 0, wenn die beiden Ergebnisse übereinstimmen, und 1, wenn sie sich unterscheiden. Release N und N+1 unterscheiden sich absichtlich; 1 ist hier also das richtige Ergebnis und kein Fehler. Die Vorführung geht weiter.
+Jeder Befehl meldet mit einer Zahl, seinem <Term id="exit-status">Exit-Status</Term>, wie er geendet hat. `regression` meldet 0, wenn die beiden Ergebnisse übereinstimmen, und 1, wenn sie sich unterscheiden. Release N und N+1 unterscheiden sich absichtlich; 1 ist hier also das richtige Ergebnis und kein Fehler. Der Quick Start geht weiter.
 
 </Callout>
 
@@ -260,7 +260,7 @@ Jeder Befehl meldet mit einer Zahl, seinem <Term id="exit-status">Exit-Status</T
 
 <StepCard steps={frontmatter.steps} anchor="result">
 
-Schritt 4 der Vorführung endet mit dieser Tabelle: eine Zeile je Revision, die im Bruttobeitrag in den ersten fünf Projektionsjahren abweicht. Jede Summe trägt ihr Vorzeichen. Unter der Tabelle meldet die Vorführung einen Teil der Abweichung als „<Term id="not-resolved">Nicht aufgelöst</Term>“; der Kasten unten erklärt das.
+Schritt 4 des Quick Starts endet mit dieser Tabelle: eine Zeile je Revision, die im Bruttobeitrag in den ersten fünf Projektionsjahren abweicht. Jede Summe trägt ihr Vorzeichen. Unter der Tabelle meldet der Quick Start einen Teil der Abweichung als „<Term id="not-resolved">Nicht aufgelöst</Term>“; der Kasten unten erklärt das.
 
 <ResultTable>Ausgabe von Schritt 4 am Referenzmodell:</ResultTable>
 
@@ -278,7 +278,7 @@ Manche Änderungen sind so klein, dass jede einzelne den Bruttobeitrag um wenige
 
 <div class="step-after">
 
-Das vollständige Ergebnis steht in `search/search.result.json`. Alle Dateien der Vorführung liegen im Ordner der Vorführung unterhalb des Paketordners; die Vorführung nennt ihn am Anfang und am Ende.
+Das vollständige Ergebnis steht in `search/search.result.json`. Alle Dateien des Quick Starts liegen in seinem Ordner unterhalb des Paketordners; der Quick Start nennt diesen Ordner am Anfang und am Ende.
 
 </div>
 </div>

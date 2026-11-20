@@ -367,7 +367,7 @@ Put your own words in the places between `<` and `>`:
 
 `request` prints the path of the request it wrote. `run` prints `outcome: succeeded`, the number of model points, the number of rows of the results and their SHA-256, and the paths of the three files it wrote. Both commands end with exit status 0. When a command ends with a traceback, look at the known limits in step 6.
 
-With a second run, of another revision, you can compare two results. `regression`, `replay`, `walk` and `search` write their compare requests themselves and run them. You write a compare request yourself only for `compare`, the comparison of two runs by hand. It is a JSON file with these members:
+With a second run, of another revision, you can compare two results. `regression`, `replay`, `walk` and `search` write their <Term id="compare-request">compare requests</Term> themselves and run them. You write a compare request yourself only for `compare`, the comparison of two runs by hand. It is a JSON file with these members:
 
 <RowList>
   <Row name="The kind of document">`document` is always `compare_request`.</Row>

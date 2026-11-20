@@ -2,8 +2,8 @@
 layout: ../../layouts/Page.astro
 lang: de
 page: understand-the-results
-lead: "Die geführte Vorführung des Quick Starts gibt drei Tabellen aus. Diese Seite geht sie in der Reihenfolge der Vorführung durch und erklärt jede Spalte und jeden Befund."
-description: "So lesen Sie die drei Tabellen der Vorführung von DeltaRecon: wo sich die Ergebnisse zweier Releases unterscheiden, was sich zwischen ihnen geändert hat und welche Änderungen die Abweichung verursachen."
+lead: "Der Quick Start gibt drei Tabellen aus. Diese Seite geht sie der Reihe nach durch und erklärt jede Spalte und jeden Befund."
+description: "So lesen Sie die drei Tabellen des Quick Starts von DeltaRecon: wo sich die Ergebnisse zweier Releases unterscheiden, was sich zwischen ihnen geändert hat und welche Änderungen die Abweichung verursachen."
 ---
 import BarFigure from '../../components/BarFigure.astro';
 import Callout from '../../components/Callout.astro';
@@ -55,7 +55,7 @@ export const typed = {
 
 <Prose>
 
-Die Vorführung läuft am <Term id="reference-model">Referenzmodell</Term>. In ihrem zweiten Schritt rechnet die <Term id="regression">Regression</Term> den Stand N+1 auf denselben Bestandsdaten und für dieselben Modellpunkte wie Release N und vergleicht beide Ergebnisse <Term id="value">Wert</Term> für Wert. Ihre Tabelle sagt, wo sie eine <Term id="deviation">Abweichung</Term> gefunden hat: eine Zeile je Größe, zum Beispiel für den <Term id="bruttobeitrag" />.
+Der Quick Start läuft am <Term id="reference-model">Referenzmodell</Term>. In seinem zweiten Schritt rechnet die <Term id="regression">Regression</Term> den Stand N+1 auf denselben Bestandsdaten und für dieselben Modellpunkte wie Release N und vergleicht beide Ergebnisse <Term id="value">Wert</Term> für Wert. Ihre Tabelle sagt, wo sie eine <Term id="deviation">Abweichung</Term> gefunden hat: eine Zeile je Größe, zum Beispiel für den <Term id="bruttobeitrag" />.
 
 </Prose>
 
@@ -165,7 +165,7 @@ Bei Ihrer eigenen Engine legt Ihr Adapter fest, welche Dateien Daten, Parameter 
 
 <Prose>
 
-Der vierte Schritt sucht unter den {facts.revisions} Änderungen diejenigen, die die Abweichung im Bruttobeitrag in den ersten fünf Projektionsjahren verursachen. Als Abweichung zählt hier eine Änderung des Bruttobeitrags um mehr als einen Cent je Modellpunkt und Monat. Unter der Tabelle meldet die Vorführung einen Teil der Abweichung als „<Term id="not-resolved">Nicht aufgelöst</Term>“.
+Der vierte Schritt sucht unter den {facts.revisions} Änderungen diejenigen, die die Abweichung im Bruttobeitrag in den ersten fünf Projektionsjahren verursachen. Als Abweichung zählt hier eine Änderung des Bruttobeitrags um mehr als einen Cent je Modellpunkt und Monat. Unter der Tabelle meldet der Quick Start einen Teil der Abweichung als „<Term id="not-resolved">Nicht aufgelöst</Term>“.
 
 </Prose>
 
@@ -223,6 +223,6 @@ Die Suche hat den Abschnitt der vier Änderungen <code translate="no">{interval[
 
 <Prose>
 
-Die Vorführung zeigt auch eine Grenze. Die Änderungen {change('e23137a').number} und {change('29c4a03').number}, eine Änderung und ihre Rücknahme, heben sich innerhalb eines Abschnitts auf, ebenso die Änderungen {change('88cdde3').number} und {change('c82b72b').number}, eine Änderung und ihr Zurücksetzen. Die Suche teilt diese Abschnitte deshalb nicht. <a href={pageAddress(howItWorks, 'de')}>{howItWorks.name.de}</a> beschreibt die Suche und ihre Grenzen.
+Der Quick Start zeigt auch eine Grenze. Die Änderungen {change('e23137a').number} und {change('29c4a03').number}, eine Änderung und ihre Rücknahme, heben sich innerhalb eines Abschnitts auf, ebenso die Änderungen {change('88cdde3').number} und {change('c82b72b').number}, eine Änderung und ihr Zurücksetzen. Die Suche teilt diese Abschnitte deshalb nicht. <a href={pageAddress(howItWorks, 'de')}>{howItWorks.name.de}</a> beschreibt die Suche und ihre Grenzen.
 
 </Prose>

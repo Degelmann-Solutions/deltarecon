@@ -316,7 +316,7 @@ The command ends with exit status {statusOf('newer-revision')}. That is the expe
       { name: 'recorded/', note: 'copy of the older run' },
       { name: 'run/', note: 'the newer run' },
       { name: 'compare.result.json', note: 'the comparison' },
-      { name: 'signature-table.json', note: 'the signature table' },
+      { name: 'signature-table.json', note: 'one row per quantity that deviates' },
     ]}
   />
   <p slot="caption">Some of what the regression writes.</p>
@@ -331,7 +331,7 @@ The command ends with exit status {statusOf('newer-revision')}. That is the expe
 
 <div class="step-after">
 
-The first line counts the values that differ; the output calls a value a coordinate. The signature table has one entry per quantity that deviates: in how many model points, in how many values and in which periods it deviates, how many values of the newer state lie above and how many below those of the older state, and the largest increase and decrease. After the table the command prints one line per model point, which this page leaves out, and the files it wrote.
+The first line counts the values that differ; the output calls a value a coordinate. The <Term id="signature-table">signature table</Term> has one entry per quantity that deviates: in how many model points, in how many values and in which periods it deviates, how many values of the newer state lie above and how many below those of the older state, and the largest increase and decrease. After the table the command prints one line per model point, which this page leaves out, and the files it wrote.
 
 <a href={pageAddress(results, 'en')}>{results.name.en}</a> explains the table that the demo prints for such a comparison.
 
