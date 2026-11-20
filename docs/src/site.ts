@@ -428,14 +428,19 @@ export function pagesOf(stage: Stage): Page[] {
   return pages.filter((page) => page.stage === stage.number);
 }
 
-/** The page before `page` on the path, if there is one. */
+/**
+ * The page before `page` on the path, if there is one. A page outside the
+ * register (the page-not-found page) has no neighbour.
+ */
 export function previousPage(page: Page): Page | undefined {
-  return pages[pages.indexOf(page) - 1];
+  const index = pages.indexOf(page);
+  return index < 0 ? undefined : pages[index - 1];
 }
 
-/** The page after `page` on the path, if there is one. */
+/** The page after `page` on the path, if there is one; see `previousPage`. */
 export function nextPage(page: Page): Page | undefined {
-  return pages[pages.indexOf(page) + 1];
+  const index = pages.indexOf(page);
+  return index < 0 ? undefined : pages[index + 1];
 }
 
 /** Address of a page below the base of the site, for example `de/glossar/`. */

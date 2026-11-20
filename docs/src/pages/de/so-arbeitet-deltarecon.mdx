@@ -16,6 +16,11 @@ import Term from '../../components/Term.astro';
 import { changeOf, example, searchCounts, unresolved } from '../../captures';
 import { findPage, pageAddress } from '../../site';
 
+export const components = {
+  // Inline code of this page names commands, options, files and outputs of
+  // the program: none of it is to be translated.
+  code: (props) => <code translate="no" {...props} />,
+};
 export const facts = example('de');
 export const counts = searchCounts('de');
 export const [interval] = unresolved('de');

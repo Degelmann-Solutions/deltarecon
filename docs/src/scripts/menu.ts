@@ -82,14 +82,27 @@ if (link && menuButton && closeButton && header && tree) {
     }
   });
 
+  /**
+   * Whether focus is lost: on an element that is out of the page, or on
+   * <body>, where the browser puts it when it takes focus from an element
+   * that left the page (the close button, before this script hears of it).
+   */
+  const focusLost = (): boolean => {
+    const active = document.activeElement;
+    return (
+      !(active instanceof HTMLElement) ||
+      active === document.body ||
+      active.getClientRects().length === 0
+    );
+  };
+
   // From the tree breakpoint up the tree is a column; an open menu ends.
   // Both buttons leave the page there, so focus that was in the menu's top
   // bar or tree moves to the current page of the tree.
   column.addEventListener('change', () => {
     if (!column.matches || !isOpen()) return;
     close(false);
-    const active = document.activeElement;
-    if (!(active instanceof HTMLElement) || active.getClientRects().length === 0) {
+    if (focusLost()) {
       tree.querySelector<HTMLElement>('a[aria-current="page"]')?.focus({ preventScroll: true });
     }
   });
@@ -100,10 +113,7 @@ if (link && menuButton && closeButton && header && tree) {
     if (!event.persisted || !isOpen()) return;
     close(false);
     // The link that was followed is in the tree, which is out of the page now.
-    const active = document.activeElement;
-    if (!(active instanceof HTMLElement) || active.getClientRects().length === 0) {
-      menuButton.focus({ preventScroll: true });
-    }
+    if (focusLost()) menuButton.focus({ preventScroll: true });
   });
 
   link.hidden = true;

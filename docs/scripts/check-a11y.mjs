@@ -10,15 +10,29 @@
 //     visible focus ring: teal-text on light grounds, teal on the navy
 //     terminal block of a step page;
 //   - the language switch leads to the counterpart and keeps the anchor, the
-//     one the page was loaded with and one set afterwards.
+//     one the page was loaded with and one set afterwards;
+//   - the link to "When something goes wrong" is the first link after the
+//     four stages of the chapter tree;
+//   - the search field of the top bar at least 40 px high, each language
+//     link at least 40 × 40 px;
+//   - the floor of every page (`checkFloor` of harness.mjs): nothing moves,
+//     text at 200 % and with the text spacing of WCAG 1.4.12 is not cut off
+//     and the page does not scroll sideways, `pre`, `code` and `kbd` are not
+//     translated, "Bruttobeitrag" carries its language on an English page;
+//   - on a page with folds: Tab once more with every fold open, so that it
+//     reaches the controls inside.
 // Phone (390 px), for every page:
+//   - Tab reaches every control in reading order, as at desktop width, also
+//     with every fold open; the floor without the text at 200 %;
 //   - the top bar holds menu button, logo and language switch only;
 //   - no sideways scrolling, also at 320 px; axe with the menu closed and open;
 //   - the menu: tree on the full screen, focus on the close button, which
 //     says "open", the page behind inert and the skip link out of the page,
 //     Tab stays inside, Escape and the close button close it and return focus
 //     to the menu button; search field and release badge inside; at 320 px
-//     its top bar is one row.
+//     its top bar is one row; nothing moves; menu button and close button at
+//     least 36 px high, the chapter links, the product-page link and the
+//     search field at least 44 px, each language link at least 40 × 40 px.
 // Phone, JavaScript off, for every page:
 //   - the menu button is a link that jumps to the chapter tree at the end of
 //     the page; the language switch opens the counterpart without the anchor.
@@ -28,7 +42,8 @@
 //     sideways scrolling.
 // Between (900 px), for the start page of each language: axe, the menu, no
 // sideways scrolling (also at 600 px); an open menu ends when the window
-// reaches the tree breakpoint, with focus in the page; the search field moves
+// reaches the tree breakpoint, with focus on the current page of the chapter
+// tree; the search field moves
 // between top bar and menu at the phone breakpoint.
 //
 // The search result list, for the start page of each language: axe with the
@@ -40,10 +55,11 @@
 // the menu open; no sideways scrolling with the list open at 600 and 320 px.
 // The page-not-found page of each language: axe at desktop and phone width
 // and with the menu open, the frame without stage line, page links and
-// current page, the two blocks with their languages, skip link, tab order,
-// language switch, the menu, no sideways scrolling.
+// current page, the two blocks with their languages, skip link, tab order
+// at both widths, language switch, the menu, the place of the link to "When
+// something goes wrong", the floor, no sideways scrolling.
 // The root page, held by a browser that names no language: axe at desktop
-// and phone width, tab order, no sideways scrolling.
+// and phone width, tab order, the floor, no sideways scrolling.
 //
 // Writes to screenshots/ (not under version control): a desktop (1280 px), a
 // between (900 px), a phone and an open-menu screenshot of the start page of
@@ -88,7 +104,11 @@ const shots = path.join(root, 'screenshots');
 const pages = await loadPages();
 const { notFound, rootPage } = await loadOtherPages();
 const { failures, expect, report } = expectations('check-a11y');
-const { checkAxe, checkNoSidewaysScroll } = pageChecks({ failures, expect });
+const { checkAxe, checkFloor, checkNoMotion, checkNoSidewaysScroll } = pageChecks({ failures, expect });
+// The page below the four stages of the chapter tree.
+const HELP = 'when-something-goes-wrong';
+// The sizes of the controls of the frame (DESIGN.md, Components, Page frame).
+const SIZES = { button: 36, menuLink: 44, fieldInMenu: 44, fieldInBar: 40, language: 40 };
 
 async function open(browser, origin, entry, viewport, { javaScript = true, anchor = '' } = {}) {
   const context = await browser.newContext({ viewport, javaScriptEnabled: javaScript });
@@ -180,6 +200,83 @@ function markStops(page, within = 'body') {
   }, within);
 }
 
+/**
+ * The link to "When something goes wrong" stands at the same place on every
+ * page: it is the first link after the four stages of the chapter tree.
+ */
+async function checkHelpLink(page, name, lang) {
+  const help = pages.find((candidate) => candidate.id === HELP && candidate.lang === lang);
+  const found = await page.evaluate(() => {
+    const stages = document.querySelector('#chapters nav > ol');
+    if (!stages) return null;
+    const after = [...document.querySelectorAll('#chapters nav a')].find(
+      (link) => stages.compareDocumentPosition(link) === Node.DOCUMENT_POSITION_FOLLOWING,
+    );
+    return {
+      stages: stages.querySelectorAll(':scope > li').length,
+      href: after?.getAttribute('href'),
+      text: after?.textContent.trim(),
+      below: after ? after.getBoundingClientRect().top >= stages.getBoundingClientRect().bottom : false,
+    };
+  });
+  expect(
+    found?.stages === 4 && found.href === help.address && found.text === help.name && found.below,
+    `${name}: the first link after the four stages of the chapter tree is not "${help.name}" at ${help.address}: ${JSON.stringify(found)}`,
+  );
+}
+
+/** The boxes of the visible elements a selector names. */
+function boxes(page, selector) {
+  return page.evaluate(
+    (query) =>
+      [...document.querySelectorAll(query)]
+        .filter((element) => element.getClientRects().length > 0)
+        .map((element) => {
+          const box = element.getBoundingClientRect();
+          const text = (element.getAttribute('aria-label') ?? element.textContent ?? '').trim();
+          return {
+            description: `<${element.tagName.toLowerCase()}> "${text.replace(/\s+/g, ' ')}"`,
+            width: box.width,
+            height: box.height,
+          };
+        }),
+    selector,
+  );
+}
+
+/** Every visible control a selector names is there and has its size. */
+async function checkSize(page, name, part, selector, { height, width = 0, count }) {
+  const found = await boxes(page, selector);
+  expect(
+    count === undefined ? found.length > 0 : found.length === count,
+    `${name}: ${found.length} of ${part} in view${count === undefined ? '' : `, expected ${count}`}`,
+  );
+  for (const box of found) {
+    expect(
+      box.height >= height && box.width >= width,
+      `${name}: ${part} ${box.description} is ${box.width} × ${box.height} px, below ${width || 24} × ${height}`,
+    );
+  }
+}
+
+/**
+ * Tab once more with every fold of the page open: the controls inside are
+ * stops like the others, each with its ring and its size. The page is loaded
+ * anew, so that the walk starts at its top.
+ */
+async function checkFoldsOpen(page, name, address) {
+  if ((await page.locator('main details[data-fold]').count()) === 0) return;
+  await page.goto(address, { waitUntil: 'networkidle' });
+  await page.evaluate(() =>
+    document.querySelectorAll('main details[data-fold]').forEach((fold) => {
+      fold.open = true;
+    }),
+  );
+  await checkTabOrder(page, `${name}, folds open`);
+  const inside = await page.locator('main details[data-fold] .fold-body [data-stop]').count();
+  expect(inside > 0, `${name}, folds open: the walk reached no control inside a fold`);
+}
+
 /** Frame, names and marks of a page, at desktop width. */
 async function checkFrame(page, name, entry) {
   expect((await page.title()) === entry.title, `${name}: title is "${await page.title()}"`);
@@ -225,6 +322,7 @@ async function checkFrame(page, name, entry) {
   } else {
     expect((await stage.count()) === 0, `${name}: a stage is marked, but the page has none`);
   }
+  await checkHelpLink(page, name, entry.lang);
   const stageLine = (await page.locator('[data-stage-line]').innerText()).trim();
   expect(entry.stageLine !== '', `${name}: the register gives no stage line`);
   expect(stageLine === entry.stageLine, `${name}: stage line is "${stageLine}", expected "${entry.stageLine}"`);
@@ -406,6 +504,7 @@ async function checkMenu(page, name, { phone, screenshot, hitWord }) {
     `${name}: closed menu: the menu button is not visible, or close button or tree are`,
   );
   expect((await state()).expanded === 'false', `${name}: the menu button does not say "closed"`);
+  await checkSize(page, name, 'the menu button', 'button[data-menu-button]', { height: SIZES.button, count: 1 });
 
   await button.click();
   const opened = await state();
@@ -453,7 +552,25 @@ async function checkMenu(page, name, { phone, screenshot, hitWord }) {
   }
 
   await checkAxe(page, `${name}, open menu`);
+  await checkNoMotion(page, `${name}, open menu`);
   if (screenshot) await page.screenshot({ path: screenshot, fullPage: true });
+
+  // The sizes of the controls of the menu.
+  const inMenu = `${name}, open menu`;
+  await checkSize(page, inMenu, 'the close button', 'button[data-menu-close]', { height: SIZES.button, count: 1 });
+  await checkSize(page, inMenu, 'the chapter links', '#chapters nav li > a', { height: SIZES.menuLink });
+  await checkSize(page, inMenu, 'the product-page link', '#chapters nav > a', { height: SIZES.menuLink, count: 1 });
+  await checkSize(page, inMenu, 'the language links', 'body > header [role="group"] a', {
+    height: SIZES.language,
+    width: SIZES.language,
+    count: 2,
+  });
+  if (phone) {
+    await checkSize(page, inMenu, 'the search field', '#chapters input[type="search"]', {
+      height: SIZES.fieldInMenu,
+      count: 1,
+    });
+  }
 
   // Tab stays inside: one round leads back to the close button.
   const stops = await markStops(page, 'header, #chapters');
@@ -766,8 +883,10 @@ async function checkNotFound(browser, origin, entry) {
         `${name}: no link "${link.name}" to ${link.address}`,
       );
     }
+    await checkHelpLink(page, name, entry.lang);
     await checkNoSidewaysScroll(page, name);
     await checkAxe(page, name);
+    await checkFloor(page, name, entry.lang);
     await page.screenshot({ path: shot('desktop'), fullPage: true });
     await checkSkipLink(page, name);
     await page.goto(`${origin}${entry.address}`, { waitUntil: 'networkidle' });
@@ -783,7 +902,10 @@ async function checkNotFound(browser, origin, entry) {
     const { context, page } = await open(browser, origin, entry, PHONE);
     await checkNoSidewaysScroll(page, name);
     await checkAxe(page, name);
+    await checkFloor(page, name, entry.lang, { resize: false });
     await page.screenshot({ path: shot('phone'), fullPage: true });
+    await checkTabOrder(page, name);
+    await page.goto(`${origin}${entry.address}`, { waitUntil: 'networkidle' });
     await checkMenu(page, name, { phone: true });
     await page.setViewportSize({ width: 320, height: 640 });
     await checkNoSidewaysScroll(page, at(320));
@@ -839,6 +961,7 @@ async function checkRoot(browser, origin, entry) {
     }
     await checkNoSidewaysScroll(page, name);
     await checkAxe(page, name);
+    await checkFloor(page, name, entry.lang, { resize: viewport === DESKTOP });
     await page.screenshot({ path: path.join(shots, `root-${kind}.png`), fullPage: true });
     await checkTabOrder(page, name);
     if (viewport === PHONE) {
@@ -866,10 +989,21 @@ async function checkEntry(browser, origin, entry) {
       );
     }
     await checkAxe(page, name);
+    await checkSize(page, name, 'the search field', 'body > header input[type="search"]', {
+      height: SIZES.fieldInBar,
+      count: 1,
+    });
+    await checkSize(page, name, 'the language links', 'body > header [role="group"] a', {
+      height: SIZES.language,
+      width: SIZES.language,
+      count: 2,
+    });
+    await checkFloor(page, name, entry.lang);
     if (entry.isRoot) await page.screenshot({ path: shot('desktop'), fullPage: true });
     await checkSkipLink(page, name);
     await page.goto(`${origin}${entry.address}`, { waitUntil: 'networkidle' });
     await checkTabOrder(page, name);
+    await checkFoldsOpen(page, name, `${origin}${entry.address}`);
     await context.close();
   }
 
@@ -913,7 +1047,11 @@ async function checkEntry(browser, origin, entry) {
     }
     await checkNoSidewaysScroll(page, name);
     await checkAxe(page, name);
+    await checkFloor(page, name, entry.lang, { resize: false });
     if (entry.isRoot) await page.screenshot({ path: shot('phone'), fullPage: true });
+    await checkTabOrder(page, name);
+    await checkFoldsOpen(page, name, `${origin}${entry.address}`);
+    await page.goto(`${origin}${entry.address}`, { waitUntil: 'networkidle' });
     await checkMenu(page, name, {
       phone: true,
       screenshot: shot('menu'),
@@ -1008,9 +1146,28 @@ async function checkEntry(browser, origin, entry) {
       widened.menu === 'closed' && !widened.inert && (await page.locator('main').isVisible()),
       `${name}: an open menu stays open at ${DESKTOP.width} px`,
     );
+    // The browser may have taken focus from the hidden close button before
+    // the page hears of the new width; focus is then on <body>.
+    const kept = await page.evaluate(
+      () => document.activeElement?.matches('#chapters a[aria-current="page"]') ?? false,
+    );
     expect(
-      (await focused(page)) !== null,
-      `${name}: focus is lost when an open menu ends at ${DESKTOP.width} px`,
+      kept,
+      `${name}: when an open menu ends at ${DESKTOP.width} px, focus is on ${(await focused(page))?.description ?? 'nothing'}, not on the current page of the chapter tree`,
+    );
+
+    // The same once more, with focus already taken from the close button, as
+    // the browser does when it lays the wider window out before the page
+    // hears of it.
+    await page.setViewportSize(BETWEEN);
+    await settle(page, () => document.querySelector('button[data-menu-button]')?.getClientRects().length > 0);
+    await page.locator('button[data-menu-button]').click();
+    await page.evaluate(() => document.activeElement.blur());
+    await page.setViewportSize(DESKTOP);
+    await settle(page, () => document.documentElement.dataset.menu === 'closed');
+    expect(
+      await page.evaluate(() => document.activeElement?.matches('#chapters a[aria-current="page"]') ?? false),
+      `${name}: when an open menu ends at ${DESKTOP.width} px with focus on <body>, focus is on ${(await focused(page))?.description ?? 'nothing'}, not on the current page of the chapter tree`,
     );
 
     await page.setViewportSize({ width: 600, height: 800 });

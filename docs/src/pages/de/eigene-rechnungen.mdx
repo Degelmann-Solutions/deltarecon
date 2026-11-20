@@ -29,6 +29,11 @@ import { changeOf, searchCounts, searchTable } from '../../captures';
 import { beyondDemo, contributionsOf, outputOf, refusal, runsOf, statusOf } from '../../ownCalculations';
 import { findPage, pageAddress } from '../../site';
 
+export const components = {
+  // Inline code of this page names commands, options, files and outputs of
+  // the program: none of it is to be translated.
+  code: (props) => <code translate="no" {...props} />,
+};
 export const commands = {
   // The command lines of each step. The build holds them against the
   // captures of the step (src/ownCalculations.ts).
@@ -195,15 +200,15 @@ Der Befehl rechnet eine Weile und gibt erst etwas aus, wenn er fertig ist. Die e
 
 <Callout tag="Die Ausgabe in einfachen Worten" title="So lesen Sie die Ausgabe einer Suche">
 
-<code lang="en">search: searched</code> Die Suche hat {provisionen.run} der {provisionen.walk} Stände gerechnet: Release N und einen Stand nach jeder Änderung. Die übrigen {provisionen.saved} hat sie nicht gebraucht.
+<code lang="en" translate="no">search: searched</code> Die Suche hat {provisionen.run} der {provisionen.walk} Stände gerechnet: Release N und einen Stand nach jeder Änderung. Die übrigen {provisionen.saved} hat sie nicht gebraucht.
 
-`state 0`, <code>state {provisionen.walk - 1}</code> Die Suche hat beide Enden noch einmal gerechnet, und jedes hat das aufgezeichnete Ergebnis geliefert.
+`state 0`, <code translate="no">state {provisionen.walk - 1}</code> Die Suche hat beide Enden noch einmal gerechnet, und jedes hat das aufgezeichnete Ergebnis geliefert.
 
-<code lang="en">held: input_data</code> Die <Term id="input-data">Bestandsdaten</Term> bleiben in jedem Stand bei Release N. Eine <Term id="revision">Revision</Term> ändert die Tabelle der <Term id="model-point">Modellpunkte</Term>; ihre Wirkung zeigt die Suche nicht.
+<code lang="en" translate="no">held: input_data</code> Die <Term id="input-data">Bestandsdaten</Term> bleiben in jedem Stand bei Release N. Eine <Term id="revision">Revision</Term> ändert die Tabelle der <Term id="model-point">Modellpunkte</Term>; ihre Wirkung zeigt die Suche nicht.
 
-<code lang="en">contribution from state …</code> Eine Revision, die für sich allein die Provisionen ändert. Die Zeile nennt die Revision vollständig; die Tabellen des Quick Starts zeigen ihre ersten sieben Zeichen. Der Stand nach der Revision hat die Nummer der Änderung in der Tabelle der Änderungen: Die größte Summe gehört hier zur Änderung {change(largest.short).number}, „<span lang="en">{change(largest.short).description}</span>“.
+<code lang="en" translate="no">contribution from state …</code> Eine Revision, die für sich allein die Provisionen ändert. Die Zeile nennt die Revision vollständig; die Tabellen des Quick Starts zeigen ihre ersten sieben Zeichen. Der Stand nach der Revision hat die Nummer der Änderung in der Tabelle der Änderungen: Die größte Summe gehört hier zur Änderung {change(largest.short).number}, „<span lang="en">{change(largest.short).description}</span>“.
 
-<code lang="en">sum</code> Die Summe mit Vorzeichen von „Stand nach der Revision minus Stand davor“ über alle Modellpunkte und die Perioden 0 bis 59, wie in der Tabelle des Quick Starts. <code lang="en">absolute sum</code> addiert dieselben Differenzen ohne ihr Vorzeichen.
+<code lang="en" translate="no">sum</code> Die Summe mit Vorzeichen von „Stand nach der Revision minus Stand davor“ über alle Modellpunkte und die Perioden 0 bis 59, wie in der Tabelle des Quick Starts. <code lang="en" translate="no">absolute sum</code> addiert dieselben Differenzen ohne ihr Vorzeichen.
 
 <a href={pageAddress(results, 'de')}>{results.name.de}</a> erklärt die Tabellen des Quick Starts und mit ihnen die Tabelle der Änderungen.
 
@@ -371,7 +376,7 @@ Jede Zeile nennt eine Revision vollständig, ihre <Term id="class">Einordnung</T
 
 <div class="step-after">
 
-Das sind die Änderungen {older.number + 1} bis {newer.number} aus der Tabelle der Änderungen des Quick Starts. <code lang="en">remainder: none</code> sagt, dass sich die beiden Läufe nur durch diese Änderungen unterscheiden.
+Das sind die Änderungen {older.number + 1} bis {newer.number} aus der Tabelle der Änderungen des Quick Starts. <code lang="en" translate="no">remainder: none</code> sagt, dass sich die beiden Läufe nur durch diese Änderungen unterscheiden.
 
 </div>
 </div>

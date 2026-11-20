@@ -34,6 +34,11 @@ import TerminalBlock from '../../components/TerminalBlock.astro';
 import { afterLines, firstSentence, notResolved, session } from '../../captures';
 import { archive, packageFolder, releasePage, sumsFile, tag } from '../../release';
 
+export const components = {
+  // Inline code of this page names commands, options, files and outputs of
+  // the program: none of it is to be translated.
+  code: (props) => <code translate="no" {...props} />,
+};
 export const zip = archive('windows');
 export const tarball = archive('linux');
 export const after = afterLines('en');
