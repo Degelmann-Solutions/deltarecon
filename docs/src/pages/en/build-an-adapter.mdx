@@ -2,6 +2,922 @@
 layout: ../../layouts/Page.astro
 lang: en
 page: build-an-adapter
-lead: "This page is not written yet; it will walk you through building an adapter for your engine."
+lead: "Seven steps from an empty module to the first run of DeltaRecon with your engine. For each part of the protocol you see what you program: what you are given, what you give back and what you report. A part to unfold shows beside it how the connection of the reference model does it."
 description: "Build the adapter that connects your engine to DeltaRecon, step by step, with the connection of the reference model as the template."
+steps:
+  - { anchor: class, title: "Write the class and what the engine says about itself" }
+  - { anchor: releases, title: "Find, check and describe a release" }
+  - { anchor: open, title: "Open a release for a run" }
+  - { anchor: session, title: "Answer the questions of an opened release" }
+  - { anchor: history, title: "List the history between two releases" }
+  - { anchor: select, title: "Let DeltaRecon find your class" }
+  - { anchor: first-run, title: "Run DeltaRecon with your engine for the first time" }
 ---
+import Callout from '../../components/Callout.astro';
+import CodeBlock from '../../components/CodeBlock.astro';
+import CodeExcerpt from '../../components/CodeExcerpt.astro';
+import FileList from '../../components/FileList.astro';
+import Fold from '../../components/Fold.astro';
+import HintLink from '../../components/HintLink.astro';
+import Member from '../../components/Member.astro';
+import Part from '../../components/Part.astro';
+import PathEnd from '../../components/PathEnd.astro';
+import PlatformPart from '../../components/PlatformPart.astro';
+import PlatformSwitch from '../../components/PlatformSwitch.astro';
+import Row from '../../components/Row.astro';
+import RowList from '../../components/RowList.astro';
+import StepCard from '../../components/StepCard.astro';
+import StepFigure from '../../components/StepFigure.astro';
+import Steps from '../../components/Steps.astro';
+import Term from '../../components/Term.astro';
+import { skeleton, skeletonFile, skeletonSelection } from '../../adapterSkeleton';
+import { findPage, pageAddress } from '../../site';
+
+export const singleCommands = findPage('single-commands');
+// The two commands of the first run. The words between `<` and `>` stand for
+// what the reader puts in; scripts/check-first-run.mjs puts an engine of the
+// repository in their place and runs both commands.
+export const firstRun = {
+  windows: [
+    String.raw`.\deltarecon.cmd request --revision <revision> --stage <stage> --label <label> --run-id <run-id> --output <output>\request.json --engine <module>:<class> --engine-path <folder>`,
+    String.raw`.\deltarecon.cmd run <output>\request.json --engine <module>:<class> --engine-path <folder>`,
+  ],
+  linux: [
+    './deltarecon request --revision <revision> --stage <stage> --label <label> --run-id <run-id> --output <output>/request.json --engine <module>:<class> --engine-path <folder>',
+    './deltarecon run <output>/request.json --engine <module>:<class> --engine-path <folder>',
+  ],
+};
+// The smallest compare request (contracts/v3/compare.md at the tag of the
+// release): two responses and an empty tolerance profile.
+// scripts/check-first-run.mjs fills it in for two runs and runs `compare`.
+export const compareRequest = [
+  '{',
+  '  "document": "compare_request",',
+  '  "contract_version": "3.3",',
+  '  "stage": "<stage>",',
+  '  "compare_id": "<id>",',
+  '  "left": { "response": { "path": "<older>/response.json", "sha256": "<sha256>" } },',
+  '  "right": { "response": { "path": "<newer>/response.json", "sha256": "<sha256>" } },',
+  '  "tolerance": { "per_quantity": {} }',
+  '}',
+];
+// The word "class" of Python, which is not the term of the Glossary.
+export const cls = <span data-no-term>class</span>;
+// A Git command of the callout, kept out of the search index. The search
+// falls back to the beginning of a term: with `-r` and `--no-renames` in its
+// index the page was the one hit of "renamed", the word that only the
+// page-not-found page is to hold (`notFoundWord` in scripts/harness.mjs).
+export const git = (line) => <code translate="no" data-pagefind-ignore="index">{line}</code>;
+// The labels of the parts of a member card, the same on every card.
+export const GET = 'You are given';
+export const GIVE = 'You give back';
+export const SET = 'You set';
+export const DO = 'You program';
+export const USE = 'What DeltaRecon does with it';
+export const REPORT = 'You report';
+export const REF = 'How the reference model does it';
+// Inline code of this page names members of the protocol, options, variables,
+// commands and paths: none of it is to be translated.
+export const components = { code: (props) => <code translate="no" {...props} /> };
+
+<Steps>
+
+<StepCard steps={frontmatter.steps} anchor="class">
+
+Your connection, the <Term id="adapter">adapter</Term>, is a {cls} in a Python module. The module lies in a folder of your choice; it need not be a part of DeltaRecon. The <Term id="protocol">protocol</Term> is the file `degelmann/deltarecon/protocol.py`. It needs the standard library of Python alone, so your module can import the types of the protocol from there: `StageDeclaration`, `DomainReference`, `Revision` and `History`, the errors `Rejection`, `UsageError` and `ModelPointFailure`, and the constant `SCRATCH_PREFIX`.
+
+Your module needs two <span data-no-term>classes</span>: that of the <Term id="engine">engine</Term>, with four statements and seven operations (steps 1 to 3 and 5), and a small one for an opened <Term id="release">release</Term> (step 4).
+
+This page goes through each part on its own. For each part you see its signature from the protocol, what DeltaRecon hands to you, what you give back and which errors you report. A part to unfold shows how the connection of the <Term id="reference-model">reference model</Term> does it, with lines of `degelmann/deltarecon/engines/reference_model.py`.
+
+<StepFigure slot="figure">
+  <FileList
+    label="In degelmann/deltarecon of the repository"
+    files={[
+      { name: 'protocol.py', note: 'the protocol' },
+      { name: 'engines/reference_model.py', note: 'the connection of the reference model' },
+    ]}
+  />
+  <p slot="caption">The two files this page reads from: what each part has to do, and how the reference model does it.</p>
+</StepFigure>
+
+<div slot="wide" class="step-parts">
+
+<div class="prose-links">
+
+Begin with this skeleton. It holds both {cls}es with every part of the protocol; each operation is still to be written and raises `NotImplementedError` until then. Save it as <code translate="no">{skeletonFile}</code> in a folder of your choice; in step 6 you then name <code translate="no">{skeletonSelection}</code>. The names of the two {cls}es and of the file are a free choice.
+
+<CodeBlock lines={skeleton('en')} label="Skeleton of an adapter" />
+
+The cards below go through the parts in the order of the steps. The {cls} `MySession` at the top of the skeleton belongs to step 4.
+
+</div>
+
+<Member name="Call the class" code="__init__" signature="constructor">
+
+DeltaRecon calls your {cls} with the number of worker processes as its one, optional argument. The signature is that of the reference model; your {cls} takes the same argument.
+
+<Part label={GET}>
+
+- `workers`: no argument when the command names no `--workers`, so give the parameter a default such as `None`; the number `N` with `--workers N`; and 1 for `request` and `derive`, which project no <Term id="model-point">model point</Term>.
+
+</Part>
+
+<Part label={DO}>
+
+Keep the number when your engine can project model points in several processes. Without an argument your engine decides itself; DeltaRecon does not read the variable `DELTARECON_WORKERS`. An engine that has no use for worker processes accepts the argument and ignores it.
+
+</Part>
+
+<Fold summary={REF}>
+
+<CodeExcerpt id="constructor">
+  <p slot="caption">The reference model keeps the number. Without an argument `worker_count` takes the number that the variable `DELTARECON_WORKERS` names, else one process per processor.</p>
+</CodeExcerpt>
+
+</Fold>
+
+</Member>
+
+<Member name="The stages your engine offers" code="stages" of="Engine">
+
+An attribute of the {cls}: one entry per stage, under the name of the stage. A stage is one kind of result that your engine computes, with fixed <Term id="quantity">quantities</Term>.
+
+<Part label={SET}>
+
+- The key is the name of the stage, which the request and the option `--stage` name.
+- The <span data-no-term>value</span> is a `StageDeclaration(domain_reference, quantities)`.
+- `domain_reference` is a `DomainReference(id, version)`: the reference to the domain reference of the stage, the text that says what its quantities, their units and signs, and the time basis mean. Both members are strings of your choice that are not empty; `version` changes only when the text changes meaning.
+- `quantities` are the names of the quantities in the order of that text.
+
+</Part>
+
+<Part label={USE}>
+
+DeltaRecon accepts a request only for a stage named here. It checks the names of the quantities that an opened release declares (step 4) against the names here, and it writes the reference into every response of the stage.
+
+</Part>
+
+<Fold summary={REF}>
+
+<CodeExcerpt id="class-statements">
+  <p slot="caption">The four statements of the reference model: one stage with its domain reference and its quantities; two kinds of change, a text patch and a <Term id="revision">revision</Term>; the three kinds of reference that one revision fixes, namely code, parameters and <Term id="input-data">input data</Term>; and the input data as the one kind it can hold.</p>
+</CodeExcerpt>
+
+The reference model offers one stage, `liability_cashflow`. Its domain reference is the file `contracts/v3/domain/liability_cashflow.md` of the repository.
+
+</Fold>
+
+</Member>
+
+<Member name="The kinds of change it can apply" code="realisations" of="Engine">
+
+An attribute of the {cls}: a set of names.
+
+<Part label={SET}>
+
+- `revision`, when your engine can apply a revision of its own <Term id="history">history</Term>. `walk` and `search` need it: they compute each <Term id="state">state</Term> as a release with enabled revisions.
+- `text_patch`, when it can apply a text patch that a <Term id="change-manifest">change manifest</Term> brings along as a file.
+
+</Part>
+
+<Part label={USE}>
+
+Every enabled change that `open` is given (step 3) is of a kind that stands here.
+
+</Part>
+
+<Fold summary={REF}>
+
+The reference model names both kinds, `text_patch` and `revision`. The line stands in the excerpt at `stages`.
+
+</Fold>
+
+</Member>
+
+<Member name="What one revision fixes" code="determines" of="Engine">
+
+An attribute of the {cls}: the kinds of reference of a release that one revision of your history determines.
+
+<Part label={SET}>
+
+The names of the kinds, as they stand in a release identity (step 2, `describe`). For the reference model one revision fixes the code (`code_state`), the parameters (`parameter_set`) and the input data (`input_data`).
+
+</Part>
+
+<Fold summary={REF}>
+
+The reference model names the three kinds `code_state`, `parameter_set` and `input_data`. The line stands in the excerpt at `stages`.
+
+</Fold>
+
+</Member>
+
+<Member name="What it can hold while revisions are applied" code="holdable" of="Engine">
+
+An attribute of the {cls}: the kinds of reference that can stay as the request names them while revisions are applied.
+
+<Part label={SET}>
+
+- The key is a kind of reference, for example `input_data`.
+- The <span data-no-term>value</span> is the set of the <Term id="class">classes</Term> of the paths that carry this kind, for example `data`.
+
+</Part>
+
+<Part label={USE}>
+
+A <Term id="regression">regression</Term> computes the newer revision on the input data of the <Term id="run">recorded run</Term>. For that DeltaRecon names in `hold` the kinds that are held (steps 3 and 5); each stands here.
+
+</Part>
+
+<Fold summary={REF}>
+
+The reference model can hold the input data: `input_data` with the class `data`, the model point table. The line stands in the excerpt at `stages`.
+
+</Fold>
+
+</Member>
+
+</div>
+
+</StepCard>
+
+<StepCard steps={frontmatter.steps} anchor="releases">
+
+DeltaRecon knows no file and no repository of your engine. It names a release by its release identity: a label and a set of references that only your connection reads. In the signatures it is called `release` and is a `dict` of Python. Four operations belong to it. None of them restores or writes anything.
+
+The reference model keeps its history in a Git repository. From such a history a connection needs four things: name a revision, read the files of a revision, list the revisions between two releases on the <Term id="main-line">main line</Term>, and say what each of them touches. This step needs the first two, step 5 the other two.
+
+The connection of the reference model reads the repository with a library, `dulwich`, and starts no Git program; so none has to be installed. An engine whose history is not in Git answers the same four questions in its own way.
+
+<StepFigure slot="figure">
+  <FileList
+    label="The folder of the histories of the reference model"
+    files={[
+      { name: 'repositories/', note: 'the folder of the histories' },
+      { name: 'delib-history/', note: 'the Git repository of the model' },
+    ]}
+  />
+  <p slot="caption">What the reference model looks for: the folder of its histories, with its repository in it.</p>
+</StepFigure>
+
+<div slot="wide" class="step-parts">
+
+<Member name="Find the folder of the histories" code="repositories_folder" of="Engine">
+
+Every command that reads a release first asks for the folder that holds what your engine restores a release from, and hands the result as `repositories` to the other operations.
+
+<Part label={GET}>
+
+- `given`: the folder that the option `--repositories` names, or `None` when the command names none.
+
+</Part>
+
+<Part label={GIVE}>
+
+A `Path`: the folder given, else the default of your engine. You read nothing beyond the lookup, and the folder need not exist.
+
+</Part>
+
+<Fold summary={REF}>
+
+<CodeExcerpt id="repositories-folder">
+  <p slot="caption">How the reference model finds its folder: the one given, else the one a variable names, else the nearest folder `repositories/` that holds its repository, in the working directory or in one of the folders above it, and when there is none, `repositories/` in the working directory.</p>
+</CodeExcerpt>
+
+</Fold>
+
+</Member>
+
+<Member name="Describe a release by its revision" code="describe" of="Engine">
+
+`request` calls this operation and writes its result into the request. It turns a revision, as a person names it, into the complete release identity.
+
+<Part label={GET}>
+
+- `stage`: the stage of the request, one of `stages`.
+- `label`: the label that the command is given with `--label`, for example `N`.
+- `revision`: the revision as the command is given it with `--revision`. How a revision is named is your engine's matter, for example by a hash, a branch or a tag.
+- `options`: the options of the engine from `--engine-option`, by key; empty when the command names none.
+- `repositories`: the folder from `repositories_folder`.
+- `input_revision`: `None`, or the identifier of a revision as `input_revision` gives it. The input data are then those of that revision. You take the identifier as it is and do not resolve it again.
+
+</Part>
+
+<Part label={GIVE}>
+
+A `dict` with two keys: `label`, the label given, and `references`, a list of references. Each reference is a `dict` with `kind` and `value`, a <span data-no-term>value</span> that only your connection reads. The list names the state completely: so that `resolve` and `open` find it again from it.
+
+</Part>
+
+<Part label={REPORT}>
+
+- `UsageError` for an option that your engine does not take, a key or a <span data-no-term>value</span>, before you read the revision.
+- `Rejection("unknown_reference", …)` when `revision` names nothing.
+
+</Part>
+
+<Fold summary={REF}>
+
+The reference model writes four references: one each for code, parameters and input data, all with the full hash of the revision, and one for the version of the core of the engine. With `input_revision` only the reference of the input data names the other revision; that is how a regression describes the state N+1 on the input data of release N.
+
+<CodeExcerpt id="describe-release">
+  <p slot="caption">The three lines of `describe`: check the options, find the full hash of the revision, and build the references from it.</p>
+</CodeExcerpt>
+
+</Fold>
+
+</Member>
+
+<Member name="Check that a release can be restored" code="resolve" of="Engine">
+
+`request` checks the release identity with it before it writes the request. `replay`, `walk` and `search` check a recorded release with it before they compute.
+
+<Part label={GET}>
+
+- `stage`: the stage of the request, one of `stages`.
+- `release`: a release identity, in the form that `describe` gives back.
+- `repositories`: the folder from `repositories_folder`.
+
+</Part>
+
+<Part label={GIVE}>
+
+Nothing. The operation ends without an error when the release identity names a state of the stage that your engine can restore.
+
+</Part>
+
+<Part label={REPORT}>
+
+- `Rejection("unknown_reference", …)` when the references cannot be resolved.
+
+</Part>
+
+<Fold summary={REF}>
+
+<CodeExcerpt id="resolve-release">
+  <p slot="caption">`resolve` of the reference model calls `_locate` and gives nothing back.</p>
+</CodeExcerpt>
+
+<CodeExcerpt id="locate-release">
+  <p slot="caption">The check of a release. The reference model reads the two revisions from the release identity, finds the repository and reads which files the revision holds.</p>
+</CodeExcerpt>
+
+</Fold>
+
+</Member>
+
+<Member name="Name the revision of the input data" code="input_revision" of="Engine">
+
+`regression` asks with it on which input data a recorded run was computed, and then has the newer revision described with those input data.
+
+<Part label={GET}>
+
+- `release`: a recorded release identity. It may come from another version of the core of your engine.
+
+</Part>
+
+<Part label={GIVE}>
+
+A string: the identifier of the revision that the release takes its input data from, in the form that `describe` takes as `input_revision`.
+
+</Part>
+
+<Part label={REPORT}>
+
+- `Rejection("unknown_reference", …)` when `release` names no state that your engine can read.
+
+</Part>
+
+<Fold summary={REF}>
+
+<CodeExcerpt id="input-revision">
+  <p slot="caption">The reference model reads the revision from the reference of the input data.</p>
+</CodeExcerpt>
+
+</Fold>
+
+</Member>
+
+<Callout tag="If you know Git" title="The same questions as Git commands">
+
+The connection of the reference model runs none of these commands. Each line names the command that answers the same question, and where the connection differs from it.
+
+{git('git rev-parse --verify <name>^{commit}')} Name a revision: the full hash of the commit that a hash, a branch, a tag or `HEAD` names. The connection takes no suffix such as `HEAD~1`.
+
+{git('git ls-tree -r <commit>')} List the files of a revision. The connection refuses a revision that holds anything but regular files.
+
+{git('git show <commit>:<path>')} Read one file of a revision. The connection writes every file of the revision into a new folder, byte for byte; it uses no archive and no working tree of the repository.
+
+{git('git log --first-parent --reverse <older>..<newer>')} List the revisions between two releases on the main line, the oldest first. The connection refuses two revisions of which the older one does not lie on the main line of the newer one.
+
+{git('git diff --name-only --no-renames <parent> <commit>')} Say which paths a revision touches, against the revision before it.
+
+{git('git fetch --unshallow')} Complete a clone whose history is cut off. From such a clone the connection does not read the history, and it names this command.
+
+</Callout>
+</div>
+
+</StepCard>
+
+<StepCard steps={frontmatter.steps} anchor="open">
+
+`open` does the work of a run. It restores the state of the release in a scratch folder, applies the enabled changes there and gives back the opened release. DeltaRecon uses the result in a `with` statement of Python and reads the opened release inside it.
+
+What the folder of the histories holds is never altered. The scratch folder is created in the temporary folder of the system, and its name begins with `deltarecon-`, the <span data-no-term>value</span> of `SCRATCH_PREFIX`.
+
+<StepFigure slot="figure">
+  <FileList
+    label="The scratch folder of the reference model"
+    files={[
+      { name: 'deltarecon-…/', note: 'in the temporary folder' },
+      { name: 'delib-history/', note: 'the restored state' },
+    ]}
+  />
+  <p slot="caption">Where the reference model restores a release. The folder is removed when the run is over.</p>
+</StepFigure>
+
+<div slot="wide" class="step-parts">
+
+<Member name="Open a release for a run" code="open" of="Engine">
+
+The operation is a context manager: it hands out the opened release and clears the scratch folder away when the `with` statement ends. The simplest way to write it is a generator with `@contextmanager` of `contextlib`.
+
+<Part label={GET}>
+
+- `stage`: the stage of the request, one of `stages`.
+- `release`: the release identity of the request, in the form of `describe`.
+- `enabled`: the enabled changes in the order in which they are applied; empty for a run without changes. Each is an entry of a change manifest, and its `realisation.type` is a kind of `realisations`.
+- `manifest_dir`: the folder of the change manifest, which the paths of its files are relative to; `None` when no change is enabled.
+- `repositories`: the folder from `repositories_folder`.
+- `hold`: the kinds of reference that you take from `release` instead of from the last enabled revision; each is a kind of `holdable`. Empty when nothing is held.
+
+</Part>
+
+<Part label={DO}>
+
+- Without enabled changes you restore the state that `release` names.
+- For changes of the kind `revision` you restore the state after the last enabled revision. The kinds in `hold` you take from `release`.
+- Restore the state in a new folder in the temporary folder of the system whose name begins with `SCRATCH_PREFIX`.
+- You are given a text patch only when your engine names `text_patch` under `realisations`. What an entry of `enabled` holds and how a text patch is applied is described in `contracts/v3/changes.md` of the repository.
+
+</Part>
+
+<Part label={GIVE}>
+
+The opened release: an object of your second {cls} (step 4).
+
+</Part>
+
+<Part label={REPORT}>
+
+- `Rejection("unsupported_realisation", …)` for a revision whose `source` is not the history of your engine, before you restore anything.
+- `Rejection("invalid_manifest", …)` for a change that does not apply.
+- Any other error ends the run with the outcome `error`.
+
+</Part>
+
+<Fold summary={REF}>
+
+<CodeExcerpt id="open-foreign">
+  <p slot="caption">First the reference model refuses a revision of another history.</p>
+</CodeExcerpt>
+
+<CodeExcerpt id="open-revisions">
+  <p slot="caption">Then it determines the files of the state: those of the release of the request, or those of the last enabled revision, with the model point table of the release when the input data are held.</p>
+</CodeExcerpt>
+
+<CodeExcerpt id="open-scratch">
+  <p slot="caption">The reference model creates the scratch folder, writes the files of the revision into it, applies the text patches there, reads the model from it and hands the opened release to the run. The excerpt shows one of the two <Term id="computation-path">computation paths</Term> of the reference model.</p>
+</CodeExcerpt>
+
+</Fold>
+
+</Member>
+
+</div>
+
+</StepCard>
+
+<StepCard steps={frontmatter.steps} anchor="session">
+
+The opened release is a second, small {cls}. It stands for one state of the model and answers what a run asks: which model points there are, and the projection of each, with one <Term id="value">value</Term> per quantity and <Term id="period">period</Term>. It also gives the parameters of the release, which the <Term id="record">record</Term> of a run holds.
+
+It has two attributes and three operations. Two further operations are optional.
+
+<StepFigure slot="figure">
+  <FileList
+    label="Where a run writes the answers"
+    files={[
+      { name: 'results.csv', note: 'ids, periods, values' },
+      { name: 'run-record.json', note: 'the parameters' },
+    ]}
+  />
+  <p slot="caption">Two of the files of a run and what they take from the opened release.</p>
+</StepFigure>
+
+<div slot="wide" class="step-parts">
+
+<Member name="The time basis" code="time_basis" of="Session">
+
+An attribute: the name of the time basis, that is of what a period counts.
+
+<Part label={SET}>
+
+A name that the domain reference of the stage explains.
+
+</Part>
+
+<Part label={USE}>
+
+A comparison first puts both runs on projection periods. For the time basis `policy_month`, whose periods count from the issue of the contract, it subtracts from every period of a model point the first period that the run gives for it. For any other name it takes the periods as your engine gives them.
+
+</Part>
+
+<Fold summary={REF}>
+
+<CodeExcerpt id="session-attributes">
+  <p slot="caption">The two attributes of the opened release of the reference model.</p>
+</CodeExcerpt>
+
+</Fold>
+
+</Member>
+
+<Member name="The quantities" code="quantities" of="Session">
+
+An attribute: name and unit of each quantity, in the order of the result columns.
+
+<Part label={SET}>
+
+A list of pairs `(name, unit)`. Each name must be one of the names that your engine names in step 1 under `stages` for the stage; DeltaRecon checks that. The order is that of the values that `project` gives per period, and that of the columns of `results.csv`.
+
+</Part>
+
+<Fold summary={REF}>
+
+<CodeExcerpt id="quantities">
+  <p slot="caption">The quantities of the reference model: name, unit, and where the connection reads each from the model. Names and units become `quantities` of the opened release, in this order.</p>
+</CodeExcerpt>
+
+</Fold>
+
+</Member>
+
+<Member name="Give the ids of the model points" code="model_point_ids" of="Session">
+
+Every run first asks which model points the release holds.
+
+<Part label={GIVE}>
+
+A list of strings: the public id of every model point of the release, in the order of your engine. An id that the release holds several times you give several times; DeltaRecon lets such a model point fail and does not project it.
+
+</Part>
+
+<Fold summary={REF}>
+
+<CodeExcerpt id="session-questions">
+  <p slot="caption">The ids come from the model point table of the model; the projection of a model point is looked up by its id.</p>
+</CodeExcerpt>
+
+</Fold>
+
+</Member>
+
+<Member name="Project one model point" code="project" of="Session">
+
+The calculation itself: DeltaRecon calls the operation for every selected model point.
+
+<Part label={GET}>
+
+- `model_point_id`: an id of `model_point_ids`.
+
+</Part>
+
+<Part label={GIVE}>
+
+A list with one entry per period of the model point. Each entry is a pair: the number of the period as an integer, and a list with one value per quantity, in the order of `quantities`. The periods follow one another without a gap, there is at least one, and every value is a finite number; otherwise DeltaRecon lets the model point fail.
+
+</Part>
+
+<Part label={REPORT}>
+
+- `ModelPointFailure(…)` when the model point cannot be calculated. The run then ends with the outcome `failed`.
+
+</Part>
+
+<Fold summary={REF}>
+
+<CodeExcerpt id="project-index">
+  <p slot="caption">The projection of one model point in the reference model: compute the result of the model, evaluate the built-in checks of the model, and put together the values of each period in the order of the quantities. An error, or a check that is false, becomes a `ModelPointFailure`.</p>
+</CodeExcerpt>
+
+</Fold>
+
+</Member>
+
+<Member name="Give the parameters" code="parameters" of="Session">
+
+Every run writes the parameters of the release into its record.
+
+<Part label={GIVE}>
+
+A list with one `dict` per parameter of the release, in the form in which the record of a run holds them. The order of the parameters and of the rows of a table carries no meaning.
+
+- A single value: `name`, `type` with the value `scalar`, and `value`.
+- A table: `name`, `type` with the value `keyed_table`, `key_columns`, `value_columns` and `rows`; each row has `key` and `values`.
+
+</Part>
+
+<Fold summary={REF}>
+
+<CodeExcerpt id="parameters" unindexed>
+  <p slot="caption">The reference model collects the single values of the model and its tables and gives them back sorted by name.</p>
+</CodeExcerpt>
+
+</Fold>
+
+</Member>
+
+<Member name="Project several model points at once" code="project_many" of="Session" tag="optional">
+
+Without this operation DeltaRecon projects model point by model point with `project`. With it your engine can spread the work itself, for example over several processes. The protocol describes it in a comment; the signature is that of the reference model.
+
+<Part label={GET}>
+
+- `model_point_ids`: the ids of the model points to compute.
+
+</Part>
+
+<Part label={GIVE}>
+
+A list with one entry per id, in the order given: the periods as `project` gives them, or the `ModelPointFailure` that `project` would raise, as an object in the list. Any other error is raised.
+
+</Part>
+
+<Fold summary={REF}>
+
+<CodeExcerpt id="project-many">
+  <p slot="caption">`project_many` of the reference model spreads the model points over the worker processes.</p>
+</CodeExcerpt>
+
+</Fold>
+
+</Member>
+
+<Member name="Project a target only" code="project_target" of="Session" tag="optional">
+
+Without this operation your engine cannot compute a run on a <Term id="target">target</Term> alone, which a search with `--target-only` needs. The protocol describes it in a comment; the signature is that of the reference model.
+
+<Part label={GET}>
+
+- `model_point_ids`: the ids of the model points to compute.
+- `quantities`: names of quantities that the opened release declares, in its order.
+- `periods`: a pair `(first, last)` in projection periods, or `None` for every period. Projection period 0 is the period of the valuation date of the model point.
+
+</Part>
+
+<Part label={GIVE}>
+
+A list with one entry per id, in the order given: a `ModelPointFailure`, or the periods of the window, with one value per name of `quantities`. The window reaches from the period of the valuation date plus `first` to that period plus `last`, at most to the last period of the model point. A model point whose window is empty has no period.
+
+</Part>
+
+<Part label={DO}>
+
+Evaluate no check of the model here: a model point fails only when a value of the target cannot be calculated.
+
+</Part>
+
+<Fold summary={REF}>
+
+<CodeExcerpt id="project-target">
+  <p slot="caption">`project_target` of the reference model spreads the model points over the worker processes as `project_many` does, and computes for each model point the values of the target alone.</p>
+</CodeExcerpt>
+
+</Fold>
+
+</Member>
+
+</div>
+
+</StepCard>
+
+<StepCard steps={frontmatter.steps} anchor="history">
+
+`walk` and `search` compute the states between two releases one after the other. For that they need the history between the two as single revisions, and a name for the state after each. `derive` writes the change manifest from the same history.
+
+What the main line is, your engine defines; in Git it is the chain of first parents.
+
+<StepFigure slot="figure">
+  <FileList
+    label="Paths of the reference model and their classes"
+    files={[
+      { name: 'model_point_table.csv', note: 'data' },
+      { name: 'mort_table.csv', note: 'parameter' },
+      { name: 'RLV_DE_S/', note: 'code' },
+    ]}
+  />
+  <p slot="caption">Three paths in the repository of the reference model. A revision carries the classes of all paths it touches.</p>
+</StepFigure>
+
+<div slot="wide" class="step-parts">
+
+<Member name="List the revisions between two releases" code="history" of="Engine">
+
+`derive`, `walk` and `search` call this operation. It also reads release identities that another version of the core of your engine recorded.
+
+<Part label={GET}>
+
+- `older` and `newer`: the release identities of two releases, the older one first. Which references name the revision is your engine's matter.
+- `repositories`: the folder from `repositories_folder`.
+
+</Part>
+
+<Part label={GIVE}>
+
+A `History(source, older, newer, revisions)`:
+
+- `source`: the kind of history, a name in small letters: `git`, or a name that your engine chooses. With `git` the main line is the chain of first parents.
+- `older` and `newer`: the identifiers of the two revisions.
+- `revisions`: every revision on the main line after the older one, up to and including the newer one, the oldest first. Empty when both releases name the same revision.
+
+Each revision is a `Revision(id, message, classes)`: its full identifier; its message as it was written, with the line breaks at its end; and the classes of the paths it touches against the revision before it, a set of `data`, `parameter` and `code`. The set is empty when the revision touches none of these.
+
+</Part>
+
+<Part label={REPORT}>
+
+- `Rejection("unknown_reference", …)` when a release identity names no revision that your engine can read.
+- `Rejection("unrelated_revisions", …)` when the older revision does not lie on the main line of the newer one.
+- `UsageError` when the history at hand is cut off.
+
+</Part>
+
+<Fold summary={REF}>
+
+<CodeExcerpt id="history-revisions">
+  <p slot="caption">The end of `history` of the reference model: the revisions after the older one, the oldest first, each with its message and with the classes of the paths it touches against the revision before it.</p>
+</CodeExcerpt>
+
+<CodeExcerpt id="path-class">
+  <p slot="caption">How the reference model classes a path: the model point table is data, a file of the model is code, another CSV file of the product folder is a parameter, and every other path has no class.</p>
+</CodeExcerpt>
+
+</Fold>
+
+</Member>
+
+<Member name="Name the state after a revision" code="state_release" of="Engine">
+
+`walk` and `search` write with the result the request for each state they compute.
+
+<Part label={GET}>
+
+- `base`: a recorded release identity; it may come from another version of the core of your engine.
+- `revision`: the identifier of a revision of `history`, or `None` for the state of `base` itself.
+- `hold`: the kinds of reference that come from `base` instead of from the revision; each is a kind of `holdable`.
+- `repositories`: the folder from `repositories_folder`.
+
+</Part>
+
+<Part label={GIVE}>
+
+The release identity of the state after `revision`, in the form of `describe`, as your engine would record it today: with the label of `base`, the kinds of `hold` from `base` and the others from the revision. Nothing is restored and nothing is written.
+
+</Part>
+
+<Part label={REPORT}>
+
+- `Rejection("unknown_reference", …)` when `base` names no state that your engine can read.
+
+</Part>
+
+<Fold summary={REF}>
+
+<CodeExcerpt id="state-release">
+  <p slot="caption">The lines of `state_release`: the state is that of the revision, and the input data stay those of the recorded release when they are held.</p>
+</CodeExcerpt>
+
+</Fold>
+
+</Member>
+
+</div>
+
+</StepCard>
+
+<StepCard steps={frontmatter.steps} anchor="select">
+
+Seven commands load an engine: `request`, `run`, `replay`, `regression`, `derive`, `walk` and `search`. Each takes the engine from the first of three places that names one, and looks for its module in a folder that you name.
+
+When a selection cannot be loaded, the command says in one line what is wrong, writes nothing and ends with <Term id="exit-status">exit status</Term> 2. This holds for a folder that is no folder, a selection that is not of the form `<module>:<class>`, a module that is not found, a name in the module that is no class, and a class that does not take the number of worker processes as its argument.
+
+<StepFigure slot="figure">
+  <FileList
+    label="What the two options name"
+    files={[
+      { name: '<folder>/', note: 'named by --engine-path' },
+      { name: '<module>.py', note: 'the module of --engine' },
+    ]}
+  />
+  <p slot="caption">The folder and the module of your connection. Your class stands in the module.</p>
+</StepFigure>
+
+<div slot="wide" class="step-parts">
+<RowList>
+  <Row name="The option of the command" code="--engine <module>:<class>" selection>Names the module and, in it, the class of your connection. The name of the module is absolute: it does not begin with a dot.</Row>
+  <Row name="The environment variable" code="DELTARECON_ENGINE" selection>Used when the command names no engine. An empty variable counts as not set.</Row>
+  <Row name="Neither">DeltaRecon takes the reference model.</Row>
+  <Row name="The folder of your module" code="--engine-path <folder>" selection>DeltaRecon puts this folder first on the import path of Python before it loads the module, so that a module in it can be named.</Row>
+  <Row name="The variable for that folder" code="DELTARECON_ENGINE_PATH" selection>Read only when the command gives no `--engine`. With `--engine`, only `--engine-path` adds a folder.</Row>
+</RowList>
+
+<Callout tag="Known limits" title="Four faults that end in a traceback">
+
+In this release DeltaRecon answers four faults of a connection with a traceback of Python and exit status 1, not with a message of its own. That is a limit of this release, not an error in how you call the command. The last line of the traceback names the cause.
+
+The module of your connection raises another error than a failed import while it is loaded, for example a syntax error.
+
+Your class raises an error of its own when it is called with the number of worker processes.
+
+Your class lacks a member of the protocol.
+
+The history that your connection gives breaks the protocol: its kind is not a name in small letters, its revisions do not lead from the older to the newer release, or a revision carries a class other than data, parameter and code.
+
+</Callout>
+</div>
+
+<HintLink slot="hint" step="select" />
+
+</StepCard>
+
+<StepCard steps={frontmatter.steps} anchor="first-run">
+
+Now DeltaRecon computes one release with your engine. `request` writes down what is to be computed, and `run` computes it. Both name your engine with the two options of step 6.
+
+<PlatformPart os="windows">
+
+Open PowerShell in the <Term id="package-folder">package folder</Term>.
+
+</PlatformPart>
+
+<PlatformPart os="linux">
+
+Open a terminal and change into the package folder.
+
+</PlatformPart>
+
+Put your own words in the places between `<` and `>`:
+
+<PlatformSwitch windows={firstRun.windows} linux={firstRun.linux} />
+
+<div class="step-after">
+
+`<revision>` is a revision as your engine names it. `<stage>` is a stage that your engine supports; you may leave `--stage` out when it supports one stage only. `<label>` and `<run-id>` are names that you give to this release and to this run. `<output>` is a folder for the files of the run. When your engine does not find the folder of its histories by itself, add `--repositories` with that folder to both commands.
+
+</div>
+
+<StepFigure slot="figure">
+  <FileList
+    label="In the folder <output>"
+    files={[
+      { name: 'request.json', note: 'what is to be computed' },
+      { name: 'response.json', note: 'how the run ended' },
+      { name: 'results.csv', note: 'the results' },
+      { name: 'run-record.json', note: 'the record' },
+    ]}
+  />
+  <p slot="caption">What the two commands write.</p>
+</StepFigure>
+
+<div slot="wide" class="step-parts">
+
+`request` prints the path of the request it wrote. `run` prints `outcome: succeeded`, the number of model points, the number of rows of the results and their SHA-256, and the paths of the three files it wrote. Both commands end with exit status 0. When a command ends with a traceback, look at the known limits in step 6.
+
+With a second run, of another revision, you can compare two results. `regression`, `replay`, `walk` and `search` write their <Term id="compare-request">compare requests</Term> themselves and run them. You write a compare request yourself only for `compare`, the comparison of two runs by hand. It is a JSON file with these members:
+
+<RowList>
+  <Row name="The kind of document">`document` is always `compare_request`.</Row>
+  <Row name="The version of the contracts">`contract_version`: the version the request is written for, `3.3` in this release.</Row>
+  <Row name="The stage">`stage`: the stage of both runs.</Row>
+  <Row name="An id">`compare_id`: a name that you give to this comparison.</Row>
+  <Row name="The two responses">`left.response` and `right.response`: for each run the path of its `response.json` and the SHA-256 of that file in small hexadecimal digits. The path is relative to the folder of the request, with forward slashes and without `..`. By convention the left run is the older one.</Row>
+  <Row name="The tolerance">`tolerance.per_quantity`: the <Term id="tolerance-profile">tolerance profile</Term>. It may be empty; every quantity is then compared exactly.</Row>
+</RowList>
+
+The smallest compare request:
+
+<CodeBlock lines={compareRequest} label="Compare request, smallest example" />
+
+`compare` takes the path of this file and nothing else. “<a href={`${pageAddress(singleCommands, 'en')}#compare`}>{singleCommands.name.en}</a>” describes what it writes.
+
+</div>
+
+<HintLink slot="hint" step="first-run" />
+
+</StepCard>
+
+</Steps>
+
+<PathEnd>With the first run of your own engine, stage 4 is complete.</PathEnd>

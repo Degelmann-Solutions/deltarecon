@@ -1,18 +1,21 @@
 ---
 // One step of a step page: the pad on the trace, the counter ("Step 2 of
 // 6"), the title as a link to the step, the text, a figure in the right
-// column, and wide parts below both.
+// column, wide parts below both, and as the last line of the card the hint
+// link of the step, where it has hints on "When something goes wrong".
 //
 //   <StepCard steps={frontmatter.steps} anchor="unpack">
 //     Text of the step, a platform switch.
 //     <StepFigure slot="figure">…</StepFigure>
 //     <div slot="wide">…a terminal block, a flow diagram, a callout…</div>
+//     <HintLink slot="hint" step="unpack" />
 //   </StepCard>
 //
 // Title, number and the word "optional" come from the step list of the
 // frontmatter; the chapter tree reads the same list. The build fails on an
 // anchor the list does not hold. A component inside the card that names its
-// step writes STEP_MARK; the card puts the number there.
+// step writes STEP_MARK; the card puts the number there. The build also
+// fails on a hint link that names another step than the card.
 import { stepCounter, texts, type Step } from '../site';
 import { pageLanguage, STEP_MARK } from '../markup';
 
@@ -39,6 +42,12 @@ const render = async (slot: string): Promise<string> =>
 const text = await render('default');
 const figure = await render('figure');
 const wide = await render('wide');
+const hint = await render('hint');
+if (hint && !hint.includes(`data-hint-of="${anchor}"`)) {
+  throw new Error(
+    `${Astro.url.pathname}: the step card "${anchor}" holds a hint link of another step.`,
+  );
+}
 ---
 
 <li class="step" id={anchor} data-step>
@@ -54,5 +63,6 @@ const wide = await render('wide');
       {figure && <Fragment set:html={figure} />}
     </div>
     {wide && <div class="step-wide prose-links" set:html={wide} />}
+    {hint && <Fragment set:html={hint} />}
   </div>
 </li>

@@ -17,7 +17,7 @@ const { code, writes } = Astro.props;
   <p class="flow-title"><slot /></p>
   {
     (code || writes) && (
-      <p class="flow-sub" translate="no">{code}{code && writes && <br />}{writes && <Fragment><span aria-hidden="true">→ </span>{writes}</Fragment>}</p>
+      <p class="flow-sub" translate="no" data-no-term>{code}{code && writes && <br />}{writes && <Fragment><span aria-hidden="true">→ </span>{writes}</Fragment>}</p>
     )
   }
 </li>

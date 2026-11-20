@@ -25,6 +25,7 @@
 //     in the content is the glossary link of its entry; no entry is linked
 //     twice; a glossary link leads to its entry on the Glossary of the
 //     page's language and has the dotted underline;
+//   - an entry that names a page that says more (`more`) links to that page;
 //   - "Appears in" of each entry lists exactly the pages that link the term,
 //     in path order, and is absent where no page does.
 //   - the way back: after a click on a glossary link of a page the entry
@@ -252,7 +253,7 @@ async function proveItself(browser, origin) {
     ['a term in the code of the page and in the name of a drawing', 'en', '<p>Text.</p><style>.record { color: inherit }</style><script>const value = 1; // a deviation</script><noscript><p>A revision.</p></noscript><svg><title>Value</title><desc>A class.</desc></svg>', []],
     ['a link to an unknown entry', 'en', `<p>${link('en', 'no-such-entry', 'Something')}</p>`, ['unknown:no-such-entry']],
     ['a link to the Glossary of the other language', 'en', `<p>A ${link('de', 'deviation', 'deviation')}.</p>`, ['address:deviation']],
-    ['a word in an exempt passage, in code, in a heading, in another link', 'en', '<h2>Deviation</h2><p>Run <code>deviation</code>, <span data-no-term>a deviation from the plan</span>, <a href="/x">the deviation page</a>.</p><pre>deviation</pre>', []],
+    ['a word in an exempt passage, in code, in a heading, in another link', 'en', '<h2>Deviation</h2><p>See <code>deviation</code>, <span data-no-term>a deviation from the plan</span>, <a href="/x">the deviation page</a>.</p><pre>deviation</pre>', []],
     ['a term inside a longer word', 'en', '<p>A deviational effect. Revisionism.</p>', []],
     ['a term without regard to case, and a form', 'en', '<p>REVISIONS and a Tolerance\n profile.</p>', ['unlinked:revision', 'unlinked:tolerance-profile']],
     ['two terms in two blocks', 'en', '<ul><li>Value</li><li>Record</li></ul>', ['unlinked:record', 'unlinked:value']],
@@ -375,6 +376,7 @@ function readGlossary(page) {
           explanation: text(part.querySelector('dd > p')),
           appearsIn: text(part.querySelector('[data-appears-in]')),
           appearsOn: [...part.querySelectorAll('[data-appears-in] a')].map((link) => link.getAttribute('href')),
+          more: [...part.querySelectorAll('[data-more] a')].map((link) => link.getAttribute('href')),
         };
       }),
     };
@@ -463,6 +465,13 @@ async function checkGlossary(browser, origin, entry, javaScript, linkedOn) {
     );
     const explanation = item[lang].explanation.replace(/<[^>]+>/g, '').trim().replace(/\s+/g, ' ');
     expect(part.explanation === explanation, `${at} shows the explanation "${part.explanation}", expected "${explanation}"`);
+
+    // An entry that names a page that says more links to that page, and no other entry does.
+    const more = item.more ? pages.filter((candidate) => candidate.id === item.more && candidate.lang === lang).map((candidate) => candidate.address) : [];
+    expect(
+      part.more.join() === more.join() && (!item.more || more.length === 1),
+      `${at}: the link to the page that says more leads to [${part.more.join(', ')}], expected [${more.join(', ')}] (the page "${item.more ?? ''}" of the register)`,
+    );
 
     // "Appears in": the pages that link the term, in path order.
     const on = linkedOn.get(part.anchor) ?? [];

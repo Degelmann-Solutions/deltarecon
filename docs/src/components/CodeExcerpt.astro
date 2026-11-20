@@ -1,0 +1,61 @@
+---
+// A code excerpt: a short piece of the repository's code with its origin.
+// A head row names the file and, at its right, the lines and the release;
+// below it the code, uncoloured; below that a caption. The code scrolls
+// sideways inside its box, takes keyboard focus for that and is a region
+// named after its file and lines. There is no copy button: an excerpt is
+// read, not run.
+//
+//   <CodeExcerpt id="session-questions">
+//     <p slot="caption">What the excerpt shows.</p>
+//   </CodeExcerpt>
+//
+// `id` names an excerpt of the register (src/excerpts.ts), which holds
+// file, lines and code as they stand at the tag of the release; a page
+// types no line of code. scripts/check-excerpts.mjs holds the built
+// excerpt against `git show v<release>:<file>`, character for character.
+//
+// The build fails on an excerpt the register does not hold, on one whose
+// code has another number of lines than its range, and without a caption.
+import { excerptFaults, excerpts } from '../excerpts';
+import { pageLanguage } from '../markup';
+import { tag } from '../release';
+import { texts } from '../site';
+
+interface Props {
+  /** The key of the excerpt in src/excerpts.ts. */
+  id: string;
+  /**
+   * Keeps the code out of the search index. For an excerpt with names of one
+   * letter: the search offers a short word as a hit for every word that
+   * begins with it.
+   */
+  unindexed?: boolean;
+}
+
+const { id, unindexed } = Astro.props;
+const where = Astro.url.pathname;
+const t = texts[pageLanguage(where)];
+const excerpt = excerpts[id];
+if (!excerpt) {
+  throw new Error(`${where}: no excerpt "${id}" in the register (src/excerpts.ts).`);
+}
+const faults = excerptFaults(excerpt);
+if (faults.length > 0) {
+  throw new Error(`${where}: the excerpt "${id}" (src/excerpts.ts): ${faults.join('; ')}.`);
+}
+if (!Astro.slots.has('caption')) {
+  throw new Error(`${where}: the code excerpt "${id}" has no caption (slot "caption").`);
+}
+const { file, first, last, code } = excerpt;
+const lines = first === last ? `${t.excerptLine} ${first}` : `${t.excerptLines} ${first} ${t.excerptTo} ${last}`;
+---
+
+<figure class="code-excerpt" data-code-excerpt data-file={file} data-first={first} data-last={last} data-release={tag}>
+  <div class="code-excerpt-head" data-code-excerpt-head>
+    <span translate="no">{file}</span>
+    <span>{lines} · <span translate="no">{tag}</span></span>
+  </div>
+  <pre class="code" tabindex="0" role="region" aria-label={`${file}, ${lines}`} translate="no" data-pagefind-ignore={unindexed ? '' : undefined}><code>{code}</code></pre>
+  <figcaption class="code-excerpt-caption prose-links"><slot name="caption" /></figcaption>
+</figure>

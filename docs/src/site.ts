@@ -1,8 +1,9 @@
-// The page register of the documentation: the four stages, the ten pages in
+// The page register of the documentation: the four stages, the eleven pages in
 // path order with their names and addresses per language, the texts of the
-// page frame, of the Glossary and of the step components, `languageOf`, the language of a page
+// page frame, of the Glossary, of the step components and of the code excerpt, `languageOf`, the language of a page
 // address, and the page-not-found page, which stands outside the path
-// (`notFoundPage`, `onPath`). Chapter tree, page links, page head, language switch and head
+// (`notFoundPage`, `onPath`), and the contact details of the help page
+// (`contact`). Chapter tree, page links, page head, language switch and head
 // data read it, and so do the Glossary (components/Glossary.astro), the
 // glossary link (components/Term.astro) and the path block of a page of
 // prose (components/PathBlock.astro); a page name stands here and in no
@@ -42,6 +43,18 @@ export interface Step {
   optional?: boolean;
 }
 
+/**
+ * A section of a page of prose that the chapter tree lists under the page,
+ * as the page names it in its frontmatter (`sections:`). `code` marks a
+ * title that is a name of the program, as the name of a command.
+ */
+export interface Section {
+  /** Anchor of the section heading, the same in both languages. */
+  anchor: string;
+  title: string;
+  code?: boolean;
+}
+
 /** What an anchor of a step looks like: small letters, digits and hyphens. */
 export const stepAnchor = /^[a-z][a-z0-9-]*$/;
 
@@ -78,7 +91,7 @@ export const stages: readonly Stage[] = [
   { number: 4, name: { en: 'Connect your engine', de: 'Ihre Engine anbinden' } },
 ];
 
-/** The ten pages in path order. */
+/** The eleven pages in path order. */
 export const pages: readonly Page[] = [
   {
     id: 'overview',
@@ -118,6 +131,12 @@ export const pages: readonly Page[] = [
       de: 'Eigene Rechnungen am Referenzmodell',
     },
     slug: { en: 'own-calculations', de: 'eigene-rechnungen' },
+  },
+  {
+    id: 'tolerance-profile',
+    stage: 3,
+    name: { en: 'Write a tolerance profile', de: 'Ein Toleranzprofil schreiben' },
+    slug: { en: 'tolerance-profile', de: 'toleranzprofil' },
   },
   {
     id: 'single-commands',
@@ -172,6 +191,21 @@ export const outside = {
   previewImage: 'https://degelmann-solutions.de/og-image.png',
 } as const;
 
+/**
+ * The contact details of the page "When something goes wrong". They are
+ * typed here, in this one place, from the imprint of the company website
+ * (`outside.imprint`; in the repository of the website `src/config/site.ts`,
+ * shown by `src/pages/impressum.astro`): the provider and its address, the
+ * e-mail address and the phone number, exactly as the imprint states them.
+ * The documentation cannot read that repository; whoever changes the imprint
+ * changes them here.
+ */
+export const contact = {
+  email: 'kontakt@degelmann-solutions.de',
+  phone: '+49 175 6085584',
+  address: ['Degelmann GmbH', 'Zur Strachau 12', '21368 Boitze'],
+} as const;
+
 export const company = 'Degelmann Solutions';
 export const product = 'DeltaRecon';
 
@@ -194,6 +228,12 @@ export interface FrameTexts {
   /** The page kind the stage line names on the page below the four stages. */
   helpKind: string;
   steps: string;
+  /** The name of the list of the sections of a page in the chapter tree. */
+  sections: string;
+  /** The label of the usage line of a command. */
+  synopsis: string;
+  /** The name of the signature of a member card. */
+  signature: string;
   pageLinks: string;
   previous: string;
   next: string;
@@ -205,6 +245,8 @@ export interface FrameTexts {
   letters: string;
   linkedTerm: string;
   appearsIn: string;
+  /** Before the link of a Glossary entry to the page that says more. */
+  moreOn: string;
   /** The step page: the counter "Step n of m" and the tag of a step that may be skipped. */
   step: string;
   stepOf: string;
@@ -230,6 +272,22 @@ export interface FrameTexts {
   newTab: string;
   /** The Glossary: the link back to the page the reader came from. */
   backToPage: string;
+  /** The code excerpt: the words of its head row, "lines 871 to 876". */
+  excerptLine: string;
+  excerptLines: string;
+  excerptTo: string;
+  /** The hint link of a step and of a section, to its group on the help page. */
+  hintLinkStep: string;
+  hintLinkSection: string;
+  /** The group label of a section on the help page: "Single commands · section". */
+  hintSection: string;
+  /** What stands before the link of a group to its step or its section. */
+  hintToStep: string;
+  hintToSection: string;
+  /** The labels of the contact block. */
+  contactEmail: string;
+  contactPhone: string;
+  contactAddress: string;
 }
 
 export const texts: Record<Lang, FrameTexts> = {
@@ -245,6 +303,9 @@ export const texts: Record<Lang, FrameTexts> = {
     stage: 'Stage',
     helpKind: 'Help',
     steps: 'Steps of this page',
+    sections: 'Sections of this page',
+    synopsis: 'Synopsis',
+    signature: 'Signature',
     pageLinks: 'Previous and next page',
     previous: 'Previous',
     next: 'Next',
@@ -255,6 +316,7 @@ export const texts: Record<Lang, FrameTexts> = {
     letters: 'Letters',
     linkedTerm: 'Linked term',
     appearsIn: 'Appears in',
+    moreOn: 'More on this',
     step: 'Step',
     stepOf: 'of',
     optional: 'optional',
@@ -272,6 +334,17 @@ export const texts: Record<Lang, FrameTexts> = {
     copyFailed: 'Not copied. Please select the command by hand.',
     newTab: 'opens in a new tab',
     backToPage: 'Back to the previous page',
+    excerptLine: 'line',
+    excerptLines: 'lines',
+    excerptTo: 'to',
+    hintLinkStep: 'If something goes wrong at this step',
+    hintLinkSection: 'If something goes wrong in this section',
+    hintSection: 'section',
+    hintToStep: 'To the step',
+    hintToSection: 'To the section',
+    contactEmail: 'E-mail',
+    contactPhone: 'Phone',
+    contactAddress: 'Address',
   },
   de: {
     documentation: 'DeltaRecon-Dokumentation',
@@ -285,6 +358,9 @@ export const texts: Record<Lang, FrameTexts> = {
     stage: 'Etappe',
     helpKind: 'Hilfe',
     steps: 'Schritte dieser Seite',
+    sections: 'Abschnitte dieser Seite',
+    synopsis: 'Aufbau des Befehls',
+    signature: 'Signatur',
     pageLinks: 'Vorherige und nächste Seite',
     previous: 'Zurück',
     next: 'Weiter',
@@ -295,6 +371,7 @@ export const texts: Record<Lang, FrameTexts> = {
     letters: 'Buchstaben',
     linkedTerm: 'Verlinkter Begriff',
     appearsIn: 'Kommt vor in',
+    moreOn: 'Mehr dazu',
     step: 'Schritt',
     stepOf: 'von',
     optional: 'optional',
@@ -312,6 +389,17 @@ export const texts: Record<Lang, FrameTexts> = {
     copyFailed: 'Nicht kopiert. Bitte markieren Sie den Befehl von Hand.',
     newTab: 'öffnet in neuem Tab',
     backToPage: 'Zurück zur vorherigen Seite',
+    excerptLine: 'Zeile',
+    excerptLines: 'Zeilen',
+    excerptTo: 'bis',
+    hintLinkStep: 'Wenn bei diesem Schritt etwas schiefgeht',
+    hintLinkSection: 'Wenn in diesem Abschnitt etwas schiefgeht',
+    hintSection: 'Abschnitt',
+    hintToStep: 'Zum Schritt',
+    hintToSection: 'Zum Abschnitt',
+    contactEmail: 'E-Mail',
+    contactPhone: 'Telefon',
+    contactAddress: 'Anschrift',
   },
 };
 
@@ -327,7 +415,7 @@ export function findPage(id: string): Page {
   return page;
 }
 
-/** Whether a page is one of the ten on the path. */
+/** Whether a page is one of the eleven on the path. */
 export function onPath(page: Page): boolean {
   return pages.includes(page);
 }
@@ -365,6 +453,12 @@ export function pageAddress(page: Page, lang: Lang): string {
 export function languageOf(pathname: string): Lang | undefined {
   const base = import.meta.env.BASE_URL.replace(/\/?$/, '/');
   return languages.find((lang) => pathname.startsWith(`${base}${lang}/`));
+}
+
+/** The page that stands at an address on the host, if it is one of the path. */
+export function pageAt(pathname: string): Page | undefined {
+  const address = pathname.replace(/\/?$/, '/');
+  return pages.find((page) => languages.some((lang) => pageAddress(page, lang) === address));
 }
 
 /** The stage line of the page head: the stage, or the page kind. */

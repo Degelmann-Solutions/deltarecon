@@ -25,7 +25,30 @@
 // Then, for every page of prose of both languages:
 //   - every level-2 heading of the content is a section heading with the
 //     anchor `prosePages` names, in its order, and is a link to itself; the
-//     page holds no "on this page" list;
+//     page holds no "on this page" list: no other link leads to a section,
+//     apart from a section `prosePages` names as linked from the content
+//     (the options several commands share and the sections of the commands,
+//     on "Single commands"), which must then be linked; where `prosePages`
+//     says so (`tree`), the chapter tree lists the sections under the page,
+//     each as a link to its anchor, in their order, and on no other page of
+//     prose does it list any;
+//   - where `prosePages` names the commands of a page: every inline code
+//     of the content that is the name of a command is a link to the section
+//     of that command, apart from the section of the command itself, which
+//     holds no link to itself but its heading;
+//   - no part of the content names a step that is not there (the mark a
+//     step card replaces);
+//   - the platform switches of a page of prose, which stand between its
+//     blocks: those `prosePages` names, in order, each named by its place
+//     ("Command, request, Windows"), and those without a command. Windows on
+//     the first visit; a tab list of two buttons, the copy button after it,
+//     then the command, a named region that takes focus; a click on "Linux"
+//     changes every switch while the used one keeps focus; the copy button
+//     copies the command that is shown; a switch without a command holds no
+//     code block and no copy button; axe with Linux chosen; at 390 px tabs
+//     and copy button are at least 40 px high; with JavaScript off both
+//     parts stand one after the other, Windows first, each under its label,
+//     without tabs and buttons;
 //   - the language switch, at the address of a section, opens the
 //     counterpart at the same section;
 //   - a wide figure holds its caption, which is text; no text of a figure is
@@ -39,7 +62,33 @@
 //     keep their size, stand apart and stay inside the figure;
 //   - the bars below it: one per revision of the search table, the label
 //     "number · revision", the sum as the capture of the language prints it;
-//   - a row list numbers its rows and closes with a hairline;
+//   - a row list numbers its rows and closes with a hairline; a list
+//     without numbers (`plain`) is an unordered list whose rows carry none;
+//     a label above a list is a small mono label in capitals and the name
+//     of the list; the code name
+//     of a row follows its name as inline code that is not translated, in
+//     weight 400; the tag of a row is a small mono label in capitals with a
+//     hairline border, at 1280 px at the right end of the row and at 390 and
+//     320 px below its text; where `prosePages` names the numbers of code
+//     names and tags, the page holds as many;
+//   - a sub-heading is a level-3 heading of 18 px after a section heading;
+//     where `prosePages` names their number, the page holds as many;
+//   - the connection figure: one per page, a wide figure and an ordered list
+//     of the three boxes `prosePages` names per language, each with its two
+//     small lines; only the box `prosePages` names as built is dashed, the
+//     others are solid; the first trace carries the one label, in teal-text;
+//     the caption is text. At 1280 px the boxes stand side by side with the
+//     label between the first two; at 390 and 320 px they are a stack with
+//     the label between the first two; nothing is scaled and nothing
+//     reaches beyond the figure;
+//   - the yardstick box: a block of the page with a navy border, its tag,
+//     the line with the number of lines in 22 px, and a text that names a
+//     file as inline code;
+//   - a code excerpt: a figure with a head row that names its file first, a
+//     caption, and the code as a named region, named after its file, that
+//     takes focus with the focus ring, is not translated, holds no markup
+//     (uncoloured) and scrolls sideways inside its box, at 390 px with the
+//     arrow keys; no copy button and nothing to copy;
 //   - the two four-column tables of the demo (DemoTable.astro): head row,
 //     rows and the sentence above as the capture of the language prints
 //     them; the table of the search: revision and sum of each row as the
@@ -75,8 +124,10 @@ import {
   BASE,
   DESKTOP,
   PHONE,
+  RING,
   expectations,
   loadExample,
+  loadHints,
   loadPages,
   loadRegister,
   loadRelease,
@@ -119,7 +170,57 @@ const prosePages = {
       },
     },
   },
+  'tolerance-profile': {
+    sections: ['what', 'file', 'rule', 'write', 'faults'],
+    counterpart: 'rule',
+    rows: 17,
+    codes: 7,
+    tags: 1,
+    switches: { places: ['search'], plain: 0 },
+  },
+  'single-commands': {
+    sections: ['start', 'request', 'run', 'replay', 'compare', 'regression', 'derive', 'walk', 'search', 'quickstart', 'shared-options'],
+    counterpart: 'search',
+    rows: 91,
+    // The sections the content links to: the section the sections of the
+    // commands link to, and the section of each command, which the name of
+    // the command links to wherever the text names it.
+    linked: ['shared-options', 'request', 'run', 'replay', 'compare', 'regression', 'derive', 'walk', 'search', 'quickstart'],
+    // The chapter tree lists the sections of this page under the page.
+    tree: true,
+    // The sections of the commands: the name of a command in the text is a
+    // link to its section, apart from its own section.
+    commands: ['request', 'run', 'replay', 'compare', 'regression', 'derive', 'walk', 'search', 'quickstart'],
+    // The platform switches: the place each switch with a command names, in
+    // order, and the number of switches without a command.
+    switches: {
+      places: ['request', 'run', 'replay', 'compare', 'regression', 'derive', 'walk', 'search', 'quickstart'],
+      plain: 1,
+    },
+  },
+  'engine-requirements': {
+    sections: ['answers', 'to-build', 'size', 'selection'],
+    counterpart: 'size',
+    rows: 24,
+    // The rows that carry a code name, the rows with a tag, the sub-headings.
+    codes: 23,
+    tags: 2,
+    subHeadings: 3,
+    // The connection figure: its boxes in order, the one that is built
+    // (dashed), and the label of the first trace.
+    connection: {
+      en: { boxes: ['DeltaRecon', 'Your connection', 'Your engine'], built: 'Your connection', label: 'protocol' },
+      de: { boxes: ['DeltaRecon', 'Ihre Anbindung', 'Ihre Engine'], built: 'Ihre Anbindung', label: 'Protokoll' },
+    },
+    yardsticks: 1,
+    excerpts: 1,
+    // A place that differs by language is named per language.
+    switches: { places: [{ en: 'engine selection', de: 'Auswahl der Engine' }], plain: 0 },
+  },
 };
+
+/** The mark a step card puts its number in the place of (src/markup.ts). */
+const STEP_MARK = '⟦step⟧';
 
 /** The widths the idea figure is looked at: side by side, then as a stack. */
 const NARROW = { width: 320, height: 844 };
@@ -131,6 +232,18 @@ const { exampleFacts, regressionTable, changeTable, unresolvedInterval } = await
 const release = await loadRelease();
 const { failures, expect, report } = expectations('check-prose');
 const { checkAxe, checkNoSidewaysScroll } = pageChecks({ failures, expect });
+
+// "When something goes wrong" is a page of prose too: its sections are the
+// hint groups of the register (src/hints.ts), in its order, and the section
+// of the contact block. A step or a section of another page links to its
+// group, and the group back; those links cross pages, so no link of the page
+// itself leads to a section. scripts/check-hints.mjs holds the groups, the
+// hint links and the contact block.
+const hints = await loadHints();
+prosePages[hints.helpPage] = {
+  sections: [...hints.hintGroups.map((group) => group.anchor), hints.contactAnchor],
+  counterpart: hints.hintGroups[hints.hintGroups.length - 1].anchor,
+};
 
 const captureFile = (platform, lang) => `captures/v${release}/${platform}-${lang}.txt`;
 const readCapture = (platform, lang) =>
@@ -466,15 +579,324 @@ async function checkHeadings(page, name, listed) {
     JSON.stringify(anchors) === JSON.stringify(listed.sections),
     `${name}: the sections are [${anchors}], expected [${listed.sections}] (prosePages in scripts/check-prose.mjs)`,
   );
-  // No "on this page" list: no link of the page but a heading itself leads to a section.
+  // No "on this page" list: no link of the page but a heading itself leads
+  // to a section, apart from a section the entry names as linked from the
+  // content, and then only from inside the content.
+  const linked = listed.linked ?? [];
   const others = await page.evaluate(
     (ids) =>
       [...document.querySelectorAll('a[href^="#"]')]
-        .filter((link) => ids.includes(link.getAttribute('href').slice(1)) && !link.closest('h2'))
-        .map((link) => link.getAttribute('href')),
+        // A link of the list of sections of the tree counts whatever it names.
+        .filter((link) => (ids.includes(link.getAttribute('href').slice(1)) || link.closest('#chapters [data-tree-sections]')) && !link.closest('h2'))
+        .map((link) => ({
+          href: link.getAttribute('href'),
+          content: link.closest('main [data-row], main [data-prose], main [data-callout]') !== null,
+          tree: link.closest('#chapters [data-tree-sections]') !== null,
+        })),
     anchors,
   );
-  expect(others.length === 0, `${name}: links to sections outside their headings: [${others}]`);
+  // The chapter tree lists the sections where the entry says so, and only there.
+  const inTree = others.filter((link) => link.tree).map((link) => link.href.slice(1));
+  expect(
+    JSON.stringify(inTree) === JSON.stringify(listed.tree ? anchors : []),
+    `${name}: the chapter tree lists the sections [${inTree}], expected [${listed.tree ? anchors : []}] (prosePages in scripts/check-prose.mjs)`,
+  );
+  const strangers = others.filter((link) => !link.tree && !(link.content && linked.includes(link.href.slice(1))));
+  expect(
+    strangers.length === 0,
+    `${name}: links to sections outside their headings: [${strangers.map((link) => link.href)}]`,
+  );
+  for (const anchor of linked) {
+    expect(
+      others.some((link) => !link.tree && link.href === `#${anchor}`),
+      `${name}: no link of the content leads to the section "${anchor}", which prosePages names as linked`,
+    );
+  }
+  // The name of a command in the text is a link to its section, apart from
+  // its own section.
+  if (listed.commands) {
+    const names = await page.evaluate((commands) => {
+      const found = [];
+      let section = '';
+      for (const part of document.querySelectorAll('main h2[data-section-heading], main code, main a[href^="#"]')) {
+        if (part.matches('h2')) {
+          section = part.id;
+        } else if (part.closest('h2, pre, [data-synopsis]')) {
+          continue;
+        } else if (part.matches('a')) {
+          const target = part.getAttribute('href').slice(1);
+          const named = part.querySelector('code')?.textContent;
+          if (commands.includes(target) && !(named && commands.includes(named) && named !== target)) found.push({ section, command: target, link: target, own: target === section });
+        } else if (commands.includes(part.textContent) && !part.closest('.row-name')) {
+          const link = part.closest('a')?.getAttribute('href')?.slice(1);
+          // In a link to another section the name is recorded here; the link itself above.
+          if (link !== part.textContent) found.push({ section, command: part.textContent, link, own: part.textContent === section });
+        }
+      }
+      return found;
+    }, listed.commands);
+    for (const found of names) {
+      if (found.own) {
+        expect(found.link === undefined, `${name}: the section "${found.section}" holds a link to itself beside its heading`);
+      } else {
+        expect(
+          found.link === found.command,
+          `${name}, section "${found.section}": the name of the command "${found.command}" is no link to its section`,
+        );
+      }
+    }
+  }
+  // A part that names its step stands in a step card, which a page of prose has not.
+  const marked = await page.evaluate((mark) => document.querySelector('main').innerHTML.includes(mark), STEP_MARK);
+  expect(!marked, `${name}: a part of the content names a step ("${STEP_MARK}"); outside a step card it needs "place"`);
+}
+
+/** What a page of prose shows of its platform switches, in order. */
+function switchState(page) {
+  return page.evaluate(() => {
+    const shown = (element) => Boolean(element) && element.getClientRects().length > 0;
+    const height = (element) => (element ? element.getBoundingClientRect().height : 0);
+    return {
+      chosen: document.documentElement.dataset.platform,
+      focus: document.activeElement?.dataset?.platformTab,
+      switches: [...document.querySelectorAll('main [data-platform-switch]')].map((element, index) => {
+        const list = element.querySelector('[role="tablist"]');
+        const tabs = [...element.querySelectorAll('[role="tab"]')];
+        const button = element.querySelector('button[data-copy-button]');
+        const parts = [...element.querySelectorAll(':scope > [data-platform-part]')];
+        const part = parts.find(shown);
+        const region = part?.querySelector('pre');
+        const text = part?.querySelector('.platform-text, .step-after');
+        return {
+          index,
+          block: element.parentElement === document.querySelector('main'),
+          plain: element.hasAttribute('data-plain'),
+          label: list?.getAttribute('aria-label') ?? '',
+          tabs: tabs.map((tab) => ({
+            platform: tab.dataset.platformTab,
+            name: tab.textContent.trim().replace(/\s+/g, ' '),
+            button: tab.tagName === 'BUTTON',
+            selected: tab.getAttribute('aria-selected') === 'true',
+            stop: tab.tabIndex === 0,
+            panel: document.getElementById(tab.getAttribute('aria-controls') ?? '')?.getAttribute('role') === 'tabpanel',
+            height: height(tab),
+          })),
+          hasFocus: element.contains(document.activeElement),
+          parts: parts.map((candidate) => ({ platform: candidate.dataset.platformPart, shown: shown(candidate) })),
+          labels: parts.filter((candidate) => shown(candidate.querySelector(':scope > [data-platform-label]'))).length,
+          blocks: element.querySelectorAll('pre').length,
+          button: button && {
+            name: button.getAttribute('aria-label') ?? '',
+            height: height(button),
+            // After the tab list, before the command.
+            placed:
+              Boolean(list && region) &&
+              Boolean(list.compareDocumentPosition(button) & Node.DOCUMENT_POSITION_FOLLOWING) &&
+              Boolean(button.compareDocumentPosition(region) & Node.DOCUMENT_POSITION_FOLLOWING),
+          },
+          region: region && {
+            name: region.getAttribute('aria-label') ?? '',
+            role: region.getAttribute('role'),
+            stop: region.tabIndex === 0,
+            scrolls: getComputedStyle(region).overflowX,
+            command: region.textContent,
+            copy: region.closest('[data-copy]')?.dataset.copy,
+          },
+          text: text ? text.textContent.trim() : '',
+        };
+      }),
+    };
+  });
+}
+
+/** The platform switches of a page of prose. */
+async function checkSwitches(browser, origin, entry, listed) {
+  const t = entry.texts;
+  const wanted = listed.places.length + listed.plain;
+  const tabNames = { windows: `${t.windows} ${t.windowsShell}`, linux: t.linux };
+  const withScript = async (viewport, options = {}) => {
+    const context = await browser.newContext({ viewport, ...options });
+    const page = await context.newPage();
+    const errors = [];
+    page.on('pageerror', (error) => errors.push(error.message));
+    await page.goto(`${origin}${entry.address}`, { waitUntil: 'networkidle' });
+    await page.waitForSelector('html[data-menu]');
+    return { context, page, errors };
+  };
+
+  /** Every switch shows `platform`, and each is what the entry names. */
+  const expectSwitches = (state, name, platform) => {
+    expect(state.chosen === platform, `${name}: <html data-platform> is "${state.chosen}", expected "${platform}"`);
+    expect(
+      state.switches.length === wanted && state.switches.filter((element) => element.plain).length === listed.plain,
+      `${name}: ${state.switches.length} platform switches, ${state.switches.filter((element) => element.plain).length} of them without a command; expected ${wanted} and ${listed.plain} (prosePages in scripts/check-prose.mjs)`,
+    );
+    const places = [...listed.places];
+    for (const element of state.switches) {
+      const which = `${name}, platform switch ${element.index + 1}`;
+      expect(element.block, `${which}: it does not stand between the blocks of the page`);
+      expect(
+        element.label === t.operatingSystem &&
+          element.tabs.length === 2 &&
+          element.tabs[0].platform === 'windows' &&
+          element.tabs[1].platform === 'linux' &&
+          element.tabs.every((tab) => tab.button && tab.panel) &&
+          element.tabs[0].name === (element.plain ? t.windows : tabNames.windows) &&
+          element.tabs[1].name === tabNames.linux,
+        `${which}: not a tab list "${t.operatingSystem}" of the buttons "${tabNames.windows}" and "${tabNames.linux}", each naming its panel: ${JSON.stringify(element.tabs)}`,
+      );
+      expect(
+        element.tabs.filter((tab) => tab.selected).map((tab) => tab.platform).join() === platform &&
+          element.tabs.filter((tab) => tab.stop).length === 1,
+        `${which}: the selected tab is not "${platform}", or the switch has not one tab stop`,
+      );
+      expect(
+        element.parts.length === 2 && element.parts.every((part) => part.shown === (part.platform === platform)) && element.labels === 0,
+        `${which}: it does not show the part of "${platform}" alone, under the tabs: ${JSON.stringify(element.parts)}`,
+      );
+      if (element.plain) {
+        expect(
+          element.blocks === 0 && !element.button && element.text !== '',
+          `${which}: a switch without a command holds a code block or a copy button, or no text`,
+        );
+        continue;
+      }
+      const place = places.shift();
+      expect(
+        Boolean(element.region) &&
+          element.region.name === `${t.command}, ${place}, ${t[platform]}` &&
+          element.region.role === 'region' &&
+          element.region.stop &&
+          element.region.scrolls === 'auto' &&
+          element.region.command === element.region.copy,
+        `${which}: its command is not the named region "${t.command}, ${place}, ${t[platform]}" that takes focus and scrolls inside its block: ${JSON.stringify(element.region)}`,
+      );
+      expect(
+        Boolean(element.button) && element.button.name === `${t.copyCommand}, ${place}` && element.button.placed,
+        `${which}: no copy button "${t.copyCommand}, ${place}" after the tabs and before the command: ${JSON.stringify(element.button)}`,
+      );
+    }
+  };
+
+  // A page whose entry names no switch holds none.
+  if (wanted === 0) {
+    const name = `${entry.address} (${DESKTOP.width} px, platform switches)`;
+    const { context, page } = await withScript(DESKTOP);
+    const { switches } = await switchState(page);
+    expect(
+      switches.length === 0,
+      `${name}: ${switches.length} platform switches, and prosePages names none (scripts/check-prose.mjs)`,
+    );
+    await context.close();
+    return;
+  }
+
+  // Desktop: Windows first, then a click on "Linux" in a switch in the middle.
+  {
+    const name = `${entry.address} (${DESKTOP.width} px, platform switches)`;
+    const { context, page, errors } = await withScript(DESKTOP, { permissions: ['clipboard-read', 'clipboard-write'] });
+    expectSwitches(await switchState(page), `${name}, first visit`, 'windows');
+    const used = Math.floor(wanted / 2);
+    const list = page.locator('main [data-platform-switch]').nth(used).locator('[role="tablist"]');
+    await list.scrollIntoViewIfNeeded();
+    const before = (await list.boundingBox()).y;
+    await list.locator('[data-platform-tab="linux"]').click();
+    const state = await switchState(page);
+    expectSwitches(state, `${name}, a click on Linux`, 'linux');
+    expect(
+      state.focus === 'linux' && state.switches[used]?.hasFocus,
+      `${name}, a click on Linux: focus is not on the tab "linux" of the used switch`,
+    );
+    const after = (await list.boundingBox()).y;
+    expect(Math.abs(after - before) <= 1, `${name}, a click on Linux: the used switch moved from ${before} to ${after} px in the window`);
+    await page.keyboard.press('ArrowLeft');
+    expectSwitches(await switchState(page), `${name}, the key ArrowLeft`, 'windows');
+    await page.keyboard.press('End');
+    expectSwitches(await switchState(page), `${name}, the key End`, 'linux');
+    // The copy button copies the command that is shown.
+    const first = (await switchState(page)).switches.find((element) => !element.plain);
+    if (first) {
+      const button = page.locator('main [data-platform-switch]').nth(first.index).locator('button[data-copy-button]');
+      await button.click();
+      await page.waitForFunction((index) => document.querySelectorAll('main [data-platform-switch]')[index].querySelector('button[data-copy-button][data-state]') !== null, first.index, { timeout: 5_000 }).catch(() => {});
+      const copied = await page.evaluate(() => navigator.clipboard.readText());
+      expect(
+        copied === first.region?.copy && (await button.textContent()) === t.copied,
+        `${name}: the copy button of platform switch ${first.index + 1} copied "${copied}" and reads "${await button.textContent()}", expected "${first.region?.copy}" and "${t.copied}"`,
+      );
+      await page.waitForFunction(() => document.querySelector('main button[data-copy-button][data-state]') === null, undefined, { timeout: 10_000 }).catch(() => {});
+    }
+    await checkAxe(page, `${name}, Linux`);
+    await checkNoSidewaysScroll(page, `${name}, Linux`);
+    expect(errors.length === 0, `${name}: script errors: ${errors.join(' | ')}`);
+    await context.close();
+  }
+
+  // Phone: tabs and copy button are at least 40 px high.
+  {
+    const name = `${entry.address} (${PHONE.width} px, platform switches)`;
+    const { context, page } = await withScript(PHONE);
+    const state = await switchState(page);
+    expectSwitches(state, name, 'windows');
+    for (const element of state.switches) {
+      expect(
+        element.tabs.every((tab) => tab.height >= 40) && (!element.button || element.button.height >= 40),
+        `${name}, platform switch ${element.index + 1}: a tab or the copy button is below 40 px (${element.tabs.map((tab) => tab.height)}, ${element.button?.height})`,
+      );
+    }
+    await context.close();
+  }
+
+  // JavaScript off: both parts, Windows first, each under its label.
+  {
+    const name = `${entry.address} (${DESKTOP.width} px, JavaScript off)`;
+    const context = await browser.newContext({ viewport: DESKTOP, javaScriptEnabled: false });
+    const page = await context.newPage();
+    await page.goto(`${origin}${entry.address}`);
+    const state = await page.evaluate(() => {
+      const shown = (element) => Boolean(element) && element.getClientRects().length > 0;
+      return {
+        chosen: document.documentElement.dataset.platform,
+        tabs: document.querySelectorAll('main [role="tab"], main [role="tablist"], main [role="tabpanel"]').length,
+        buttons: [...document.querySelectorAll('main button')].filter(shown).length,
+        switches: [...document.querySelectorAll('main [data-platform-switch]')].map((element) => ({
+          plain: element.hasAttribute('data-plain'),
+          parts: [...element.querySelectorAll(':scope > [data-platform-part]')].map((part) => {
+            const label = part.querySelector(':scope > [data-platform-label]');
+            const block = part.querySelector('pre');
+            return {
+              platform: part.dataset.platformPart,
+              label: shown(label) ? label.textContent.trim().replace(/\s+/g, ' ') : '',
+              labelTop: label?.getBoundingClientRect().top,
+              blockTop: shown(block) ? block.getBoundingClientRect().top : -1,
+            };
+          }),
+        })),
+      };
+    });
+    expect(state.chosen === undefined, `${name}: <html> names a platform`);
+    expect(
+      state.tabs === 0 && state.buttons === 0,
+      `${name}: the page holds tabs or a visible button (${state.tabs} tab parts, ${state.buttons} buttons)`,
+    );
+    expect(state.switches.length === wanted, `${name}: ${state.switches.length} platform switches, expected ${wanted}`);
+    state.switches.forEach((element, index) => {
+      const [first, second] = element.parts;
+      expect(
+        element.parts.length === 2 &&
+          first.platform === 'windows' &&
+          second.platform === 'linux' &&
+          first.label === (element.plain ? t.windows : tabNames.windows) &&
+          second.label === tabNames.linux &&
+          first.labelTop < second.labelTop &&
+          (element.plain
+            ? first.blockTop === -1 && second.blockTop === -1
+            : first.labelTop < first.blockTop && first.blockTop < second.labelTop && second.labelTop < second.blockTop),
+        `${name}, platform switch ${index + 1}: not the part of Windows and then of Linux, each under its visible label${element.plain ? ', without a command' : ' above its command'}: ${JSON.stringify(element.parts)}`,
+      );
+    });
+    await context.close();
+  }
 }
 
 /** The language switch at the address of a section. */
@@ -1082,31 +1504,437 @@ async function checkFlow(page, name, listed, stacked) {
   }
 }
 
-/** Row lists: numbered rows, a hairline above each and below the list. */
-async function checkRowLists(page, name, expected) {
+/**
+ * Row lists: numbered rows, a hairline above each and below the list; the
+ * code name and the tag of a row. `counts` names how many rows the page
+ * holds and, where its entry says so, how many code names and tags.
+ */
+async function checkRowLists(page, name, counts, stacked) {
   const lists = await page.evaluate(() =>
     [...document.querySelectorAll('main [data-row-list]')].map((list) => ({
       ordered: list.tagName === 'OL',
+      plain: list.hasAttribute('data-plain'),
+      label: (() => {
+        const label = list.previousElementSibling?.matches('[data-row-list-label]') ? list.previousElementSibling : null;
+        if (!label) return null;
+        const style = getComputedStyle(label);
+        return {
+          text: label.textContent.trim(),
+          name: list.getAttribute('aria-label'),
+          size: Number.parseFloat(style.fontSize),
+          upper: style.textTransform,
+          mono: style.fontFamily.includes('JetBrains Mono'),
+        };
+      })(),
       closed: getComputedStyle(list).borderBottomWidth,
-      rows: [...list.querySelectorAll(':scope > [data-row]')].map((row) => ({
-        number: getComputedStyle(row, '::before').content,
-        rule: getComputedStyle(row).borderTopWidth,
-        name: row.querySelector('.row-name')?.textContent.trim() ?? '',
-      })),
+      rows: [...list.querySelectorAll(':scope > [data-row]')].map((row) => {
+        const box = (element) => {
+          const { left, right, top, bottom } = element.getBoundingClientRect();
+          return { left, right, top, bottom };
+        };
+        const title = row.querySelector('.row-name');
+        const codes = [...(title?.querySelectorAll('code') ?? [])];
+        const code = codes[0];
+        const tag = row.querySelector('[data-row-tag]');
+        const style = (element) => getComputedStyle(element);
+        return {
+          number: getComputedStyle(row, '::before').content,
+          rule: getComputedStyle(row).borderTopWidth,
+          name: title?.textContent.trim() ?? '',
+          codes: codes.length,
+          code: code && {
+            text: code.textContent,
+            // After the name in plain words, which is not empty.
+            after: (title.firstElementChild?.textContent.trim() ?? '') !== '' && title.lastElementChild === code,
+            translate: code.getAttribute('translate'),
+            weight: style(code).fontWeight,
+            mono: style(code).fontFamily.includes('JetBrains Mono'),
+          },
+          tag: tag && {
+            text: tag.textContent.trim(),
+            size: Number.parseFloat(style(tag).fontSize),
+            upper: style(tag).textTransform,
+            border: `${style(tag).borderTopWidth} ${style(tag).borderTopStyle}`,
+            mono: style(tag).fontFamily.includes('JetBrains Mono'),
+            box: box(tag),
+            text_box: box(row.querySelector('.row-text')),
+            row: box(row),
+          },
+        };
+      }),
     })),
   );
-  const rows = lists.flatMap((list) => list.rows).length;
-  expect(rows === expected, `${name}: ${rows} rows in row lists, expected ${expected}`);
+  const rows = lists.flatMap((list) => list.rows);
+  if (!stacked) expect(rows.length === counts.rows, `${name}: ${rows.length} rows in row lists, expected ${counts.rows}`);
+  for (const [part, held] of [
+    ['codes', rows.filter((row) => row.code).length],
+    ['tags', rows.filter((row) => row.tag).length],
+  ]) {
+    if (counts[part] !== undefined) {
+      expect(held === counts[part], `${name}: ${held} rows with ${part === 'codes' ? 'a code name' : 'a tag'}, expected ${counts[part]} (prosePages in scripts/check-prose.mjs)`);
+    }
+  }
   lists.forEach((list, at) => {
-    expect(list.ordered && list.closed === '1px', `${name}: row list ${at + 1} is no ordered list with a hairline below`);
-    list.rows.forEach((row, index) => {
+    expect(
+      list.ordered !== list.plain && list.closed === '1px',
+      `${name}: row list ${at + 1} is no ordered list, or no unordered list without numbers, with a hairline below`,
+    );
+    if (list.label) {
+      const { label } = list;
       expect(
-        row.number.includes('counter(row)') || row.number === `"${index + 1}"`,
-        `${name}: row ${index + 1} of row list ${at + 1} carries no number (${row.number})`,
+        label.text !== '' && label.name === label.text && Math.abs(label.size - 11) < 0.1 && label.upper === 'uppercase' && label.mono,
+        `${name}: the label "${label.text}" of row list ${at + 1} is no small mono label in capitals that names its list (${label.size} px, ${label.upper}, name "${label.name}")`,
       );
-      expect(row.rule === '1px' && row.name !== '', `${name}: row ${index + 1} of row list ${at + 1} has no hairline or no name`);
+    }
+    list.rows.forEach((row, index) => {
+      const which = `${name}: row ${index + 1} of row list ${at + 1}`;
+      expect(
+        list.plain
+          ? row.number === 'none'
+          : row.number.includes('counter(row)') || row.number === `"${index + 1}"`,
+        list.plain ? `${which} of a list without numbers carries one (${row.number})` : `${which} carries no number (${row.number})`,
+      );
+      expect(row.rule === '1px' && row.name !== '', `${which} has no hairline or no name`);
+      if (row.code) {
+        expect(
+          row.codes === 1 && row.code.after && row.code.text.trim() !== '',
+          `${which}: its code name does not follow a name in plain words, as the one inline code of the name`,
+        );
+        expect(
+          row.code.translate === 'no' && row.code.weight === '400' && row.code.mono,
+          `${which}: its code name "${row.code.text}" is translated, or not mono in weight 400 (translate: ${row.code.translate}, weight: ${row.code.weight})`,
+        );
+      }
+      if (row.tag) {
+        const { tag } = row;
+        expect(
+          tag.text !== '' && Math.abs(tag.size - 11) < 0.1 && tag.upper === 'uppercase' && tag.border === '1px solid' && tag.mono,
+          `${which}: its tag "${tag.text}" is no small mono label in capitals with a hairline border (${tag.size} px, ${tag.upper}, ${tag.border})`,
+        );
+        expect(
+          stacked
+            ? tag.box.top >= tag.text_box.bottom && tag.box.left >= tag.text_box.left - 0.5
+            : tag.box.left >= tag.text_box.right - 0.5 && tag.box.top < tag.text_box.bottom && Math.abs(tag.box.right - tag.row.right) < 1,
+          `${which}: its tag does not stand ${stacked ? 'below the text' : 'at the right end of the row'}`,
+        );
+        expect(tag.box.right <= tag.row.right + 0.5, `${which}: its tag reaches beyond the row`);
+      }
     });
   });
+}
+
+/** Sub-headings: level-3 headings of 18 px, each after a section heading. */
+async function checkSubHeadings(page, name, expected) {
+  const headings = await page.evaluate(() =>
+    [...document.querySelectorAll('main [data-sub-heading]')].map((heading) => {
+      const first = document.querySelector('main h2[data-section-heading]');
+      const style = getComputedStyle(heading);
+      return {
+        text: heading.textContent.trim(),
+        level: heading.tagName,
+        size: Number.parseFloat(style.fontSize),
+        weight: style.fontWeight,
+        above: style.marginTop,
+        block: heading.parentElement === document.querySelector('main'),
+        after: Boolean(first && first.compareDocumentPosition(heading) & Node.DOCUMENT_POSITION_FOLLOWING),
+      };
+    }),
+  );
+  if (expected !== undefined) {
+    expect(headings.length === expected, `${name}: ${headings.length} sub-headings, expected ${expected} (prosePages in scripts/check-prose.mjs)`);
+  }
+  for (const heading of headings) {
+    const which = `${name}: the sub-heading "${heading.text}"`;
+    expect(heading.text !== '' && heading.level === 'H3' && heading.block, `${which} is no level-3 heading between the blocks of the page`);
+    expect(
+      Math.abs(heading.size - 18) < 0.1 && heading.weight === '600' && heading.above === '32px',
+      `${which} is ${heading.size} px in weight ${heading.weight} with ${heading.above} above, expected 18 px, 600 and 32px`,
+    );
+    expect(heading.after, `${which} stands before the first section heading`);
+  }
+}
+
+/** The connection figure: three boxes, one of them dashed, one label. */
+async function checkConnection(page, name, listed, stacked) {
+  const found = await page.evaluate(() => {
+    const figures = [...document.querySelectorAll('main [data-connection]')];
+    const figure = figures[0];
+    if (!figure) return null;
+    const box = (element) => {
+      const { left, right, top, bottom, width, height } = element.getBoundingClientRect();
+      return { left, right, top, bottom, width, height };
+    };
+    const text = (element) => element?.textContent.replace(/\s+/g, ' ').trim() ?? '';
+    const list = figure.querySelector('.connection-boxes');
+    const boxes = [...(list?.children ?? [])];
+    const labels = [...figure.querySelectorAll('[data-connection-label]')];
+    const label = labels[0];
+    return {
+      count: figures.length,
+      wide: figure.tagName === 'FIGURE' && figure.hasAttribute('data-wide-figure'),
+      figure: box(figure),
+      ordered: list?.tagName === 'OL' && boxes.every((item) => item.tagName === 'LI' && item.hasAttribute('data-connection-box')),
+      caption: text(figure.querySelector(':scope > figcaption')),
+      boxes: boxes.map((item) => {
+        const style = getComputedStyle(item);
+        return {
+          title: text(item.querySelector('.flow-title')),
+          state: text(item.querySelector('.connection-state')),
+          sub: text(item.querySelector('.flow-sub')),
+          size: Number.parseFloat(getComputedStyle(item.querySelector('.flow-title')).fontSize),
+          // The style alone: a border of 1.5 px is drawn, and reported, as
+          // whole device pixels.
+          border: style.borderTopStyle,
+          colour: style.borderTopColor,
+          built: item.hasAttribute('data-built'),
+          // The trace to the next box and the square it ends in.
+          trace: getComputedStyle(item, '::after').content !== 'none',
+          square: getComputedStyle(item, '::before').content !== 'none',
+          hidden: item.getAttribute('aria-hidden'),
+          box: box(item),
+        };
+      }),
+      labels: labels.length,
+      label: label && {
+        text: text(label),
+        first: label.parentElement === boxes[0],
+        colour: getComputedStyle(label).color,
+        size: Number.parseFloat(getComputedStyle(label).fontSize),
+        mono: getComputedStyle(label).fontFamily.includes('JetBrains Mono'),
+        box: box(label),
+      },
+      scaled: [figure, list, ...boxes, ...labels].some(
+        (part) => part && (getComputedStyle(part).transform !== 'none' || getComputedStyle(part).zoom !== '1'),
+      ),
+    };
+  });
+  if (!found) {
+    failures.push(`${name}: no connection figure`);
+    return;
+  }
+  expect(found.count === 1 && found.wide, `${name}: the page holds ${found.count} connection figures, expected one that is a wide figure`);
+  expect(found.ordered, `${name}: the boxes of the connection figure are no ordered list`);
+  expect(found.caption.length > 40, `${name}: the connection figure has no caption that says what it shows ("${found.caption}")`);
+  const titles = found.boxes.map((entry) => entry.title);
+  expect(
+    JSON.stringify(titles) === JSON.stringify(listed.boxes),
+    `${name}: the boxes of the connection figure are [${titles}], expected [${listed.boxes}] (prosePages in scripts/check-prose.mjs)`,
+  );
+  const dashed = found.boxes.filter((entry) => entry.border === 'dashed').map((entry) => entry.title);
+  expect(
+    JSON.stringify(dashed) === JSON.stringify([listed.built]) &&
+      found.boxes.every((entry) => entry.built === (entry.title === listed.built)) &&
+      found.boxes.every((entry) => entry.title === listed.built || entry.border === 'solid'),
+    `${name}: the dashed boxes of the connection figure are [${dashed}], expected "${listed.built}" alone, the others solid (${found.boxes.map((entry) => entry.border).join(', ')})`,
+  );
+  expect(!found.scaled, `${name}: the connection figure is scaled`);
+  expect(
+    found.labels === 1 && found.label.text === listed.label && found.label.first,
+    `${name}: the connection figure carries ${found.labels} labels (${found.label?.text}), expected "${listed.label}" alone, on the first trace`,
+  );
+  if (found.label) {
+    expect(
+      found.label.colour === RING && Math.abs(found.label.size - 11) < 0.1 && found.label.mono,
+      `${name}: the label of the trace is not mono 11 px in teal-text (${found.label.size} px, ${found.label.colour})`,
+    );
+  }
+  found.boxes.forEach((entry, index) => {
+    const which = `${name}: box ${index + 1} of the connection figure`;
+    const previous = found.boxes[index - 1];
+    const last = index === found.boxes.length - 1;
+    expect(entry.state !== '' && entry.sub !== '', `${which} lacks one of its two small lines`);
+    expect(
+      Math.abs(entry.size - 13) < 0.1 && entry.colour === 'rgb(30, 37, 71)' && entry.hidden === null,
+      `${which}: its title is ${entry.size} px, its outline ${entry.colour}, or it is hidden from assistive technology`,
+    );
+    expect(entry.trace === !last && entry.square === !last, `${which}: ${last ? 'a trace leaves the last box' : 'no trace with its square leads to the next box'}`);
+    expect(
+      entry.box.left >= found.figure.left && entry.box.right <= found.figure.right + 0.05,
+      `${which} reaches beyond its figure`,
+    );
+    if (!previous) return;
+    if (stacked) {
+      expect(
+        entry.box.top >= previous.box.bottom &&
+          Math.abs(entry.box.left - previous.box.left) < 1 &&
+          Math.abs(entry.box.width - previous.box.width) < 1,
+        `${which} does not stand below box ${index}, at its width`,
+      );
+    } else {
+      expect(
+        entry.box.left >= previous.box.right && Math.abs(entry.box.top - previous.box.top) < 1 && Math.abs(entry.box.height - previous.box.height) < 1,
+        `${which} does not stand right of box ${index}, in its row and at its height`,
+      );
+    }
+  });
+  const [first, second] = found.boxes;
+  if (found.label && first && second) {
+    const label = found.label.box;
+    expect(
+      stacked
+        ? label.top >= first.box.bottom && label.bottom <= second.box.top
+        : label.left >= first.box.right - 0.5 && label.right <= second.box.left + 0.5 && label.bottom <= (first.box.top + first.box.bottom) / 2,
+      `${name}: the label of the trace does not stand ${stacked ? 'between the first two boxes of the stack' : 'between the first two boxes, above the trace'}`,
+    );
+    expect(label.left >= found.figure.left && label.right <= found.figure.right + 0.05, `${name}: the label of the trace reaches beyond its figure`);
+  }
+}
+
+/** The yardstick box: border, tag, the line with the number, the text. */
+async function checkYardsticks(page, name, expected, stacked) {
+  const boxes = await page.evaluate(() =>
+    [...document.querySelectorAll('main [data-yardstick]')].map((box) => {
+      const style = getComputedStyle(box);
+      const tag = box.querySelector('.yardstick-tag');
+      const size = box.querySelector('.yardstick-size');
+      const text = box.querySelector('.yardstick-text');
+      return {
+        block: box.parentElement === document.querySelector('main'),
+        border: `${style.borderTopWidth} ${style.borderTopStyle} ${style.borderTopColor}`,
+        padding: `${style.paddingTop} ${style.paddingRight}`,
+        width: box.getBoundingClientRect().width,
+        tag: tag && { text: tag.textContent.trim(), colour: getComputedStyle(tag).color, upper: getComputedStyle(tag).textTransform },
+        size: size && {
+          text: size.textContent.replace(/\s+/g, ' ').trim(),
+          number: size.querySelector('[data-yardstick-lines]')?.textContent.trim() ?? '',
+          px: Number.parseFloat(getComputedStyle(size).fontSize),
+          weight: getComputedStyle(size).fontWeight,
+        },
+        text: text?.textContent.trim() ?? '',
+        codes: [...(text?.querySelectorAll('code') ?? [])].map((code) => code.getAttribute('translate')),
+        heading: box.querySelector('h1, h2, h3, h4') !== null,
+      };
+    }),
+  );
+  expect(boxes.length === expected, `${name}: ${boxes.length} yardstick boxes, expected ${expected} (prosePages in scripts/check-prose.mjs)`);
+  boxes.forEach((box, index) => {
+    const which = `${name}: yardstick box ${index + 1}`;
+    expect(box.block && box.width <= 820.5, `${which} is no block of the page of at most 820 px (${box.width} px)`);
+    expect(box.border === '1px solid rgb(30, 37, 71)', `${which}: its border is "${box.border}", expected 1 px in navy`);
+    expect(box.padding === (stacked ? '16px 16px' : '20px 24px'), `${which}: its padding is ${box.padding}`);
+    expect(
+      Boolean(box.tag) && box.tag.text !== '' && box.tag.colour === RING && box.tag.upper === 'uppercase',
+      `${which}: no tag in teal-text and capitals (${box.tag?.text}, ${box.tag?.colour})`,
+    );
+    expect(
+      Boolean(box.size) && /^\d/.test(box.size.number) && box.size.text.startsWith(`${box.size.number} `) && box.size.text.length > box.size.number.length + 3 &&
+        Math.abs(box.size.px - 22) < 0.1 && box.size.weight === '600',
+      `${which}: its line "${box.size?.text}" does not begin with the number of lines, in 22 px and weight 600`,
+    );
+    expect(
+      box.text.length > 20 && box.codes.length > 0 && box.codes.every((translate) => translate === 'no'),
+      `${which}: its text names no file as inline code that is not translated`,
+    );
+    expect(!box.heading, `${which} holds a heading`);
+  });
+}
+
+/** Code excerpts: head row, the code as a named region, caption, no copy button. */
+async function checkExcerpts(page, name, expected, stacked) {
+  const read = () =>
+    page.evaluate(() =>
+      [...document.querySelectorAll('main [data-code-excerpt]')].map((figure) => {
+        const head = figure.querySelector('[data-code-excerpt-head]');
+        const pre = figure.querySelector('pre');
+        const code = pre?.querySelector('code');
+        const parts = [...(head?.children ?? [])];
+        const style = pre && getComputedStyle(pre);
+        return {
+          isFigure: figure.tagName === 'FIGURE',
+          width: figure.getBoundingClientRect().width,
+          file: figure.dataset.file,
+          head: head && {
+            parts: parts.map((part) => part.textContent.replace(/\s+/g, ' ').trim()),
+            fileKept: parts[0]?.getAttribute('translate'),
+            ground: getComputedStyle(head).backgroundColor,
+            colour: getComputedStyle(head).color,
+            size: Number.parseFloat(getComputedStyle(head).fontSize),
+            // Left and right in one row, or one below the other where it wraps.
+            apart: parts.length === 2 && (parts[1].getBoundingClientRect().left >= parts[0].getBoundingClientRect().right || parts[1].getBoundingClientRect().top >= parts[0].getBoundingClientRect().bottom),
+            joined: pre ? Math.abs(head.getBoundingClientRect().bottom - pre.getBoundingClientRect().top) < 0.5 : false,
+          },
+          region: pre && {
+            role: pre.getAttribute('role'),
+            label: pre.getAttribute('aria-label') ?? '',
+            stop: pre.tabIndex === 0,
+            translate: pre.getAttribute('translate'),
+            overflow: style.overflowX,
+            space: style.whiteSpace,
+            top: style.borderTopWidth,
+            ligatures: style.fontVariantLigatures,
+            plain: code !== null && code.children.length === 0 && pre.children.length === 1,
+            lines: code?.textContent.split('\n').length ?? 0,
+            scroll: pre.scrollWidth,
+            client: pre.clientWidth,
+            left: pre.scrollLeft,
+            focused: document.activeElement === pre,
+            ring: `${style.outlineWidth} ${style.outlineStyle} ${style.outlineColor}`,
+          },
+          caption: figure.querySelector(':scope > figcaption')?.textContent.trim() ?? '',
+          buttons: figure.querySelectorAll('button, [data-copy], [data-copy-button]').length,
+        };
+      }),
+    );
+  const excerpts = await read();
+  expect(excerpts.length === expected, `${name}: ${excerpts.length} code excerpts, expected ${expected} (prosePages in scripts/check-prose.mjs)`);
+  for (const [index, excerpt] of excerpts.entries()) {
+    const which = `${name}: code excerpt ${index + 1}`;
+    expect(excerpt.isFigure && excerpt.caption !== '' && excerpt.width <= 820.5, `${which} is no figure with a caption, at most 820 px wide`);
+    expect(
+      Boolean(excerpt.head) && excerpt.head.parts.length === 2 && excerpt.head.parts[0] === excerpt.file && excerpt.head.fileKept === 'no' && excerpt.head.apart,
+      `${which}: its head row does not hold the file and, right of or below it, lines and release ([${excerpt.head?.parts}])`,
+    );
+    if (excerpt.head) {
+      expect(
+        excerpt.head.ground === 'rgb(245, 247, 250)' && excerpt.head.colour === 'rgb(58, 64, 96)' && Math.abs(excerpt.head.size - 12) < 0.1 && excerpt.head.joined,
+        `${which}: its head row is not 12 px in text-secondary on bg-subtle, joined to the code (${excerpt.head.size} px, ${excerpt.head.colour}, ${excerpt.head.ground})`,
+      );
+    }
+    expect(excerpt.buttons === 0, `${which} holds a button or a command to copy`);
+    const { region } = excerpt;
+    if (!region) {
+      failures.push(`${which} holds no code`);
+      continue;
+    }
+    expect(
+      region.role === 'region' && region.stop && region.label.startsWith(`${excerpt.file}, `),
+      `${which}: its code is no region that takes focus and is named after its file (role: ${region.role}, name: "${region.label}")`,
+    );
+    expect(
+      region.translate === 'no' && region.plain && region.lines > 0 && region.ligatures === 'none',
+      `${which}: its code is translated, coloured or marked up, or has ligatures`,
+    );
+    expect(
+      region.overflow === 'auto' && region.space === 'pre' && region.top === '0px',
+      `${which}: its code wraps, does not scroll inside its box, or has a top border below the head row (${region.overflow}, ${region.space}, ${region.top})`,
+    );
+    // Focus by keyboard shows the ring; where the code is wider than its
+    // box, the arrow key scrolls it.
+    const pre = page.locator('main [data-code-excerpt] pre').nth(index);
+    await pre.scrollIntoViewIfNeeded();
+    await pre.evaluate((element) => element.previousElementSibling?.scrollIntoView());
+    await page.keyboard.press('Tab');
+    await pre.focus();
+    await page.keyboard.press('Shift+Tab');
+    await page.keyboard.press('Tab');
+    const focused = (await read())[index].region;
+    expect(
+      focused.focused && focused.ring === `2px solid ${RING}`,
+      `${which}: Tab does not reach its code, or it shows no focus ring (${focused.ring})`,
+    );
+    if (stacked) {
+      expect(region.scroll > region.client, `${which}: its code is not wider than its box at this width (${region.scroll} px in ${region.client} px); the check of the sideways scroll needs a long line`);
+      await page.keyboard.press('ArrowRight');
+      // The browser scrolls after the key, not with it.
+      const scrolled = await pre
+        .evaluate((element) => new Promise((resolve) => {
+          const until = performance.now() + 2000;
+          const look = () => (element.scrollLeft > 0 || performance.now() > until ? resolve(element.scrollLeft) : requestAnimationFrame(look));
+          look();
+        }));
+      expect(scrolled > 0, `${which}: the arrow key does not scroll its code sideways`);
+    }
+  }
 }
 
 /** The path block: the stages and pages of the register. */
@@ -1174,6 +2002,7 @@ async function checkNoMotion(page, name) {
 
 async function checkProsePage(browser, origin, entry, listed, facts) {
   const at = (viewport) => `${entry.address} (${viewport.width} px)`;
+  const counts = { rows: listed.rows ?? 0, codes: listed.codes, tags: listed.tags };
 
   // Desktop.
   {
@@ -1181,12 +2010,16 @@ async function checkProsePage(browser, origin, entry, listed, facts) {
     const name = at(DESKTOP);
     await checkHeadings(page, name, listed);
     const figures = await checkFigures(page, name);
-    expect(!(listed.idea || listed.line || listed.flow) || figures > 0, `${name}: no wide figure`);
+    expect(!(listed.idea || listed.line || listed.flow || listed.connection) || figures > 0, `${name}: no wide figure`);
     if (listed.idea) await checkIdea(page, name, facts, entry.lang, false);
     if (listed.tables) await checkDemoTables(page, name, facts, entry.lang, false);
     if (listed.line) await checkLine(page, name, facts, entry.lang, false);
     if (listed.flow) await checkFlow(page, name, listed.flow[entry.lang], false);
-    await checkRowLists(page, name, listed.rows ?? 0);
+    if (listed.connection) await checkConnection(page, name, listed.connection[entry.lang], false);
+    await checkRowLists(page, name, counts, false);
+    await checkSubHeadings(page, name, listed.subHeadings);
+    await checkYardsticks(page, name, listed.yardsticks ?? 0, false);
+    await checkExcerpts(page, name, listed.excerpts ?? 0, false);
     if (listed.path) await checkPathBlock(page, name, entry);
     await checkNoMotion(page, name);
     await checkNoSidewaysScroll(page, name);
@@ -1203,12 +2036,23 @@ async function checkProsePage(browser, origin, entry, listed, facts) {
     if (listed.tables) await checkDemoTables(page, name, facts, entry.lang, true);
     if (listed.line) await checkLine(page, name, facts, entry.lang, true);
     if (listed.flow) await checkFlow(page, name, listed.flow[entry.lang], true);
+    if (listed.connection) await checkConnection(page, name, listed.connection[entry.lang], true);
+    await checkRowLists(page, name, counts, true);
+    await checkYardsticks(page, name, listed.yardsticks ?? 0, true);
+    await checkExcerpts(page, name, listed.excerpts ?? 0, true);
     await checkNoSidewaysScroll(page, name);
     if (viewport === PHONE) await checkAxe(page, name);
     await context.close();
   }
 
   if (listed.counterpart) await checkCounterpart(browser, origin, entry, listed.counterpart);
+
+  // A page of prose holds platform switches only where its entry names them.
+  const switches = listed.switches ?? { places: [], plain: 0 };
+  await checkSwitches(browser, origin, entry, {
+    ...switches,
+    places: switches.places.map((place) => (typeof place === 'string' ? place : place[entry.lang])),
+  });
 }
 
 const { origin: reported, stop } = startPreview();

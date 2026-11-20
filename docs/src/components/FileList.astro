@@ -20,7 +20,7 @@ const { label, files } = Astro.props;
 const lang = pageLanguage(Astro.url.pathname);
 ---
 
-<ul class="file-list" aria-label={label} data-file-list>
+<ul class="file-list" aria-label={label} data-file-list data-no-term>
   {
     files.map((file) => (
       <li data-platform-part={file.platform}>

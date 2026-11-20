@@ -68,6 +68,40 @@
 //   - every other output of the page (a quoted message, a line of the
 //     summary list) stands in a capture of the page; "…" in it stands for a
 //     part that is left out.
+//
+// The page "Single commands" describes every command of the released
+// `deltarecon`. For it the check holds, on the built page of both languages,
+// against the same help of the unpacked Linux package:
+//   - the sections marked as the section of a command (`data-command`) are
+//     the commands the help names, in its order, each under the anchor of
+//     its name: a command the page lacks and a section of a command the help
+//     does not name both fail;
+//   - in the section of a command the marked options (`data-option`) are
+//     the options its help names, without `--help`: an option the page lacks,
+//     an option the help does not name and an option that stands twice all
+//     fail and name command and option;
+//   - the last section, which describes the options several commands share,
+//     marks only options that at least two commands take; in the section of
+//     a command exactly these are named as shared (`data-shared`), with a
+//     link to that section;
+//   - an example command stands in the section of a command alone, once per
+//     platform; it starts that command (`quickstart` through its starter)
+//     and is a line of the guide of the page's language in the package of
+//     the platform. The examples of `walk` and `compare`, which no guide
+//     holds, start the launcher of the platform, name only options of the
+//     help of their command, and are the same on both platforms apart from
+//     the launcher and the path separators;
+//   - the synopsis of a command (`data-synopsis`) stands in its section,
+//     once, and is the usage line of its help, word for word, without
+//     `[-h]`.
+//
+// The page "Write a tolerance profile" shows the tolerance profile of the
+// package: on the built page of both languages the first document to copy
+// is the file `profiles/tolerance-bruttobeitrag.json` of the unpacked Linux
+// package, line for line; the example profile is JSON with both bounds, both
+// parts and a derivation for a quantity the page lists; the quantities the
+// page lists are those of the reference model at the tag; and the command
+// that uses the example is a search with options of the released help alone.
 // Exits non-zero and names what differs or what is missing: a file of the
 // release folder, the pin, a search result of another shape, a build that
 // does not start.
@@ -547,9 +581,17 @@ const wordsOf = (line) => [...line.matchAll(/"[^"]*"|\S+/g)].map(([word]) => wor
 const allPages = await loadPages();
 const stepPages = allPages.filter((entry) => entry.id === 'quick-start');
 const ownPages = allPages.filter((entry) => entry.id === OWN);
+/** The page that describes every command, and what stands in no guide there. */
+const SINGLE = 'single-commands';
+const SHARED_SECTION = 'shared-options';
+const NO_GUIDE = ['walk', 'compare'];
+/** The starter of the guided demo, per platform, as the guides write it. */
+const STARTER = { windows: '.\\quickstart.cmd', linux: './quickstart' };
+const singlePages = allPages.filter((entry) => entry.id === SINGLE);
 const { origin: reported, stop } = startPreview();
 let browser;
 const found = { 'release notes': 0, README: 0, guide: 0, help: 0, lines: 0 };
+const single = { commands: 0, options: 0, synopses: 0, guide: 0, help: 0 };
 try {
   const origin = await reported;
   browser = await chromium.launch();
@@ -837,6 +879,226 @@ try {
     }
   }
   expect(ownPages.length === LANGUAGES.length, `the page "${OWN}" is not in the page register once per language`);
+
+  // ---- The page of single commands ----
+  /** The options the help of a command names, without `--help`. */
+  const optionsOf = (command) => [...released.get(command)].filter((option) => option !== '--help');
+  for (const entry of singlePages) {
+    const name = entry.address;
+    const lang = entry.lang;
+    await page.goto(`${origin}${entry.address}`);
+    // The sections of the page in order, each with what it marks.
+    const sections = await page.evaluate((sharedSection) => {
+      const list = [];
+      const parts = document.querySelectorAll(
+        'main h2[data-section-heading], main [data-option], main [data-copy], main [data-synopsis], main a[href]',
+      );
+      for (const part of parts) {
+        if (part.matches('h2')) {
+          list.push({ id: part.id, command: part.dataset.command, options: [], shared: [], blocks: [], synopses: [], links: 0 });
+          continue;
+        }
+        const section = list.at(-1);
+        if (!section) continue;
+        if (part.matches('[data-option]')) {
+          section.options.push(part.dataset.option);
+          if (part.hasAttribute('data-shared')) section.shared.push(part.dataset.option);
+        } else if (part.matches('[data-synopsis]')) {
+          section.synopses.push({ command: part.dataset.synopsis, text: part.querySelector('pre')?.textContent ?? '' });
+        } else if (part.matches('[data-copy]')) {
+          section.blocks.push({
+            platform: part.closest('[data-platform-part]')?.dataset.platformPart,
+            lines: part.dataset.copy.split('\n'),
+          });
+        } else if (part.getAttribute('href') === `#${sharedSection}` && !part.closest('h2')) {
+          section.links += 1;
+        }
+      }
+      return list;
+    }, SHARED_SECTION);
+
+    // The sections of the commands are the commands of the help, in its order.
+    const marked = sections.filter((section) => section.command !== undefined);
+    const names = marked.map((section) => section.command);
+    for (const command of released.keys()) {
+      expect(names.includes(command), `${name}: the command "${command}" of the released deltarecon is missing: no section is marked as its section`);
+    }
+    for (const section of marked) {
+      expect(
+        released.has(section.command),
+        `${name}: the section "${section.id}" is marked as the section of "${section.command}", which is no command of the released deltarecon (${[...released.keys()].join(', ')})`,
+      );
+      expect(section.id === section.command, `${name}: the section of the command "${section.command}" has the anchor "${section.id}", expected the name of the command`);
+    }
+    expect(
+      new Set(names).size === names.length,
+      `${name}: a command has more than one section: [${names}]`,
+    );
+    expect(
+      names.filter((command) => released.has(command)).join() === [...released.keys()].filter((command) => names.includes(command)).join(),
+      `${name}: the sections of the commands stand in the order [${names}], the help names [${[...released.keys()]}]`,
+    );
+
+    // The section of the shared options: only options several commands take.
+    const sharedSections = sections.filter((section) => section.command === undefined && section.options.length > 0);
+    expect(
+      sharedSections.length === 1 && sharedSections[0].id === SHARED_SECTION,
+      `${name}: options are marked outside the sections of the commands in [${sharedSections.map((section) => section.id)}], expected the section "${SHARED_SECTION}" alone`,
+    );
+    const sharedOptions = sections.find((section) => section.id === SHARED_SECTION)?.options ?? [];
+    expect(new Set(sharedOptions).size === sharedOptions.length, `${name}, section "${SHARED_SECTION}": an option stands twice: [${sharedOptions}]`);
+    for (const option of sharedOptions) {
+      const takers = [...released.keys()].filter((command) => released.get(command).has(option));
+      expect(
+        takers.length >= 2,
+        `${name}, section "${SHARED_SECTION}": the option "${option}" is described as shared, the help names it for [${takers}]`,
+      );
+    }
+
+    /** The example of each command, per platform, for the examples that build on one another. */
+    const examples = new Map();
+    for (const section of marked) {
+      const command = section.command;
+      if (!released.has(command)) continue;
+      single.commands += 1;
+      const at = `${name}, command "${command}"`;
+      // The options: those of the help, each once.
+      const wanted = optionsOf(command);
+      for (const option of wanted) {
+        expect(section.options.includes(option), `${at}: the option "${option}" of the help of the released "deltarecon ${command}" is missing in its section`);
+      }
+      for (const option of new Set(section.options)) {
+        expect(wanted.includes(option), `${at}: the option "${option}" does not stand in the help of the released "deltarecon ${command}"`);
+        expect(
+          section.options.filter((candidate) => candidate === option).length === 1,
+          `${at}: the option "${option}" stands more than once in its section`,
+        );
+        if (wanted.includes(option)) single.options += 1;
+      }
+      // Its shared options: named as such, with a link to their section.
+      const expectedShared = wanted.filter((option) => sharedOptions.includes(option));
+      expect(
+        [...section.shared].sort().join() === [...expectedShared].sort().join(),
+        `${at}: the options named as shared are [${section.shared}], the section "${SHARED_SECTION}" describes [${expectedShared}] of its options`,
+      );
+      expect(
+        expectedShared.length === 0 || section.links > 0,
+        `${at}: its section names shared options and holds no link to the section "${SHARED_SECTION}"`,
+      );
+
+      // The synopsis: the usage line of the help, without `[-h]`.
+      const usage = squash(helpOf(command).split(/\n\s*\n/)[0]).replace(/^usage: /, '').replace(/ ?\[-h\]/, '');
+      expect(
+        section.synopses.length === 1 && section.synopses[0].command === command && squash(section.synopses[0].text) === usage,
+        `${at}: its section does not hold the usage line of the help once ("${usage}"); it holds [${section.synopses.map((synopsis) => `"${squash(synopsis.text)}"`)}]`,
+      );
+      if (section.synopses.length === 1 && squash(section.synopses[0].text) === usage) single.synopses += 1;
+
+      // The example command.
+      const lines = {};
+      for (const platform of PLATFORMS) {
+        const blocks = section.blocks.filter((block) => block.platform === platform);
+        expect(
+          blocks.length === 1 && blocks[0].lines.length === 1,
+          `${at}, ${platform}: not one example command of one line (${blocks.map((block) => block.lines.length)} lines per block)`,
+        );
+        const line = blocks[0]?.lines[0];
+        if (!line) continue;
+        lines[platform] = line;
+        const [launcher, sub, ...rest] = wordsOf(line);
+        // It starts the command of its section.
+        expect(
+          command === 'quickstart' ? launcher === STARTER[platform] : launcher === LAUNCHER[platform] && sub === command,
+          `${at}, ${platform}: the example "${line}" does not start "${command}" through "${command === 'quickstart' ? STARTER[platform] : LAUNCHER[platform]}"`,
+        );
+        if (guides[lang][platform].has(line)) {
+          single.guide += 1;
+          continue;
+        }
+        if (!NO_GUIDE.includes(command)) {
+          failures.push(`${at}, ${platform}: the example "${line}" does not stand in the guide ${GUIDES[lang]} of the ${platform} package`);
+          continue;
+        }
+        // No guide holds it: every option stands in the help of the command.
+        const options = rest.filter((word) => word.startsWith('--'));
+        for (const option of options) {
+          expect(released.get(command).has(option), `${at}, ${platform}: the option "${option}" of the example does not stand in the help of the released "deltarecon ${command}"`);
+        }
+        if (options.every((option) => released.get(command).has(option))) single.help += 1;
+      }
+      examples.set(command, lines);
+      if (command === 'compare' && lines.linux && examples.get('replay')?.linux) {
+        const record = wordsOf(examples.get('replay').linux).at(-1);
+        const wanted = `${record.slice(0, record.lastIndexOf('/'))}/replay-compare.request.json`;
+        expect(
+          wordsOf(lines.linux).at(-1) === wanted,
+          `${at}: the example does not run the compare request that the example of "replay" writes (${wanted}): "${lines.linux}"`,
+        );
+      }
+      if (NO_GUIDE.includes(command) && lines.windows && lines.linux) {
+        expect(
+          lines.windows.replaceAll('\\', '/').replace('./deltarecon.cmd ', './deltarecon ') === lines.linux,
+          `${at}: the example differs between the platforms beyond the name of the launcher and the path separators: "${lines.windows}" and "${lines.linux}"`,
+        );
+      }
+    }
+    // No example outside the section of a command.
+    for (const section of sections.filter((candidate) => candidate.command === undefined)) {
+      expect(section.blocks.length === 0, `${name}, section "${section.id}": a command stands outside the section of a command`);
+      expect(section.synopses.length === 0, `${name}, section "${section.id}": a synopsis stands outside the section of a command`);
+    }
+  }
+  expect(singlePages.length === LANGUAGES.length, `the page "${SINGLE}" is not in the page register once per language`);
+
+  // ---- The page of the tolerance profile ----
+  const profileFile = path.join(releaseFolder, folders.linux, 'profiles', 'tolerance-bruttobeitrag.json');
+  const profile = (await read(profileFile)).replace(/\n$/, '');
+  const profilePages = allPages.filter((entry) => entry.id === 'tolerance-profile');
+  for (const entry of profilePages) {
+    await page.goto(`${origin}${entry.address}`);
+    const shown = await page.evaluate(() => document.querySelector('main [data-document]')?.dataset.copy);
+    expect(
+      shown === profile,
+      `${entry.address}: the first document to copy is not the file ${relative(profileFile)} of the release, line for line`,
+    );
+    // The example profile is JSON once its derivation is filled in, and names a quantity of the page.
+    const rest = await page.evaluate(() => ({
+      example: [...document.querySelectorAll('main [data-document]')][1]?.dataset.copy ?? '',
+      quantities: [...document.querySelectorAll('main [data-quantity]')].map((code) => code.textContent),
+      commands: [...document.querySelectorAll('main [data-platform-part] [data-copy]')].map((block) => block.dataset.copy),
+    }));
+    let example;
+    try {
+      example = JSON.parse(rest.example);
+    } catch {
+      example = undefined;
+    }
+    const entries = Object.entries(example?.per_quantity ?? {});
+    expect(
+      entries.length > 0 &&
+        entries.every(([quantity, bounds]) =>
+          rest.quantities.includes(quantity) &&
+          ['upper', 'lower'].every((bound) => ['abs_tol', 'rel_tol'].every((part) => typeof bounds[bound]?.[part] === 'number' && bounds[bound][part] >= 0)) &&
+          typeof bounds.derivation === 'string' && bounds.derivation !== ''),
+      `${entry.address}: the example profile is no tolerance profile in JSON with both bounds, both parts and a derivation for a quantity the page lists`,
+    );
+    // The quantities are those of the reference model at the tag.
+    const model = spawnSync('git', ['show', `v${version}:degelmann/deltarecon/engines/reference_model.py`], { cwd: repository, encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 });
+    const block = /^QUANTITIES = \(\n([\s\S]*?)^\)/m.exec(model.stdout ?? '')?.[1] ?? '';
+    const names = [...block.matchAll(/^\s+\("([^"]+)",/gm)].map(([, quantity]) => quantity);
+    expect(
+      names.length > 0 && rest.quantities.join('|') === names.join('|'),
+      `${entry.address}: the page lists the quantities [${rest.quantities}], the reference model has [${names}] at v${version}`,
+    );
+    // The command that uses the example: a search with options of the released help alone.
+    expect(rest.commands.length === PLATFORMS.length, `${entry.address}: not one command per platform`);
+    for (const line of rest.commands) {
+      const [, sub, ...words] = wordsOf(line);
+      const unknown = words.filter((word) => word.startsWith('--') && !released.get('search')?.has(word));
+      expect(sub === 'search' && unknown.length === 0 && words.includes('--tolerance'), `${entry.address}: the command "${line}" is no search with --tolerance, or names an option the help of the released "deltarecon search" does not hold: [${unknown}]`);
+    }
+  }
+  expect(profilePages.length === LANGUAGES.length, `the page "tolerance-profile" is not in the page register once per language`);
 } catch (error) {
   failures.push(error.stack ?? error.message);
 } finally {
@@ -845,5 +1107,5 @@ try {
 }
 
 report(
-  `release ${version}: the four captures agree with each other and with the search result of the pin; on the Quick start of both languages ${found['release notes']} command lines stand in the release notes, ${found.README} in the README of the release and ${found.guide} in the package guides; file names, sums and output are those of the release; on the page of own calculations of both languages the commands are those of the ${ownSteps.length} captured steps, ${found.help} options stand in the help of the released deltarecon and ${found.lines} lines of output are those of the captures`,
+  `release ${version}: the four captures agree with each other and with the search result of the pin; on the Quick start of both languages ${found['release notes']} command lines stand in the release notes, ${found.README} in the README of the release and ${found.guide} in the package guides; file names, sums and output are those of the release; on the page of own calculations of both languages the commands are those of the ${ownSteps.length} captured steps, ${found.help} options stand in the help of the released deltarecon and ${found.lines} lines of output are those of the captures; on the page of single commands of both languages the ${single.commands} sections of commands are the ${released.size} commands of the released deltarecon in each language, ${single.options} options stand in the help of their command and no command and no option of the package is missing, ${single.synopses} synopses are the usage lines of the help, ${single.guide} example commands stand in the package guides and ${single.help} use options of the help alone`,
 );

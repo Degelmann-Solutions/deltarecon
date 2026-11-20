@@ -1,0 +1,58 @@
+---
+// The yardstick box: the size of the connection of the reference model, as
+// lines and files, with the file paths. It states no effort.
+//
+//   <YardstickBox tag="Yardstick" files={[files.connection]} unit="lines in one file">
+//
+//   That is the connection of the reference model, `degelmann/…/reference_model.py`.
+//
+//   </YardstickBox>
+//
+// `files` are the files of the connection, by their paths in the
+// repository; the box adds up their lines (`lineCount` of src/excerpts.ts)
+// and prints the sum before `unit`, the words of the page. The content is
+// one or two sentences, which name each of the files as inline code.
+// scripts/check-excerpts.mjs holds the sum and the paths against the tag of
+// the release.
+//
+// The build fails on a box without files, without `tag` or `unit`, without
+// content, and for a file src/excerpts.ts holds no number of lines for.
+import { inWords, lineCount } from '../excerpts';
+import { pageLanguage } from '../markup';
+
+interface Props {
+  /** The mono tag above the numbers. */
+  tag: string;
+  /** The files of the connection. */
+  files: string[];
+  /** What follows the number of lines: "lines in one file". */
+  unit: string;
+}
+
+const { tag, files, unit } = Astro.props;
+const where = Astro.url.pathname;
+const lang = pageLanguage(where);
+if (!Array.isArray(files) || files.length === 0) {
+  throw new Error(`${where}: a yardstick box names no file ("files").`);
+}
+if (!tag || !unit) {
+  throw new Error(`${where}: a yardstick box lacks "tag" or "unit".`);
+}
+if (!Astro.slots.has('default')) {
+  throw new Error(`${where}: a yardstick box has no text.`);
+}
+let sum = 0;
+for (const file of files) {
+  try {
+    sum += lineCount(file);
+  } catch (error) {
+    throw new Error(`${where}: yardstick box: ${(error as Error).message}`);
+  }
+}
+---
+
+<div class="yardstick" data-yardstick data-yardstick-files={files.join(' ')}>
+  <p class="yardstick-tag">{tag}</p>
+  <p class="yardstick-size"><span data-yardstick-lines>{inWords(sum, lang)}</span> {unit}</p>
+  <div class="yardstick-text prose-links"><slot /></div>
+</div>

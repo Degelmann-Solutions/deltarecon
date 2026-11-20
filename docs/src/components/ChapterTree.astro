@@ -5,7 +5,9 @@
 // end of the page where no script runs.
 //
 // `steps` are the steps of the current page; the tree lists them under the
-// page as links, in the column only (the menu leaves them out).
+// page as links, in the column only (the menu leaves them out). `sections`
+// are the sections of a page of prose that names them: the tree lists them
+// the same way, as points without numbers.
 import ProductMark from './ProductMark.astro';
 import {
   outside,
@@ -16,6 +18,7 @@ import {
   texts,
   type Lang,
   type Page,
+  type Section,
   type Step,
 } from '../site';
 import { tag } from '../release';
@@ -24,9 +27,10 @@ interface Props {
   lang: Lang;
   page: Page;
   steps?: Step[];
+  sections?: Section[];
 }
 
-const { lang, page, steps = [] } = Astro.props;
+const { lang, page, steps = [], sections = [] } = Astro.props;
 const t = texts[lang];
 const below = pages.filter((entry) => entry.stage === null);
 
@@ -116,6 +120,25 @@ const linkState = (entry: Page): string =>
                             </li>
                           ))}
                         </ol>
+                      )}
+                      {entry === page && sections.length > 0 && (
+                        <ul
+                          class="mt-1.5 mb-1 list-disc pl-5 text-[0.8125rem] leading-[1.4] text-text-secondary max-tree:hidden"
+                          aria-label={t.sections}
+                          data-tree-sections
+                        >
+                          {sections.map((section) => (
+                            <li>
+                              <a class="nav-link block py-[3px]" href={`#${section.anchor}`}>
+                                {section.code ? (
+                                  <code class="font-mono" translate="no">{section.title}</code>
+                                ) : (
+                                  section.title
+                                )}
+                              </a>
+                            </li>
+                          ))}
+                        </ul>
                       )}
                     </li>
                   ))}

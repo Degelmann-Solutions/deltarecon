@@ -55,7 +55,7 @@ export const typed = {
 
 <Prose>
 
-The demo runs on the <Term id="reference-model">reference model</Term>. In its second step the <Term id="regression">regression</Term> computes the state N+1 on the same portfolio data and for the same model points as release N and compares the two results <Term id="value">value</Term> by value. Its table says where it found a <Term id="deviation">deviation</Term>: one row per quantity, for example the <Term id="bruttobeitrag" />, the gross premium.
+The demo <span data-no-term>runs</span> on the <Term id="reference-model">reference model</Term>. In its second step the <Term id="regression">regression</Term> computes the <Term id="state">state</Term> N+1 on the same <Term id="input-data">portfolio data</Term> and for the same <Term id="model-point">model points</Term> as <Term id="release">release</Term> N and compares the two results <Term id="value">value</Term> by value. Its table says where it found a <Term id="deviation">deviation</Term>: one row per <Term id="quantity">quantity</Term>, for example the <Term id="bruttobeitrag" />, the gross premium.
 
 </Prose>
 
@@ -64,7 +64,7 @@ The demo runs on the <Term id="reference-model">reference model</Term>. In its s
 <SubHeading>The columns</SubHeading>
 
 <RowList>
-  <Row name={regression.head[0]}>A result that the reference model writes for every model point and every period. The names are German in both languages, as the program prints them.</Row>
+  <Row name={regression.head[0]}>A result that the reference model writes for every model point and every <Term id="period">period</Term>. The names are German in both languages, as the program prints them.</Row>
   <Row name={regression.head[1]}>In how many of the {facts.modelPoints} model points at least one value of the quantity differs.</Row>
   <Row name={regression.head[2]}>How many values of the quantity differ. A value is one quantity of one model point in one period.</Row>
   <Row name={regression.head[3]}>The first and the last period in which a value differs. A period is one projection month, counted from 0 at the valuation date.</Row>
@@ -100,7 +100,7 @@ The number of model points differs from row to row, because each quantity reacts
 
 <Prose>
 
-The third step reads the history of the model between release N and the state N+1 and lists every change on its own, in the order in which it was made. Each change is one <Term id="revision">revision</Term> and gets a <Term id="class">class</Term>.
+The third step reads the <Term id="history">history</Term> of the model between release N and the state N+1 and lists every change on its own, in the order in which it was made. Each change is one <Term id="revision">revision</Term> and gets a <Term id="class">class</Term>.
 
 </Prose>
 
@@ -118,10 +118,10 @@ The third step reads the history of the model between release N and the state N+
 <SubHeading>The four classes</SubHeading>
 
 <RowList>
-  <Row name={change('2d05ecf').classes}>The portfolio. Change {change('2d05ecf').number}: “{change('2d05ecf').description}”.</Row>
-  <Row name={change('936e50d').classes}>Tables such as lapse or cost rates. Change {change('936e50d').number}: “{change('936e50d').description}”.</Row>
-  <Row name={change('76fc46c').classes}>The calculation rules. Change {change('76fc46c').number}: “{change('76fc46c').description}”.</Row>
-  <Row name={change('205a880').classes}>None of these, for example documentation only. Change {change('205a880').number}: “{change('205a880').description}”.</Row>
+  <Row name={change('2d05ecf').classes}>The portfolio. Change {change('2d05ecf').number}: “<span data-no-term>{change('2d05ecf').description}</span>”.</Row>
+  <Row name={change('936e50d').classes}>Tables such as lapse or cost rates. Change {change('936e50d').number}: “<span data-no-term>{change('936e50d').description}</span>”.</Row>
+  <Row name={change('76fc46c').classes}>The calculation rules. Change {change('76fc46c').number}: “<span data-no-term>{change('76fc46c').description}</span>”.</Row>
+  <Row name={change('205a880').classes}>None of these, for example documentation only. Change {change('205a880').number}: “<span data-no-term>{change('205a880').description}</span>”.</Row>
 </RowList>
 
 <SubHeading>How the classes are found</SubHeading>
@@ -130,7 +130,7 @@ The third step reads the history of the model between release N and the state N+
 
 DeltaRecon does not judge the content of a change, and it does not read the description: the description is what the author wrote, not a finding. It looks at the files. For every revision it takes the files that the revision adds, removes or alters against the revision before it; for a merge that is the state before the side branch came in. The revision gets the class of every one of these files. That is why a revision can have two classes, and why a revision that touches no such file has none.
 
-Which file has which class, DeltaRecon does not know by itself. The <Term id="adapter">adapter</Term> of the engine says it. The adapter also reads the history and names the files of each revision. For the reference model its adapter declares:
+Which file has which class, DeltaRecon does not know by itself. The <Term id="adapter">adapter</Term> of the <Term id="engine">engine</Term> says it. The adapter also reads the history and names the files of each revision. For the reference model its adapter declares:
 
 </Prose>
 
@@ -143,7 +143,7 @@ Which file has which class, DeltaRecon does not know by itself. The <Term id="ad
 
 <Prose>
 
-The class therefore says where a change was made, not what it means. Change {change('76fc46c').number}, “{change('76fc46c').description}”, alters a cost rate and is still code: in the reference model this rate stands in the calculation rules, not in a table.
+The class therefore says where a change was made, not what it means. Change {change('76fc46c').number}, “<span data-no-term>{change('76fc46c').description}</span>”, alters a cost rate and is still code: in the reference model this rate stands in the calculation rules, not in a table.
 
 With an engine of your own, your adapter declares which files are data, parameters and code. <a href={pageAddress(enginePage, 'en')}>{enginePage.name.en}</a> describes what an adapter has to provide.
 
@@ -153,11 +153,11 @@ With an engine of your own, your adapter declares which files are data, paramete
 
 <Prose>
 
-Change {change('8f81933').number}, “{change('8f81933').description}”, is a merge: it brings the work of a side branch into the main line. The table lists it as one revision.
+Change {change('8f81933').number}, “<span data-no-term>{change('8f81933').description}</span>”, is a merge: it brings the work of a side branch into the <Term id="main-line">main line</Term>. The table lists it as one revision.
 
 Change {change('29c4a03').number} is a revert: it takes change {change('e23137a').number} back. Both stay in the list, each as a revision of its own.
 
-Change {change('54b4bca').number}, “{change('54b4bca').description}”, has two classes, {change('54b4bca').classes}: it touches a table and the calculation rules.
+Change {change('54b4bca').number}, “<span data-no-term>{change('54b4bca').description}</span>”, has two classes, {change('54b4bca').classes}: it touches a table and the calculation rules.
 
 </Prose>
 
@@ -209,7 +209,7 @@ The line above the table says “{counts.computed} of {counts.states}”. {count
 
 <Prose>
 
-The four sums add up to {typed.sumOfFour}. The whole deviation of the <span lang="de">Bruttobeitrag</span> between N and N+1, over the same model points and months, is {typed.whole}. The remainder of {typed.remainder} is what stays below the tolerance, the interval that is not resolved included.
+The four sums add up to {typed.sumOfFour}. The whole deviation of the <span lang="de">Bruttobeitrag</span> between N and N+1, over the same model points and months, is {typed.whole}. The <span data-no-term>remainder</span> of {typed.remainder} is what stays below the tolerance, the <Term id="interval">interval</Term> that is not resolved included.
 
 </Prose>
 

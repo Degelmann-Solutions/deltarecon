@@ -529,6 +529,12 @@
     margin-top: 12px;
   }
 
+  /* Several blocks in the wide part of a card (row list, code excerpt,
+     callout, text, code block), one below the other. */
+  .step-wide > .step-parts > * + * {
+    margin-top: 16px;
+  }
+
   /* The path end: a square on the trace axis, the closing line. */
   .path-end {
     position: relative;
@@ -648,6 +654,13 @@
     margin-top: 4px;
   }
 
+  /* On a page of prose a switch is a block of its own between prose and
+     row lists. */
+  main > .platform-switch {
+    max-width: var(--spacing-block-max);
+    margin-top: 16px;
+  }
+
   /* ---- Code block and copy button ---- */
 
   .code {
@@ -663,6 +676,9 @@
     font-variant-ligatures: none;
     line-height: var(--text-code-phone--line-height);
     white-space: pre;
+    /* A block that takes focus at the edge of the window is scrolled fully
+       into it, with its border and its focus ring. */
+    scroll-margin-block: 8px;
   }
 
   /* Under its tabs the block joins the active tab. */
@@ -670,6 +686,13 @@
   .code-block[data-copy-button] .code {
     border-top: 0;
     border-radius: 0 0 var(--radius-sm) var(--radius-sm);
+  }
+
+  /* A document to copy may be long (the skeleton of an adapter): it keeps to
+     a height that fits a window and scrolls inside its box. */
+  .code-block[data-document] .code {
+    max-height: 26rem;
+    overflow-y: auto;
   }
 
   /* A code block that stands alone: the copy button in a row above it. */
@@ -1904,6 +1927,162 @@
     font-size: var(--text-label);
   }
 
+  /* Rows without numbers: the name of a row carries a number of its own. */
+  .row-list-plain > .row {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .row-list-plain > .row::before {
+    content: none;
+  }
+
+  /* On the phone the tag of such a row stands below its text, in the one
+     column the row has. */
+  .row-list-plain > .row > .row-tag {
+    grid-column: 1;
+  }
+
+  /* The kind of the rows of a list, or the name of a synopsis: a small
+     label above the block it names. */
+  .list-label {
+    max-width: var(--spacing-block-max);
+    margin-top: 20px;
+    color: var(--color-text-secondary);
+    font-family: var(--font-mono);
+    font-size: var(--text-label-small);
+    letter-spacing: var(--text-label-small--letter-spacing);
+    text-transform: uppercase;
+  }
+
+  .row-list-labelled {
+    margin-top: 6px;
+  }
+
+  /* ---- Member card, its parts, fold ---- */
+
+  /* One member of the protocol: a hairline above, the heading with the name
+     in the code, the signature, the content. */
+  .member {
+    padding-top: 20px;
+    border-top: 1px solid var(--color-border);
+  }
+
+  .step-wide > .step-parts > .member + .member,
+  .step-wide > .step-parts > * + .member {
+    margin-top: 28px;
+  }
+
+  .member-title {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 4px 8px;
+    font-size: var(--text-sub-heading);
+    font-weight: var(--text-sub-heading--font-weight);
+    line-height: var(--text-sub-heading--line-height);
+  }
+
+  .member-title code {
+    font-weight: 400;
+  }
+
+  .member-title .tag {
+    margin-left: 0;
+  }
+
+  .member-signature {
+    margin-top: 10px;
+  }
+
+  .member-body > * {
+    margin-top: 12px;
+  }
+
+  .member-part .list-label {
+    margin-top: 0;
+  }
+
+  .member-part-text {
+    margin-top: 4px;
+  }
+
+  .member-part-text > * + *,
+  .fold-body > * + * {
+    margin-top: 10px;
+  }
+
+  .member-part-text ul {
+    padding-left: 20px;
+    list-style: disc;
+  }
+
+  .member-part-text li + li {
+    margin-top: 4px;
+  }
+
+  /* The fold: a line that opens it, with a mark that turns; what it holds
+     stands on a hairline at its left. */
+  .fold {
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-sm);
+  }
+
+  .fold-summary {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-height: 44px;
+    padding: 8px 14px;
+    color: var(--color-teal-text);
+    font-weight: 600;
+    cursor: pointer;
+    list-style: none;
+  }
+
+  .fold-summary::-webkit-details-marker {
+    display: none;
+  }
+
+  .fold-summary::before {
+    content: '+';
+    flex: none;
+    width: 14px;
+    font-family: var(--font-mono);
+    text-align: center;
+  }
+
+  .fold[open] > .fold-summary::before {
+    content: '−';
+  }
+
+  .fold[open] > .fold-summary {
+    border-bottom: 1px solid var(--color-border);
+  }
+
+  .fold-body {
+    padding: 14px;
+  }
+
+  .fold-body > :first-child,
+  .fold-body > .code-excerpt:first-child {
+    margin-top: 0;
+  }
+
+  /* ---- Synopsis ---- */
+
+  .synopsis {
+    max-width: var(--spacing-block-max);
+    margin-top: 16px;
+  }
+
+  .synopsis .list-label {
+    margin-top: 0;
+  }
+
+  .synopsis .code {
+    margin-top: 6px;
+  }
+
   .row-name {
     font-size: var(--text-callout-title);
     font-weight: var(--text-callout-title--font-weight);
@@ -1935,10 +2114,208 @@
       grid-template-columns: 28px minmax(0, 1fr) auto;
     }
 
+    .row-list-plain > .row {
+      grid-template-columns: minmax(0, 1fr) auto;
+    }
+
+    .row-list-plain > .row > .row-tag {
+      grid-column: auto;
+    }
+
     .row-tag {
       grid-column: auto;
       margin-top: 3px;
     }
+  }
+
+  /* ---- Connection figure ---- */
+
+  /* Three outlined boxes on one trace, inside the frame of a wide figure
+     (the figure also carries `wide-figure`). Title and lower line of a box
+     are those of a flow box. As a stack the trace runs down from a box to
+     the next and its label stands beside it. */
+  .connection-boxes {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    row-gap: 30px;
+  }
+
+  .connection-box {
+    position: relative;
+    padding: 14px 16px;
+    border: 1.5px solid var(--color-navy);
+    border-radius: var(--radius-sm);
+    background: var(--color-bg);
+  }
+
+  /* The box the reader builds: dashed, a cue beside the words of the box. */
+  .connection-built {
+    border-style: dashed;
+  }
+
+  .connection-state {
+    color: var(--color-text-secondary);
+    font-family: var(--font-mono);
+    font-size: var(--text-label-small);
+    line-height: 1.5;
+  }
+
+  /* The trace to the next box, and the 7 px square it ends in. */
+  .connection-box:not(:last-child)::after {
+    content: "";
+    position: absolute;
+    top: calc(100% + 1.5px);
+    left: 24px;
+    height: 30px;
+    border-left: var(--spacing-trace-width) solid var(--color-teal-text);
+  }
+
+  .connection-box:not(:last-child)::before {
+    content: "";
+    position: absolute;
+    top: calc(100% + 24.5px);
+    left: calc(24px + var(--spacing-trace-width) / 2 - 3.5px);
+    border: 3.5px solid var(--color-teal-text);
+  }
+
+  /* The label of the first trace. */
+  .connection-label {
+    position: absolute;
+    top: calc(100% + 8.5px);
+    left: 38px;
+    color: var(--color-teal-text);
+    font-family: var(--font-mono);
+    font-size: var(--text-label-small);
+    line-height: 1.4;
+  }
+
+  /* From the tree breakpoint up the boxes stand side by side; the first
+     trace is the longer one and carries its label above it. */
+  @media (min-width: 80rem) {
+    .connection-boxes {
+      grid-template-columns: minmax(0, 1fr) 128px minmax(0, 1fr) 56px minmax(0, 1fr);
+      row-gap: 0;
+    }
+
+    .connection-box:nth-child(1) {
+      --connection-trace: 128px;
+      grid-column: 1;
+    }
+
+    .connection-box:nth-child(2) {
+      --connection-trace: 56px;
+      grid-column: 3;
+    }
+
+    .connection-box:nth-child(3) {
+      grid-column: 5;
+    }
+
+    .connection-box:not(:last-child)::after {
+      top: calc(50% - var(--spacing-trace-width) / 2);
+      left: calc(100% + 1.5px);
+      width: var(--connection-trace);
+      height: 0;
+      border-top: var(--spacing-trace-width) solid var(--color-teal-text);
+      border-left: 0;
+    }
+
+    .connection-box:not(:last-child)::before {
+      top: calc(50% - 3.5px);
+      left: calc(100% + var(--connection-trace) - 5.5px);
+    }
+
+    .connection-label {
+      top: calc(50% - 22px);
+      left: calc(100% + 1.5px);
+      width: 128px;
+      text-align: center;
+    }
+  }
+
+  /* ---- Yardstick box ---- */
+
+  /* The size of the connection of the reference model. Its navy border
+     marks it as the box that carries the main fact of its page. */
+  .yardstick {
+    max-width: var(--spacing-block-max);
+    margin-top: 20px;
+    padding: 16px;
+    border: 1px solid var(--color-navy);
+    border-radius: var(--radius-sm);
+  }
+
+  .yardstick-tag {
+    color: var(--color-teal-text);
+    font-family: var(--font-mono);
+    font-size: var(--text-label);
+    letter-spacing: var(--text-label--letter-spacing);
+    text-transform: uppercase;
+  }
+
+  .yardstick-size {
+    margin-top: 4px;
+    font-size: 1.375rem;
+    font-weight: 600;
+    line-height: 1.35;
+  }
+
+  .yardstick-text {
+    font-size: var(--text-body-small);
+    line-height: var(--text-body-small--line-height);
+  }
+
+  .yardstick-text > * {
+    margin-top: 8px;
+  }
+
+  @media (min-width: 37.5rem) {
+    .yardstick {
+      padding: 20px 24px;
+    }
+  }
+
+  /* ---- Code excerpt ---- */
+
+  /* A head row with the origin, the code below it without a top border, a
+     caption below. The code is a code block: uncoloured, it scrolls
+     sideways inside its box. */
+  .code-excerpt {
+    max-width: var(--spacing-block-max);
+    margin: 20px 0 0;
+  }
+
+  .code-excerpt-head {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    gap: 4px 16px;
+    padding: 8px 16px;
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-sm) var(--radius-sm) 0 0;
+    background: var(--color-bg-subtle);
+    color: var(--color-text-secondary);
+    font-family: var(--font-mono);
+    font-size: var(--text-label);
+    font-variant-ligatures: none;
+    overflow-wrap: anywhere;
+  }
+
+  /* In a step card the excerpt takes the full card width. */
+  .step-wide .code-excerpt {
+    max-width: none;
+  }
+
+  .code-excerpt .code {
+    border-top: 0;
+    border-radius: 0 0 var(--radius-sm) var(--radius-sm);
+  }
+
+  .code-excerpt-caption {
+    margin-top: 10px;
+    color: var(--color-text-secondary);
+    font-size: var(--text-caption);
+    line-height: var(--text-caption--line-height);
   }
 
   /* ---- Path block ---- */
@@ -2009,6 +2386,205 @@
     overflow: hidden;
     clip-path: inset(50%);
     white-space: nowrap;
+  }
+
+  /* ---- Help (DESIGN.md, Components: Help) ---- */
+
+  /* The hint list of "When something goes wrong": groups of hints, one per
+     step or section. The group label names page and step and stands outside
+     the heading; the group title is a section heading in its smaller size. */
+  .hint-group-label {
+    margin-top: 48px;
+    color: var(--color-text-secondary);
+    font-family: var(--font-mono);
+    font-size: var(--text-label);
+    letter-spacing: var(--text-label--letter-spacing);
+    text-transform: uppercase;
+  }
+
+  .hint-group-label + .section-heading {
+    margin-top: 4px;
+    font-size: 1.25rem;
+  }
+
+  .hint-list {
+    max-width: 900px;
+    margin-top: 16px;
+    border-bottom: 1px solid var(--color-border);
+  }
+
+  /* One hint: what the reader sees, then what it means. One column on the
+     phone, two from the phone breakpoint. */
+  .hint {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    row-gap: 6px;
+    padding: 16px 0;
+    border-top: 1px solid var(--color-border);
+  }
+
+  .hint-title {
+    font-size: var(--text-callout-title);
+    font-weight: var(--text-callout-title--font-weight);
+    line-height: 1.45;
+  }
+
+  .hint-title code {
+    font-weight: 400;
+  }
+
+  .hint-text {
+    min-width: 0;
+  }
+
+  .hint-text > * + * {
+    margin-top: 10px;
+  }
+
+  /* A quoted message of the program: the white mono box of the callout. */
+  .hint-text > .callout-quote {
+    padding: 8px 12px;
+    overflow-wrap: anywhere;
+  }
+
+  .hint-text > .callout-quote:first-child {
+    margin-top: 0;
+  }
+
+  /* The link of a group to its step or section. */
+  .hint-back {
+    max-width: 900px;
+    margin-top: 12px;
+    color: var(--color-text-secondary);
+    font-size: var(--text-body-small);
+    line-height: var(--text-body-small--line-height);
+  }
+
+  /* The hint link of a step or a section, which leads to its group. */
+  .hint-link {
+    max-width: var(--spacing-block-max);
+    margin-top: 16px;
+    font-size: var(--text-body-small);
+    line-height: var(--text-body-small--line-height);
+  }
+
+  @media (min-width: 37.5rem) {
+    .hint-group-label + .section-heading {
+      font-size: 1.375rem;
+    }
+
+    .hint {
+      grid-template-columns: 260px minmax(0, 1fr);
+      column-gap: 36px;
+    }
+  }
+
+  /* The contact block. Its navy border marks it as the box that carries the
+     main fact of its page. On the phone each label stands above its value. */
+  .contact-block {
+    max-width: var(--spacing-text-max);
+    margin-top: 20px;
+    padding: 16px;
+    border: 1px solid var(--color-navy);
+    border-radius: var(--radius-sm);
+  }
+
+  .contact-tag {
+    color: var(--color-teal-text);
+    font-family: var(--font-mono);
+    font-size: var(--text-label);
+    letter-spacing: var(--text-label--letter-spacing);
+    text-transform: uppercase;
+  }
+
+  .contact-title {
+    margin-top: 4px;
+    font-size: var(--text-sub-heading);
+    font-weight: var(--text-sub-heading--font-weight);
+    line-height: var(--text-sub-heading--line-height);
+  }
+
+  .contact-list {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 2px;
+    align-items: baseline;
+    margin-top: 16px;
+  }
+
+  .contact-list dt {
+    color: var(--color-text-secondary);
+    font-family: var(--font-mono);
+    font-size: var(--text-label-small);
+    letter-spacing: var(--text-label-small--letter-spacing);
+    text-transform: uppercase;
+  }
+
+  .contact-list dd {
+    margin: 0 0 10px;
+    font-family: var(--font-mono);
+    font-size: 1rem;
+    font-variant-ligatures: none;
+    overflow-wrap: anywhere;
+  }
+
+  .contact-list dd.contact-address {
+    color: var(--color-text-secondary);
+    font-family: var(--font-sans);
+    font-size: 0.875rem;
+  }
+
+  /* The padding makes the link at least 24 px high as a target. */
+  .contact-list a {
+    padding-block: 5px;
+    color: var(--color-teal-text);
+    text-decoration-line: underline;
+    text-decoration-thickness: 1px;
+    text-underline-offset: 3px;
+  }
+
+  .contact-list a:hover,
+  .contact-list a:active {
+    color: var(--color-navy);
+  }
+
+  /* What to tell: a short list below a hairline. */
+  .contact-tell {
+    margin-top: 10px;
+    padding-top: 16px;
+    border-top: 1px solid var(--color-border);
+    font-size: var(--text-body-small);
+    line-height: var(--text-body-small--line-height);
+  }
+
+  .contact-tell > * + * {
+    margin-top: 6px;
+  }
+
+  .hint-text ul,
+  .contact-tell ul {
+    padding-left: 20px;
+    list-style: disc;
+  }
+
+  @media (min-width: 37.5rem) {
+    .contact-block {
+      padding: 24px;
+    }
+
+    .contact-list {
+      grid-template-columns: auto minmax(0, 1fr);
+      gap: 8px 20px;
+    }
+
+    .contact-list dd {
+      margin-bottom: 0;
+      font-size: 1.125rem;
+    }
+
+    .contact-tell {
+      margin-top: 20px;
+    }
   }
 }
 

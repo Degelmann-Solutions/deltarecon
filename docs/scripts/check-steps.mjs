@@ -38,6 +38,12 @@
 //     shows and announces the failure text;
 //   - every block that scrolls sideways takes focus and is a named region;
 //     the terminal block shows its ring inside;
+//   - a code excerpt in a card: in the steps and in the number the entry of
+//     the page names, a figure with a caption over the full card width, its
+//     code a region named after its file that Tab reaches, with the focus
+//     ring, without a copy button; a code block that is no command (a
+//     document the reader copies into a file) carries the name the entry
+//     gives it, and its copy button is named after it;
 //   - the result table (caption, column headers, the revision as the header
 //     of its row) and the bar figure, which shows the sums of the table:
 //     the bar of the largest sum spans half the track, the others in
@@ -55,8 +61,9 @@
 // as a stack, the result table as stacked records with its head row, code
 // and terminal scrolling inside their block, tabs and copy button at least
 // 40 px high, the step list left out of the menu, the scroll position kept
-// when the menu opens and closes; axe in both platform states. An element
-// that reaches beyond the window is named.
+// when the menu opens and closes; a code excerpt inside the window, its code
+// scrolling inside its box with the arrow key; axe in both platform states.
+// An element that reaches beyond the window is named.
 // JavaScript off (1280 and 390 px): both platforms' parts visible, Windows
 // first, each under its label; no tabs, no button, no copy button; no
 // sideways scrolling.
@@ -71,6 +78,7 @@ import { chromium } from 'playwright';
 import {
   DESKTOP,
   PHONE,
+  RING,
   RING_ON_NAVY,
   expectations,
   loadPages,
@@ -122,6 +130,24 @@ const stepPages = {
     closing: {
       en: 'You have run three calculations of your own. “Single commands” describes each command.',
       de: 'Sie haben drei eigene Rechnungen durchgeführt. „Einzelne Befehle“ beschreibt jeden Befehl.',
+    },
+  },
+  'build-an-adapter': {
+    anchors: ['class', 'releases', 'open', 'session', 'history', 'select', 'first-run'],
+    optional: [],
+    switches: ['first-run'],
+    // The number of code excerpts in each step that holds one; a page
+    // without `excerpts` must hold none.
+    excerpts: { class: 2, releases: 5, open: 3, session: 7, history: 3 },
+    // A code block that is no command: its step and its name per language.
+    // A page without `documents` must hold none.
+    documents: [
+      { step: 'class', en: 'Skeleton of an adapter', de: 'Gerüst eines Adapters' },
+      { step: 'first-run', en: 'Compare request, smallest example', de: 'Vergleichsanfrage, kleinstes Beispiel' },
+    ],
+    closing: {
+      en: 'With the first run of your own engine, stage 4 is complete.',
+      de: 'Mit dem ersten Lauf Ihrer eigenen Engine ist Etappe 4 abgeschlossen.',
     },
   },
 };
@@ -397,10 +423,12 @@ async function checkNoMotion(page, name) {
 async function checkRegions(page, name, entry, expected, cards) {
   const w = words[entry.lang];
   const regions = await page.evaluate(() =>
-    [...document.querySelectorAll('main pre')].map((block) => ({
+    // The code of an excerpt is checked with its figure (checkExcerpts).
+    [...document.querySelectorAll('main pre')].filter((block) => !block.closest('[data-code-excerpt], [data-signature]')).map((block) => ({
       step: block.closest('[data-step]')?.id,
       part: block.closest('[data-platform-part]')?.dataset.platformPart,
       terminal: block.closest('[data-terminal]') !== null,
+      document: block.closest('[data-document]') !== null,
       tabindex: block.getAttribute('tabindex'),
       role: block.getAttribute('role'),
       name: block.getAttribute('aria-label'),
@@ -408,13 +436,20 @@ async function checkRegions(page, name, entry, expected, cards) {
     })),
   );
   expect(regions.length > 0, `${name}: the page holds no code or terminal block`);
+  const documents = regions.filter((region) => region.document);
+  expect(
+    documents.map((region) => region.step).join() === expected.documents.map((entry) => entry.step).join(),
+    `${name}: the code blocks that are no command stand in the steps [${documents.map((region) => region.step)}], expected [${expected.documents.map((entry) => entry.step)}] ("documents" in stepPages)`,
+  );
   for (const region of regions) {
     const number = cards.findIndex((card) => card.anchor === region.step) + 1;
-    const wanted = region.terminal
-      ? expected.sessions
-        ? w.session(number, region.part)
-        : w.terminal[region.part]
-      : w.command(number, w.labels[region.part]);
+    const wanted = region.document
+      ? expected.documents[documents.indexOf(region)]?.[entry.lang]
+      : region.terminal
+        ? expected.sessions
+          ? w.session(number, region.part)
+          : w.terminal[region.part]
+        : w.command(number, w.labels[region.part]);
     expect(
       region.tabindex === '0' && region.role === 'region' && region.overflow === 'auto',
       `${name}: the block "${region.name}" does not take focus as a region that scrolls sideways`,
@@ -430,6 +465,8 @@ async function checkRegions(page, name, entry, expected, cards) {
     ),
     `${name}: the terminal blocks stand in the steps [${terminals.map((region) => `${region.step} (${region.part})`)}], expected one per platform in each of [${expected.terminal}]`,
   );
+  // A page without a terminal block has no ring on navy to show.
+  if (expected.terminal.length === 0) return;
   const terminal = page.locator('main [data-terminal] pre:visible').first();
   await terminal.focus();
   await page.keyboard.press('Shift+Tab');
@@ -442,6 +479,139 @@ async function checkRegions(page, name, entry, expected, cards) {
     ring.focus && ring.outline === `solid 2px ${RING_ON_NAVY}` && ring.offset === '-4px',
     `${name}: the terminal block does not show a 2 px teal ring inside itself on keyboard focus (${ring.outline}, offset ${ring.offset})`,
   );
+}
+
+/**
+ * Code excerpts in step cards: where they stand, the figure over the full
+ * card width, the code as a named region that Tab reaches, no copy button.
+ * `narrow`: the excerpt stays inside the window and its code scrolls inside
+ * its box with the arrow key.
+ */
+/**
+ * Folds: a `details` element that is closed when the page opens; the line
+ * that opens it is a `summary` with text, at least 44 px high, that takes
+ * focus and opens the fold with Enter. Leaves every fold open, so that the
+ * checks after it see what the folds hold.
+ */
+async function checkFolds(page, name) {
+  const folds = await page.evaluate(() =>
+    [...document.querySelectorAll('main [data-fold]')].map((fold) => {
+      const summary = fold.querySelector(':scope > summary');
+      return {
+        details: fold.tagName === 'DETAILS',
+        open: fold.open,
+        text: summary?.textContent.trim() ?? '',
+        height: summary?.getBoundingClientRect().height ?? 0,
+      };
+    }),
+  );
+  folds.forEach((fold, index) => {
+    expect(
+      fold.details && !fold.open && fold.text !== '' && fold.height >= 44,
+      `${name}: fold ${index + 1} is no closed details element with a line of at least 44 px that opens it (open: ${fold.open}, "${fold.text}", ${fold.height} px)`,
+    );
+  });
+  if (folds.length > 0) {
+    const first = page.locator('main [data-fold] > summary').first();
+    await first.focus();
+    await page.keyboard.press('Enter');
+    expect(
+      await page.evaluate(() => document.querySelector('main [data-fold]').open && document.activeElement?.tagName === 'SUMMARY'),
+      `${name}: Enter on the line of the first fold does not open it, or the line loses focus`,
+    );
+  }
+  await page.evaluate(() => document.querySelectorAll('main [data-fold]').forEach((fold) => (fold.open = true)));
+  return folds.length;
+}
+
+async function checkExcerpts(page, name, expected, narrow) {
+  await checkFolds(page, name);
+  const found = await page.evaluate(() =>
+    [...document.querySelectorAll('main [data-code-excerpt]')].map((figure) => {
+      const pre = figure.querySelector('pre');
+      const slot = figure.closest('.step-wide');
+      const style = pre && getComputedStyle(pre);
+      return {
+        step: figure.closest('[data-step]')?.id ?? '',
+        file: figure.dataset.file ?? '',
+        isFigure: figure.tagName === 'FIGURE',
+        caption: figure.querySelector(':scope > figcaption')?.textContent.trim() ?? '',
+        // The wide part of the card, below its two columns.
+        wide: slot !== null,
+        width: figure.getBoundingClientRect().width,
+        // Inside a fold the width to fill is that of what the fold holds.
+        slotWidth: (() => {
+          const body = figure.closest('.fold-body');
+          if (!body) return slot?.getBoundingClientRect().width ?? 0;
+          const padding = getComputedStyle(body);
+          return body.getBoundingClientRect().width - Number.parseFloat(padding.paddingLeft) - Number.parseFloat(padding.paddingRight);
+        })(),
+        inside: figure.getBoundingClientRect().right <= document.documentElement.clientWidth,
+        buttons: figure.querySelectorAll('button, [data-copy], [data-copy-button]').length,
+        region: pre && {
+          role: pre.getAttribute('role'),
+          label: pre.getAttribute('aria-label') ?? '',
+          stop: pre.tabIndex === 0,
+          translate: pre.getAttribute('translate'),
+          overflow: style.overflowX,
+          plain: pre.children.length === 1 && pre.firstElementChild.children.length === 0,
+          wider: pre.scrollWidth > pre.clientWidth,
+        },
+      };
+    }),
+  );
+  const counts = {};
+  for (const excerpt of found) counts[excerpt.step] = (counts[excerpt.step] ?? 0) + 1;
+  const count = (list) => Object.entries(list).map(([step, number]) => `${step}: ${number}`).join(', ');
+  expect(
+    count(counts) === count(expected.excerpts),
+    `${name}: the code excerpts stand in the steps {${count(counts)}}, expected {${count(expected.excerpts)}} ("excerpts" in stepPages)`,
+  );
+  for (const [index, excerpt] of found.entries()) {
+    const which = `${name}, step "${excerpt.step}": code excerpt ${index + 1}`;
+    expect(excerpt.isFigure && excerpt.caption !== '', `${which} is no figure with a caption`);
+    expect(
+      excerpt.wide && Math.abs(excerpt.width - excerpt.slotWidth) < 1,
+      `${which} does not span the full card width below the columns of its card (${excerpt.width} px of ${excerpt.slotWidth} px)`,
+    );
+    expect(excerpt.buttons === 0, `${which} holds a button or a command to copy`);
+    const { region } = excerpt;
+    if (!region) {
+      failures.push(`${which} holds no code`);
+      continue;
+    }
+    expect(
+      region.role === 'region' && region.stop && region.label.startsWith(`${excerpt.file}, `) && region.overflow === 'auto',
+      `${which}: its code is no region named after its file that takes focus and scrolls inside its box (role: ${region.role}, name: "${region.label}", ${region.overflow})`,
+    );
+    expect(region.translate === 'no' && region.plain, `${which}: its code is translated, coloured or marked up`);
+    const pre = page.locator('main [data-code-excerpt] pre').nth(index);
+    await pre.focus();
+    await page.keyboard.press('Shift+Tab');
+    await page.keyboard.press('Tab');
+    const ring = await pre.evaluate((block) => {
+      const style = getComputedStyle(block);
+      return { focus: block === document.activeElement, outline: `${style.outlineWidth} ${style.outlineStyle} ${style.outlineColor}` };
+    });
+    expect(ring.focus && ring.outline === `2px solid ${RING}`, `${which}: Tab does not reach its code, or it shows no focus ring (${ring.outline})`);
+    if (narrow) {
+      expect(excerpt.inside, `${which} reaches beyond the window`);
+      if (region.wider) {
+        await page.keyboard.press('ArrowRight');
+        // The browser scrolls after the key, not with it.
+        const scrolled = await pre.evaluate(
+          (block) =>
+            new Promise((resolve) => {
+              const until = performance.now() + 2000;
+              const look = () => (block.scrollLeft > 0 || performance.now() > until ? resolve(block.scrollLeft) : requestAnimationFrame(look));
+              look();
+            }),
+        );
+        expect(scrolled > 0, `${which}: the arrow key does not scroll its code sideways`);
+      }
+    }
+  }
+  return found.length;
 }
 
 /** The result table and the bar figure beside it. */
@@ -775,6 +945,7 @@ async function checkCopy(browser, origin, entry, expected, cards) {
             command: command.dataset.copy,
             shown: block.textContent,
             terminal: command.matches('[data-terminal]'),
+            document: command.matches('[data-document]'),
             // A session of several commands is copied one command per line.
             typed: [...command.querySelectorAll('[data-terminal-command]')]
               .map((typed) => typed.textContent)
@@ -796,15 +967,22 @@ async function checkCopy(browser, origin, entry, expected, cards) {
           ...(expected.terminal.includes(step) ? [step] : []),
         ])
       : [...withCommand, ...expected.terminal];
+    // A code block that is no command stands in its step, after the commands
+    // of that step; the documents are named in the order of the page.
+    steps.push(...expected.documents.map((entry) => entry.step));
+    steps.sort((first, second) => expected.anchors.indexOf(first) - expected.anchors.indexOf(second));
+    let documents = 0;
     expect(
       buttons.map((button) => button.step).join() === steps.join(),
       `${name}, ${platform}: the copy buttons stand in the steps [${buttons.map((button) => button.step)}], expected [${steps}]`,
     );
     for (const [index, button] of buttons.entries()) {
       const at = `${name}, ${platform}, step "${button.step}"`;
-      const wanted = button.terminal
-        ? `${w.copyName(numberOf(button.step))}, ${w.labels[platform]}`
-        : w.copyName(numberOf(button.step));
+      const wanted = button.document
+        ? `${w.copy}: ${expected.documents[documents++]?.[entry.lang]}`
+        : button.terminal
+          ? `${w.copyName(numberOf(button.step))}, ${w.labels[platform]}`
+          : w.copyName(numberOf(button.step));
       expect(button.text === w.copy && button.name === wanted, `${at}: the button reads "${button.text}" and is named "${button.name}", expected "${w.copy}" and "${wanted}"`);
       expect(button.order && button.clear, `${at}: the button does not stand after the tabs and before the command, above its text`);
       expect(button.height >= 24, `${at}: the button is ${button.height} px high, below 24 px`);
@@ -964,6 +1142,7 @@ async function checkPhone(browser, origin, entry, expected, kind) {
   await checkNoSidewaysScroll(page, name);
   await checkAxe(page, `${name}, Windows`);
   await page.screenshot({ path: path.join(shots, `${kind}-phone-${entry.lang}.png`), fullPage: true });
+  await checkExcerpts(page, name, expected, true);
 
   // The menu: the step list is left out; the scroll position is kept.
   await page.evaluate(() => window.scrollTo(0, 700));
@@ -1096,6 +1275,12 @@ async function checkStepPage(browser, origin, entry, expected) {
       `${name}: a step figure does not stand right of the text in a column of 264 px, or the text column is below 474 px: ${JSON.stringify(columns)}`,
     );
     await page.screenshot({ path: path.join(shots, `${kind}-desktop-${entry.lang}.png`), fullPage: true });
+    await checkExcerpts(page, name, expected, false);
+    // The folds are open now: what they hold is checked like the rest.
+    if ((await page.locator('main [data-fold]').count()) > 0) {
+      await checkAxe(page, `${name}, folds open`);
+      await checkNoSidewaysScroll(page, `${name}, folds open`);
+    }
     expect(errors.length === 0, `${name}: script errors: ${errors.join(' | ')}`);
     await context.close();
   }
@@ -1161,7 +1346,8 @@ try {
       continue;
     }
     // An entry without `plain`: no switch of the page is without a command.
-    const expected = { plain: [], terminal: [], ...listed };
+    // Nor does it hold a code excerpt or a code block that is no command.
+    const expected = { plain: [], terminal: [], excerpts: {}, documents: [], ...listed };
     // An error on one page is a failure of that page; the others still run.
     try {
       await checkStepPage(browser, origin, entry, expected);
