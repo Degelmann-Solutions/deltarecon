@@ -232,6 +232,8 @@ export interface FrameTexts {
   sections: string;
   /** The label of the usage line of a command. */
   synopsis: string;
+  /** The name of the signature of a member card. */
+  signature: string;
   pageLinks: string;
   previous: string;
   next: string;
@@ -303,6 +305,7 @@ export const texts: Record<Lang, FrameTexts> = {
     steps: 'Steps of this page',
     sections: 'Sections of this page',
     synopsis: 'Synopsis',
+    signature: 'Signature',
     pageLinks: 'Previous and next page',
     previous: 'Previous',
     next: 'Next',
@@ -357,6 +360,7 @@ export const texts: Record<Lang, FrameTexts> = {
     steps: 'Schritte dieser Seite',
     sections: 'Abschnitte dieser Seite',
     synopsis: 'Aufbau des Befehls',
+    signature: 'Signatur',
     pageLinks: 'Vorherige und nächste Seite',
     previous: 'Zurück',
     next: 'Weiter',

@@ -1945,6 +1945,121 @@
     margin-top: 6px;
   }
 
+  /* ---- Member card, its parts, sample, fold ---- */
+
+  /* One member of the protocol: a hairline above, the heading with the name
+     in the code, the signature, the content. */
+  .member {
+    padding-top: 20px;
+    border-top: 1px solid var(--color-border);
+  }
+
+  .step-wide > .step-parts > .member + .member,
+  .step-wide > .step-parts > * + .member {
+    margin-top: 28px;
+  }
+
+  .member-title {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 4px 8px;
+    font-size: var(--text-sub-heading);
+    font-weight: var(--text-sub-heading--font-weight);
+    line-height: var(--text-sub-heading--line-height);
+  }
+
+  .member-title code {
+    font-weight: 400;
+  }
+
+  .member-title .tag {
+    margin-left: 0;
+  }
+
+  .member-signature {
+    margin-top: 10px;
+  }
+
+  .member-body > * {
+    margin-top: 12px;
+  }
+
+  .member-part .list-label,
+  .sample .list-label {
+    margin-top: 0;
+  }
+
+  .member-part-text {
+    margin-top: 4px;
+  }
+
+  .member-part-text > * + *,
+  .fold-body > * + * {
+    margin-top: 10px;
+  }
+
+  .member-part-text ul {
+    padding-left: 20px;
+    list-style: disc;
+  }
+
+  .member-part-text li + li {
+    margin-top: 4px;
+  }
+
+  .sample .code {
+    margin-top: 6px;
+  }
+
+  /* The fold: a line that opens it, with a mark that turns; what it holds
+     stands on a hairline at its left. */
+  .fold {
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-sm);
+  }
+
+  .fold-summary {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-height: 44px;
+    padding: 8px 14px;
+    color: var(--color-teal-text);
+    font-weight: 600;
+    cursor: pointer;
+    list-style: none;
+  }
+
+  .fold-summary::-webkit-details-marker {
+    display: none;
+  }
+
+  .fold-summary::before {
+    content: '+';
+    flex: none;
+    width: 14px;
+    font-family: var(--font-mono);
+    text-align: center;
+  }
+
+  .fold[open] > .fold-summary::before {
+    content: '−';
+  }
+
+  .fold[open] > .fold-summary {
+    border-bottom: 1px solid var(--color-border);
+  }
+
+  .fold-body {
+    padding: 14px;
+  }
+
+  .fold-body > :first-child,
+  .fold-body > .code-excerpt:first-child {
+    margin-top: 0;
+  }
+
   /* ---- Synopsis ---- */
 
   .synopsis {

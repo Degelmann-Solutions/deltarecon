@@ -191,6 +191,333 @@ def path_class(path: str) -> str | None:
                 "references": release_references(state, input_revision, release_path(base))}
 `,
   },
+  // The class is called with the worker count.
+  'constructor': {
+    file: 'degelmann/deltarecon/engines/reference_model.py',
+    first: 1007,
+    last: 1009,
+    code: lines`
+    def __init__(self, workers: int | None = None):
+        """${'`'}${'`'}workers${'`'}${'`'} is the number of worker processes of a session, see :func:${'`'}worker_count${'`'}."""
+        self.workers = worker_count(workers)
+`,
+  },
+  // `input_revision` of the reference model.
+  'input-revision': {
+    file: 'degelmann/deltarecon/engines/reference_model.py',
+    first: 1099,
+    last: 1101,
+    code: lines`
+    def input_revision(self, release: dict) -> str:
+        """The input-data revision of a recorded identity of any engine version, see :func:${'`'}recorded_identity${'`'}."""
+        return recorded_identity(release)[1]
+`,
+  },
+  // `resolve` of the reference model.
+  'resolve-release': {
+    file: 'degelmann/deltarecon/engines/reference_model.py',
+    first: 1103,
+    last: 1105,
+    code: lines`
+    def resolve(self, stage: str, release: dict, repositories: Path) -> None:
+        # One stage: the run admits only a stage of ${'`'}${'`'}stages${'`'}${'`'}, so ${'`'}${'`'}stage${'`'}${'`'} selects nothing here.
+        self._locate(release, repositories)
+`,
+  },
+  // The two attributes of the session of the reference model.
+  'session-attributes': {
+    file: 'degelmann/deltarecon/engines/reference_model.py',
+    first: 812,
+    last: 814,
+    code: lines`
+class ReferenceModelSession:
+    time_basis = TIME_BASIS
+    quantities = [(name, unit) for name, unit, _, _ in QUANTITIES]
+`,
+  },
+  // `project_many` and `project_target` of the reference model.
+  'project-many': {
+    file: 'degelmann/deltarecon/engines/reference_model.py',
+    first: 878,
+    last: 891,
+    code: lines`
+    def project_many(self, model_point_ids: list[str]) -> list:
+        """The outcome of each id in the given order: its periods or its :class:${'`'}ModelPointFailure${'`'}.
+
+        The parent maps each id to its row; the workers project by row and return the periods
+        or the message of a failure, so a message is the same on every worker count.
+        """
+        return self._project_rows(model_point_ids, "_project_index")
+
+    def project_target(self, model_point_ids: list[str], quantities: list[str],
+                       periods: tuple[int, int] | None) -> list:
+        """The outcome of each id in the given order: the periods of its target window, with one value
+        per name of ${'`'}${'`'}quantities${'`'}${'`'}, or its :class:${'`'}ModelPointFailure${'`'}; see "Target-only runs"."""
+        return self._project_rows(model_point_ids, "_project_target_index", tuple(quantities),
+                                  None if periods is None else tuple(periods))
+`,
+  },
+  // The projection of one model point: results, checks, values per period.
+  'project-index': {
+    file: 'degelmann/deltarecon/engines/reference_model.py',
+    first: 945,
+    last: 966,
+    code: lines`
+    def _project_index(self, index: int) -> list[tuple[int, list[float]]]:
+        """The periods of the point of row ${'`'}${'`'}index${'`'}${'`'}. Raises :class:${'`'}ModelPointFailure${'`'}."""
+        with self._projection(index, "result_cf") as projection:
+            try:
+                frame = projection.result_cf()
+            except Exception as exc:  # a modelx FormulaError wraps the cause
+                raise ModelPointFailure(self._failure("result_cf", exc, projection, index)) from None
+            problems = []
+            for check in CHECKS:
+                try:
+                    if not bool(getattr(projection, check)()):
+                        problems.append(f"{check} is false")
+                except Exception as exc:
+                    problems.append(self._failure(check, exc, projection, index))
+            if problems:
+                raise ModelPointFailure("; ".join(problems))
+            try:
+                columns = [[float(value) for value in frame[column]] for _, _, column, _ in QUANTITIES]
+                periods = [int(period) for period in frame.index]
+            except Exception as exc:
+                raise _form_failure("result_cf", exc) from None
+            return [(period, [column[row] for column in columns]) for row, period in enumerate(periods)]
+`,
+  },
+  // The parameter inventory of the reference model.
+  'parameters': {
+    file: 'degelmann/deltarecon/engines/reference_model.py',
+    first: 972,
+    last: 994,
+    code: lines`
+    def _parameters(self) -> list[dict]:
+        inventory: dict[str, dict] = {}
+
+        def add(parameter: dict) -> None:
+            if parameter["name"] in inventory:
+                raise RuntimeError(f"two parameters of the model have the name {parameter['name']}")
+            inventory[parameter["name"]] = parameter
+
+        for space in (self._model.Projection, self._model.Data):
+            for name, value in space.refs.items():
+                if not name.startswith("_") and name not in NOT_A_PARAMETER and _is_scalar(value):
+                    add({"name": name, "type": "scalar", "value": _plain(value)})
+        for name in PARAMETER_TABLES:
+            frame = getattr(self._model.Data, name)()
+            value_columns = [str(c) for c in frame.columns if c not in NOT_A_VALUE_COLUMN]
+            rows = []
+            for key, values in zip(frame.index, frame[value_columns].itertuples(index=False, name=None)):
+                key = list(key) if isinstance(key, tuple) else [key]
+                rows.append({"key": [_plain(k) for k in key], "values": [_plain(v) for v in values]})
+            add({"name": name, "type": "keyed_table",
+                 "key_columns": [str(c) for c in frame.index.names],
+                 "value_columns": value_columns, "rows": rows})
+        return [inventory[name] for name in sorted(inventory)]
+`,
+  },
+  // `open` refuses a revision of another history source first.
+  'open-foreign': {
+    file: 'degelmann/deltarecon/engines/reference_model.py',
+    first: 1131,
+    last: 1135,
+    code: lines`
+        foreign = [c["id"] for c in enabled
+                   if c["realisation"]["type"] == changes_contract.REVISION and c["realisation"]["source"] != SOURCE]
+        if foreign:
+            raise Rejection("unsupported_realisation", f"The change {foreign[0]} is a revision of another history "
+                            f"source than {SOURCE}, which the reference model cannot realise.", change_ids=foreign)
+`,
+  },
+  // `open`: the files of the state, after the last enabled revision.
+  'open-revisions': {
+    file: 'degelmann/deltarecon/engines/reference_model.py',
+    first: 1136,
+    last: 1147,
+    code: lines`
+        clone, files = self._locate(release, repositories)
+        path = release_path(release)
+        revisions = [c["realisation"]["revision"] for c in enabled
+                     if c["realisation"]["type"] == changes_contract.REVISION]
+        patches = [c for c in enabled if c["realisation"]["type"] != changes_contract.REVISION]
+        if revisions:  # the state after the last enabled revision; the request's state is the base
+            _, input_revision = parse_identity(release)
+            last = revisions[-1]
+            try:
+                files = self._files(clone, last, input_revision if "input_data" in hold else last)
+            except Rejection as rejection:  # the request is accepted; the state cannot be restored
+                raise RuntimeError(rejection.message) from None
+`,
+  },
+};
+
+/**
+ * The signature of each member of the protocol, as it stands at the tag: the
+ * lines of the file, without the indentation they share. The member card
+ * (components/Member.astro) shows it; scripts/check-excerpts.mjs holds it
+ * against the tag like an excerpt. The two optional operations of a session
+ * have no line of their own in the protocol, which describes them in a
+ * comment: their signature is that of the reference model.
+ */
+export const signatures: Record<string, Excerpt> = {
+  'Engine.stages': {
+    file: 'degelmann/deltarecon/protocol.py',
+    first: 167,
+    last: 167,
+    code: lines`
+stages: Mapping[str, StageDeclaration]
+`,
+  },
+  'Engine.realisations': {
+    file: 'degelmann/deltarecon/protocol.py',
+    first: 168,
+    last: 168,
+    code: lines`
+realisations: frozenset[str]  # the realisation types of a change the engine can apply
+`,
+  },
+  'Engine.determines': {
+    file: 'degelmann/deltarecon/protocol.py',
+    first: 169,
+    last: 169,
+    code: lines`
+determines: frozenset[str]    # the kinds of release reference one revision fixes
+`,
+  },
+  'Engine.holdable': {
+    file: 'degelmann/deltarecon/protocol.py',
+    first: 172,
+    last: 172,
+    code: lines`
+holdable: Mapping[str, frozenset[str]]
+`,
+  },
+  'Engine.repositories_folder': {
+    file: 'degelmann/deltarecon/protocol.py',
+    first: 174,
+    last: 174,
+    code: lines`
+def repositories_folder(self, given: Path | str | None) -> Path:
+`,
+  },
+  'Engine.resolve': {
+    file: 'degelmann/deltarecon/protocol.py',
+    first: 182,
+    last: 182,
+    code: lines`
+def resolve(self, stage: str, release: dict, repositories: Path) -> None:
+`,
+  },
+  'Engine.describe': {
+    file: 'degelmann/deltarecon/protocol.py',
+    first: 194,
+    last: 195,
+    code: lines`
+def describe(self, stage: str, label: str, revision: str, options: Mapping[str, str], repositories: Path,
+             input_revision: str | None = None) -> dict:
+`,
+  },
+  'Engine.input_revision': {
+    file: 'degelmann/deltarecon/protocol.py',
+    first: 211,
+    last: 211,
+    code: lines`
+def input_revision(self, release: dict) -> str:
+`,
+  },
+  'Engine.open': {
+    file: 'degelmann/deltarecon/protocol.py',
+    first: 220,
+    last: 221,
+    code: lines`
+def open(self, stage: str, release: dict, enabled: list[dict], manifest_dir: Path | None,
+         repositories: Path, hold: frozenset[str] = frozenset()) -> ContextManager[Session]:
+`,
+  },
+  'Engine.history': {
+    file: 'degelmann/deltarecon/protocol.py',
+    first: 247,
+    last: 247,
+    code: lines`
+def history(self, older: dict, newer: dict, repositories: Path) -> History:
+`,
+  },
+  'Engine.state_release': {
+    file: 'degelmann/deltarecon/protocol.py',
+    first: 269,
+    last: 270,
+    code: lines`
+def state_release(self, base: dict, revision: str | None, hold: frozenset[str],
+                  repositories: Path) -> dict:
+`,
+  },
+  'Session.time_basis': {
+    file: 'degelmann/deltarecon/protocol.py',
+    first: 59,
+    last: 59,
+    code: lines`
+time_basis: str
+`,
+  },
+  'Session.quantities': {
+    file: 'degelmann/deltarecon/protocol.py',
+    first: 60,
+    last: 60,
+    code: lines`
+quantities: list[tuple[str, str]]  # name and unit, in export column order
+`,
+  },
+  'Session.model_point_ids': {
+    file: 'degelmann/deltarecon/protocol.py',
+    first: 62,
+    last: 62,
+    code: lines`
+def model_point_ids(self) -> list[str]:
+`,
+  },
+  'Session.project': {
+    file: 'degelmann/deltarecon/protocol.py',
+    first: 65,
+    last: 65,
+    code: lines`
+def project(self, model_point_id: str) -> list[tuple[int, list[float]]]:
+`,
+  },
+  'Session.parameters': {
+    file: 'degelmann/deltarecon/protocol.py',
+    first: 85,
+    last: 85,
+    code: lines`
+def parameters(self) -> list[dict]:
+`,
+  },
+  'Session.project_many': {
+    file: 'degelmann/deltarecon/engines/reference_model.py',
+    first: 878,
+    last: 878,
+    code: lines`
+def project_many(self, model_point_ids: list[str]) -> list:
+`,
+  },
+  'Session.project_target': {
+    file: 'degelmann/deltarecon/engines/reference_model.py',
+    first: 886,
+    last: 887,
+    code: lines`
+def project_target(self, model_point_ids: list[str], quantities: list[str],
+                   periods: tuple[int, int] | None) -> list:
+`,
+  },
+  'constructor': {
+    file: 'degelmann/deltarecon/engines/reference_model.py',
+    first: 1007,
+    last: 1007,
+    code: lines`
+def __init__(self, workers: int | None = None):
+`,
+  },
 };
 
 /** The files a page states the size of. */

@@ -1,0 +1,26 @@
+---
+// A fold: a part of a page that the reader opens, so that a long page stays
+// short. It is a `details` element, so it opens and closes without a script
+// and the search of the browser finds what it holds.
+//
+//   <Fold summary="How the reference model does it">
+//     …
+//   </Fold>
+//
+// The line that opens it says what it holds. What stands inside is content
+// like any other: the glossary check and the excerpt check read it.
+interface Props {
+  /** The line that opens the fold. */
+  summary: string;
+}
+
+const { summary } = Astro.props;
+if (typeof summary !== 'string' || summary.trim() === '') {
+  throw new Error(`${Astro.url.pathname}: a fold has no "summary".`);
+}
+---
+
+<details class="fold" data-fold>
+  <summary class="fold-summary" data-no-term><span>{summary}</span></summary>
+  <div class="fold-body prose-links"><slot /></div>
+</details>

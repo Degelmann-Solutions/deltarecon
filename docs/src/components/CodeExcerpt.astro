@@ -25,9 +25,15 @@ import { texts } from '../site';
 interface Props {
   /** The key of the excerpt in src/excerpts.ts. */
   id: string;
+  /**
+   * Keeps the code out of the search index. For an excerpt with names of one
+   * letter: the search offers a short word as a hit for every word that
+   * begins with it.
+   */
+  unindexed?: boolean;
 }
 
-const { id } = Astro.props;
+const { id, unindexed } = Astro.props;
 const where = Astro.url.pathname;
 const t = texts[pageLanguage(where)];
 const excerpt = excerpts[id];
@@ -50,6 +56,6 @@ const lines = first === last ? `${t.excerptLine} ${first}` : `${t.excerptLines} 
     <span translate="no">{file}</span>
     <span>{lines} · <span translate="no">{tag}</span></span>
   </div>
-  <pre class="code" tabindex="0" role="region" aria-label={`${file}, ${lines}`} translate="no"><code>{code}</code></pre>
+  <pre class="code" tabindex="0" role="region" aria-label={`${file}, ${lines}`} translate="no" data-pagefind-ignore={unindexed ? '' : undefined}><code>{code}</code></pre>
   <figcaption class="code-excerpt-caption prose-links"><slot name="caption" /></figcaption>
 </figure>

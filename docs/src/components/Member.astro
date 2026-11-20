@@ -1,0 +1,60 @@
+---
+// A member card: one member of the protocol (degelmann/deltarecon/
+// protocol.py) as a block of its own. A heading with the name in plain
+// words and the name in the code, the signature as it stands at the tag of
+// the release (`signatures` of src/excerpts.ts), then the content: what the
+// reader programs, what the member is given, what it gives back and what it
+// reports, and in a fold how the reference model does it.
+//
+//   <Member name="Describe a release by its revision" code="describe" of="Engine">
+//     …
+//     <Part label="You are given">…</Part>
+//     <Fold summary="How the reference model does it">…</Fold>
+//   </Member>
+//
+// `of` is the class of the protocol; the card marks its code name
+// `data-member="Engine.describe"`, which scripts/check-excerpts.mjs holds
+// against the tag, as it does the signature. `tag` is a word at the right
+// end of the heading, as "optional". A card without `of` is no member of
+// the protocol (the call of the class); it names its signature by
+// `signature`.
+import { excerptFaults, signatures } from '../excerpts';
+import { pageLanguage } from '../markup';
+import { texts } from '../site';
+
+interface Props {
+  /** The name in plain words. */
+  name: string;
+  /** The name in the code. */
+  code: string;
+  /** The class of the protocol the member belongs to. */
+  of?: 'Engine' | 'Session';
+  /** The key of the signature, for a card that is no member. */
+  signature?: string;
+  /** A word at the right end of the heading. */
+  tag?: string;
+}
+
+const { name, code, of, signature, tag } = Astro.props;
+const where = Astro.url.pathname;
+const t = texts[pageLanguage(where)];
+const key = of ? `${of}.${code}` : signature;
+const shown = key ? signatures[key] : undefined;
+if (!shown) {
+  throw new Error(`${where}: no signature "${key}" for the member card "${name}" (src/excerpts.ts).`);
+}
+const faults = excerptFaults(shown);
+if (faults.length > 0) {
+  throw new Error(`${where}: the signature "${key}" (src/excerpts.ts): ${faults.join('; ')}.`);
+}
+---
+
+<section class="member" data-member-card>
+  <h3 class="member-title">
+    <span>{name}</span>
+    <code translate="no" data-member={of ? `${of}.${code}` : undefined}>{code}</code>
+    {tag && <span class="tag" data-member-tag>{tag}</span>}
+  </h3>
+  <pre class="code member-signature" tabindex="0" role="region" aria-label={`${t.signature}, ${code}`} translate="no" data-signature={key} data-file={shown.file} data-first={shown.first} data-last={shown.last}><code>{shown.code}</code></pre>
+  <div class="member-body prose-links"><slot /></div>
+</section>
