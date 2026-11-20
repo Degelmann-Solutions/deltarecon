@@ -1,0 +1,31 @@
+---
+// The synopsis of a command of the package: its usage line as the help of
+// the command prints it (src/synopsis.ts), under a small label. It is a
+// pattern, not a command to run: it has no copy button and nothing to copy.
+//
+//   <Synopsis command="request" />
+//
+// The block scrolls sideways inside its box, takes keyboard focus for that
+// and is a named region ("Synopsis, request"). scripts/check-release.mjs
+// reads it by `data-synopsis` and holds it against the released help.
+import { pageLanguage } from '../markup';
+import { texts } from '../site';
+import { usage } from '../synopsis';
+
+interface Props {
+  /** The command of the package whose usage line is shown. */
+  command: string;
+}
+
+const { command } = Astro.props;
+const lines = Object.hasOwn(usage, command) ? usage[command] : undefined;
+if (!lines) {
+  throw new Error(`${Astro.url.pathname}: no usage line of the command "${command}" in src/synopsis.ts.`);
+}
+const t = texts[pageLanguage(Astro.url.pathname)];
+---
+
+<div class="synopsis" data-synopsis={command}>
+  <p class="list-label">{t.synopsis}</p>
+  <pre class="code" tabindex="0" role="region" aria-label={`${t.synopsis}, ${command}`} translate="no"><code>{lines.join('\n')}</code></pre>
+</div>

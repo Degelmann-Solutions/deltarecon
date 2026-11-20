@@ -688,6 +688,13 @@
     border-radius: 0 0 var(--radius-sm) var(--radius-sm);
   }
 
+  /* A document to copy may be long (the skeleton of an adapter): it keeps to
+     a height that fits a window and scrolls inside its box. */
+  .code-block[data-document] .code {
+    max-height: 26rem;
+    overflow-y: auto;
+  }
+
   /* A code block that stands alone: the copy button in a row above it. */
   .code-head {
     display: flex;
@@ -1920,6 +1927,162 @@
     font-size: var(--text-label);
   }
 
+  /* Rows without numbers: the name of a row carries a number of its own. */
+  .row-list-plain > .row {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .row-list-plain > .row::before {
+    content: none;
+  }
+
+  /* On the phone the tag of such a row stands below its text, in the one
+     column the row has. */
+  .row-list-plain > .row > .row-tag {
+    grid-column: 1;
+  }
+
+  /* The kind of the rows of a list, or the name of a synopsis: a small
+     label above the block it names. */
+  .list-label {
+    max-width: var(--spacing-block-max);
+    margin-top: 20px;
+    color: var(--color-text-secondary);
+    font-family: var(--font-mono);
+    font-size: var(--text-label-small);
+    letter-spacing: var(--text-label-small--letter-spacing);
+    text-transform: uppercase;
+  }
+
+  .row-list-labelled {
+    margin-top: 6px;
+  }
+
+  /* ---- Member card, its parts, fold ---- */
+
+  /* One member of the protocol: a hairline above, the heading with the name
+     in the code, the signature, the content. */
+  .member {
+    padding-top: 20px;
+    border-top: 1px solid var(--color-border);
+  }
+
+  .step-wide > .step-parts > .member + .member,
+  .step-wide > .step-parts > * + .member {
+    margin-top: 28px;
+  }
+
+  .member-title {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 4px 8px;
+    font-size: var(--text-sub-heading);
+    font-weight: var(--text-sub-heading--font-weight);
+    line-height: var(--text-sub-heading--line-height);
+  }
+
+  .member-title code {
+    font-weight: 400;
+  }
+
+  .member-title .tag {
+    margin-left: 0;
+  }
+
+  .member-signature {
+    margin-top: 10px;
+  }
+
+  .member-body > * {
+    margin-top: 12px;
+  }
+
+  .member-part .list-label {
+    margin-top: 0;
+  }
+
+  .member-part-text {
+    margin-top: 4px;
+  }
+
+  .member-part-text > * + *,
+  .fold-body > * + * {
+    margin-top: 10px;
+  }
+
+  .member-part-text ul {
+    padding-left: 20px;
+    list-style: disc;
+  }
+
+  .member-part-text li + li {
+    margin-top: 4px;
+  }
+
+  /* The fold: a line that opens it, with a mark that turns; what it holds
+     stands on a hairline at its left. */
+  .fold {
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-sm);
+  }
+
+  .fold-summary {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-height: 44px;
+    padding: 8px 14px;
+    color: var(--color-teal-text);
+    font-weight: 600;
+    cursor: pointer;
+    list-style: none;
+  }
+
+  .fold-summary::-webkit-details-marker {
+    display: none;
+  }
+
+  .fold-summary::before {
+    content: '+';
+    flex: none;
+    width: 14px;
+    font-family: var(--font-mono);
+    text-align: center;
+  }
+
+  .fold[open] > .fold-summary::before {
+    content: '−';
+  }
+
+  .fold[open] > .fold-summary {
+    border-bottom: 1px solid var(--color-border);
+  }
+
+  .fold-body {
+    padding: 14px;
+  }
+
+  .fold-body > :first-child,
+  .fold-body > .code-excerpt:first-child {
+    margin-top: 0;
+  }
+
+  /* ---- Synopsis ---- */
+
+  .synopsis {
+    max-width: var(--spacing-block-max);
+    margin-top: 16px;
+  }
+
+  .synopsis .list-label {
+    margin-top: 0;
+  }
+
+  .synopsis .code {
+    margin-top: 6px;
+  }
+
   .row-name {
     font-size: var(--text-callout-title);
     font-weight: var(--text-callout-title--font-weight);
@@ -1949,6 +2112,14 @@
   @media (min-width: 37.5rem) {
     .row {
       grid-template-columns: 28px minmax(0, 1fr) auto;
+    }
+
+    .row-list-plain > .row {
+      grid-template-columns: minmax(0, 1fr) auto;
+    }
+
+    .row-list-plain > .row > .row-tag {
+      grid-column: auto;
     }
 
     .row-tag {
@@ -2215,6 +2386,205 @@
     overflow: hidden;
     clip-path: inset(50%);
     white-space: nowrap;
+  }
+
+  /* ---- Help (DESIGN.md, Components: Help) ---- */
+
+  /* The hint list of "When something goes wrong": groups of hints, one per
+     step or section. The group label names page and step and stands outside
+     the heading; the group title is a section heading in its smaller size. */
+  .hint-group-label {
+    margin-top: 48px;
+    color: var(--color-text-secondary);
+    font-family: var(--font-mono);
+    font-size: var(--text-label);
+    letter-spacing: var(--text-label--letter-spacing);
+    text-transform: uppercase;
+  }
+
+  .hint-group-label + .section-heading {
+    margin-top: 4px;
+    font-size: 1.25rem;
+  }
+
+  .hint-list {
+    max-width: 900px;
+    margin-top: 16px;
+    border-bottom: 1px solid var(--color-border);
+  }
+
+  /* One hint: what the reader sees, then what it means. One column on the
+     phone, two from the phone breakpoint. */
+  .hint {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    row-gap: 6px;
+    padding: 16px 0;
+    border-top: 1px solid var(--color-border);
+  }
+
+  .hint-title {
+    font-size: var(--text-callout-title);
+    font-weight: var(--text-callout-title--font-weight);
+    line-height: 1.45;
+  }
+
+  .hint-title code {
+    font-weight: 400;
+  }
+
+  .hint-text {
+    min-width: 0;
+  }
+
+  .hint-text > * + * {
+    margin-top: 10px;
+  }
+
+  /* A quoted message of the program: the white mono box of the callout. */
+  .hint-text > .callout-quote {
+    padding: 8px 12px;
+    overflow-wrap: anywhere;
+  }
+
+  .hint-text > .callout-quote:first-child {
+    margin-top: 0;
+  }
+
+  /* The link of a group to its step or section. */
+  .hint-back {
+    max-width: 900px;
+    margin-top: 12px;
+    color: var(--color-text-secondary);
+    font-size: var(--text-body-small);
+    line-height: var(--text-body-small--line-height);
+  }
+
+  /* The hint link of a step or a section, which leads to its group. */
+  .hint-link {
+    max-width: var(--spacing-block-max);
+    margin-top: 16px;
+    font-size: var(--text-body-small);
+    line-height: var(--text-body-small--line-height);
+  }
+
+  @media (min-width: 37.5rem) {
+    .hint-group-label + .section-heading {
+      font-size: 1.375rem;
+    }
+
+    .hint {
+      grid-template-columns: 260px minmax(0, 1fr);
+      column-gap: 36px;
+    }
+  }
+
+  /* The contact block. Its navy border marks it as the box that carries the
+     main fact of its page. On the phone each label stands above its value. */
+  .contact-block {
+    max-width: var(--spacing-text-max);
+    margin-top: 20px;
+    padding: 16px;
+    border: 1px solid var(--color-navy);
+    border-radius: var(--radius-sm);
+  }
+
+  .contact-tag {
+    color: var(--color-teal-text);
+    font-family: var(--font-mono);
+    font-size: var(--text-label);
+    letter-spacing: var(--text-label--letter-spacing);
+    text-transform: uppercase;
+  }
+
+  .contact-title {
+    margin-top: 4px;
+    font-size: var(--text-sub-heading);
+    font-weight: var(--text-sub-heading--font-weight);
+    line-height: var(--text-sub-heading--line-height);
+  }
+
+  .contact-list {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 2px;
+    align-items: baseline;
+    margin-top: 16px;
+  }
+
+  .contact-list dt {
+    color: var(--color-text-secondary);
+    font-family: var(--font-mono);
+    font-size: var(--text-label-small);
+    letter-spacing: var(--text-label-small--letter-spacing);
+    text-transform: uppercase;
+  }
+
+  .contact-list dd {
+    margin: 0 0 10px;
+    font-family: var(--font-mono);
+    font-size: 1rem;
+    font-variant-ligatures: none;
+    overflow-wrap: anywhere;
+  }
+
+  .contact-list dd.contact-address {
+    color: var(--color-text-secondary);
+    font-family: var(--font-sans);
+    font-size: 0.875rem;
+  }
+
+  /* The padding makes the link at least 24 px high as a target. */
+  .contact-list a {
+    padding-block: 5px;
+    color: var(--color-teal-text);
+    text-decoration-line: underline;
+    text-decoration-thickness: 1px;
+    text-underline-offset: 3px;
+  }
+
+  .contact-list a:hover,
+  .contact-list a:active {
+    color: var(--color-navy);
+  }
+
+  /* What to tell: a short list below a hairline. */
+  .contact-tell {
+    margin-top: 10px;
+    padding-top: 16px;
+    border-top: 1px solid var(--color-border);
+    font-size: var(--text-body-small);
+    line-height: var(--text-body-small--line-height);
+  }
+
+  .contact-tell > * + * {
+    margin-top: 6px;
+  }
+
+  .hint-text ul,
+  .contact-tell ul {
+    padding-left: 20px;
+    list-style: disc;
+  }
+
+  @media (min-width: 37.5rem) {
+    .contact-block {
+      padding: 24px;
+    }
+
+    .contact-list {
+      grid-template-columns: auto minmax(0, 1fr);
+      gap: 8px 20px;
+    }
+
+    .contact-list dd {
+      margin-bottom: 0;
+      font-size: 1.125rem;
+    }
+
+    .contact-tell {
+      margin-top: 20px;
+    }
   }
 }
 

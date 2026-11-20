@@ -1,0 +1,98 @@
+---
+// A group of the hint list of "When something goes wrong": the hints of one
+// step of a step page or of one section of a page of prose.
+//
+//   <HintGroup id="quick-start-download">
+//     <Hint title="What the reader sees">What it means and what to do.</Hint>
+//   </HintGroup>
+//
+// `id` names the entry of the register of the hint groups (src/hints.ts),
+// which gives the page and the step or section. The group shows a label with
+// page and step ("Quick start · step 1"), which stands outside the heading,
+// the title of the step as a section heading with the anchor of the group,
+// the hints, and a link to the step by its title. The label holds the name
+// of a page, as a heading does; a glossary term in that name is no
+// occurrence of the term (`data-no-term`).
+//
+// The title of a step comes from the step list in the frontmatter of its
+// page, so it is the title of the step card. A page of prose names its
+// sections in its text only; the group of a section takes the title from
+// the slot `title`, and scripts/check-hints.mjs holds it against the heading
+// of the section:
+//
+//   <HintGroup id="single-commands-run">
+//     <Fragment slot="title"><code translate="no">run</code>: compute a request</Fragment>
+//     …
+//   </HintGroup>
+//
+// The build fails, with the page and the group, on a group the register does
+// not hold, on a page the page register does not hold, on a step the
+// frontmatter of its page does not hold, on a group of a section without the
+// slot `title`, and on a group without hints.
+import SectionHeading from './SectionHeading.astro';
+import { findGroup, type HintGroup } from '../hints';
+import { escapeHtml, pageLanguage } from '../markup';
+import { findPage, pageAddress, stepPlace, texts, type Page, type Step } from '../site';
+
+interface Props {
+  /** The anchor of the group in the register of the hint groups. */
+  id: string;
+}
+
+const { id } = Astro.props;
+const where = Astro.url.pathname;
+const lang = pageLanguage(where);
+const t = texts[lang];
+
+let group: HintGroup;
+let target: Page;
+try {
+  group = findGroup(id);
+  target = findPage(group.page);
+} catch (error) {
+  throw new Error(`${where}: ${(error as Error).message}`);
+}
+if (!Astro.slots.has('default')) {
+  throw new Error(`${where}: the hint group "${id}" holds no hint.`);
+}
+
+// The page files, loaded only when a group asks for the steps of one.
+const pageFiles = import.meta.glob<{ frontmatter: { steps?: Step[] } }>('../pages/*/*.mdx');
+
+let title: string;
+let label: string;
+if (group.kind === 'step') {
+  const file = `../pages/${lang}/${target.slug[lang] || 'index'}.mdx`;
+  const load = pageFiles[file];
+  if (!load) {
+    throw new Error(`${where}: the hint group "${id}": no page file ${file.slice(3)}.`);
+  }
+  const steps = (await load()).frontmatter.steps ?? [];
+  const index = steps.findIndex((step) => step.anchor === group.target);
+  if (index === -1) {
+    throw new Error(
+      `${where}: the hint group "${id}" names the step "${group.target}", which the page "${group.page}" (${lang}) does not hold.`,
+    );
+  }
+  title = escapeHtml(steps[index].title);
+  label = `${target.name[lang]} · ${stepPlace(index + 1, lang)}`;
+} else {
+  if (!Astro.slots.has('title')) {
+    throw new Error(
+      `${where}: the hint group "${id}" belongs to a section and needs its title in the slot "title".`,
+    );
+  }
+  title = (await Astro.slots.render('title')).trim();
+  label = `${target.name[lang]} · ${t.hintSection}`;
+}
+const address = `${pageAddress(target, lang)}#${group.target}`;
+---
+
+<div class="hint-group" data-hint-group={group.anchor} data-hint-kind={group.kind}>
+  <p class="hint-group-label" data-hint-group-label data-no-term>{label}</p>
+  <SectionHeading id={group.anchor}><Fragment set:html={title} /></SectionHeading>
+  <div class="hint-list" data-hint-list><slot /></div>
+  <p class="hint-back prose-links" data-hint-back>
+    <span data-no-term>{group.kind === 'step' ? t.hintToStep : t.hintToSection}</span>: <a href={address}><Fragment set:html={title} /></a>
+  </p>
+</div>

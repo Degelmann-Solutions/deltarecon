@@ -157,7 +157,7 @@ function markStops(page, within = 'body') {
   return page.evaluate((scope) => {
     const stops = [
       ...document.querySelectorAll(
-        'a[href], button, input, select, textarea, [tabindex]:not([tabindex="-1"])',
+        'a[href], button, input, select, textarea, summary, [tabindex]:not([tabindex="-1"])',
       ),
     ].filter(
       (element) =>
@@ -165,7 +165,9 @@ function markStops(page, within = 'body') {
         element.closest(scope) !== null &&
         element.getClientRects().length > 0 &&
         getComputedStyle(element).visibility !== 'hidden' &&
-        !element.closest('[inert]'),
+        !element.closest('[inert]') &&
+        // What a closed fold holds is no stop; the line that opens it is one.
+        !(element.closest('details:not([open])') && !element.closest('summary')),
     );
     stops.forEach((element, index) => {
       element.dataset.stop = String(index);

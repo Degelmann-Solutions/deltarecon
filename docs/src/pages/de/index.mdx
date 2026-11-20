@@ -29,7 +29,7 @@ export const requirements = findPage('engine-requirements');
 
 <Prose>
 
-Die Veränderungsanalyse kennen Sie aus Bilanz und Solvency II: eine Überleitung vom Vorjahr auf den aktuellen Stand, Schritt für Schritt. DeltaRecon nimmt als Schritte die <Term id="revision">Revisionen</Term> des versionierten Berechnungsprogramms. Jede Revision ist eine Änderung. Zwischen Release N und dem Stand N+1 rechnet DeltaRecon Stände, vergleicht sie und ordnet die <Term id="deviation">Abweichung</Term> in einer Größe den einzelnen Revisionen zu, die sie verursachen.
+Die Veränderungsanalyse kennen Sie aus Bilanz und Solvency II: eine Überleitung vom Vorjahr auf den aktuellen <span data-no-term>Stand</span>, Schritt für Schritt. DeltaRecon nimmt als Schritte die <Term id="revision">Revisionen</Term> des versionierten Berechnungsprogramms. Jede Revision ist eine Änderung. Zwischen <Term id="release">Release</Term> N und dem <Term id="state">Stand</Term> N+1 rechnet DeltaRecon Stände, vergleicht sie und ordnet die <Term id="deviation">Abweichung</Term> in einer <Term id="quantity">Größe</Term> den einzelnen Revisionen zu, die sie verursachen.
 
 Jedes Ergebnis stammt aus Rechnungen und Vergleichen, die jedes Mal dasselbe Ergebnis liefern. DeltaRecon verwendet keine Agenten.
 
@@ -53,7 +53,7 @@ Das Bild zeigt das Beispiel des Quick Starts am <Term id="reference-model">Refer
 
 <Prose>
 
-Einen Computer mit Windows oder Linux. Sie laden ein Archiv herunter und entpacken es. Installiert wird nichts: Das Paket enthält alles, was es braucht, auch das Referenzmodell, eine Risikolebensversicherung mit {facts.modelPoints} Modellpunkten. Das Referenzmodell führt die Mechanik vor und ist kein Bewertungsmodell; sein Bestand ist synthetisch und enthält keine Kundendaten.
+Einen Computer mit Windows oder Linux. Sie laden ein Archiv herunter und entpacken es. Installiert wird nichts: Das Paket enthält alles, was es braucht, auch das Referenzmodell, eine Risikolebensversicherung mit {facts.modelPoints} <Term id="model-point">Modellpunkten</Term>. Das Referenzmodell führt die Mechanik vor und ist kein Bewertungsmodell; sein Bestand ist synthetisch und enthält keine Kundendaten.
 
 </Prose>
 
@@ -61,12 +61,12 @@ Einen Computer mit Windows oder Linux. Sie laden ein Archiv herunter und entpack
 
 <Prose>
 
-Die geführte Vorführung des Quick Starts läuft in vier Schritten und zeigt drei Tabellen. Jeder Lauf hinterlässt außerdem einen <Term id="record">Nachweis</Term>, womit was gerechnet wurde: Code, Parameter und Bestandsdaten.
+Der Quick Start läuft in vier Schritten und zeigt drei Tabellen. Jeder <Term id="run">Lauf</Term> hinterlässt außerdem einen <Term id="record">Nachweis</Term>, womit was gerechnet wurde: Code, Parameter und <Term id="input-data">Bestandsdaten</Term>.
 
 </Prose>
 
 <RowList>
-  <Row name="Wo sich die Ergebnisse der beiden Releases unterscheiden">Nach der <Term id="regression">Regression</Term>. Spalten: Größe, Modellpunkte, <Term id="value">Werte</Term>, Perioden.</Row>
+  <Row name="Wo sich die Ergebnisse der beiden Releases unterscheiden">Nach der <Term id="regression">Regression</Term>. Spalten: Größe, Modellpunkte, <Term id="value">Werte</Term>, <Term id="period">Perioden</Term>.</Row>
   <Row name="Was sich zwischen den beiden Releases geändert hat">Nach der Auflistung der Änderungen. Spalten: Nr., Revision, <Term id="class">Einordnung</Term>, Beschreibung.</Row>
   <Row name="Welche Änderungen die Abweichung verursachen">Nach der Suche. Spalten: Revision, Beschreibung, Summe der Abweichung.</Row>
 </RowList>
@@ -77,7 +77,7 @@ Die geführte Vorführung des Quick Starts läuft in vier Schritten und zeigt dr
 
 Sie möchten wissen, was DeltaRecon genau kann, und es ohne technischen Hintergrund ausprobieren: Beginnen Sie mit dem <a href={pageAddress(quickStart, 'de')}>{quickStart.name.de}</a>. Er führt Sie vom Download bis zur ersten Ergebnistabelle.
 
-Regressionstests kosten Ihr Team viel Zeit, und Sie möchten einschätzen, was die Anbindung Ihrer eigenen Engine erfordert: Lesen Sie <a href={pageAddress(howItWorks, 'de')}>{howItWorks.name.de}</a> und danach <a href={pageAddress(requirements, 'de')}>{requirements.name.de}</a>.
+Regressionstests kosten Ihr Team viel Zeit, und Sie möchten einschätzen, was die Anbindung Ihrer eigenen <Term id="engine">Engine</Term> erfordert: Lesen Sie <a href={pageAddress(howItWorks, 'de')}>{howItWorks.name.de}</a> und danach <a href={pageAddress(requirements, 'de')}>{requirements.name.de}</a>.
 
 </Prose>
 

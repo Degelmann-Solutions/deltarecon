@@ -29,7 +29,7 @@ export const requirements = findPage('engine-requirements');
 
 <Prose>
 
-You know the analysis of change from the balance sheet and from Solvency II: a reconciliation from last year to the current state, step by step. DeltaRecon takes as its steps the <Term id="revision">revisions</Term> of the versioned valuation program. Each revision is one change. Between release N and the state N+1 DeltaRecon computes states, compares them, and attributes the <Term id="deviation">deviation</Term> in a quantity to the single revisions that cause it.
+You know the analysis of change from the balance sheet and from Solvency II: a reconciliation from last year to the current <span data-no-term>state</span>, step by step. DeltaRecon takes as its steps the <Term id="revision">revisions</Term> of the versioned valuation program. Each revision is one change. Between <Term id="release">release</Term> N and the <Term id="state">state</Term> N+1 DeltaRecon computes states, compares them, and attributes the <Term id="deviation">deviation</Term> in a <Term id="quantity">quantity</Term> to the single revisions that cause it.
 
 Every result comes from computations and comparisons that give the same result each time. DeltaRecon uses no agents.
 
@@ -53,7 +53,7 @@ The picture shows the example of the quick start on the <Term id="reference-mode
 
 <Prose>
 
-A computer with Windows or Linux. You download one archive and unpack it. Nothing is installed: the package holds everything it needs, including the reference model, a term life insurance with {facts.modelPoints} model points. The reference model demonstrates the mechanics and is not a valuation model; its portfolio is synthetic and holds no client data.
+A computer with Windows or Linux. You download one archive and unpack it. Nothing is installed: the package holds everything it needs, including the reference model, a term life insurance with {facts.modelPoints} <Term id="model-point">model points</Term>. The reference model demonstrates the mechanics and is not a valuation model; its portfolio is synthetic and holds no client data.
 
 </Prose>
 
@@ -61,12 +61,12 @@ A computer with Windows or Linux. You download one archive and unpack it. Nothin
 
 <Prose>
 
-The guided demo of the quick start runs four steps and shows three tables. Each run also leaves a <Term id="record">record</Term> of what was computed with what: code, parameters and portfolio data.
+The guided demo of the quick start <span data-no-term>runs</span> four steps and shows three tables. <Term id="run">Each run</Term> also leaves a <Term id="record">record</Term> of what was computed with what: code, parameters and <Term id="input-data">portfolio data</Term>.
 
 </Prose>
 
 <RowList>
-  <Row name="Where the results of the two releases differ">After the <Term id="regression">regression</Term>. Columns: Quantity, Model points, <Term id="value">Values</Term>, Periods.</Row>
+  <Row name="Where the results of the two releases differ">After the <Term id="regression">regression</Term>. Columns: Quantity, Model points, <Term id="value">Values</Term>, <Term id="period">Periods</Term>.</Row>
   <Row name="What changed between the two releases">After the changes are listed. Columns: No., Revision, <Term id="class">Class</Term>, Description.</Row>
   <Row name="Which changes cause the deviation">After the search. Columns: Revision, Description, Sum of the deviation.</Row>
 </RowList>
@@ -77,7 +77,7 @@ The guided demo of the quick start runs four steps and shows three tables. Each 
 
 You want to know what exactly DeltaRecon can do, and to try it without a technical background: start with the <a href={pageAddress(quickStart, 'en')}>{quickStart.name.en}</a>. It takes you from the download to the first result table.
 
-Regression testing costs your team much time, and you want to judge what connecting your own engine takes: read <a href={pageAddress(howItWorks, 'en')}>{howItWorks.name.en}</a>, then <a href={pageAddress(requirements, 'en')}>{requirements.name.en}</a>.
+Regression testing costs your team much time, and you want to judge what connecting your own <Term id="engine">engine</Term> takes: read <a href={pageAddress(howItWorks, 'en')}>{howItWorks.name.en}</a>, then <a href={pageAddress(requirements, 'en')}>{requirements.name.en}</a>.
 
 </Prose>
 

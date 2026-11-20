@@ -138,10 +138,11 @@ const stepPages = {
     switches: ['first-run'],
     // The number of code excerpts in each step that holds one; a page
     // without `excerpts` must hold none.
-    excerpts: { class: 1, releases: 3, open: 1, session: 2, history: 3 },
+    excerpts: { class: 2, releases: 5, open: 3, session: 7, history: 3 },
     // A code block that is no command: its step and its name per language.
     // A page without `documents` must hold none.
     documents: [
+      { step: 'class', en: 'Skeleton of an adapter', de: 'Gerüst eines Adapters' },
       { step: 'first-run', en: 'Compare request, smallest example', de: 'Vergleichsanfrage, kleinstes Beispiel' },
     ],
     closing: {
@@ -423,7 +424,7 @@ async function checkRegions(page, name, entry, expected, cards) {
   const w = words[entry.lang];
   const regions = await page.evaluate(() =>
     // The code of an excerpt is checked with its figure (checkExcerpts).
-    [...document.querySelectorAll('main pre')].filter((block) => !block.closest('[data-code-excerpt]')).map((block) => ({
+    [...document.querySelectorAll('main pre')].filter((block) => !block.closest('[data-code-excerpt], [data-signature]')).map((block) => ({
       step: block.closest('[data-step]')?.id,
       part: block.closest('[data-platform-part]')?.dataset.platformPart,
       terminal: block.closest('[data-terminal]') !== null,
@@ -486,7 +487,45 @@ async function checkRegions(page, name, entry, expected, cards) {
  * `narrow`: the excerpt stays inside the window and its code scrolls inside
  * its box with the arrow key.
  */
+/**
+ * Folds: a `details` element that is closed when the page opens; the line
+ * that opens it is a `summary` with text, at least 44 px high, that takes
+ * focus and opens the fold with Enter. Leaves every fold open, so that the
+ * checks after it see what the folds hold.
+ */
+async function checkFolds(page, name) {
+  const folds = await page.evaluate(() =>
+    [...document.querySelectorAll('main [data-fold]')].map((fold) => {
+      const summary = fold.querySelector(':scope > summary');
+      return {
+        details: fold.tagName === 'DETAILS',
+        open: fold.open,
+        text: summary?.textContent.trim() ?? '',
+        height: summary?.getBoundingClientRect().height ?? 0,
+      };
+    }),
+  );
+  folds.forEach((fold, index) => {
+    expect(
+      fold.details && !fold.open && fold.text !== '' && fold.height >= 44,
+      `${name}: fold ${index + 1} is no closed details element with a line of at least 44 px that opens it (open: ${fold.open}, "${fold.text}", ${fold.height} px)`,
+    );
+  });
+  if (folds.length > 0) {
+    const first = page.locator('main [data-fold] > summary').first();
+    await first.focus();
+    await page.keyboard.press('Enter');
+    expect(
+      await page.evaluate(() => document.querySelector('main [data-fold]').open && document.activeElement?.tagName === 'SUMMARY'),
+      `${name}: Enter on the line of the first fold does not open it, or the line loses focus`,
+    );
+  }
+  await page.evaluate(() => document.querySelectorAll('main [data-fold]').forEach((fold) => (fold.open = true)));
+  return folds.length;
+}
+
 async function checkExcerpts(page, name, expected, narrow) {
+  await checkFolds(page, name);
   const found = await page.evaluate(() =>
     [...document.querySelectorAll('main [data-code-excerpt]')].map((figure) => {
       const pre = figure.querySelector('pre');
@@ -500,7 +539,13 @@ async function checkExcerpts(page, name, expected, narrow) {
         // The wide part of the card, below its two columns.
         wide: slot !== null,
         width: figure.getBoundingClientRect().width,
-        slotWidth: slot?.getBoundingClientRect().width ?? 0,
+        // Inside a fold the width to fill is that of what the fold holds.
+        slotWidth: (() => {
+          const body = figure.closest('.fold-body');
+          if (!body) return slot?.getBoundingClientRect().width ?? 0;
+          const padding = getComputedStyle(body);
+          return body.getBoundingClientRect().width - Number.parseFloat(padding.paddingLeft) - Number.parseFloat(padding.paddingRight);
+        })(),
         inside: figure.getBoundingClientRect().right <= document.documentElement.clientWidth,
         buttons: figure.querySelectorAll('button, [data-copy], [data-copy-button]').length,
         region: pre && {
@@ -922,8 +967,10 @@ async function checkCopy(browser, origin, entry, expected, cards) {
           ...(expected.terminal.includes(step) ? [step] : []),
         ])
       : [...withCommand, ...expected.terminal];
-    // A code block that is no command stands after the commands of its page.
+    // A code block that is no command stands in its step, after the commands
+    // of that step; the documents are named in the order of the page.
     steps.push(...expected.documents.map((entry) => entry.step));
+    steps.sort((first, second) => expected.anchors.indexOf(first) - expected.anchors.indexOf(second));
     let documents = 0;
     expect(
       buttons.map((button) => button.step).join() === steps.join(),
@@ -1229,6 +1276,11 @@ async function checkStepPage(browser, origin, entry, expected) {
     );
     await page.screenshot({ path: path.join(shots, `${kind}-desktop-${entry.lang}.png`), fullPage: true });
     await checkExcerpts(page, name, expected, false);
+    // The folds are open now: what they hold is checked like the rest.
+    if ((await page.locator('main [data-fold]').count()) > 0) {
+      await checkAxe(page, `${name}, folds open`);
+      await checkNoSidewaysScroll(page, `${name}, folds open`);
+    }
     expect(errors.length === 0, `${name}: script errors: ${errors.join(' | ')}`);
     await context.close();
   }

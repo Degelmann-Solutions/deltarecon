@@ -1,0 +1,52 @@
+---
+// The contact block, the last part of "When something goes wrong": e-mail,
+// phone and address of the imprint of the company website (`contact` in
+// src/site.ts), and what the reader is asked to tell.
+//
+//   <ContactBlock tag="Contact" title="Write to us or call">
+//
+//   So that we can help, please tell us:
+//
+//   - the release, for example {tag}
+//   - …
+//
+//   </ContactBlock>
+//
+// The e-mail address is a link; phone and address are text. The content is
+// the short list of what to tell. Its navy border marks the block as the
+// box that carries the main fact of its page. The build fails without
+// `tag`, `title` or content.
+import { contact, texts } from '../site';
+import { pageLanguage } from '../markup';
+
+interface Props {
+  /** The mono tag above the title. */
+  tag: string;
+  /** The title, a level-3 heading. */
+  title: string;
+}
+
+const { tag, title } = Astro.props;
+const where = Astro.url.pathname;
+const t = texts[pageLanguage(where)];
+if (!tag || !title) {
+  throw new Error(`${where}: the contact block lacks "tag" or "title".`);
+}
+if (!Astro.slots.has('default')) {
+  throw new Error(`${where}: the contact block does not say what to tell.`);
+}
+---
+
+<div class="contact-block" data-contact>
+  <p class="contact-tag">{tag}</p>
+  <h3 class="contact-title">{title}</h3>
+  <dl class="contact-list">
+    <dt>{t.contactEmail}</dt>
+    <dd translate="no" data-contact-email><a href={`mailto:${contact.email}`}>{contact.email}</a></dd>
+    <dt>{t.contactPhone}</dt>
+    <dd translate="no" data-contact-phone>{contact.phone}</dd>
+    <dt>{t.contactAddress}</dt>
+    <dd class="contact-address" translate="no" data-contact-address>{contact.address.join(', ')}</dd>
+  </dl>
+  <div class="contact-tell prose-links" data-contact-tell><slot /></div>
+</div>

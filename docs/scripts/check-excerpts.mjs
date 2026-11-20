@@ -10,7 +10,11 @@
 //     character, the lines its head row names of its file at the tag
 //     (`git show v<release>:<file>`); the head row names the file, the lines
 //     and the tag;
-//   - a row marked as a member of the protocol (Row with `member`): the name
+//   - the signature of a member card (Member.astro): its code is, line for
+//     line, the lines it names of its file at the tag, without the
+//     indentation those lines share;
+//   - a row or a member card marked as a member of the protocol (Row with
+//     `member`, Member with `of`): the name
 //     is a member of that class in degelmann/deltarecon/protocol.py at the
 //     tag, a method or an annotated attribute; a row with a tag (as
 //     "optional") may instead name an operation that the comment of the class
@@ -85,6 +89,32 @@ function tagFault(tag, holds) {
   return holds(`refs/tags/${tag}`)
     ? null
     : `the tag ${tag} of the release (src/release.json) is not a tag of the local repository; fetch it (git fetch --tags)`;
+}
+
+/**
+ * What is wrong with the signature of a member card: its code is, line for
+ * line, the lines it names of its file at the tag, without the indentation
+ * those lines share.
+ */
+function signatureFaults(found, tag, source) {
+  const which = `signature "${found.key}" (${found.file}, lines ${found.first} to ${found.last})`;
+  const lines = source(found.file);
+  if (!lines) return [`${which}: ${tag} holds no file ${found.file}`];
+  if (!(Number.isInteger(found.first) && Number.isInteger(found.last) && found.first >= 1 && found.last >= found.first && found.last <= lines.length)) {
+    return [`${which}: these are no lines of the file at ${tag}`];
+  }
+  const named = lines.slice(found.first - 1, found.last);
+  const shared = Math.min(...named.filter((line) => line.trim() !== '').map((line) => line.length - line.trimStart().length));
+  const expected = named.map((line) => line.slice(shared)).join('\n');
+  if (found.code !== expected) {
+    return [`${which}: the file holds ${JSON.stringify(expected)} at ${tag}, the page shows ${JSON.stringify(found.code)}`];
+  }
+  // The lines are the signature of the member the key names, and all of it.
+  const name = found.key.includes('.') ? found.key.split('.').pop() : '__init__';
+  const faults = [];
+  if (!new RegExp(`^(def ${name}\\(|${name}:)`).test(expected)) faults.push(`${which}: these lines are not the signature of "${name}"`);
+  if (expected.startsWith('def ') && !/:\s*(#.*)?$/.test(expected)) faults.push(`${which}: the signature does not end in these lines`);
+  return faults;
 }
 
 /**
@@ -324,10 +354,20 @@ function readPage(page) {
         head: text(figure.querySelector('[data-code-excerpt-head]')).replace(/\s+/g, ' ').trim(),
         code: text(figure.querySelector('pre code')),
       })),
+      signatures: [...document.querySelectorAll('main [data-signature]')].map((block) => ({
+        key: block.dataset.signature,
+        file: block.dataset.file ?? '',
+        first: Number(block.dataset.first),
+        last: Number(block.dataset.last),
+        code: text(block.querySelector('code')),
+      })),
       members: [...document.querySelectorAll('main [data-member]')].map((code) => ({
         member: code.dataset.member,
         shown: text(code).trim(),
-        tagged: Boolean(code.closest('[data-row]')?.querySelector('[data-row-tag]')),
+        tagged: Boolean(
+          code.closest('[data-row]')?.querySelector('[data-row-tag]') ??
+            code.closest('.member-title')?.querySelector('[data-member-tag]'),
+        ),
       })),
       selections: [...document.querySelectorAll('main [data-selection]')].map((code) => text(code).trim()),
       unmarked: [...document.querySelectorAll('main [data-row] .row-name code')].filter((code) => !marked(code)).map((code) => text(code).trim()),
@@ -347,7 +387,7 @@ function readPage(page) {
 const proved = proveItself();
 const release = await loadRelease();
 const tag = `v${release}`;
-const totals = { pages: 0, excerpts: 0, members: 0, selections: 0, counts: 0, yardsticks: 0, complete: 0 };
+const totals = { pages: 0, excerpts: 0, signatures: 0, members: 0, selections: 0, counts: 0, yardsticks: 0, complete: 0 };
 
 const missing = tagFault(tag, (ref) => git('rev-parse', '--quiet', '--verify', `${ref}^{commit}`) !== null);
 if (missing) {
@@ -383,6 +423,7 @@ if (missing) {
       const found = await readPage(page);
       const faults = [
         ...found.excerpts.flatMap((excerpt) => excerptFaults(excerpt, tag, source)),
+        ...found.signatures.flatMap((signature) => signatureFaults(signature, tag, source)),
         ...(protocol ? found.members.flatMap((member) => memberFaults(member, tag, protocol)) : []),
         ...(selection ? found.selections.flatMap((shown) => selectionFaults(shown, tag, selection)) : []),
         ...found.counts.flatMap((count) => countFaults(count, tag, source)),
@@ -400,9 +441,9 @@ if (missing) {
         totals.complete += 1;
       }
       failures.push(...faults.map((fault) => `${entry.address}: ${fault}`));
-      const held = found.excerpts.length + found.members.length + found.selections.length + found.counts.length + found.yardsticks.length;
+      const held = found.excerpts.length + found.signatures.length + found.members.length + found.selections.length + found.counts.length + found.yardsticks.length;
       if (held > 0) totals.pages += 1;
-      for (const part of ['excerpts', 'members', 'selections', 'counts', 'yardsticks']) totals[part] += found[part].length;
+      for (const part of ['excerpts', 'signatures', 'members', 'selections', 'counts', 'yardsticks']) totals[part] += found[part].length;
     }
     await context.close();
   } catch (error) {
@@ -423,5 +464,5 @@ if (missing) {
 }
 
 report(
-  `${proved} cases on its own texts; at ${tag}: ${totals.excerpts} excerpts, ${totals.members} members of the protocol, ${totals.selections} names of the engine selection, ${totals.counts} numbers of lines and ${totals.yardsticks} yardstick boxes on ${totals.pages} pages; ${totals.complete} pages name every member of ${CLASSES.join(' and ')} once; ${PROTOCOL} and ${SELECTION} are the same on ${MAIN}`,
+  `${proved} cases on its own texts; at ${tag}: ${totals.excerpts} excerpts, ${totals.signatures} signatures, ${totals.members} members of the protocol, ${totals.selections} names of the engine selection, ${totals.counts} numbers of lines and ${totals.yardsticks} yardstick boxes on ${totals.pages} pages; ${totals.complete} pages name every member of ${CLASSES.join(' and ')} once; ${PROTOCOL} and ${SELECTION} are the same on ${MAIN}`,
 );

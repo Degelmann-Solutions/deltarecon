@@ -1,0 +1,135 @@
+---
+layout: ../../layouts/Page.astro
+lang: en
+page: tolerance-profile
+lead: "A tolerance profile sets for each quantity which difference a comparison does not count as a deviation. This page explains the form of the file and the rule behind it, and shows how to write and use a profile of your own."
+description: "How to write a tolerance profile for DeltaRecon: the form of the JSON file, the rule by which a value deviates, an example to copy, and what a command refuses in a profile."
+---
+import CodeBlock from '../../components/CodeBlock.astro';
+import PlatformSwitch from '../../components/PlatformSwitch.astro';
+import Prose from '../../components/Prose.astro';
+import Row from '../../components/Row.astro';
+import RowList from '../../components/RowList.astro';
+import SectionHeading from '../../components/SectionHeading.astro';
+import Term from '../../components/Term.astro';
+import { findPage, pageAddress } from '../../site';
+import { DERIVATION, example, packaged, quantities, search } from '../../toleranceProfile';
+
+export const own = findPage('own-calculations');
+export const single = findPage('single-commands');
+export const quickStart = findPage('quick-start');
+// Inline code of this page names members of the file, options, files and
+// messages of the program: none of it is to be translated.
+export const components = { code: (props) => <code translate="no" {...props} /> };
+// A command of the package, as a link to its section on "Single commands".
+export const command = (name) => (
+  <a href={`${pageAddress(single, 'en')}#${name}`}><code translate="no">{name}</code></a>
+);
+
+<SectionHeading id="what">What a tolerance profile sets</SectionHeading>
+
+<Prose>
+
+A <Term id="tolerance-profile">tolerance profile</Term> sets for each <Term id="quantity">quantity</Term> how far a <Term id="value">value</Term> of the newer result may lie above and below the value of the older one before the difference counts as a <Term id="deviation">deviation</Term>. It is a file in JSON. You hand it with the option `--tolerance` to one of the commands {command('replay')}, {command('regression')}, {command('walk')} and {command('search')}. {command('compare')} takes the profile from its <Term id="compare-request">compare request</Term>, where it stands under `tolerance`.
+
+There is no general tolerance and no profile that holds by itself. Without `--tolerance` each of these commands compares exactly, and a quantity that has no entry in the profile is compared exactly.
+
+A tolerance is what a comparison deliberately does not see. So every rounding and every bound above zero comes with a derivation: a sentence, or a reference to a document, that says where the number comes from. The result of a comparison holds the profile with its derivations; whoever reads the result sees what was compared with.
+
+</Prose>
+
+<SectionHeading id="file">The form of the file</SectionHeading>
+
+<Prose>
+
+The package holds a tolerance profile in the folder `profiles`, the file `tolerance-bruttobeitrag.json`. The search of the <a href={pageAddress(quickStart, 'en')}>{quickStart.name.en}</a> compares under it. It has one entry, for the <Term id="bruttobeitrag" />:
+
+</Prose>
+
+<CodeBlock lines={packaged} label="Tolerance profile of the package" />
+
+<Prose>
+
+The members of the file:
+
+</Prose>
+
+<RowList>
+  <Row name="The quantities" code="per_quantity">One entry per quantity that has a tolerance, under the name of the quantity. The list may be empty; then every quantity is compared exactly.</Row>
+  <Row name="The upper bound" code="upper">How far the newer value may lie above the older one.</Row>
+  <Row name="The lower bound" code="lower">How far the newer value may lie below the older one.</Row>
+  <Row name="The absolute part of a bound" code="abs_tol">A number in the unit of the quantity, in the example `0.01` for one cent.</Row>
+  <Row name="The relative part of a bound" code="rel_tol">A share of the larger of the two absolute values that are compared; `0.001` stands for one per mille.</Row>
+  <Row name="The decimal places" code="decimals" tag="optional">An integer from 0 to 15. Both values are rounded to that many decimal places before they are compared.</Row>
+  <Row name="The derivation" code="derivation">Where the decimal places and the bounds come from, as text or as a reference to a document. It is required as soon as the entry rounds or a part of a bound is above zero.</Row>
+</RowList>
+
+<Prose>
+
+Every entry needs both bounds, and every bound both parts; a part that is not to hold is `0`. No part is negative. Numbers are written with a point as the decimal mark.
+
+For `replay` and `regression` the older value is that of the <Term id="run">recorded run</Term>, and the newer one that of the run the command computes. `walk` and `search` compare two <Term id="state">states</Term> of the <Term id="history">history</Term>; the older one is the earlier state.
+
+</Prose>
+
+<SectionHeading id="rule">When a value deviates</SectionHeading>
+
+<Prose>
+
+When the entry of a quantity has `decimals`, both values are rounded first, commercially: a 5 rounds away from zero. Then the comparison forms the difference “newer value minus older value”.
+
+Each bound is the larger of its two parts: the absolute part, or the relative part times the larger of the two absolute values. The value deviates when the difference is greater than the upper bound, or when it lies further below zero than the lower bound.
+
+</Prose>
+
+<RowList>
+  <Row name="Exactly at the bound is no deviation">A difference that is exactly as large as its bound does not count. With an upper bound of `0.25`, 100.25 does not deviate from 100.</Row>
+  <Row name="The two bounds hold separately">With an upper bound of `0.25` and a lower bound of `0`, 100 deviates from 100.25: the newer value lies below the older one, and for that the lower bound holds. A profile with equal bounds compares alike in both directions.</Row>
+  <Row name="The relative part grows with the value">With a relative part of `0.001`, 1201 does not deviate from 1200: the bound is 0.001 times 1201, that is 1.201.</Row>
+  <Row name="Rounding does not hide a rounding step">With two decimal places, 0.6972 and 0.6974 both give 0.70 and do not deviate. 0.6949 and 0.6951 give 0.69 and 0.70 and deviate, although they lie closer together.</Row>
+  <Row name="Round first, then compare exactly">For a quantity with defined decimal places the first choice is to round and to compare exactly: `decimals` with both bounds at zero. A bound above zero is for what remains after that.</Row>
+  <Row name="Per quantity, and no finer">A tolerance holds for every value of its quantity. There is no tolerance per <Term id="model-point">model point</Term>, per <Term id="period">period</Term> or per tariff.</Row>
+</RowList>
+
+<SectionHeading id="write">Write a profile of your own</SectionHeading>
+
+<Prose>
+
+Create a new text file, for example `mein-profil.json` in the folder `profiles` of the <Term id="package-folder">package folder</Term>. Place and name are a free choice. The example rounds the commissions, <code lang="de" translate="no">Provisionen</code>, to two decimal places and then compares them exactly:
+
+</Prose>
+
+<CodeBlock lines={example('en')} label="Tolerance profile, example" />
+
+<Prose>
+
+Replace <code translate="no">{DERIVATION.en}</code> with your derivation; with an empty derivation this profile is refused. For every further quantity add a further entry, separated by a comma.
+
+Write the name of a quantity exactly as the results give it, in the first line of `results.csv`. The quantities of the <Term id="reference-model">reference model</Term>: {quantities.map((name, index) => <>{index > 0 && ', '}<code data-quantity lang="de" translate="no">{name}</code></>)}.
+
+This search is the search for the commissions of <a href={`${pageAddress(own, 'en')}#other-quantity`}>{own.name.en}</a>, now with your profile. You set the variable `Q` with the folder of the quick start there, in step 1.
+
+</Prose>
+
+<PlatformSwitch place="search" windows={search.windows} linux={search.linux} />
+
+<Prose>
+
+The result `search.result.json` in the new folder holds your profile with the derivation.
+
+</Prose>
+
+<SectionHeading id="faults">When a profile is refused</SectionHeading>
+
+<Prose>
+
+A command checks the profile before it computes. When it finds a fault, it ends with <Term id="exit-status">exit status</Term> 2, names the file and the fault and writes nothing.
+
+</Prose>
+
+<RowList>
+  <Row name="The file does not exist">The message holds `no tolerance file at`. Check the path after `--tolerance`.</Row>
+  <Row name="The file is no valid JSON">The message holds `is not JSON` and names line and column. Often a quotation mark or a comma is missing, or there is a comma too many.</Row>
+  <Row name="The form is not right">The message holds `violates its schema at` and names the place: a bound or a part is missing, a part is negative, or the derivation is missing although the entry rounds or a part is above zero.</Row>
+  <Row name="A quantity is unknown">The message names the name and ends with `which the run does not declare`. Compare the name with the first line of `results.csv`.</Row>
+</RowList>

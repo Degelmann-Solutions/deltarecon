@@ -27,7 +27,7 @@
 import { execFileSync, spawnSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { existsSync } from 'node:fs';
-import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import { chromium } from 'playwright';
@@ -79,7 +79,7 @@ function run(line) {
 
 /** What the last step of the page shows. */
 function readStep(page) {
-  return page.evaluate((step) => {
+  return page.evaluate(([step, skeletonStep]) => {
     const card = document.getElementById(step);
     const commands = (platform) =>
       (card?.querySelector(`[data-platform-switch] > [data-platform-part="${platform}"] [data-copy]`)?.dataset.copy ?? '')
@@ -91,13 +91,58 @@ function readStep(page) {
       linux: commands('linux'),
       files: [...(card?.querySelectorAll('[data-file-list] [data-file-name]') ?? [])].map((file) => file.textContent.trim()),
       document: card?.querySelector('[data-document]')?.dataset.copy ?? '',
+      skeleton: document.querySelector(`#${skeletonStep} [data-document]`)?.dataset.copy ?? '',
       text: document.querySelector('main')?.innerHTML ?? '',
     };
-  }, STEP);
+  }, [STEP, SKELETON_STEP]);
+}
+
+/** The step that holds the skeleton of an adapter, and the names it is saved and loaded under. */
+const SKELETON_STEP = 'class';
+const SKELETON = { file: 'my_engine.py', module: 'my_engine', engine: 'MyEngine', session: 'MySession' };
+/**
+ * Loads the skeleton with the protocol of the checkout: it is Python that
+ * imports, its class is called without and with a worker count, and both
+ * classes hold every member of `Engine` and `Session` of the protocol.
+ */
+const LOAD_SKELETON = `
+import inspect, sys
+sys.path.insert(0, sys.argv[1])
+import ${SKELETON.module} as module
+from degelmann.deltarecon import protocol
+for wanted, own in ((protocol.Engine, module.${SKELETON.engine}), (protocol.Session, module.${SKELETON.session})):
+    names = set(getattr(wanted, "__annotations__", {})) | {name for name, value in vars(wanted).items() if inspect.isfunction(value)}
+    missing = sorted(name for name in names if not name.startswith("_") and not hasattr(own, name))
+    assert not missing, f"{own.__name__} lacks {missing}"
+    for name in sorted(names):
+        asked = getattr(wanted, name, None)
+        if name.startswith("_") or not inspect.isfunction(asked):
+            continue
+        given = getattr(own, name)
+        given = getattr(given, "__wrapped__", given)
+        want = [(p.name, p.default is not p.empty) for p in inspect.signature(asked).parameters.values()]
+        have = [(p.name, p.default is not p.empty) for p in inspect.signature(given).parameters.values()]
+        assert want == have, f"{own.__name__}.{name} takes {have}, the protocol {want}"
+module.${SKELETON.engine}()
+module.${SKELETON.engine}(4)
+`;
+
+async function checkSkeleton(name, shown, folder) {
+  expect(shown.skeleton !== '', `${name}, step "${SKELETON_STEP}": no skeleton to copy`);
+  if (shown.skeleton === '') return;
+  const place = path.join(folder, 'skeleton');
+  await mkdir(place, { recursive: true });
+  await writeFile(path.join(place, SKELETON.file), `${shown.skeleton}\n`);
+  const loaded = spawnSync('uv', ['run', 'python', '-c', LOAD_SKELETON, place], { cwd: repository, encoding: 'utf8' });
+  expect(
+    loaded.status === 0,
+    `${name}, step "${SKELETON_STEP}": the skeleton does not load, or lacks a member of the protocol:\n      ${`${loaded.stdout ?? ''}${loaded.stderr ?? ''}${loaded.error ? loaded.error.message : ''}`.trim().split('\n').join('\n      ')}`,
+  );
 }
 
 /** The first run of one page: both commands, twice, and the comparison. */
 async function checkPage(name, shown, folder) {
+  await checkSkeleton(name, shown, folder);
   expect(shown.found, `${name}: no step "${STEP}"`);
   expect(!NAMED.test(shown.text), `${name}: the page names the engine this script runs (${NAMED})`);
   expect(

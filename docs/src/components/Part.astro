@@ -1,0 +1,20 @@
+---
+// A part of a member card: a small label ("You are given", "You give back",
+// "You report") and under it what belongs to it, as text or as a list.
+//
+//   <Part label="You are given">
+//
+//   - `stage`: the stage of the request.
+//
+//   </Part>
+interface Props {
+  label: string;
+}
+
+const { label } = Astro.props;
+---
+
+<div class="member-part" data-member-part>
+  <p class="list-label" data-no-term>{label}</p>
+  <div class="member-part-text"><slot /></div>
+</div>

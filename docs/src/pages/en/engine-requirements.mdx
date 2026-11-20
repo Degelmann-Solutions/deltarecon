@@ -34,9 +34,9 @@ export const components = { code: (props) => <code translate="no" {...props} /> 
 
 <Prose>
 
-DeltaRecon does not calculate anything itself. It asks a calculation engine a fixed set of questions, the protocol, and works with the answers. To connect your engine you build one connection, the <Term id="adapter">adapter</Term>, which answers these questions for your engine. The adapter is a <span data-no-term>class</span> in Python. Your engine itself stays unchanged.
+DeltaRecon does not calculate anything itself. It asks a calculation <Term id="engine">engine</Term> a fixed set of questions, the <Term id="protocol">protocol</Term>, and works with the answers. To connect your engine you build one connection, the <Term id="adapter">adapter</Term>, which answers these questions for your engine. The adapter is a <span data-no-term>class</span> in Python. Your engine itself stays unchanged.
 
-For this, your engine must be able to give three things. For a release: its model points and the projection of each, with one <Term id="value">value</Term> per quantity and period, and its parameters. For two releases: the history between them as single <Term id="revision">revisions</Term>, each with what it touches: data, parameters or code. And for each revision of that history: the state of the model after it, so that DeltaRecon can have that state computed.
+For this, your engine must be able to give three things. For a <Term id="release">release</Term>: its <Term id="model-point">model points</Term> and the projection of each, with one <Term id="value">value</Term> per <Term id="quantity">quantity</Term> and <Term id="period">period</Term>, and its parameters. For two releases: the <Term id="history">history</Term> between them as single <Term id="revision">revisions</Term>, each with what it touches: data, parameters or code. And for each revision of that history: the <Term id="state">state</Term> of the model after it, so that DeltaRecon can have that state computed.
 
 The yardstick for the size of such a connection is the connection of the <Term id="reference-model">reference model</Term>, which is part of the package: one file of {lines(files.connection)} lines, comments and blank lines included.
 
@@ -57,7 +57,7 @@ The yardstick for the size of such a connection is the connection of the <Term i
 
 <Prose>
 
-For one release, opened for a run, the connection must be able to give:
+For one release, opened for <Term id="run">a run</Term>, the connection must be able to give:
 
 </Prose>
 
@@ -82,7 +82,7 @@ One <span data-no-term>class</span> with four statements about itself and seven 
 <RowList>
   <Row name="The stages it supports, with their quantities" code="stages" member="Engine">For each stage the domain reference, the text that says what its quantities mean, and the names of the quantities in the order of that text.</Row>
   <Row name="The kinds of change it can apply" code="realisations" member="Engine">For example a revision of its own history.</Row>
-  <Row name="What one revision fixes" code="determines" member="Engine">The parts of a release that one revision determines. For the reference model these are the code, the parameters and the input data.</Row>
+  <Row name="What one revision fixes" code="determines" member="Engine">The parts of a release that one revision determines. For the reference model these are the code, the parameters and the <Term id="input-data">input data</Term>.</Row>
   <Row name="What it can hold while revisions are applied" code="holdable" member="Engine">The parts of a release that can stay as the request names them while revisions are applied. For the reference model this is the input data.</Row>
 </RowList>
 
@@ -105,7 +105,7 @@ One <span data-no-term>class</span> with four statements about itself and seven 
   <Row name="Project one model point" code="project" member="Session">It reports a model point that cannot be calculated as such.</Row>
   <Row name="Give its parameters" code="parameters" member="Session">As in the first list of this page.</Row>
   <Row name="Project several model points at once" code="project_many" member="Session" tag="optional">Without it DeltaRecon projects point by point.</Row>
-  <Row name="Project a target only" code="project_target" member="Session" tag="optional">Chosen quantities in chosen periods. Without it the engine cannot compute a run on a target alone, which a search with `--target-only` needs.</Row>
+  <Row name="Project a target only" code="project_target" member="Session" tag="optional">Chosen quantities in chosen periods. Without it the engine cannot compute a run on a <Term id="target">target</Term> alone, which a search with `--target-only` needs.</Row>
 </RowList>
 
 <SectionHeading id="size">How large is that?</SectionHeading>

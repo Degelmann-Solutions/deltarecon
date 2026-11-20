@@ -2,7 +2,7 @@
 // `npm run check`.
 //
 // The built pages (every index.html under dist/, outside the search index)
-// must be exactly the 20 pages of the page register and three more: the
+// must be exactly the 22 pages of the page register and three more: the
 // page-not-found page of each language and the root page. For each page of
 // the register it asserts, in Chromium with JavaScript off:
 //   - the title "page name – DeltaRecon documentation", unique on the site;

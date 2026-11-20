@@ -25,6 +25,6 @@ const lang = pageLanguage(Astro.url.pathname);
 <div class="callout" data-callout>
   <p class="callout-tag">{tag}</p>
   <h3 class="callout-title">{title}</h3>
-  {quote.map((message) => <p class="callout-quote" data-capture="not-resolved" lang={quoteLang === lang ? undefined : quoteLang} set:html={outputHtml(message, lang)} />)}
+  {quote.map((message) => <p class="callout-quote" data-no-term data-capture="not-resolved" lang={quoteLang === lang ? undefined : quoteLang} set:html={outputHtml(message, lang)} />)}
   <div class="callout-text prose-links"><slot /></div>
 </div>
