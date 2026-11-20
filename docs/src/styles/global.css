@@ -1936,6 +1936,12 @@
     content: none;
   }
 
+  /* On the phone the tag of such a row stands below its text, in the one
+     column the row has. */
+  .row-list-plain > .row > .row-tag {
+    grid-column: 1;
+  }
+
   /* The kind of the rows of a list, or the name of a synopsis: a small
      label above the block it names. */
   .list-label {
@@ -2110,6 +2116,10 @@
 
     .row-list-plain > .row {
       grid-template-columns: minmax(0, 1fr) auto;
+    }
+
+    .row-list-plain > .row > .row-tag {
+      grid-column: auto;
     }
 
     .row-tag {

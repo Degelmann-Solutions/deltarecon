@@ -30,7 +30,7 @@ export const command = (name) => (
 
 <Prose>
 
-A <Term id="tolerance-profile">tolerance profile</Term> sets for each <Term id="quantity">quantity</Term> how far a <Term id="value">value</Term> of the newer result may lie above and below the value of the older one before the difference counts as a <Term id="deviation">deviation</Term>. It is a file in JSON. You hand it with the option `--tolerance` to one of the commands {command('replay')}, {command('regression')}, {command('walk')} and {command('search')}.
+A <Term id="tolerance-profile">tolerance profile</Term> sets for each <Term id="quantity">quantity</Term> how far a <Term id="value">value</Term> of the newer result may lie above and below the value of the older one before the difference counts as a <Term id="deviation">deviation</Term>. It is a file in JSON. You hand it with the option `--tolerance` to one of the commands {command('replay')}, {command('regression')}, {command('walk')} and {command('search')}. {command('compare')} takes the profile from its <Term id="compare-request">compare request</Term>, where it stands under `tolerance`.
 
 There is no general tolerance and no profile that holds by itself. Without `--tolerance` each of these commands compares exactly, and a quantity that has no entry in the profile is compared exactly.
 
@@ -105,7 +105,7 @@ Create a new text file, for example `mein-profil.json` in the folder `profiles` 
 
 Replace <code translate="no">{DERIVATION.en}</code> with your derivation; with an empty derivation this profile is refused. For every further quantity add a further entry, separated by a comma.
 
-Write the name of a quantity exactly as the results give it, in the first line of `results.csv`. The quantities of the <Term id="reference-model">reference model</Term>: {quantities.map((name, index) => <>{index > 0 && ', '}<code lang="de" translate="no">{name}</code></>)}.
+Write the name of a quantity exactly as the results give it, in the first line of `results.csv`. The quantities of the <Term id="reference-model">reference model</Term>: {quantities.map((name, index) => <>{index > 0 && ', '}<code data-quantity lang="de" translate="no">{name}</code></>)}.
 
 This search is the search for the commissions of <a href={`${pageAddress(own, 'en')}#other-quantity`}>{own.name.en}</a>, now with your profile. You set the variable `Q` with the folder of the quick start there, in step 1.
 
@@ -128,7 +128,7 @@ A command checks the profile before it computes. When it finds a fault, it ends 
 </Prose>
 
 <RowList>
-  <Row name="The file does not exist">The message begins with `no tolerance file at`. Check the path after `--tolerance`.</Row>
+  <Row name="The file does not exist">The message holds `no tolerance file at`. Check the path after `--tolerance`.</Row>
   <Row name="The file is no valid JSON">The message holds `is not JSON` and names line and column. Often a quotation mark or a comma is missing, or there is a comma too many.</Row>
   <Row name="The form is not right">The message holds `violates its schema at` and names the place: a bound or a part is missing, a part is negative, or the derivation is missing although the entry rounds or a part is above zero.</Row>
   <Row name="A quantity is unknown">The message names the name and ends with `which the run does not declare`. Compare the name with the first line of `results.csv`.</Row>

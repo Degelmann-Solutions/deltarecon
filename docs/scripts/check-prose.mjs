@@ -586,7 +586,8 @@ async function checkHeadings(page, name, listed) {
   const others = await page.evaluate(
     (ids) =>
       [...document.querySelectorAll('a[href^="#"]')]
-        .filter((link) => ids.includes(link.getAttribute('href').slice(1)) && !link.closest('h2'))
+        // A link of the list of sections of the tree counts whatever it names.
+        .filter((link) => (ids.includes(link.getAttribute('href').slice(1)) || link.closest('#chapters [data-tree-sections]')) && !link.closest('h2'))
         .map((link) => ({
           href: link.getAttribute('href'),
           content: link.closest('main [data-row], main [data-prose], main [data-callout]') !== null,
@@ -624,10 +625,12 @@ async function checkHeadings(page, name, listed) {
           continue;
         } else if (part.matches('a')) {
           const target = part.getAttribute('href').slice(1);
-          if (commands.includes(target)) found.push({ section, command: target, link: target, own: target === section });
+          const named = part.querySelector('code')?.textContent;
+          if (commands.includes(target) && !(named && commands.includes(named) && named !== target)) found.push({ section, command: target, link: target, own: target === section });
         } else if (commands.includes(part.textContent) && !part.closest('.row-name')) {
           const link = part.closest('a')?.getAttribute('href')?.slice(1);
-          if (!link || !commands.includes(link)) found.push({ section, command: part.textContent, link, own: part.textContent === section });
+          // In a link to another section the name is recorded here; the link itself above.
+          if (link !== part.textContent) found.push({ section, command: part.textContent, link, own: part.textContent === section });
         }
       }
       return found;

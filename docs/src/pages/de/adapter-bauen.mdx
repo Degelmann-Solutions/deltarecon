@@ -109,7 +109,7 @@ Beginnen Sie mit diesem Gerüst. Es enthält beide Klassen mit jedem Teil des Pr
 
 <CodeBlock lines={skeleton('de')} label="Gerüst eines Adapters" />
 
-Die Karten unten gehen das Gerüst von oben nach unten durch, in der Reihenfolge der Schritte.
+Die Karten unten gehen die Teile in der Reihenfolge der Schritte durch. Die Klasse `MySession` am Anfang des Gerüsts gehört zu Schritt 4.
 
 </div>
 
@@ -119,7 +119,7 @@ DeltaRecon ruft Ihre Klasse mit der Zahl der Arbeitsprozesse als einzigem, optio
 
 <Part label={GET}>
 
-- `workers`: `None`, wenn der Befehl kein `--workers` nennt; die Zahl `N` bei `--workers N`; und 1 bei `request` und `derive`, die keinen <Term id="model-point">Modellpunkt</Term> projizieren.
+- `workers`: kein Argument, wenn der Befehl kein `--workers` nennt, geben Sie dem Parameter deshalb eine Voreinstellung wie `None`; die Zahl `N` bei `--workers N`; und 1 bei `request` und `derive`, die keinen <Term id="model-point">Modellpunkt</Term> projizieren.
 
 </Part>
 
@@ -459,6 +459,7 @@ Die Operation ist ein Kontextmanager: Sie gibt das geöffnete Release heraus und
 - Ohne eingeschaltete Änderungen stellen Sie den Stand wieder her, den `release` nennt.
 - Bei Änderungen der Art `revision` stellen Sie den Stand nach der letzten eingeschalteten Revision wieder her. Die Arten in `hold` nehmen Sie dabei aus `release`.
 - Stellen Sie den Stand in einem neuen Ordner im temporären Ordner des Systems wieder her, dessen Name mit `SCRATCH_PREFIX` beginnt.
+- Einen Textpatch erhalten Sie nur, wenn Ihre Engine `text_patch` unter `realisations` nennt. Was ein Eintrag von `enabled` enthält und wie ein Textpatch angewendet wird, beschreibt `contracts/v3/changes.md` im Repository.
 
 </Part>
 
@@ -523,7 +524,13 @@ Ein Attribut: der Name der Zeitbasis, also dessen, was eine Periode zählt.
 
 <Part label={SET}>
 
-Einen Namen, den die fachliche Beschreibung der Stufe erklärt. Zwei Läufe lassen sich nur vergleichen, wenn sie dieselbe Zeitbasis nennen.
+Einen Namen, den die fachliche Beschreibung der Stufe erklärt.
+
+</Part>
+
+<Part label={USE}>
+
+Ein Vergleich bringt beide Läufe zuerst auf Projektionsperioden. Bei der Zeitbasis `policy_month`, deren Perioden ab dem Beginn des Vertrags zählen, zieht er dafür von jeder Periode eines Modellpunkts dessen erste ausgegebene Periode ab. Bei jedem anderen Namen nimmt er die Perioden, wie Ihre Engine sie ausgibt.
 
 </Part>
 
@@ -559,9 +566,11 @@ Eine Liste von Paaren `(Name, Einheit)`. Jeder Name muss einer der Namen sein, d
 
 <Member name="Die Kennungen der Modellpunkte liefern" code="model_point_ids" of="Session">
 
+Jeder Lauf fragt zuerst, welche Modellpunkte das Release enthält.
+
 <Part label={GIVE}>
 
-Eine Liste von Zeichenketten: die öffentliche Kennung jedes Modellpunkts des Release, in der Reihenfolge Ihrer Engine. Eine Kennung, die das Release mehrmals enthält, liefern Sie mehrmals.
+Eine Liste von Zeichenketten: die öffentliche Kennung jedes Modellpunkts des Release, in der Reihenfolge Ihrer Engine. Eine Kennung, die das Release mehrmals enthält, liefern Sie mehrmals; DeltaRecon lässt einen solchen Modellpunkt fehlschlagen und projiziert ihn nicht.
 
 </Part>
 
@@ -577,6 +586,8 @@ Eine Liste von Zeichenketten: die öffentliche Kennung jedes Modellpunkts des Re
 
 <Member name="Einen Modellpunkt projizieren" code="project" of="Session">
 
+Die eigentliche Rechnung: DeltaRecon ruft die Operation für jeden gewählten Modellpunkt auf.
+
 <Part label={GET}>
 
 - `model_point_id`: eine Kennung aus `model_point_ids`.
@@ -585,7 +596,7 @@ Eine Liste von Zeichenketten: die öffentliche Kennung jedes Modellpunkts des Re
 
 <Part label={GIVE}>
 
-Eine Liste mit einem Eintrag je Periode des Modellpunkts. Jeder Eintrag ist ein Paar: die Nummer der Periode als ganze Zahl und eine Liste mit einem Wert je Größe, in der Reihenfolge von `quantities`.
+Eine Liste mit einem Eintrag je Periode des Modellpunkts. Jeder Eintrag ist ein Paar: die Nummer der Periode als ganze Zahl und eine Liste mit einem Wert je Größe, in der Reihenfolge von `quantities`. Die Perioden folgen lückenlos aufeinander, es gibt mindestens eine, und jeder Wert ist eine endliche Zahl; sonst lässt DeltaRecon den Modellpunkt fehlschlagen.
 
 </Part>
 
@@ -606,6 +617,8 @@ Eine Liste mit einem Eintrag je Periode des Modellpunkts. Jeder Eintrag ist ein 
 </Member>
 
 <Member name="Die Parameter liefern" code="parameters" of="Session">
+
+Jeder Lauf schreibt die Parameter des Release in seinen Nachweis.
 
 <Part label={GIVE}>
 
@@ -712,6 +725,8 @@ Was die Hauptlinie ist, legt Ihre Engine fest; in Git ist es die Kette der erste
 
 <Member name="Die Revisionen zwischen zwei Releases auflisten" code="history" of="Engine">
 
+`derive`, `walk` und `search` rufen diese Operation auf. Sie liest auch Beschreibungen, die eine andere Version des Kerns Ihrer Engine aufgezeichnet hat.
+
 <Part label={GET}>
 
 - `older` und `newer`: die Beschreibungen zweier Releases, das ältere zuerst. Welche Verweise die Revision nennen, ist Sache Ihrer Engine.
@@ -723,7 +738,7 @@ Was die Hauptlinie ist, legt Ihre Engine fest; in Git ist es die Kette der erste
 
 Ein `History(source, older, newer, revisions)`:
 
-- `source`: die Art der Versionsgeschichte, ein Name in Kleinbuchstaben: `git`, oder ein Name, den Ihre Engine wählt.
+- `source`: die Art der Versionsgeschichte, ein Name in Kleinbuchstaben: `git`, oder ein Name, den Ihre Engine wählt. Mit `git` ist die Hauptlinie die Kette der ersten Eltern.
 - `older` und `newer`: die Kennungen der beiden Revisionen.
 - `revisions`: jede Revision auf der Hauptlinie nach der älteren, bis einschließlich der neueren, die älteste zuerst. Leer, wenn beide Releases dieselbe Revision nennen.
 

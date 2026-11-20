@@ -144,7 +144,7 @@ No command overwrites an existing file. A command whose output exists already do
 
 This page shows no output. <a href={pageAddress(own, 'en')}>{own.name.en}</a> shows step by step what single commands print, and <a href={pageAddress(results, 'en')}>{results.name.en}</a> explains how to read the tables of the demo.
 
-Under the heading of each command stands its synopsis, as the help of the command prints it, for example `./deltarecon request --help`. What stands between `[` and `]` may be left out. A word in capitals is a placeholder that you fill in; `...` means that it may be given several times. The words in small letters at the end are the paths that the command is given.
+Under the heading of each command stands its synopsis, as the help of the command prints it, for example `./deltarecon request --help`. What stands between `[` and `]` may be left out. A word in capitals is a placeholder that you fill in; `...` means that several may follow. Between `{` and `}` stand the choices, of which you pick one. The synopsis writes `deltarecon` for `.\deltarecon.cmd` or `./deltarecon`. The words in small letters at the end are the paths that the command is given.
 
 </Prose>
 
@@ -475,11 +475,11 @@ The files of <code translate="no">walk</code>:
 
 <Prose>
 
-<code translate="no">search</code> takes the same two records as `walk` and makes the same checks before it computes. It needs no walk. It computes state 0 and the last state, checks them against the two records, and then halves the history: it judges a <Term id="interval">stretch</Term> of the history by comparing the states at its two ends, does not divide a stretch whose ends agree, and attributes a deviation to a stretch that holds a single change. <a href={pageAddress(works, 'en')}>{works.name.en}</a> explains the method and its limits.
+<code translate="no">search</code> takes the same two records as `walk` and makes the same checks before it computes. It needs no walk. It computes state 0 and the last state, checks them against the two records, and then halves the history: it judges an <Term id="interval">interval</Term> of the history by comparing the states at its two ends, does not divide an interval whose ends agree, and attributes a deviation to an interval that holds a single change. <a href={pageAddress(works, 'en')}>{works.name.en}</a> explains the method and its limits.
 
 You can narrow the search to a target with `--quantity` and `--periods`. Only the values of the target are then judged and summed. The example searches in the <Term id="bruttobeitrag" /> in the periods 0 to 59, the first five projection years.
 
-The result names the target, the stretches that were judged, the changes that contribute with their sums, and the findings, among them a stretch that is “<Term id="not-resolved">not resolved</Term>”. It also counts the states that the search computed, those that a walk would compute, and those it saved. The exit status is 0 when both ends ran and are reproduced.
+The result names the target, the intervals that were judged, the changes that contribute with their sums, and the findings, among them an interval that is “<Term id="not-resolved">not resolved</Term>”. It also counts the states that the search computed, those that a walk would compute, and those it saved. The exit status is 0 when both ends ran and are reproduced.
 
 </Prose>
 

@@ -18,20 +18,20 @@ const table = searchTable(lang);
 const [revision, description, sum] = table.head;
 ---
 
-<div class="result-wrap" data-no-term>
+<div class="result-wrap">
   <table class="result-table" role="table" data-result-table>
     <caption>
       <slot />
-      <span data-capture="caption" set:html={outputHtml(caption(lang), lang)} />
+      <span data-no-term data-capture="caption" set:html={outputHtml(caption(lang), lang)} />
     </caption>
-    <thead role="rowgroup">
+    <thead data-no-term role="rowgroup">
       <tr role="row">
         <th scope="col" role="columnheader" class="result-rev" data-capture="head">{revision}</th>
         <th scope="col" role="columnheader" class="result-desc" data-capture="head">{description}</th>
         <th scope="col" role="columnheader" class="result-num" data-capture="head">{sum}</th>
       </tr>
     </thead>
-    <tbody role="rowgroup">
+    <tbody data-no-term role="rowgroup">
       {
         table.rows.map((row) => (
           <tr role="row" data-capture="row">

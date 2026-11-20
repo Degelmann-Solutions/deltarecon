@@ -69,6 +69,7 @@ export function skeleton(lang: Lang): string[] {
   const w = words[lang];
   return [
     `"""${w.module}"""`,
+    'import tempfile',
     'from contextlib import contextmanager',
     'from pathlib import Path',
     '',
@@ -124,7 +125,8 @@ export function skeleton(lang: Lang): string[] {
     `        # ${w.open2}`,
     `        # ${w.open3}`,
     '        raise NotImplementedError',
-    '        yield MySession()',
+    '        with tempfile.TemporaryDirectory(prefix=SCRATCH_PREFIX) as scratch:',
+    '            yield MySession()',
     '',
     '    def history(self, older, newer, repositories):',
     `        raise NotImplementedError  # ${w.history}`,

@@ -114,6 +114,15 @@ for wanted, own in ((protocol.Engine, module.${SKELETON.engine}), (protocol.Sess
     names = set(getattr(wanted, "__annotations__", {})) | {name for name, value in vars(wanted).items() if inspect.isfunction(value)}
     missing = sorted(name for name in names if not name.startswith("_") and not hasattr(own, name))
     assert not missing, f"{own.__name__} lacks {missing}"
+    for name in sorted(names):
+        asked = getattr(wanted, name, None)
+        if name.startswith("_") or not inspect.isfunction(asked):
+            continue
+        given = getattr(own, name)
+        given = getattr(given, "__wrapped__", given)
+        want = [(p.name, p.default is not p.empty) for p in inspect.signature(asked).parameters.values()]
+        have = [(p.name, p.default is not p.empty) for p in inspect.signature(given).parameters.values()]
+        assert want == have, f"{own.__name__}.{name} takes {have}, the protocol {want}"
 module.${SKELETON.engine}()
 module.${SKELETON.engine}(4)
 `;
@@ -127,7 +136,7 @@ async function checkSkeleton(name, shown, folder) {
   const loaded = spawnSync('uv', ['run', 'python', '-c', LOAD_SKELETON, place], { cwd: repository, encoding: 'utf8' });
   expect(
     loaded.status === 0,
-    `${name}, step "${SKELETON_STEP}": the skeleton does not load, or lacks a member of the protocol:\n      ${`${loaded.stdout ?? ''}${loaded.stderr ?? ''}`.trim().split('\n').join('\n      ')}`,
+    `${name}, step "${SKELETON_STEP}": the skeleton does not load, or lacks a member of the protocol:\n      ${`${loaded.stdout ?? ''}${loaded.stderr ?? ''}${loaded.error ? loaded.error.message : ''}`.trim().split('\n').join('\n      ')}`,
   );
 }
 

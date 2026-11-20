@@ -38,8 +38,11 @@ interface Props {
 const { name, code, of, signature, tag } = Astro.props;
 const where = Astro.url.pathname;
 const t = texts[pageLanguage(where)];
+if (Boolean(of) === Boolean(signature)) {
+  throw new Error(`${where}: the member card "${name}" names "of" or "signature", one of the two.`);
+}
 const key = of ? `${of}.${code}` : signature;
-const shown = key ? signatures[key] : undefined;
+const shown = key && Object.hasOwn(signatures, key) ? signatures[key] : undefined;
 if (!shown) {
   throw new Error(`${where}: no signature "${key}" for the member card "${name}" (src/excerpts.ts).`);
 }

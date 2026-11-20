@@ -1,7 +1,8 @@
 ---
 // A fold: a part of a page that the reader opens, so that a long page stays
-// short. It is a `details` element, so it opens and closes without a script
-// and the search of the browser finds what it holds.
+// short. It is a `details` element, so it opens and closes without a
+// script. It stands in a step card: scripts/check-steps.mjs checks the fold
+// and opens it before it reads what it holds.
 //
 //   <Fold summary="How the reference model does it">
 //     …
@@ -17,6 +18,9 @@ interface Props {
 const { summary } = Astro.props;
 if (typeof summary !== 'string' || summary.trim() === '') {
   throw new Error(`${Astro.url.pathname}: a fold has no "summary".`);
+}
+if (!Astro.slots.has('default')) {
+  throw new Error(`${Astro.url.pathname}: the fold "${summary}" holds nothing.`);
 }
 ---
 

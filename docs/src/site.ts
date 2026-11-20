@@ -415,7 +415,7 @@ export function findPage(id: string): Page {
   return page;
 }
 
-/** Whether a page is one of the ten on the path. */
+/** Whether a page is one of the eleven on the path. */
 export function onPath(page: Page): boolean {
   return pages.includes(page);
 }

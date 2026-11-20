@@ -98,7 +98,10 @@
 // The page "Write a tolerance profile" shows the tolerance profile of the
 // package: on the built page of both languages the first document to copy
 // is the file `profiles/tolerance-bruttobeitrag.json` of the unpacked Linux
-// package, line for line.
+// package, line for line; the example profile is JSON with both bounds, both
+// parts and a derivation for a quantity the page lists; the quantities the
+// page lists are those of the reference model at the tag; and the command
+// that uses the example is a search with options of the released help alone.
 // Exits non-zero and names what differs or what is missing: a file of the
 // release folder, the pin, a search result of another shape, a build that
 // does not start.
@@ -952,6 +955,8 @@ try {
       );
     }
 
+    /** The example of each command, per platform, for the examples that build on one another. */
+    const examples = new Map();
     for (const section of marked) {
       const command = section.command;
       if (!released.has(command)) continue;
@@ -1021,6 +1026,15 @@ try {
         }
         if (options.every((option) => released.get(command).has(option))) single.help += 1;
       }
+      examples.set(command, lines);
+      if (command === 'compare' && lines.linux && examples.get('replay')?.linux) {
+        const record = wordsOf(examples.get('replay').linux).at(-1);
+        const wanted = `${record.slice(0, record.lastIndexOf('/'))}/replay-compare.request.json`;
+        expect(
+          wordsOf(lines.linux).at(-1) === wanted,
+          `${at}: the example does not run the compare request that the example of "replay" writes (${wanted}): "${lines.linux}"`,
+        );
+      }
       if (NO_GUIDE.includes(command) && lines.windows && lines.linux) {
         expect(
           lines.windows.replaceAll('\\', '/').replace('./deltarecon.cmd ', './deltarecon ') === lines.linux,
@@ -1047,6 +1061,42 @@ try {
       shown === profile,
       `${entry.address}: the first document to copy is not the file ${relative(profileFile)} of the release, line for line`,
     );
+    // The example profile is JSON once its derivation is filled in, and names a quantity of the page.
+    const rest = await page.evaluate(() => ({
+      example: [...document.querySelectorAll('main [data-document]')][1]?.dataset.copy ?? '',
+      quantities: [...document.querySelectorAll('main [data-quantity]')].map((code) => code.textContent),
+      commands: [...document.querySelectorAll('main [data-platform-part] [data-copy]')].map((block) => block.dataset.copy),
+    }));
+    let example;
+    try {
+      example = JSON.parse(rest.example);
+    } catch {
+      example = undefined;
+    }
+    const entries = Object.entries(example?.per_quantity ?? {});
+    expect(
+      entries.length > 0 &&
+        entries.every(([quantity, bounds]) =>
+          rest.quantities.includes(quantity) &&
+          ['upper', 'lower'].every((bound) => ['abs_tol', 'rel_tol'].every((part) => typeof bounds[bound]?.[part] === 'number' && bounds[bound][part] >= 0)) &&
+          typeof bounds.derivation === 'string' && bounds.derivation !== ''),
+      `${entry.address}: the example profile is no tolerance profile in JSON with both bounds, both parts and a derivation for a quantity the page lists`,
+    );
+    // The quantities are those of the reference model at the tag.
+    const model = spawnSync('git', ['show', `v${version}:degelmann/deltarecon/engines/reference_model.py`], { cwd: repository, encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 });
+    const block = /^QUANTITIES = \(\n([\s\S]*?)^\)/m.exec(model.stdout ?? '')?.[1] ?? '';
+    const names = [...block.matchAll(/^\s+\("([^"]+)",/gm)].map(([, quantity]) => quantity);
+    expect(
+      names.length > 0 && rest.quantities.join('|') === names.join('|'),
+      `${entry.address}: the page lists the quantities [${rest.quantities}], the reference model has [${names}] at v${version}`,
+    );
+    // The command that uses the example: a search with options of the released help alone.
+    expect(rest.commands.length === PLATFORMS.length, `${entry.address}: not one command per platform`);
+    for (const line of rest.commands) {
+      const [, sub, ...words] = wordsOf(line);
+      const unknown = words.filter((word) => word.startsWith('--') && !released.get('search')?.has(word));
+      expect(sub === 'search' && unknown.length === 0 && words.includes('--tolerance'), `${entry.address}: the command "${line}" is no search with --tolerance, or names an option the help of the released "deltarecon search" does not hold: [${unknown}]`);
+    }
   }
   expect(profilePages.length === LANGUAGES.length, `the page "tolerance-profile" is not in the page register once per language`);
 } catch (error) {

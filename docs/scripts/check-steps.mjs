@@ -1276,6 +1276,11 @@ async function checkStepPage(browser, origin, entry, expected) {
     );
     await page.screenshot({ path: path.join(shots, `${kind}-desktop-${entry.lang}.png`), fullPage: true });
     await checkExcerpts(page, name, expected, false);
+    // The folds are open now: what they hold is checked like the rest.
+    if ((await page.locator('main [data-fold]').count()) > 0) {
+      await checkAxe(page, `${name}, folds open`);
+      await checkNoSidewaysScroll(page, `${name}, folds open`);
+    }
     expect(errors.length === 0, `${name}: script errors: ${errors.join(' | ')}`);
     await context.close();
   }

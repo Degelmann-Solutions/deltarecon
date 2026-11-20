@@ -30,7 +30,7 @@ export const command = (name) => (
 
 <Prose>
 
-Ein <Term id="tolerance-profile">Toleranzprofil</Term> legt je <Term id="quantity">Größe</Term> fest, wie weit ein <Term id="value">Wert</Term> des neueren Ergebnisses über und unter dem Wert des älteren liegen darf, bevor die Differenz als <Term id="deviation">Abweichung</Term> zählt. Es ist eine Datei in JSON. Sie übergeben sie mit der Option `--tolerance` an einen der Befehle {command('replay')}, {command('regression')}, {command('walk')} und {command('search')}.
+Ein <Term id="tolerance-profile">Toleranzprofil</Term> legt je <Term id="quantity">Größe</Term> fest, wie weit ein <Term id="value">Wert</Term> des neueren Ergebnisses über und unter dem Wert des älteren liegen darf, bevor die Differenz als <Term id="deviation">Abweichung</Term> zählt. Es ist eine Datei in JSON. Sie übergeben sie mit der Option `--tolerance` an einen der Befehle {command('replay')}, {command('regression')}, {command('walk')} und {command('search')}. {command('compare')} nimmt das Profil aus seiner <Term id="compare-request">Vergleichsanfrage</Term>, wo es unter `tolerance` steht.
 
 Es gibt keine allgemeine Toleranz und kein Profil, das von selbst gilt. Ohne `--tolerance` vergleicht jeder dieser Befehle exakt, und eine Größe, die im Profil keinen Eintrag hat, wird exakt verglichen.
 
@@ -105,7 +105,7 @@ Legen Sie eine neue Textdatei an, zum Beispiel `mein-profil.json` im Ordner `pro
 
 Ersetzen Sie <code translate="no">{DERIVATION.de}</code> durch Ihre Herleitung; mit einer leeren Herleitung wird dieses Profil abgelehnt. Für jede weitere Größe fügen Sie einen weiteren Eintrag hinzu, durch ein Komma getrennt.
 
-Den Namen einer Größe schreiben Sie genau so, wie ihn die Ergebnisse nennen, in der ersten Zeile von `results.csv`. Die Größen des <Term id="reference-model">Referenzmodells</Term>: {quantities.map((name, index) => <>{index > 0 && ', '}<code translate="no">{name}</code></>)}.
+Den Namen einer Größe schreiben Sie genau so, wie ihn die Ergebnisse nennen, in der ersten Zeile von `results.csv`. Die Größen des <Term id="reference-model">Referenzmodells</Term>: {quantities.map((name, index) => <>{index > 0 && ', '}<code data-quantity translate="no">{name}</code></>)}.
 
 Diese Suche ist die Suche nach den Provisionen aus <a href={`${pageAddress(own, 'de')}#other-quantity`}>{own.name.de}</a>, jetzt mit Ihrem Profil. Die Variable `Q` mit dem Ordner des Quick Starts setzen Sie dort in Schritt 1.
 
@@ -128,7 +128,7 @@ Ein Befehl prüft das Profil, bevor er rechnet. Findet er einen Fehler, endet er
 </Prose>
 
 <RowList>
-  <Row name="Die Datei gibt es nicht">Die Meldung beginnt mit <code lang="en">no tolerance file at</code>. Prüfen Sie den Pfad nach `--tolerance`.</Row>
+  <Row name="Die Datei gibt es nicht">Die Meldung enthält <code lang="en">no tolerance file at</code>. Prüfen Sie den Pfad nach `--tolerance`.</Row>
   <Row name="Die Datei ist kein gültiges JSON">Die Meldung enthält <code lang="en">is not JSON</code> und nennt Zeile und Spalte. Häufig fehlt ein Anführungszeichen oder ein Komma, oder ein Komma steht zu viel.</Row>
   <Row name="Der Aufbau stimmt nicht">Die Meldung enthält <code lang="en">violates its schema at</code> und nennt die Stelle: eine Schranke oder ein Anteil fehlt, ein Anteil ist negativ, oder die Herleitung fehlt, obwohl der Eintrag rundet oder ein Anteil über null liegt.</Row>
   <Row name="Eine Größe ist unbekannt">Die Meldung nennt den Namen und endet mit <code lang="en">which the run does not declare</code>. Vergleichen Sie den Namen mit der ersten Zeile von `results.csv`.</Row>

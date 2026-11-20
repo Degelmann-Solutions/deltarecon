@@ -110,7 +110,7 @@ The design tokens are the `@theme` block of `src/styles/global.css`.
 
 ## Pages outside the path
 
-Three built pages are not among the ten of the register's path. Search
+Three built pages are not among the eleven of the register's path. Search
 engines are asked not to list them (`noindex`), and the search of the site
 does not index them.
 
@@ -172,7 +172,8 @@ description: "The description of the page for search engines and shared links."
   `code: true`). The chapter tree then lists them under the page, as points
   without numbers, in the column only. "Single commands" does so; the prose
   check (`tree` in `prosePages`) holds the list against the section headings
-  and fails on a page of prose that lists sections without that entry.
+  by their anchors, and fails on a page of prose that lists sections
+  without that entry. It does not read the titles of the list.
 - A new page needs an entry in `pages` of `src/site.ts` (at its place on the
   path) and both files. `npm run check` fails when a page of the register is
   not built or a built page is not in the register.
@@ -833,8 +834,11 @@ contract of the comparison at the tag of the release
 its worked values) and from the messages of the released package. The
 profile of the package stands in `src/toleranceProfile.ts`, line for line;
 `npm run check:release` holds it against the file of the unpacked Linux
-package. The example profile and the command that uses it stand in the same
-file; no check runs them.
+package, and it holds the example profile (JSON with both bounds, both parts
+and a derivation, for a quantity the page lists), the list of the quantities
+(those of the reference model at the tag) and the command that uses the
+example (a search with options of the released help alone). No check runs
+the command or holds the messages the page quotes.
 
 The check does not read what a row says about an option, which options are
 tagged as required, or the file lists.

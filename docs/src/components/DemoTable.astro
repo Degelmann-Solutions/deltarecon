@@ -35,15 +35,15 @@ const german = lang === 'de' ? undefined : 'de';
 const english = lang === 'en' ? undefined : 'en';
 ---
 
-<div class="result-wrap" data-no-term>
+<div class="result-wrap">
   {
     table === 'regression' ? (
       <table class="result-table result-table-regression" role="table" data-demo-table="regression">
         <caption>
           <slot />
-          <span data-capture="caption" set:html={outputHtml(regression.caption, lang)} />
+          <span data-no-term data-capture="caption" set:html={outputHtml(regression.caption, lang)} />
         </caption>
-        <thead role="rowgroup">
+        <thead data-no-term role="rowgroup">
           <tr role="row">
             <th scope="col" role="columnheader" class="result-key" data-capture="head">{regression.head[0]}</th>
             <th scope="col" role="columnheader" class="result-num result-points" data-capture="head">{regression.head[1]}</th>
@@ -51,7 +51,7 @@ const english = lang === 'en' ? undefined : 'en';
             <th scope="col" role="columnheader" class="result-num result-periods" data-capture="head">{regression.head[3]}</th>
           </tr>
         </thead>
-        <tbody role="rowgroup">
+        <tbody data-no-term role="rowgroup">
           {regression.rows.map((row) => (
             <tr role="row" data-capture="row">
               <th scope="row" role="rowheader" class="result-key" lang={german}>{row.quantity}</th>
@@ -66,9 +66,9 @@ const english = lang === 'en' ? undefined : 'en';
       <table class="result-table result-table-changes" role="table" data-demo-table="changes">
         <caption>
           <slot />
-          <span data-capture="caption" set:html={outputHtml(changes.caption, lang)} />
+          <span data-no-term data-capture="caption" set:html={outputHtml(changes.caption, lang)} />
         </caption>
-        <thead role="rowgroup">
+        <thead data-no-term role="rowgroup">
           <tr role="row">
             <th scope="col" role="columnheader" class="result-no" data-capture="head">{changes.head[0]}</th>
             <th scope="col" role="columnheader" class="result-rev" data-capture="head">{changes.head[1]}</th>
@@ -76,7 +76,7 @@ const english = lang === 'en' ? undefined : 'en';
             <th scope="col" role="columnheader" class="result-desc" data-capture="head">{changes.head[3]}</th>
           </tr>
         </thead>
-        <tbody role="rowgroup">
+        <tbody data-no-term role="rowgroup">
           {changes.rows.map((row) => (
             <tr role="row" data-capture="row">
               <td role="cell" class="result-no">{row.number}</td>

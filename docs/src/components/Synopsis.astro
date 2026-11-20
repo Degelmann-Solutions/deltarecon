@@ -18,7 +18,7 @@ interface Props {
 }
 
 const { command } = Astro.props;
-const lines = usage[command];
+const lines = Object.hasOwn(usage, command) ? usage[command] : undefined;
 if (!lines) {
   throw new Error(`${Astro.url.pathname}: no usage line of the command "${command}" in src/synopsis.ts.`);
 }

@@ -106,9 +106,15 @@ function signatureFaults(found, tag, source) {
   const named = lines.slice(found.first - 1, found.last);
   const shared = Math.min(...named.filter((line) => line.trim() !== '').map((line) => line.length - line.trimStart().length));
   const expected = named.map((line) => line.slice(shared)).join('\n');
-  return found.code === expected
-    ? []
-    : [`${which}: the file holds ${JSON.stringify(expected)} at ${tag}, the page shows ${JSON.stringify(found.code)}`];
+  if (found.code !== expected) {
+    return [`${which}: the file holds ${JSON.stringify(expected)} at ${tag}, the page shows ${JSON.stringify(found.code)}`];
+  }
+  // The lines are the signature of the member the key names, and all of it.
+  const name = found.key.includes('.') ? found.key.split('.').pop() : '__init__';
+  const faults = [];
+  if (!new RegExp(`^(def ${name}\\(|${name}:)`).test(expected)) faults.push(`${which}: these lines are not the signature of "${name}"`);
+  if (expected.startsWith('def ') && !/:\s*(#.*)?$/.test(expected)) faults.push(`${which}: the signature does not end in these lines`);
+  return faults;
 }
 
 /**
@@ -358,7 +364,10 @@ function readPage(page) {
       members: [...document.querySelectorAll('main [data-member]')].map((code) => ({
         member: code.dataset.member,
         shown: text(code).trim(),
-        tagged: Boolean(code.closest('[data-row], [data-member-card]')?.querySelector('[data-row-tag], [data-member-tag]')),
+        tagged: Boolean(
+          code.closest('[data-row]')?.querySelector('[data-row-tag]') ??
+            code.closest('.member-title')?.querySelector('[data-member-tag]'),
+        ),
       })),
       selections: [...document.querySelectorAll('main [data-selection]')].map((code) => text(code).trim()),
       unmarked: [...document.querySelectorAll('main [data-row] .row-name code')].filter((code) => !marked(code)).map((code) => text(code).trim()),
@@ -432,7 +441,7 @@ if (missing) {
         totals.complete += 1;
       }
       failures.push(...faults.map((fault) => `${entry.address}: ${fault}`));
-      const held = found.excerpts.length + found.members.length + found.selections.length + found.counts.length + found.yardsticks.length;
+      const held = found.excerpts.length + found.signatures.length + found.members.length + found.selections.length + found.counts.length + found.yardsticks.length;
       if (held > 0) totals.pages += 1;
       for (const part of ['excerpts', 'signatures', 'members', 'selections', 'counts', 'yardsticks']) totals[part] += found[part].length;
     }

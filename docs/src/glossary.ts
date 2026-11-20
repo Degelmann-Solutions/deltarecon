@@ -224,7 +224,7 @@ export const entries: readonly Entry[] = [
       term: 'Revision',
       forms: ['revisions'],
       explanation:
-        'One change in the history of the model. Each change is one revision; release N+1 of the quick start lies 32 revisions after release N.',
+        'One change in the history of the model. Each change is one revision; the state N+1 of the quick start lies 32 revisions after release N.',
     },
     de: {
       term: 'Revision',
@@ -283,13 +283,13 @@ export const entries: readonly Entry[] = [
       term: 'Release',
       forms: ['releases'],
       explanation:
-        'A state of the model that is named completely: code, parameters and input data, each by its revision. For the reference model a release is one revision of the history.',
+        'A state of the model that is named completely: code, parameters and input data, each by its revision, and the version of the core of the engine. For the reference model a release is one revision of the history.',
     },
     de: {
       term: 'Release',
       forms: ['Releases'],
       explanation:
-        'Ein Stand des Modells, der vollständig benannt ist: Code, Parameter und Bestandsdaten, jeweils mit ihrer Revision. Beim Referenzmodell ist ein Release eine Revision der Versionsgeschichte.',
+        'Ein Stand des Modells, der vollständig benannt ist: Code, Parameter und Bestandsdaten, jeweils mit ihrer Revision, und die Version des Kerns der Engine. Beim Referenzmodell ist ein Release eine Revision der Versionsgeschichte.',
     },
   },
   {
@@ -298,13 +298,13 @@ export const entries: readonly Entry[] = [
       term: 'State',
       forms: ['states'],
       explanation:
-        'The model after a certain number of changes. State 0 is the older of the two revisions; after each change follows a further state.',
+        'The model after a certain number of changes. State 0 is the older of the two revisions that are compared; after each change follows a further state.',
     },
     de: {
       term: 'Stand',
       forms: ['Stands', 'Standes', 'Stände', 'Ständen'],
       explanation:
-        'Das Modell nach einer bestimmten Zahl von Änderungen. Stand 0 ist die ältere der beiden Revisionen; nach jeder Änderung folgt ein weiterer Stand.',
+        'Das Modell nach einer bestimmten Zahl von Änderungen. Stand 0 ist die ältere der beiden Revisionen, die verglichen werden; nach jeder Änderung folgt ein weiterer Stand.',
     },
   },
   {
@@ -343,13 +343,13 @@ export const entries: readonly Entry[] = [
       term: 'Model point',
       forms: ['model points'],
       explanation:
-        'The smallest unit for which an engine gives results: a single contract, an aggregated contract record, or an output group. The reference model has 350 model points.',
+        'The smallest unit for which an engine gives results: a single contract, an aggregated contract record, or an output group.',
     },
     de: {
       term: 'Modellpunkt',
       forms: ['Modellpunkts', 'Modellpunktes', 'Modellpunkte', 'Modellpunkten'],
       explanation:
-        'Die kleinste Einheit, für die eine Engine Ergebnisse ausgibt: ein einzelner Vertrag, ein verdichteter Vertragsdatensatz oder eine Ausgabegruppe. Das Referenzmodell hat 350 Modellpunkte.',
+        'Die kleinste Einheit, für die eine Engine Ergebnisse ausgibt: ein einzelner Vertrag, ein verdichteter Vertragsdatensatz oder eine Ausgabegruppe.',
     },
   },
   {
@@ -373,13 +373,13 @@ export const entries: readonly Entry[] = [
       term: 'Period',
       forms: ['periods'],
       explanation:
-        'One projection month, counted from 0 at the valuation date.',
+        'A time step of the results. In the tables and commands of DeltaRecon a period is one projection month, counted from 0 at the valuation date. An engine counts the periods it gives on its own time basis.',
     },
     de: {
       term: 'Periode',
       forms: ['Perioden'],
       explanation:
-        'Ein Projektionsmonat, gezählt ab 0 am Bewertungsstichtag.',
+        'Ein Zeitschritt der Ergebnisse. In den Tabellen und Befehlen von DeltaRecon ist eine Periode ein Projektionsmonat, gezählt ab 0 am Bewertungsstichtag. Eine Engine zählt die Perioden, die sie liefert, auf ihrer eigenen Zeitbasis.',
     },
   },
   {
@@ -416,7 +416,7 @@ export const entries: readonly Entry[] = [
     anchor: 'interval',
     en: {
       term: 'Interval',
-      forms: ['intervals', 'stretch', 'stretches'],
+      forms: ['intervals'],
       explanation:
         'A connected piece of the history between two states. The search judges an interval by comparing the states at its two ends.',
     },
