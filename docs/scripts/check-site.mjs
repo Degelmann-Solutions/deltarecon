@@ -295,7 +295,13 @@ async function checkBreakpoints() {
   const queries = [...css.matchAll(/@media\s([^{;]*)\{/g)].map((match) => match[1].trim());
   expect(queries.length > 0, `${file}: no @media rule found`);
   for (const query of queries) {
-    for (const [, width] of query.matchAll(/\b(?:min-|max-)?width\s*:\s*([^)\s]+)/g)) {
+    // `min-width: 37.5rem`, and the range form, `width >= 37.5rem` or `37.5rem < width`.
+    const widths = [
+      ...[...query.matchAll(/\b(?:min-|max-)?width\s*:\s*([^)\s]+)/g)].map((match) => match[1]),
+      ...[...query.matchAll(/(?<![\w-])width\s*(?:<=|>=|<|>|=)\s*([^)\s<>=]+)/g)].map((match) => match[1]),
+      ...[...query.matchAll(/([^(\s<>=]+)\s*(?:<=|>=|<|>|=)\s*width(?![\w-])/g)].map((match) => match[1]),
+    ];
+    for (const width of widths) {
       expect(
         [tablet, tree].includes(width),
         `${file}: @media ${query} names the width ${width}, which is neither breakpoint of src/breakpoints.ts (${tablet}, ${tree})`,

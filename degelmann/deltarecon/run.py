@@ -61,6 +61,7 @@ RECORD_NAME = "run-record.json"
 # one of them, as the tests write genuine earlier documents, names no domain reference.
 WITHOUT_DOMAIN_REFERENCE = ("1.0", "2.0", "3.0", "3.1")
 
+
 def check_supported_stage(stage: str, stages) -> None:
     """Refuse a stage that is not among ``stages``, the stages an engine declares, with
     ``unsupported_stage``."""

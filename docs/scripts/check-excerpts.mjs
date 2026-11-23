@@ -32,16 +32,17 @@
 //     code.
 // On the page "Write a tolerance profile" (`QUOTED`), in both languages: the
 // message each row of the section of the refusals quotes, the first inline
-// code of the row's text, stands in a string of degelmann/deltarecon/compare.py
-// at the tag, with adjacent string literals joined, as Python joins them.
+// code of the row's text, is not empty and stands in the text of
+// degelmann/deltarecon/compare.py at the tag, adjacent string literals across
+// lines joined, as Python joins them.
 // And once: the two files are the same on `main` as at the tag, so that the
 // pages describe the protocol as it is.
 //
 // First it proves itself on texts it sets itself: an altered excerpt, a
 // range that does not hold the code, a member the protocol does not hold, a
 // member a complete page leaves out or names twice, a file that differs on
-// `main`, a wrong number of lines, a quoted message the file does not hold
-// and a tag the clone does not hold must each fail and name what the message
+// `main`, a wrong number of lines, a quoted message the file does not hold,
+// an empty quoted message and a tag the clone does not hold must each fail and name what the message
 // is to name; a message split over two string literals must pass.
 //
 // Exits non-zero and names page and part of every failed expectation.
@@ -291,9 +292,10 @@ function joinedLiterals(lines) {
 
 /** What is wrong with a message a page quotes from a file. */
 function quoteFaults(quote, tag, file, joined) {
+  if (quote.trim() === '') return ['a row quotes no message: the text of the row holds no inline code'];
   return joined.includes(quote)
     ? []
-    : [`the quoted message "${quote}" stands in no string of ${file} at ${tag}`];
+    : [`the quoted message "${quote}" does not stand in the text of ${file} at ${tag}`];
 }
 
 /** The files that differ between the tag and a branch. `blob(ref, file)` names the content of a file at a reference. */
@@ -352,6 +354,7 @@ function proveItself() {
     ['a quoted message the file holds', quoteFaults('no tolerance file at', tag, file, joinedLiterals(['        raise UsageError(f"no tolerance file at {path}")'])), null],
     ['a quoted message split over two string literals', quoteFaults('which the run does not declare', tag, file, joinedLiterals(['        raise UsageError(f"names {name!r}, which the "', '                         "run does not declare")'])), null],
     ['a quoted message the file does not hold', quoteFaults('which the run does not know', tag, file, joinedLiterals(['        raise UsageError(f"names {name!r}, which the "', '                         "run does not declare")'])), ['"which the run does not know"', file]],
+    ['an empty quoted message', quoteFaults('', tag, file, joinedLiterals(['        raise UsageError(f"no tolerance file at {path}")'])), ['quotes no message']],
     ['a tag the clone holds', [tagFault(tag, () => true)].filter(Boolean), null],
     ['a tag the clone does not hold', [tagFault(tag, () => false)].filter(Boolean), [tag]],
   ];
@@ -492,7 +495,9 @@ if (missing) {
           faults.push(`${tag} holds no file ${QUOTED.file}`);
         } else {
           const joined = joinedLiterals(lines);
-          for (const quote of quotes) faults.push(...quoteFaults(quote, tag, QUOTED.file, joined));
+          for (const quote of quotes) {
+            faults.push(...quoteFaults(quote, tag, QUOTED.file, joined).map((fault) => `section "${QUOTED.section}": ${fault}`));
+          }
         }
         totals.quotes += quotes.length;
       }
