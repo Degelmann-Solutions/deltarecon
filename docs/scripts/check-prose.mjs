@@ -231,7 +231,7 @@ const pages = await loadPages();
 const { exampleFacts, regressionTable, changeTable, unresolvedInterval } = await loadExample();
 const release = await loadRelease();
 const { failures, expect, report } = expectations('check-prose');
-const { checkAxe, checkNoSidewaysScroll } = pageChecks({ failures, expect });
+const { checkAxe, checkNoMotion, checkNoSidewaysScroll } = pageChecks({ failures, expect });
 
 // "When something goes wrong" is a page of prose too: its sections are the
 // hint groups of the register (src/hints.ts), in its order, and the section
@@ -1982,22 +1982,6 @@ async function checkPathBlock(page, name, entry) {
       `${which}: a link is not underlined`,
     );
   });
-}
-
-/** Nothing in the content moves. */
-async function checkNoMotion(page, name) {
-  const moving = await page.evaluate(() =>
-    [...document.querySelectorAll('main *')]
-      .filter((element) => {
-        const style = getComputedStyle(element);
-        return (
-          style.animationName !== 'none' ||
-          style.transitionDuration.split(',').some((duration) => Number.parseFloat(duration) > 0)
-        );
-      })
-      .map((element) => element.className || element.tagName),
-  );
-  expect(moving.length === 0, `${name}: these parts of the content move: ${[...new Set(moving)].join(', ')}`);
 }
 
 async function checkProsePage(browser, origin, entry, listed, facts) {

@@ -29,6 +29,11 @@ import { changeOf, searchCounts, searchTable } from '../../captures';
 import { beyondDemo, contributionsOf, outputOf, refusal, runsOf, statusOf } from '../../ownCalculations';
 import { findPage, pageAddress } from '../../site';
 
+export const components = {
+  // Inline code of this page names commands, options, files and outputs of
+  // the program: none of it is to be translated.
+  code: (props) => <code translate="no" {...props} />,
+};
 export const commands = {
   // The command lines of each step. The build holds them against the
   // captures of the step (src/ownCalculations.ts).
@@ -197,7 +202,7 @@ The command computes for a while and prints nothing until it is done. The single
 
 `search: searched` The search computed {provisionen.run} of the {provisionen.walk} states: release N and one state after each change. It did not need the other {provisionen.saved}.
 
-`state 0`, <code>state {provisionen.walk - 1}</code> The search computed both ends again, and each gave the recorded result.
+`state 0`, <code translate="no">state {provisionen.walk - 1}</code> The search computed both ends again, and each gave the recorded result.
 
 `held: input_data` The <Term id="input-data">portfolio data</Term> stay at release N in every state. One <Term id="revision">revision</Term> changes the table of the <Term id="model-point">model points</Term>; the search does not show its effect.
 

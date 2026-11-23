@@ -9,20 +9,37 @@
 //   - a description of its own, unique on the site;
 //   - the canonical address, and `alternate` links for `de` and `en`, each
 //     the absolute address of a page of the register;
-//   - Open Graph title, description, address, type, locale and image;
-//   - one JSON-LD block that parses and names the page.
+//   - Open Graph title, description, address, type, locale, the locale of
+//     the other language, the name of the site and the image; the card type
+//     for Twitter;
+//   - one JSON-LD block that parses and names the page, the start page of
+//     its language as the site it is part of, and the product with its page
+//     and the release number of src/release.json.
 // For each of the three other pages: its language, a title of its own, and
-// `noindex`; it names no canonical address and no language versions. The two
-// `.htaccess` files of the build name the addresses of the page-not-found
-// pages.
+// `noindex`; it names no canonical address and no language versions. Every
+// page names the one icon of the site, which is served. The two `.htaccess`
+// files of the build name the addresses of the page-not-found pages. The
+// register gives a page outside the path no neighbour on it.
 // Exits non-zero and names page and field of every failed expectation.
 import { readFile, readdir } from 'node:fs/promises';
 import path from 'node:path';
 import { chromium } from 'playwright';
-import { BASE, expectations, loadOtherPages, loadPages, root, startPreview } from './harness.mjs';
+import {
+  BASE,
+  expectations,
+  loadOtherPages,
+  loadPages,
+  loadRegister,
+  loadRelease,
+  root,
+  startPreview,
+} from './harness.mjs';
 
 const SITE = 'https://degelmann-solutions.de';
 
+const ICON = `${BASE}favicon.svg`;
+
+const version = await loadRelease();
 const pages = await loadPages();
 const { notFound, rootPage } = await loadOtherPages();
 const others = [...notFound, rootPage];
@@ -52,8 +69,12 @@ function readHead(page) {
       alternates: [...document.head.querySelectorAll('link[rel="alternate"][hreflang]')].map(
         (link) => [link.getAttribute('hreflang'), link.getAttribute('href')],
       ),
+      icons: [...document.head.querySelectorAll('link[rel~="icon"]')].map(
+        (link) => `${link.getAttribute('href')} ${link.getAttribute('type')}`,
+      ),
+      twitterCard: attribute('meta[name="twitter:card"]', 'content'),
       og: Object.fromEntries(
-        ['title', 'description', 'url', 'type', 'locale', 'image'].map((name) => [
+        ['title', 'description', 'url', 'type', 'locale', 'locale:alternate', 'site_name', 'image'].map((name) => [
           name,
           attribute(`meta[property="og:${name}"]`, 'content'),
         ]),
@@ -65,6 +86,14 @@ function readHead(page) {
   });
 }
 
+/** The one icon of the site, named by every page. */
+function checkIcon(entry, head) {
+  expect(
+    head.icons.length === 1 && head.icons[0] === `${ICON} image/svg+xml`,
+    `${entry.address}: the icon links are [${head.icons.join(' | ')}], expected the one "${ICON} image/svg+xml"`,
+  );
+}
+
 function checkHead(entry, head, seen) {
   const name = entry.address;
   const field = (label, values, expected) => {
@@ -73,6 +102,7 @@ function checkHead(entry, head, seen) {
       `${name}: ${label} is [${values.join(' | ')}], expected "${expected}"`,
     );
   };
+  checkIcon(entry, head);
   const canonical = `${SITE}${entry.address}`;
 
   expect(head.title === entry.title, `${name}: title is "${head.title}", expected "${entry.title}"`);
@@ -110,7 +140,10 @@ function checkHead(entry, head, seen) {
   field('og:url', head.og.url, canonical);
   field('og:type', head.og.type, 'website');
   field('og:locale', head.og.locale, entry.locale);
+  field('og:locale:alternate', head.og['locale:alternate'], entry.otherLocale);
+  field('og:site_name', head.og.site_name, entry.texts.documentation);
   field('og:image', head.og.image, entry.previewImage);
+  field('twitter:card', head.twitterCard, 'summary_large_image');
 
   expect(head.jsonLd.length === 1, `${name}: ${head.jsonLd.length} JSON-LD blocks, expected 1`);
   if (head.jsonLd.length === 1) {
@@ -129,8 +162,20 @@ function checkHead(entry, head, seen) {
     expect(data.inLanguage === entry.lang, `${name}: JSON-LD inLanguage is "${data.inLanguage}"`);
     expect(data.isPartOf?.['@type'] === 'WebSite', `${name}: JSON-LD isPartOf is not a WebSite`);
     expect(
+      data.isPartOf?.url === `${SITE}${entry.start}`,
+      `${name}: JSON-LD isPartOf.url is "${data.isPartOf?.url}", expected "${SITE}${entry.start}"`,
+    );
+    expect(
       data.about?.['@type'] === 'SoftwareApplication' && data.about?.name === 'DeltaRecon',
       `${name}: JSON-LD about is not the SoftwareApplication DeltaRecon`,
+    );
+    expect(
+      data.about?.url === entry.productPage,
+      `${name}: JSON-LD about.url is "${data.about?.url}", expected "${entry.productPage}"`,
+    );
+    expect(
+      data.about?.softwareVersion === version,
+      `${name}: JSON-LD about.softwareVersion is "${data.about?.softwareVersion}", expected "${version}" (src/release.json)`,
     );
     expect(Boolean(data.publisher?.name), `${name}: JSON-LD names no publisher`);
   }
@@ -139,6 +184,7 @@ function checkHead(entry, head, seen) {
 /** A page outside the path: language, a title of its own, `noindex`. */
 function checkOtherHead(entry, head, seen) {
   const name = entry.address;
+  checkIcon(entry, head);
   expect(head.lang === entry.lang, `${name}: <html lang> is "${head.lang}", expected "${entry.lang}"`);
   expect(head.title === entry.title, `${name}: title is "${head.title}", expected "${entry.title}"`);
   expect(!seen.titles.has(head.title), `${name}: title "${head.title}" stands on another page too`);
@@ -152,6 +198,16 @@ function checkOtherHead(entry, head, seen) {
   expect(
     head.canonical.length === 0 && head.alternates.length === 0 && head.og.url.length === 0,
     `${name}: names a canonical address, a language version or an Open Graph address`,
+  );
+}
+
+// A page outside the path has no neighbour on it.
+{
+  const site = await loadRegister();
+  const neighbours = [site.previousPage(site.notFoundPage), site.nextPage(site.notFoundPage)];
+  expect(
+    neighbours.every((neighbour) => neighbour === undefined),
+    `src/site.ts: the page-not-found page, which is outside the register, has a neighbour on the path: ${neighbours.map((neighbour) => neighbour?.id).join(', ')}`,
   );
 }
 
@@ -201,6 +257,14 @@ try {
   const context = await browser.newContext({ javaScriptEnabled: false });
   const page = await context.newPage();
   const seen = { titles: new Set(), descriptions: new Set() };
+  // The icon every page names is served as an SVG image.
+  {
+    const answer = await page.request.get(`${origin}${ICON}`);
+    expect(
+      answer.status() === 200 && (answer.headers()['content-type'] ?? '').startsWith('image/svg+xml'),
+      `${ICON}: answered ${answer.status()} as "${answer.headers()['content-type']}", expected 200 and an SVG image`,
+    );
+  }
   // The anchors of the content of each page, by address.
   const anchors = new Map();
   for (const entry of pages) {

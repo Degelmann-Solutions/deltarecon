@@ -5,8 +5,15 @@
 // page-not-found page of each language:
 //   - language, release number, link to the counterpart;
 //   - the same with JavaScript off, and that no search field is in the page;
+//     the level-1 heading and every heading of the content are visible, and
+//     the content holds at least the text it shows with JavaScript on;
 //   - no request leaves the local origin, and every file the page loads
 //     (typeface, logo, script) is served;
+//   - the browser holds no cookie after the load, and none after a platform
+//     is chosen on a page with a platform switch;
+// once, for the built stylesheets and the styles in the built pages: no
+// `prefers-color-scheme` (a dark mode), no `@media print` (a print design)
+// and no `scroll-behavior: smooth`;
 // for the start page of each language, the search:
 //   - nothing is shown or said at the load of the page;
 //   - a word of its own language gives its hits and the number of matches;
@@ -27,6 +34,8 @@
 // for the root page: with JavaScript off it stays and offers both languages,
 // each link in its own language; with JavaScript it leads on to a language.
 // Exits non-zero and names every failed expectation.
+import { readFile, readdir } from 'node:fs/promises';
+import path from 'node:path';
 import { chromium } from 'playwright';
 import {
   expectations,
@@ -34,6 +43,7 @@ import {
   loadPages,
   loadRelease,
   pageWords,
+  root,
   searchTexts,
   startPreview,
 } from './harness.mjs';
@@ -128,6 +138,136 @@ async function checkPage(page, name, entry) {
       (await link.getAttribute('hreflang')) === entry.otherLang,
       `${name}: the link to the counterpart does not carry hreflang="${entry.otherLang}"`,
     );
+  }
+}
+
+/** The browser holds no cookie, and the page can read none. */
+async function checkNoCookie(context, page, name) {
+  const cookies = await context.cookies();
+  const read = await page.evaluate(() => document.cookie);
+  expect(
+    cookies.length === 0 && read === '',
+    `${name}: the browser holds a cookie: ${cookies.map((cookie) => cookie.name).join(', ')} ${read}`,
+  );
+}
+
+/**
+ * The text the content shows, one entry per piece of text. Left out: what a
+ * script puts into the page as a control (a button: the tabs of a platform
+ * switch, the copy button) and what it announces (a status). With `within`,
+ * only the text inside an element that matches the selector.
+ */
+function shownText(page, within) {
+  return page.evaluate((within) => {
+    const found = [];
+    const walker = document.createTreeWalker(document.querySelector('main'), NodeFilter.SHOW_TEXT);
+    for (let node = walker.nextNode(); node; node = walker.nextNode()) {
+      const text = node.textContent.trim().replace(/\s+/g, ' ');
+      if (text === '' || node.parentElement.closest('button, [role="status"], script, style')) continue;
+      if (within && !node.parentElement.closest(within)) continue;
+      const range = document.createRange();
+      range.selectNodeContents(node);
+      if (range.getClientRects().length > 0) found.push(text);
+    }
+    return found;
+  }, within);
+}
+
+/**
+ * The pieces of `expected` that `shown` does not hold, by number: a piece
+ * that is expected twice and shown once is missing once.
+ */
+function missingPieces(expected, shown) {
+  const left = new Map();
+  for (const text of shown) left.set(text, (left.get(text) ?? 0) + 1);
+  return expected.filter((text) => {
+    const count = left.get(text) ?? 0;
+    left.set(text, count - 1);
+    return count <= 0;
+  });
+}
+
+// The count proves itself: a piece that stands twice, shown once, is missing
+// once, and so is a piece of the Linux parts that reads as one of Windows.
+{
+  const cases = [
+    [['a', 'b', 'a'], ['a', 'b', 'a', 'c'], []],
+    [['a', 'b', 'a'], ['a', 'b'], ['a']],
+    [['run', 'run'], ['run'], ['run']],
+    [['a'], [], ['a']],
+  ];
+  for (const [expected, shown, missing] of cases) {
+    const found = missingPieces(expected, shown);
+    expect(
+      JSON.stringify(found) === JSON.stringify(missing),
+      `missingPieces(${JSON.stringify(expected)}, ${JSON.stringify(shown)}) names ${JSON.stringify(found)}, expected ${JSON.stringify(missing)}`,
+    );
+  }
+}
+
+/**
+ * Without JavaScript: the level-1 heading and every heading of the content
+ * are visible, a heading in a closed fold aside; the content holds at least
+ * the text it shows with JavaScript on (`withScript`), each piece as often
+ * as it stands there. On a page with a platform switch `withScript` is the
+ * text with Windows chosen and the text of the Linux parts with Linux
+ * chosen, since the page without JavaScript shows both.
+ */
+async function checkReadable(page, name, withScript) {
+  const headings = await page.evaluate(() =>
+    [...document.querySelectorAll('main :is(h1, h2, h3, h4, h5, h6)')]
+      .filter((heading) => !heading.closest('details:not([open])'))
+      .map((heading) => ({
+        level: heading.tagName,
+        text: heading.textContent.trim().replace(/\s+/g, ' '),
+        visible:
+          heading.getClientRects().length > 0 &&
+          getComputedStyle(heading).visibility === 'visible' &&
+          heading.getBoundingClientRect().height > 1,
+      })),
+  );
+  expect(
+    headings.filter((heading) => heading.level === 'H1' && heading.visible).length === 1,
+    `${name}: the level-1 heading is not visible`,
+  );
+  const unseen = headings.filter((heading) => !heading.visible).map((heading) => heading.text);
+  expect(unseen.length === 0, `${name}: headings that are not visible: ${unseen.join(' | ')}`);
+  const missing = missingPieces(withScript, await shownText(page));
+  expect(
+    missing.length === 0,
+    `${name}: ${missing.length} pieces of text that the content shows with JavaScript on are missing: ${missing.slice(0, 5).join(' | ')}`,
+  );
+}
+
+/**
+ * The built stylesheets and the styles in the built pages hold nothing of
+ * what the site leaves out: a dark mode, a print design, smooth scrolling.
+ * The files under pagefind/ are those of the search index, which no page
+ * loads as a stylesheet.
+ */
+async function checkStyles() {
+  const dist = path.join(root, 'dist');
+  const files = (await readdir(dist, { recursive: true }))
+    .map((file) => file.split(path.sep).join('/'))
+    .filter((file) => !file.startsWith('pagefind/') && /\.(css|html)$/.test(file));
+  expect(
+    files.some((file) => file.endsWith('.css')),
+    'dist/: the build holds no stylesheet',
+  );
+  const leftOut = [
+    ['a dark mode (prefers-color-scheme)', /prefers-color-scheme/],
+    ['a print design (@media print)', /@media[^{]*\bprint\b/],
+    ['smooth scrolling (scroll-behavior: smooth)', /scroll-behavior\s*:\s*smooth/],
+  ];
+  for (const file of files) {
+    const text = await readFile(path.join(dist, file), 'utf8');
+    const styles = file.endsWith('.css')
+      ? text
+      : [...text.matchAll(/<style[^>]*>([\s\S]*?)<\/style>/g)].map((match) => match[1]).join('\n') +
+        [...text.matchAll(/\sstyle="([^"]*)"/g)].map((match) => match[1]).join('\n');
+    for (const [what, pattern] of leftOut) {
+      expect(!pattern.test(styles), `dist/${file}: the styles hold ${what}`);
+    }
   }
 }
 
@@ -314,9 +454,27 @@ async function checkSearch(page, name, entry) {
 
 async function checkEntry(browser, origin, entry) {
   // JavaScript on: the page; on the start page also the search.
+  let withScript;
   {
     const { context, page, name, scriptErrors } = await open(browser, origin, entry);
     await checkPage(page, name, entry);
+    await checkNoCookie(context, page, name);
+    withScript = await shownText(page);
+    // A platform is chosen: the choice is remembered without a cookie.
+    const linux = page.locator('main [data-platform-tab="linux"]').first();
+    if ((await linux.count()) > 0) {
+      await linux.click();
+      expect(
+        (await page.getAttribute('html', 'data-platform')) === 'linux',
+        `${name}: a click on "Linux" does not choose the platform`,
+      );
+      // The parts of Linux are content too, each piece of them, also one
+      // that reads as a piece of the Windows parts.
+      withScript.push(...(await shownText(page, '[data-platform-part="linux"]')));
+      await checkNoCookie(context, page, `${name}, Linux chosen`);
+      await page.reload({ waitUntil: 'networkidle' });
+      await checkNoCookie(context, page, `${name}, Linux chosen, loaded again`);
+    }
     expect((await page.locator('input[type="search"]').count()) === 1, `${name}: no search field`);
     expect(
       (await page.locator('label[for]').count()) === 1,
@@ -337,6 +495,8 @@ async function checkEntry(browser, origin, entry) {
   {
     const { context, page, name } = await open(browser, origin, entry, { javaScript: false });
     await checkPage(page, name, entry);
+    await checkReadable(page, name, withScript);
+    await checkNoCookie(context, page, name);
     expect(
       (await page.locator('input').count()) === 0,
       `${name}: a search field is in the page without JavaScript`,
@@ -425,9 +585,12 @@ async function checkEntry(browser, origin, entry) {
 
 /** A page-not-found page: the frame in its language, and a search that works. */
 async function checkNotFound(browser, origin, entry) {
+  let withScript;
   {
     const { context, page, name, scriptErrors } = await open(browser, origin, entry);
     await checkPage(page, name, entry);
+    await checkNoCookie(context, page, name);
+    withScript = await shownText(page);
     expect((await page.locator('input[type="search"]').count()) === 1, `${name}: no search field`);
     try {
       const start = pages.find((candidate) => candidate.isRoot && candidate.lang === entry.lang);
@@ -443,6 +606,7 @@ async function checkNotFound(browser, origin, entry) {
   {
     const { context, page, name } = await open(browser, origin, entry, { javaScript: false });
     await checkPage(page, name, entry);
+    await checkReadable(page, name, withScript);
     expect(
       (await page.locator('input').count()) === 0,
       `${name}: a search field is in the page without JavaScript`,
@@ -471,6 +635,11 @@ async function checkRoot(browser, origin, entry) {
       );
     }
     expect((await page.locator('input').count()) === 0, `${name}: a field is in the page`);
+    expect(
+      (await page.locator('h1').count()) === 1 && (await page.locator('h1').isVisible()),
+      `${name}: the level-1 heading is not visible`,
+    );
+    await checkNoCookie(context, page, name);
     await context.close();
   }
   // With JavaScript, in a browser that asks for English (the default of the
@@ -489,6 +658,7 @@ async function checkRoot(browser, origin, entry) {
     const target = `${origin}${entry.links.find((link) => link.lang === 'en').address}`;
     await page.waitForURL(target, { timeout: 10_000 }).catch(() => {});
     expect(page.url() === target, `${name}: ends at ${page.url()}, expected ${target}`);
+    await checkNoCookie(context, page, name);
     await context.close();
   }
 }
@@ -496,6 +666,7 @@ async function checkRoot(browser, origin, entry) {
 const { origin: reported, stop } = startPreview();
 let browser;
 try {
+  await checkStyles();
   const origin = await reported;
   browser = await chromium.launch();
   // An error on one page is a failure of that page; the others still run.
@@ -517,5 +688,5 @@ try {
 }
 
 report(
-  `all ${pages.length} pages, the ${notFound.length} page-not-found pages and the root page pass (release ${version})`,
+  `all ${pages.length} pages, the ${notFound.length} page-not-found pages, the root page and the built styles pass (release ${version})`,
 );

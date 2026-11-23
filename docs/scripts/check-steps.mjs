@@ -55,7 +55,8 @@
 //     of the page, on a line of its own, in the typeface of the text between
 //     two dashed rules; a page without a result table or a flow diagram in
 //     its entry holds none;
-//   - nothing in the content moves: no transition, no animation;
+//   - nothing on the page moves: no transition, no animation, no smooth
+//     scrolling (`checkNoMotion` of harness.mjs);
 //   - axe with Windows and with Linux chosen; no sideways scrolling.
 // Phone (390 px): one column, the figure below the text, the flow diagram
 // as a stack, the result table as stacked records with its head row, code
@@ -204,7 +205,7 @@ const amountOf = (sum, lang) =>
 /** Whether a printed sum begins with a minus sign. */
 const isLowering = (sum) => sum.startsWith('-');
 const { failures, expect, report } = expectations('check-steps');
-const { checkAxe, checkNoSidewaysScroll } = pageChecks({ failures, expect });
+const { checkAxe, checkNoMotion, checkNoSidewaysScroll } = pageChecks({ failures, expect });
 
 async function open(browser, origin, entry, viewport, options = {}) {
   const { javaScript = true, anchor = '', setup, permissions = [] } = options;
@@ -403,22 +404,6 @@ async function checkCards(page, name, entry, expected) {
   return cards;
 }
 
-/** Nothing in the content moves. */
-async function checkNoMotion(page, name) {
-  const moving = await page.evaluate(() =>
-    [...document.querySelectorAll('main *')]
-      .filter((element) => {
-        const style = getComputedStyle(element);
-        return (
-          style.transitionDuration.split(',').some((part) => Number.parseFloat(part) > 0) ||
-          style.animationName !== 'none'
-        );
-      })
-      .map((element) => element.outerHTML.slice(0, 80)),
-  );
-  expect(moving.length === 0, `${name}: a transition or an animation on ${moving.join(' | ')}`);
-}
-
 /** Blocks that scroll sideways: focus, name, the ring of the terminal block. */
 async function checkRegions(page, name, entry, expected, cards) {
   const w = words[entry.lang];
@@ -490,7 +475,8 @@ async function checkRegions(page, name, entry, expected, cards) {
 /**
  * Folds: a `details` element that is closed when the page opens; the line
  * that opens it is a `summary` with text, at least 44 px high, that takes
- * focus and opens the fold with Enter. Leaves every fold open, so that the
+ * focus and opens the fold with Enter; before the browser prints
+ * (`beforeprint`) every fold opens. Leaves every fold open, so that the
  * checks after it see what the folds hold.
  */
 async function checkFolds(page, name) {
@@ -512,6 +498,15 @@ async function checkFolds(page, name) {
     );
   });
   if (folds.length > 0) {
+    // Before the browser prints, every fold opens (src/scripts/fold.ts).
+    const printed = await page.evaluate(() => {
+      window.dispatchEvent(new Event('beforeprint'));
+      const folds = [...document.querySelectorAll('main [data-fold]')];
+      const closed = folds.filter((fold) => !fold.open).length;
+      folds.forEach((fold) => (fold.open = false));
+      return closed;
+    });
+    expect(printed === 0, `${name}: ${printed} of ${folds.length} folds stay closed when the browser prints`);
     const first = page.locator('main [data-fold] > summary').first();
     await first.focus();
     await page.keyboard.press('Enter');
@@ -725,6 +720,7 @@ async function checkSessions(page, name, entry, expected) {
             text: cut.textContent,
             left: cut.dataset.cut,
             lang: cut.closest('[lang]')?.getAttribute('lang'),
+            translate: cut.closest('[translate]')?.getAttribute('translate'),
             ownLine: cut.previousSibling?.textContent.endsWith('\n') && cut.nextSibling?.textContent.startsWith('\n'),
             typeface: style.fontFamily !== getComputedStyle(pre).fontFamily,
             rules: `${style.borderTopStyle} ${style.borderBottomStyle}`,
@@ -750,6 +746,8 @@ async function checkSessions(page, name, entry, expected) {
         mark.text === cut[entry.lang] && mark.left === String(cut.left) && mark.lang === entry.lang,
         `${at}: the mark of the cut reads "${mark.text}" for ${mark.left} lines in the language "${mark.lang}", expected "${cut[entry.lang]}" for ${cut.left} lines in "${entry.lang}"`,
       );
+      // The mark is text of the page inside a block that is not translated.
+      expect(mark.translate === 'yes', `${at}: the mark of the cut is not open to translation (translate="${mark.translate}")`);
       expect(
         mark.ownLine && mark.typeface && mark.rules === 'dashed dashed',
         `${at}: the mark of the cut does not stand on a line of its own in the typeface of the text between two dashed rules (${JSON.stringify(mark)})`,

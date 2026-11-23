@@ -50,7 +50,8 @@ const typed = (text: string): string =>
 let session: string;
 let copy: string;
 if (entries) {
-  // The output is English; the mark of a cut is text of the page.
+  // The output is English; the mark of a cut is text of the page, so it
+  // may be translated inside the block, which is not.
   const foreign = lang === 'en' ? '' : ' lang="en"';
   const own = lang === 'en' ? '' : ` lang="${lang}"`;
   session = entries
@@ -58,7 +59,7 @@ if (entries) {
       const printed = entry.lines
         .map((line) =>
           'cut' in line
-            ? `<span class="terminal-cut" data-cut="${line.left}"${own}>${escapeHtml(line.cut)}</span>`
+            ? `<span class="terminal-cut" data-cut="${line.left}" translate="yes"${own}>${escapeHtml(line.cut)}</span>`
             : commandOutputHtml(line.text),
         )
         .join('\n');
@@ -91,5 +92,5 @@ if (entries) {
     <span>{shell}</span>
     <span class="terminal-place">{t.packageFolder}</span>
   </div>
-  <pre tabindex="0" role="region" aria-label={name} set:html={session} />
+  <pre tabindex="0" role="region" aria-label={name} translate="no" set:html={session} />
 </div>
