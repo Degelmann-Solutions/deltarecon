@@ -18,9 +18,10 @@ Run them in `docs/`. Node 20 and npm are required.
 |---|---|
 | `npm ci` | Installs the pinned dependencies from `package-lock.json`. |
 | `npm run local` | Builds the site with its search index and serves it. When port 4321 is free, the pages are at `http://localhost:4321/deltarecon/docs/de/` and `/en/`; otherwise the server takes the next free port. The command prints the address it serves on. |
-| `npm run build` | Builds the site to `dist/` and writes the search index to `dist/pagefind/`. |
-| `npm run check` | Builds the site, then runs the eight checks below in Chromium. Every page entry runs it. The last of them reads Git and needs the tag of the release and the branch `main` in the local clone. |
+| `npm run build` | Builds the site to `dist/`, writes the search index to `dist/pagefind/`, and last, with `scripts/write-delivery.mjs`, the sitemap `dist/sitemap.xml` and the delivery record `dist/delivery.json` (see "Delivery to the company website"). The last step reads Git and needs a checkout. |
+| `npm run check` | Builds the site, then runs the nine checks below in Chromium. Every page entry runs it. The last of them reads Git and needs the tag of the release and the branch `main` in the local clone. |
 | `npm run check:apache` | Builds the site, then checks in an Apache what only Apache shows: unknown addresses and the root address. Needs Docker; not part of `npm run check`. |
+| `npm run check:apache:site -- <folder>` | Runs the same Apache check on a server root that is given: the output of the company website's build (its `dist/`), which holds the documentation under `deltarecon/docs`. Builds nothing. Needs Docker; not part of `npm run check`. |
 | `npm run check:release -- --search <folder>` | Holds the capture files, the built step pages and the page of single commands against the published release. Needs `../dist/release-v<version>/` and the search folder of a run of the demo; not part of `npm run check` (see "Captures and the release check"). |
 | `npm run check:first-run` | Builds the site, then runs the commands of the last step of "Build an adapter step by step" on the engine of `../examples/toy_engine/`, with `uv run deltarecon` in the checkout. Needs `uv`; not part of `npm run check` (see "The first run of the adapter page"). |
 | `npx astro check` | Type-checks the project. |
@@ -36,10 +37,12 @@ indexes the build output.
 
 ## Checks
 
-`npm run check` runs eight scripts one after the other; three more,
+`npm run check` runs nine scripts one after the other; three more,
 `scripts/check-apache.mjs`, `scripts/check-release.mjs` and
-`scripts/check-first-run.mjs`, run on their own (below). Each of the eight starts `astro preview` (`scripts/harness.mjs`),
-reads the page register, and names every failed expectation with its page.
+`scripts/check-first-run.mjs`, run on their own (below). Each of the first eight starts `astro preview` (`scripts/harness.mjs`),
+reads the page register, and names every failed expectation with its page;
+the ninth, `scripts/check-delivery.mjs`, starts no server and reads the files
+of the build.
 `scripts/harness.mjs` also holds the checks of an open page that hold for
 every page of the site (`pageChecks`): axe, the check for sideways
 scrolling, and the floor (`checkFloor`), which is: no transition, no
@@ -76,6 +79,7 @@ goes there.
 | `scripts/check-prose.mjs` | First the reader of the facts of the example (`src/example.ts`) on the four capture files: the number of revisions, the number of each revision of the search table, the revisions of the two states and the number of model points, each held against the capture in a second way; and it must throw, with the file and the part, on a capture text whose table of the changes lacks a revision of the search table or its rows, whose commands name no revision, and on a search table without rows. Then the readers of the two four-column tables of the demo and of the interval of a "Not resolved" message, in the same file: head row, rows and the sentence above each table, held against the capture in a second way. The reader of the table of the regression must throw on a capture text without the table, without its head row and without the sentence above it; the reader of the table of the changes on one without the table, without its head row and with a row that leaves the columns of its head row; the reader of the interval on a message whose revisions the table of the changes does not hold, that names none, or whose changes do not follow one another. Then every page of prose, which is every page that holds section headings; what a page must show stands in `prosePages` at the top of the script, and a page of prose without an entry there fails. Every level-2 heading of the content is a section heading with the anchor the script names, in order, and a link to itself; no other link leads to a section, apart from a section the entry of the page names as linked from the content (`linked`; the options several commands share on "Single commands"), which the content must then link. No part of the content names a step that is not there. The platform switches of a page of prose are those its entry names (`switches`), each a block between the blocks of the page: a tab list of two buttons, the copy button after it, the command as a named region with the place the page gives it ("Command, request, Windows"); Windows on the first visit, a click on "Linux" and the arrow keys change every switch while the used one keeps focus and place, the copy button copies the command that is shown, a switch without a command holds no code block and no copy button; axe with Linux chosen; tabs and copy button at least 40 px high at 390 px; with JavaScript off both parts under their labels, Windows first, without tabs and buttons. A page of prose whose entry names no switch must hold none. The language switch at the address of a section opens the counterpart at that section. A wide figure spans the content width and holds its caption as text; no text of a figure is below 11 px. The idea figure: the boxes name the revisions of the two states; one square per revision, 7 px, those of the search table 11 px with their number, drawn as borders and hidden from assistive technology; the two lines of text begin with the counts and the caption names the numbers; at 1280 px the boxes stand left and right of the trace, at 390 and 320 px the figure is a stack of box, trace, box, and the squares keep their size, do not overlap and stay inside the figure. The bars below it carry "number · revision" and the sum of the capture of the language. A row list numbers its rows; the code name of a row follows its name as inline code that is not translated, in weight 400, and the tag of a row is a small mono label in capitals with a hairline border, at 1280 px at the right end of the row and at 390 and 320 px below its text; where the entry of the page names the numbers of code names and tags (`codes`, `tags`), the page holds as many. A sub-heading is a level-3 heading of 18 px after a section heading, as many as the entry names (`subHeadings`). The connection figure: one per page, a wide figure and an ordered list of the three boxes the script names per language, each with its two small lines; only the box the script names as built is dashed, the others are solid; the first trace carries the one label, in teal-text; at 1280 px the boxes stand side by side with the label between the first two, above the trace, at 390 and 320 px they are a stack with the label between the first two; nothing is scaled and nothing reaches beyond the figure. The yardstick box: a block of the page with a navy border, its tag, the line that begins with the number of lines in 22 px, and a text that names a file as inline code. A code excerpt: a figure with a caption and a head row that names its file first; its code is a region named after its file that Tab reaches, with the focus ring, not translated, without markup (uncoloured), and scrolls sideways inside its box, at 390 and 320 px with the arrow key; it holds no copy button. A page whose entry names no yardstick box and no code excerpt must hold none. The tables of the demo: for the two of `DemoTable`, head row, rows and the sentence above as the capture of the language prints them; for the table of the search, revision and sum of each row as the capture prints them, and a caption that is not empty. For all three: the roles written out, a header per row, a quantity, a description and "Bruttobeitrag" with their language, a hash marked as not to be translated; at 1280 px a row is one line, at 390 and 320 px every row and the head row are records of two lines, each cell on the line of its column name and, in a four-column table, below it, and no cell reaches beyond the window. The line of the changes: one square per change, those of the search table 11 px with their number, a bracket from the first to the last change of the interval that is not resolved with their numbers above it, the key and the caption with the numbers; at 1280 px the key stands right of the trace, at 390 and 320 px below it; nothing is scaled; the bars below it as under the idea figure. The wide flow diagram: one per page, a wide figure and an ordered list of the boxes the script names per language, in their order, each numbered, outlined, with a title of 13 px and no mono line; the trace ends in a pad hidden from assistive technology and the words the script names; the first row list of the page names the same parts in the same order; at 1280 px the boxes stand side by side from left to right with the end right of them, at 390 and 320 px as a stack with the end below; nothing is scaled and nothing reaches beyond the figure. The path block shows the four stages of the register, each with a sentence and a link to each of its pages but the page itself, by name and address of the register. No transition, no animation and no smooth scrolling; no sideways scrolling at 1280, 390 and 320 px; axe at 1280 and 390 px. |
 | `scripts/check-hints.mjs` | The hint list and the contact block of "When something goes wrong" and the hint links that lead to it, in both languages (see "The help page"). First the register of the hint groups (`groupFaults` in `src/hints.ts`): anchors of small letters, digits and hyphens, each once; pages of the page register in path order; one group per step or section. Then it proves itself on the facts it has read from the built pages, altered in one place each: a group whose step is not there, a hint link without a group, a group whose step carries no hint link, a group and a hint link in one language only, groups out of order and a heading that is not the title of the step must each be named with the group, the step or the page. On the built pages: the help page shows exactly the groups of the register, in its order; a group names a step or a section that its page holds, carries the label of page and step ("Quick start · step 1", for a section the word "section") outside its heading, the title of the step card or the heading of the section as a section heading with the anchor of the group, at least one hint with a level-3 title and a text, and one link to its step by that title; a step or a section with a group carries exactly one hint link, inside it, in the words of the language, to its group on the help page of the language, and no other step or section carries one; both languages hold the same groups and the same hint links. Followed in the browser: every hint link opens the help page of its language at its group, and the link of the group leads back to the step or section. The contact block: the last block of the page under the last section heading, its title a level-3 heading; e-mail, phone and address are those of `contact` in `src/site.ts`, the e-mail the one link (`mailto:`); the list of what to tell names the release of `src/release.json`; the page holds no form. The looks at 1280, 390 and 320 px: the group label in mono 12 px capitals, the group heading 22 px and on the phone 20 px, 4 px below its label; a hint with a hairline above and 16 px padding, at 1280 px in two columns, the left 260 px wide and 36 px from the right, at 390 and 320 px in one column; a quoted message in the white mono box; the contact block with a 1 px navy border, 24 px padding and on the phone 16 px, the e-mail in mono, underlined and at least 24 px high, the values 18 px beside their labels and on the phone 16 px below them, the address 14 px; no sideways scrolling. Axe, the section headings and the language switch of the page are checked by the scripts above, as for every page of prose. |
 | `scripts/check-excerpts.mjs` | What the built pages show of the repository's code, held against the tag of the release (`v<version>` of `src/release.json`), which it reads with the `git` program. First it proves itself on texts it sets itself: an altered excerpt, a range that does not hold the code, a member the protocol does not hold, a member a complete page leaves out or names twice, a file that differs on `main`, a wrong number of lines and a tag the clone does not hold must each fail and name what the message is to name. Then, on every page of the register: the code of a code excerpt is, character for character, the lines its head row names of its file at the tag, and the head row names file, lines and tag; a row marked as a member of the protocol (`member`) names a method or an annotated attribute of that class in `degelmann/deltarecon/protocol.py` at the tag, or, where the row carries a tag such as "optional", an operation the comment of the class describes; a row marked as a name of the engine selection (`selection`) names, with the first word of its code name, a name that stands in `degelmann/deltarecon/engine_selection.py` at the tag; on a page with such rows every code name of a row carries one of the two marks; on a page the script names as complete (`COMPLETE`: "Build an adapter step by step") every member of `Engine` and of `Session` at the tag, the operations their comments describe included, has exactly one row marked as that member, so a member the page leaves out or names twice fails; a number of lines (`data-lines-of`) is that of its file at the tag, and the number of a yardstick box the sum over its files, each of which its text names as inline code. Once: the two files are the same on `main` as at the tag. It fails, with the name of the tag, when the local clone does not hold the tag, and when no built page holds an excerpt, a member row or a yardstick box. It does not read what a row says about a member, and on a page that is not named as complete not whether it lists every member of the protocol. |
+| `scripts/check-delivery.mjs` | What the build writes for the company website (see "Delivery to the company website"). The sitemap `dist/sitemap.xml` is well-formed XML, lists exactly the 22 absolute addresses of the page register, each once and each with its two `xhtml:link` alternates (`de` and `en`: the page and its counterpart), and every address it lists is a built page. The delivery record `dist/delivery.json`: `commit` is the commit `git rev-parse HEAD` names, `changed` is a boolean, and `pages` is the register in its order, each entry with language, absolute address, page name and the description that Chromium reads from the head of the built page, and with no other field. It does not assert the value of `changed`: a check runs on a working tree in progress too. |
 
 `npm run check:apache` runs `scripts/check-apache.mjs` after the build. The
 preview server of the other checks knows no `.htaccess`, so this script
@@ -95,6 +99,16 @@ and at the server root a stand-in for the company website (its rule
 It stops and removes its container in every outcome. Without Docker it ends
 with a message that says so. Run it when the page-not-found pages, the root
 page or an `.htaccess` file change.
+
+`npm run check:apache:site -- <folder>` runs the same script with
+`--site <folder>`. The folder is then the server root: the output of the
+company website's build, which holds the documentation under
+`deltarecon/docs`. The script sets up no stand-in, mounts no `dist/` and
+needs no build of the documentation. The assertions are the same, with one
+difference: the unknown address outside the documentation must answer 404
+with the page Apache serves at `/404.html`, which is the website's own, and
+must show no page-not-found page of the documentation. Run it on the
+website's output before a deploy that takes a new state of the documentation.
 
 The accessibility check writes its screenshots to `screenshots/` (not under
 version control): the start page of each language at desktop width, at
@@ -163,6 +177,54 @@ does not index them.
   decides, and languages of which none is German or English lead to English.
   Where no language can be read, and without JavaScript, the page stays.
   Nothing is remembered, and no other page redirects.
+
+## Delivery to the company website
+
+The documentation has no deploy of its own. The build of the company website
+takes a finished build of the documentation and puts it into its own output
+under `deltarecon/docs`; the website's deploy then mirrors that output. For
+this the last step of `npm run build`, `scripts/write-delivery.mjs`, writes
+two files to `dist/`:
+
+- **The sitemap**, `dist/sitemap.xml`: the 22 pages of the page register with
+  their absolute addresses, each with its `de` and `en` versions as
+  `xhtml:link` alternates. The root page and the page-not-found pages are not
+  listed. The `robots.txt` of the website names this sitemap beside the
+  website's own.
+- **The delivery record**, `dist/delivery.json`, with three fields:
+  - `commit`: the full commit the build was made from (`git rev-parse HEAD`);
+  - `changed`: `true` when the working tree of the repository differed from
+    that commit at the build (`git status --porcelain` prints a line). An
+    untracked file that Git does not ignore counts, because pages quote
+    files of the repository;
+  - `pages`: per page of the register, German pages first, its language
+    (`lang`), absolute address (`address`), page name (`title`) and the
+    description of its built head (`description`). The website lists the
+    pages in its `llms.txt` from this and keeps no register of its own.
+
+  The record is not published: the website reads it and leaves it out of its
+  output.
+
+The script ends with an error when a page of the register is not built, when
+a built page holds no description or more than one, and when Git does not
+answer. `scripts/check-delivery.mjs` holds both files against the register
+and the built pages (see "Checks").
+
+Three decisions of the owner (2026-11-23) set how the website takes the
+build:
+
+1. The website reads the path of the build, this project's `dist/`, from its
+   `.env` (`DELTARECON_DOCS_DIST`).
+2. The website takes a finished build and never builds the documentation
+   itself. Build it here first, with `npm run build`.
+3. The accepted commit is pinned in the repository of the website. The
+   website's build fails when the record names another commit or
+   `changed: true`. So a build to deliver is made on an unchanged working
+   tree of the commit the website pins; after a new commit here, the pin
+   there is set again.
+
+`npm run check:apache:site -- <folder>` checks the website's output, with
+the documentation in it, on Apache (see "Checks").
 
 ## Search
 
