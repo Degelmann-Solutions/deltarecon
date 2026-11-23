@@ -19,7 +19,7 @@ Run them in `docs/`. Node 20 and npm are required.
 | `npm ci` | Installs the pinned dependencies from `package-lock.json`. |
 | `npm run local` | Builds the site with its search index and serves it. When port 4321 is free, the pages are at `http://localhost:4321/deltarecon/docs/de/` and `/en/`; otherwise the server takes the next free port. The command prints the address it serves on. |
 | `npm run build` | Builds the site to `dist/`, writes the search index to `dist/pagefind/`, and last, with `scripts/write-delivery.mjs`, the sitemap `dist/sitemap.xml` and the delivery record `dist/delivery.json` (see "Delivery to the company website"). The last step reads Git and needs a checkout. |
-| `npm run check` | Builds the site, then runs the nine checks below in Chromium. Every page entry runs it. The last of them reads Git and needs the tag of the release and the branch `main` in the local clone. |
+| `npm run check` | Builds the site, then runs the nine checks below in Chromium. Every page entry runs it. `scripts/check-excerpts.mjs` reads Git and needs the tag of the release and the branch `main` in the local clone; `scripts/check-delivery.mjs` reads the commit of the checkout. |
 | `npm run check:apache` | Builds the site, then checks in an Apache what only Apache shows: unknown addresses and the root address. Needs Docker; not part of `npm run check`. |
 | `npm run check:apache:site -- <folder>` | Runs the same Apache check on a server root that is given: the output of the company website's build (its `dist/`), which holds the documentation under `deltarecon/docs`. Builds nothing. Needs Docker; not part of `npm run check`. |
 | `npm run check:release -- --search <folder>` | Holds the capture files, the built step pages and the page of single commands against the published release. Needs `../dist/release-v<version>/` and the search folder of a run of the demo; not part of `npm run check` (see "Captures and the release check"). |
@@ -107,7 +107,8 @@ company website's build, which holds the documentation under
 needs no build of the documentation. The assertions are the same, with one
 difference: the unknown address outside the documentation must answer 404
 with the page Apache serves at `/404.html`, which is the website's own, and
-must show no page-not-found page of the documentation. Run it on the
+must not carry the title of a page-not-found page of the documentation (the
+website's page may use the same words in its text). Run it on the
 website's output before a deploy that takes a new state of the documentation.
 
 The accessibility check writes its screenshots to `screenshots/` (not under
@@ -194,7 +195,8 @@ two files to `dist/`:
 - **The delivery record**, `dist/delivery.json`, with three fields:
   - `commit`: the full commit the build was made from (`git rev-parse HEAD`);
   - `changed`: `true` when the working tree of the repository differed from
-    that commit at the build (`git status --porcelain` prints a line). An
+    that commit at the build (`git status --porcelain --untracked-files=normal`
+    prints a line, whatever the Git configuration says about untracked files). An
     untracked file that Git does not ignore counts, because pages quote
     files of the repository;
   - `pages`: per page of the register, German pages first, its language

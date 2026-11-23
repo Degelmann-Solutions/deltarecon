@@ -26,7 +26,8 @@
 // then sets up no stand-in, mounts no dist/ and needs no build here. The
 // assertions are the same, but for the unknown address outside the
 // documentation: it must answer 404 with the page Apache serves at /404.html,
-// the website's own, and with no page-not-found page of the documentation.
+// the website's own, and not with the title of a page-not-found page of the
+// documentation.
 // The container is stopped and removed in every outcome.
 // Exits non-zero and names every failed expectation.
 import { spawnSync } from 'node:child_process';
@@ -291,8 +292,10 @@ async function checkOutside(browser, origin, address) {
   } else {
     expect(text.includes(STAND_IN), `${name}: does not show the stand-in page of the website`);
   }
+  // The stand-in holds none of the names. The website's own page may print
+  // the same words in its text, so a given server root is held to the titles.
   expect(
-    notFound.every((entry) => !text.includes(entry.name) && title !== entry.title),
+    notFound.every((entry) => title !== entry.title && (given || !text.includes(entry.name))),
     `${name}: shows a page-not-found page of the documentation`,
   );
   await context.close();

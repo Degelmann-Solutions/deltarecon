@@ -72,7 +72,8 @@ const pages = await loadPages();
 
 const record = {
   commit: git('rev-parse', 'HEAD').trim(),
-  changed: git('status', '--porcelain').trim() !== '',
+  // Untracked files count, whatever the Git configuration of the user says.
+  changed: git('status', '--porcelain', '--untracked-files=normal').trim() !== '',
   pages: [],
 };
 for (const entry of pages) {
