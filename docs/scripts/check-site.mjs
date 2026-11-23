@@ -154,27 +154,64 @@ async function checkNoCookie(context, page, name) {
 /**
  * The text the content shows, one entry per piece of text. Left out: what a
  * script puts into the page as a control (a button: the tabs of a platform
- * switch, the copy button) and what it announces (a status).
+ * switch, the copy button) and what it announces (a status). With `within`,
+ * only the text inside an element that matches the selector.
  */
-function shownText(page) {
-  return page.evaluate(() => {
+function shownText(page, within) {
+  return page.evaluate((within) => {
     const found = [];
     const walker = document.createTreeWalker(document.querySelector('main'), NodeFilter.SHOW_TEXT);
     for (let node = walker.nextNode(); node; node = walker.nextNode()) {
       const text = node.textContent.trim().replace(/\s+/g, ' ');
       if (text === '' || node.parentElement.closest('button, [role="status"], script, style')) continue;
+      if (within && !node.parentElement.closest(within)) continue;
       const range = document.createRange();
       range.selectNodeContents(node);
       if (range.getClientRects().length > 0) found.push(text);
     }
     return found;
+  }, within);
+}
+
+/**
+ * The pieces of `expected` that `shown` does not hold, by number: a piece
+ * that is expected twice and shown once is missing once.
+ */
+function missingPieces(expected, shown) {
+  const left = new Map();
+  for (const text of shown) left.set(text, (left.get(text) ?? 0) + 1);
+  return expected.filter((text) => {
+    const count = left.get(text) ?? 0;
+    left.set(text, count - 1);
+    return count <= 0;
   });
+}
+
+// The count proves itself: a piece that stands twice, shown once, is missing
+// once, and so is a piece of the Linux parts that reads as one of Windows.
+{
+  const cases = [
+    [['a', 'b', 'a'], ['a', 'b', 'a', 'c'], []],
+    [['a', 'b', 'a'], ['a', 'b'], ['a']],
+    [['run', 'run'], ['run'], ['run']],
+    [['a'], [], ['a']],
+  ];
+  for (const [expected, shown, missing] of cases) {
+    const found = missingPieces(expected, shown);
+    expect(
+      JSON.stringify(found) === JSON.stringify(missing),
+      `missingPieces(${JSON.stringify(expected)}, ${JSON.stringify(shown)}) names ${JSON.stringify(found)}, expected ${JSON.stringify(missing)}`,
+    );
+  }
 }
 
 /**
  * Without JavaScript: the level-1 heading and every heading of the content
  * are visible, a heading in a closed fold aside; the content holds at least
- * the text it shows with JavaScript on (`withScript`).
+ * the text it shows with JavaScript on (`withScript`), each piece as often
+ * as it stands there. On a page with a platform switch `withScript` is the
+ * text with Windows chosen and the text of the Linux parts with Linux
+ * chosen, since the page without JavaScript shows both.
  */
 async function checkReadable(page, name, withScript) {
   const headings = await page.evaluate(() =>
@@ -195,14 +232,7 @@ async function checkReadable(page, name, withScript) {
   );
   const unseen = headings.filter((heading) => !heading.visible).map((heading) => heading.text);
   expect(unseen.length === 0, `${name}: headings that are not visible: ${unseen.join(' | ')}`);
-  // Every occurrence counts: a piece that stands twice must stand twice.
-  const shown = new Map();
-  for (const text of await shownText(page)) shown.set(text, (shown.get(text) ?? 0) + 1);
-  const missing = withScript.filter((text) => {
-    const left = shown.get(text) ?? 0;
-    shown.set(text, left - 1);
-    return left <= 0;
-  });
+  const missing = missingPieces(withScript, await shownText(page));
   expect(
     missing.length === 0,
     `${name}: ${missing.length} pieces of text that the content shows with JavaScript on are missing: ${missing.slice(0, 5).join(' | ')}`,
@@ -438,9 +468,9 @@ async function checkEntry(browser, origin, entry) {
         (await page.getAttribute('html', 'data-platform')) === 'linux',
         `${name}: a click on "Linux" does not choose the platform`,
       );
-      // What only the parts of Linux show is content too.
-      const seen = new Set(withScript);
-      withScript.push(...(await shownText(page)).filter((text) => !seen.has(text)));
+      // The parts of Linux are content too, each piece of them, also one
+      // that reads as a piece of the Windows parts.
+      withScript.push(...(await shownText(page, '[data-platform-part="linux"]')));
       await checkNoCookie(context, page, `${name}, Linux chosen`);
       await page.reload({ waitUntil: 'networkidle' });
       await checkNoCookie(context, page, `${name}, Linux chosen, loaded again`);

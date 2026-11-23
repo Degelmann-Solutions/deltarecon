@@ -104,7 +104,10 @@ const shots = path.join(root, 'screenshots');
 const pages = await loadPages();
 const { notFound, rootPage } = await loadOtherPages();
 const { failures, expect, report } = expectations('check-a11y');
-const { checkAxe, checkFloor, checkNoMotion, checkNoSidewaysScroll } = pageChecks({ failures, expect });
+const { checkAxe, checkFloor, checkNoMotion, checkNoSidewaysScroll, checkTextSpacing } = pageChecks({
+  failures,
+  expect,
+});
 // The page below the four stages of the chapter tree.
 const HELP = 'when-something-goes-wrong';
 // The sizes of the controls of the frame (DESIGN.md, Components, Page frame).
@@ -694,6 +697,38 @@ function listBox(page) {
   });
 }
 
+/**
+ * The look for "Bruttobeitrag" in text that cannot carry a language proves
+ * itself: on an English page the word is put into an attribute, into the
+ * title of the page and into a description of the head, one at a time, and
+ * each must be named; the page as built must pass.
+ */
+async function checkOtherLanguageProof(browser, origin, entry) {
+  const name = `${entry.address} (proof of the look for "Bruttobeitrag")`;
+  const { context, page } = await open(browser, origin, entry, DESKTOP);
+  const faults = [
+    ['aria-label', () => document.querySelector('main h1').setAttribute('aria-label', 'Bruttobeitrag')],
+    ['placeholder', () => document.querySelector('input[type="search"]').setAttribute('placeholder', 'Bruttobeitrag')],
+    ['title', () => document.body.setAttribute('title', 'Der Bruttobeitrag')],
+    ['the title of the page', () => (document.title = 'Bruttobeitrag')],
+    ['<meta description>', () => (document.querySelector('meta[name="description"]').content = 'Bruttobeitrag')],
+  ];
+  for (const [named, fault] of [[undefined, () => {}], ...faults]) {
+    await page.reload({ waitUntil: 'networkidle' });
+    await page.evaluate(fault);
+    const own = expectations('proof');
+    await pageChecks(own).checkOtherLanguage(page, name, 'en');
+    const heard = own.failures.filter((failure) => failure.includes('cannot carry the language'));
+    expect(
+      named === undefined
+        ? heard.length === 0
+        : heard.length === 1 && heard[0].includes('1 times') && heard[0].includes(named),
+      `${name}: with ${named ?? 'the page as built'} the look names: ${heard.join(' | ') || 'nothing'}`,
+    );
+  }
+  await context.close();
+}
+
 /** The search result list on the start page of a language. */
 async function checkSearchList(browser, origin, entry) {
   const texts = searchTexts[entry.lang];
@@ -723,6 +758,10 @@ async function checkSearchList(browser, origin, entry) {
     expect(list.oneLine && list.bold, `${name}: an excerpt is not one line with its match in bold`);
     await checkAxe(page, name);
     await checkNoSidewaysScroll(page, name);
+    // The hits with the text spacing of WCAG 1.4.12: nothing is cut off but
+    // the excerpt, which is one line by design.
+    await checkTextSpacing(page, name);
+    expect((await listBox(page)).shown, `${name}: the list is closed after the look at the text spacing`);
     await page.screenshot({ path: shot('desktop') });
 
     // The hits follow the field in tab order, each with a focus ring; focus
@@ -803,6 +842,8 @@ async function checkSearchList(browser, origin, entry) {
     expect(list.oneLine && list.bold, `${name}: an excerpt is not one line with its match in bold`);
     await checkAxe(page, name);
     await checkNoSidewaysScroll(page, name);
+    await checkTextSpacing(page, name);
+    expect((await listBox(page)).shown, `${name}: the list is closed after the look at the text spacing`);
     await page.screenshot({ path: shot('menu'), fullPage: true });
 
     // Escape in the field: the list closes, the menu stays, focus stays.
@@ -1203,6 +1244,7 @@ async function checkEntry(browser, origin, entry) {
 
   // The search result list: the start pages.
   if (entry.isRoot) await checkSearchList(browser, origin, entry);
+  if (entry.isRoot && entry.lang === 'en') await checkOtherLanguageProof(browser, origin, entry);
 }
 
 const { origin: reported, stop } = startPreview();

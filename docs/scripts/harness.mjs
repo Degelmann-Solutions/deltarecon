@@ -239,8 +239,10 @@ export const pageWords = {
  * the box on that axis, and text of the element reaches out of the box. A
  * box that scrolls (`overflow: auto`: code, terminal, wide tables) cuts
  * nothing off. Left out: text that is hidden from view on purpose (a box of
- * 1 × 1 px, as `.sr-only`), and the one line that the design cuts off with
- * an ellipsis (the excerpt of a search hit, DESIGN.md, Search result list).
+ * 1 × 1 px, as `.sr-only`), and the excerpt of a search hit
+ * (`.search-hit-excerpt`), the one line that the design cuts off with an
+ * ellipsis (DESIGN.md, Search result list); it is left out only while it is
+ * one line with an ellipsis.
  */
 function lostText() {
   const describe = (element) => element.outerHTML.replace(/\s+/g, ' ').slice(0, 100);
@@ -270,7 +272,14 @@ function lostText() {
     if (!x && !y) continue;
     const box = element.getBoundingClientRect();
     if (box.width <= 1 && box.height <= 1) continue;
-    if (element.matches('.search-hit-excerpt')) continue;
+    if (
+      element.matches('.search-hit-excerpt') &&
+      style.textOverflow === 'ellipsis' &&
+      style.whiteSpace === 'nowrap' &&
+      !y
+    ) {
+      continue;
+    }
     const inner = {
       left: box.left + element.clientLeft,
       top: box.top + element.clientTop,
@@ -320,6 +329,17 @@ const TEXT_SPACING = `
 /** The font sizes Chromium starts with, and twice those. */
 const FONT_SIZES = { standard: 16, fixed: 13 };
 const FONT_SIZES_200 = { standard: 32, fixed: 26 };
+// The attributes whose text a reader hears or reads and that cannot carry a
+// language of their own.
+const HEARD_ATTRIBUTES = [
+  'aria-label',
+  'aria-description',
+  'aria-roledescription',
+  'aria-valuetext',
+  'alt',
+  'title',
+  'placeholder',
+];
 
 /**
  * The checks of an open page that hold for every page of the site, bound to
@@ -338,7 +358,9 @@ const FONT_SIZES_200 = { standard: 32, fixed: 26 };
  *     command or of code (`code`, the command of a terminal session), which
  *     are marked as not to be translated and carry no language
  *     (EXPERIENCE.md, Accessibility Floor, Language), and stands in no
- *     attribute a reader hears (`aria-label`, `alt`, `title`).
+ *     text that cannot carry a second language: the attributes a reader
+ *     hears (`HEARD_ATTRIBUTES`), the title of the page and the
+ *     descriptions and titles of its head.
  * `checkFloor` runs the last five in a row and leaves the page as it was;
  * with `resize: false` it leaves the text at 200 % out, which is looked at
  * at desktop width only.
@@ -442,7 +464,7 @@ export function pageChecks({ failures, expect }) {
     },
     async checkOtherLanguage(page, name, lang) {
       if (lang !== 'en') return;
-      const bare = await page.evaluate(() => {
+      const { bare, heard } = await page.evaluate((attributes) => {
         const found = [];
         const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
         for (let node = walker.nextNode(); node; node = walker.nextNode()) {
@@ -453,21 +475,34 @@ export function pageChecks({ failures, expect }) {
             found.push(parent.outerHTML.replace(/\s+/g, ' ').slice(0, 100));
           }
         }
-        // An attribute a reader hears cannot carry a second language.
-        for (const element of document.body.querySelectorAll('[aria-label], [alt], [title]')) {
-          if (
-            ['aria-label', 'alt', 'title'].some((attribute) =>
-              (element.getAttribute(attribute) ?? '').includes('Bruttobeitrag'),
-            )
-          ) {
-            found.push(`in an attribute of ${element.outerHTML.replace(/\s+/g, ' ').slice(0, 100)}`);
+        // Text that cannot carry a second language: an attribute a reader
+        // hears, on <body> or an element in it, and the texts of the head.
+        const heard = [];
+        const selector = attributes.map((attribute) => `[${attribute}]`).join(', ');
+        for (const element of [document.body, ...document.body.querySelectorAll(selector)]) {
+          for (const attribute of attributes) {
+            const value = element.getAttribute(attribute) ?? '';
+            if (value.includes('Bruttobeitrag')) {
+              heard.push(`${attribute}="${value.slice(0, 80)}" of <${element.tagName.toLowerCase()}>`);
+            }
           }
         }
-        return found;
-      });
+        if (document.title.includes('Bruttobeitrag')) heard.push(`the title of the page "${document.title}"`);
+        for (const meta of document.head.querySelectorAll('meta[content]')) {
+          const key = meta.getAttribute('name') ?? meta.getAttribute('property') ?? '';
+          if (/(^|:)(description|title)$/.test(key) && meta.content.includes('Bruttobeitrag')) {
+            heard.push(`<meta ${key}> "${meta.content.slice(0, 80)}"`);
+          }
+        }
+        return { bare: found, heard };
+      }, HEARD_ATTRIBUTES);
       expect(
         bare.length === 0,
         `${name}: "Bruttobeitrag" stands ${bare.length} times outside an element with lang="de": ${bare.slice(0, 5).join(' | ')}`,
+      );
+      expect(
+        heard.length === 0,
+        `${name}: "Bruttobeitrag" stands ${heard.length} times in text that cannot carry the language "de": ${heard.slice(0, 5).join(' | ')}`,
       );
     },
     /** The rules of the floor that hold on every page, at the open width. */

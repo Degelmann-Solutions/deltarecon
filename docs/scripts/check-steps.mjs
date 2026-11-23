@@ -720,6 +720,7 @@ async function checkSessions(page, name, entry, expected) {
             text: cut.textContent,
             left: cut.dataset.cut,
             lang: cut.closest('[lang]')?.getAttribute('lang'),
+            translate: cut.closest('[translate]')?.getAttribute('translate'),
             ownLine: cut.previousSibling?.textContent.endsWith('\n') && cut.nextSibling?.textContent.startsWith('\n'),
             typeface: style.fontFamily !== getComputedStyle(pre).fontFamily,
             rules: `${style.borderTopStyle} ${style.borderBottomStyle}`,
@@ -745,6 +746,8 @@ async function checkSessions(page, name, entry, expected) {
         mark.text === cut[entry.lang] && mark.left === String(cut.left) && mark.lang === entry.lang,
         `${at}: the mark of the cut reads "${mark.text}" for ${mark.left} lines in the language "${mark.lang}", expected "${cut[entry.lang]}" for ${cut.left} lines in "${entry.lang}"`,
       );
+      // The mark is text of the page inside a block that is not translated.
+      expect(mark.translate === 'yes', `${at}: the mark of the cut is not open to translation (translate="${mark.translate}")`);
       expect(
         mark.ownLine && mark.typeface && mark.rules === 'dashed dashed',
         `${at}: the mark of the cut does not stand on a line of its own in the typeface of the text between two dashed rules (${JSON.stringify(mark)})`,
