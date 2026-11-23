@@ -30,14 +30,19 @@
 //     (YardstickBox.astro): the number is that of the file at the tag, for
 //     the box the sum over its files, each of which the box names as inline
 //     code.
+// On the page "Write a tolerance profile" (`QUOTED`), in both languages: the
+// message each row of the section of the refusals quotes, the first inline
+// code of the row's text, stands in a string of degelmann/deltarecon/compare.py
+// at the tag, with adjacent string literals joined, as Python joins them.
 // And once: the two files are the same on `main` as at the tag, so that the
 // pages describe the protocol as it is.
 //
 // First it proves itself on texts it sets itself: an altered excerpt, a
 // range that does not hold the code, a member the protocol does not hold, a
 // member a complete page leaves out or names twice, a file that differs on
-// `main`, a wrong number of lines and a tag the clone does not hold must each
-// fail and name what the message is to name.
+// `main`, a wrong number of lines, a quoted message the file does not hold
+// and a tag the clone does not hold must each fail and name what the message
+// is to name; a message split over two string literals must pass.
 //
 // Exits non-zero and names page and part of every failed expectation.
 import { execFileSync } from 'node:child_process';
@@ -55,6 +60,11 @@ const CLASSES = ['Engine', 'Session'];
  * each names every member of the classes above exactly once.
  */
 const COMPLETE = ['build-an-adapter'];
+/**
+ * The page, by its id in the register, whose section `section` quotes in each
+ * row a message of the program, and the file that holds the messages.
+ */
+const QUOTED = { page: 'tolerance-profile', section: 'faults', file: 'degelmann/deltarecon/compare.py' };
 const repository = path.resolve(root, '..');
 
 const { failures, expect, report } = expectations('check-excerpts');
@@ -270,6 +280,22 @@ function yardstickFaults(found, tag, source) {
   return faults;
 }
 
+/**
+ * The text of a Python file with adjacent string literals joined, as Python
+ * joins them: `"... the "` at the end of a line and `"run ..."` at the start
+ * of the next become one string.
+ */
+function joinedLiterals(lines) {
+  return lines.join('\n').replace(/(["'])\s*\n\s*[rRbBfFuU]{0,2}\1/g, '');
+}
+
+/** What is wrong with a message a page quotes from a file. */
+function quoteFaults(quote, tag, file, joined) {
+  return joined.includes(quote)
+    ? []
+    : [`the quoted message "${quote}" stands in no string of ${file} at ${tag}`];
+}
+
 /** The files that differ between the tag and a branch. `blob(ref, file)` names the content of a file at a reference. */
 function branchFaults(tag, branch, files, blob) {
   return files.flatMap((file) => {
@@ -323,6 +349,9 @@ function proveItself() {
     ['a file that is the same on the branch', branchFaults(tag, MAIN, [file], () => 'a1'), null],
     ['a file that differs on the branch', branchFaults(tag, MAIN, [file], (ref) => (ref === tag ? 'a1' : 'b2')), [file, 'differs', MAIN]],
     ['a branch the clone does not hold', branchFaults(tag, MAIN, [file], (ref) => (ref === tag ? 'a1' : null)), [file, MAIN]],
+    ['a quoted message the file holds', quoteFaults('no tolerance file at', tag, file, joinedLiterals(['        raise UsageError(f"no tolerance file at {path}")'])), null],
+    ['a quoted message split over two string literals', quoteFaults('which the run does not declare', tag, file, joinedLiterals(['        raise UsageError(f"names {name!r}, which the "', '                         "run does not declare")'])), null],
+    ['a quoted message the file does not hold', quoteFaults('which the run does not know', tag, file, joinedLiterals(['        raise UsageError(f"names {name!r}, which the "', '                         "run does not declare")'])), ['"which the run does not know"', file]],
     ['a tag the clone holds', [tagFault(tag, () => true)].filter(Boolean), null],
     ['a tag the clone does not hold', [tagFault(tag, () => false)].filter(Boolean), [tag]],
   ];
@@ -338,6 +367,25 @@ function proveItself() {
   }
   expect(numberOf('1,170') === 1170 && numberOf('1.170') === 1170 && numberOf('281') === 281 && Number.isNaN(numberOf('1 170')) && Number.isNaN(numberOf('')), 'the check on its own texts: a number is not read as written');
   return cases.length;
+}
+
+/**
+ * The messages the rows of a section quote: the first inline code of the
+ * text of each row between the heading of the section and the next one.
+ */
+function readQuotes(page, section) {
+  return page.evaluate((anchor) => {
+    const heading = document.querySelector(`main h2#${anchor}`);
+    if (!heading) return [];
+    const headings = [...document.querySelectorAll('main h2')];
+    const next = headings[headings.indexOf(heading) + 1];
+    const inside = (element) =>
+      heading.compareDocumentPosition(element) & Node.DOCUMENT_POSITION_FOLLOWING &&
+      !(next && next.compareDocumentPosition(element) & Node.DOCUMENT_POSITION_FOLLOWING);
+    return [...document.querySelectorAll('main [data-row]')]
+      .filter(inside)
+      .map((row) => row.querySelector('.row-line code')?.textContent ?? '');
+  }, section);
 }
 
 /** What a page shows of the repository's code. */
@@ -387,7 +435,7 @@ function readPage(page) {
 const proved = proveItself();
 const release = await loadRelease();
 const tag = `v${release}`;
-const totals = { pages: 0, excerpts: 0, signatures: 0, members: 0, selections: 0, counts: 0, yardsticks: 0, complete: 0 };
+const totals = { pages: 0, excerpts: 0, signatures: 0, members: 0, selections: 0, counts: 0, yardsticks: 0, complete: 0, quotes: 0 };
 
 const missing = tagFault(tag, (ref) => git('rev-parse', '--quiet', '--verify', `${ref}^{commit}`) !== null);
 if (missing) {
@@ -436,6 +484,18 @@ if (missing) {
           faults.push(`the row of "${name}" is marked neither as a member of the protocol nor as a name of the engine selection (Row with "member" or "selection")`);
         }
       }
+      if (entry.id === QUOTED.page) {
+        const quotes = await readQuotes(page, QUOTED.section);
+        const lines = source(QUOTED.file);
+        if (quotes.length === 0) faults.push(`the section "${QUOTED.section}" holds no row that quotes a message (QUOTED)`);
+        if (!lines) {
+          faults.push(`${tag} holds no file ${QUOTED.file}`);
+        } else {
+          const joined = joinedLiterals(lines);
+          for (const quote of quotes) faults.push(...quoteFaults(quote, tag, QUOTED.file, joined));
+        }
+        totals.quotes += quotes.length;
+      }
       if (protocol && COMPLETE.includes(entry.id)) {
         faults.push(...completenessFaults(found.members.map((member) => member.member), tag, protocol));
         totals.complete += 1;
@@ -456,6 +516,7 @@ if (missing) {
   for (const id of COMPLETE) {
     expect(pages.some((entry) => entry.id === id), `the page "${id}", named as complete (COMPLETE), is no page of the register`);
   }
+  expect(pages.some((entry) => entry.id === QUOTED.page), `the page "${QUOTED.page}", named as quoting messages (QUOTED), is no page of the register`);
   // A check that finds nothing to hold proves nothing.
   expect(
     totals.excerpts > 0 && totals.members > 0 && totals.yardsticks > 0,
@@ -464,5 +525,5 @@ if (missing) {
 }
 
 report(
-  `${proved} cases on its own texts; at ${tag}: ${totals.excerpts} excerpts, ${totals.signatures} signatures, ${totals.members} members of the protocol, ${totals.selections} names of the engine selection, ${totals.counts} numbers of lines and ${totals.yardsticks} yardstick boxes on ${totals.pages} pages; ${totals.complete} pages name every member of ${CLASSES.join(' and ')} once; ${PROTOCOL} and ${SELECTION} are the same on ${MAIN}`,
+  `${proved} cases on its own texts; at ${tag}: ${totals.excerpts} excerpts, ${totals.signatures} signatures, ${totals.members} members of the protocol, ${totals.selections} names of the engine selection, ${totals.counts} numbers of lines and ${totals.yardsticks} yardstick boxes on ${totals.pages} pages, ${totals.quotes} quoted messages in ${QUOTED.file}; ${totals.complete} pages name every member of ${CLASSES.join(' and ')} once; ${PROTOCOL} and ${SELECTION} are the same on ${MAIN}`,
 );

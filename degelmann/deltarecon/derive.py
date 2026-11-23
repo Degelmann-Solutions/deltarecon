@@ -26,8 +26,8 @@ from pathlib import Path
 
 from . import changes as changes_contract
 from .documents import CHANGES_SCHEMA, CONTRACT_VERSION, Rejection, write_document
+from .protocol import Engine, History, UsageError
 from .replay import RecordedRun, read_recorded_run, refuse_target_only
-from .run import Engine, History, UsageError
 
 REVISION = "revision"
 CLASS_ORDER = ("data", "parameter", "code")

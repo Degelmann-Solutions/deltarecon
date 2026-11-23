@@ -62,6 +62,7 @@ import {
   loadPages,
   loadRegister,
   loadRelease,
+  openPage,
   pageChecks,
   root,
   startPreview,
@@ -378,12 +379,8 @@ function proveItself(factsByLang) {
   expect(hints.groupFaults([entry('quick-start', 'download'), entry('own-calculations', 'folder')], ids).length === 0, 'the check does not prove itself: groupFaults names a fault of a register that holds');
 }
 
-async function open(browser, origin, address, viewport) {
-  const context = await browser.newContext({ viewport });
-  const page = await context.newPage();
-  await page.goto(`${origin}${address}`, { waitUntil: 'networkidle' });
-  await page.waitForSelector('html[data-menu]');
-  return { context, page };
+function open(browser, origin, address, viewport) {
+  return openPage(browser, `${origin}${address}`, { viewport });
 }
 
 /** Every hint link, followed: to the group, and from the group back. */

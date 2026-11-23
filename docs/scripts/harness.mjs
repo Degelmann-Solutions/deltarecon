@@ -1,12 +1,14 @@
-// What the check scripts share: the preview server, the page register, the
-// glossary register, the list of failed expectations, and the checks of an
-// open page that hold for every page of the site (`pageChecks`).
+// What the check scripts share: the preview server, the opening of a page
+// (`openPage`), the page register, the glossary register, the list of failed
+// expectations, and the checks of an open page that hold for every page of
+// the site (`pageChecks`).
 import { spawn } from 'node:child_process';
 import { readFile } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import axe from '@axe-core/playwright';
 import ts from 'typescript';
+import astroConfig from '../astro.config.mjs';
 
 const AxeBuilder = axe.AxeBuilder ?? axe.default ?? axe;
 /** The rules axe runs: A and AA of WCAG 2.0 to 2.2. */
@@ -22,7 +24,7 @@ export const RING_ON_NAVY = 'rgb(101, 194, 203)';
 export const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 export const PORT = 4399;
 /** The base of the site (astro.config.mjs, `base`), with a closing slash. */
-export const BASE = '/deltarecon/docs/';
+export const BASE = astroConfig.base.replace(/\/?$/, '/');
 
 /** Starts `astro preview` and resolves with the origin it reports. */
 export function startPreview() {
@@ -59,6 +61,43 @@ export function startPreview() {
 }
 
 /**
+ * Opens `url` in a browser context of its own and waits until the network is
+ * idle. With JavaScript on it then waits until each selector of `waitFor` is
+ * in the page (the default: the menu script has set `data-menu` on <html>).
+ * `setup` is a script that runs before the scripts of the page; `errors`
+ * collects the script errors of the page. With `pageScripts: false` the
+ * browser runs JavaScript but no script of the site: every page arrives with
+ * the policy `script-src 'none'`, so the page is the page without JavaScript,
+ * and a check that needs JavaScript itself, as axe, can still run on it.
+ */
+export async function openPage(
+  browser,
+  url,
+  { viewport, javaScript = true, pageScripts = true, permissions = [], setup, waitFor = ['html[data-menu]'] } = {},
+) {
+  const context = await browser.newContext({ viewport, javaScriptEnabled: javaScript, permissions });
+  if (setup) await context.addInitScript(setup);
+  if (!pageScripts) {
+    await context.route('**/*', async (route) => {
+      if (route.request().resourceType() !== 'document') return route.continue();
+      const response = await route.fetch();
+      return route.fulfill({
+        response,
+        headers: { ...response.headers(), 'content-security-policy': "script-src 'none'" },
+      });
+    });
+  }
+  const page = await context.newPage();
+  const errors = [];
+  page.on('pageerror', (error) => errors.push(error.message));
+  await page.goto(url, { waitUntil: 'networkidle' });
+  if (javaScript && pageScripts) {
+    for (const selector of waitFor) await page.waitForSelector(selector, { state: 'attached' });
+  }
+  return { context, page, errors };
+}
+
+/**
  * Loads a register under src/. Node does not run TypeScript, so the file is
  * turned into JavaScript in memory; it imports nothing but types, which the
  * conversion drops.
@@ -69,6 +108,11 @@ async function loadSource(file) {
     compilerOptions: { module: ts.ModuleKind.ESNext, target: ts.ScriptTarget.ES2022 },
   });
   return import(`data:text/javascript;base64,${Buffer.from(outputText).toString('base64')}`);
+}
+
+/** Loads the two breakpoints of the site, src/breakpoints.ts. */
+export function loadBreakpoints() {
+  return loadSource('breakpoints.ts');
 }
 
 /** Loads the page register, src/site.ts. */

@@ -62,8 +62,9 @@ from .derive import CLASS_ORDER, build_manifest, read_derive_input, remainder
 from .documents import (CONTRACT_VERSION, RECORD_SCHEMA, RUN_SCHEMA, SCHEMA_FOLDERS, Rejection, artifact_reference,
                         check_artifact, copy_files, document_bytes, parse_document, read_document, sha256_file,
                         write_document, write_new)
+from .protocol import Engine, UsageError
 from .replay import RecordedRun, check_recorded_stage, check_response
-from .run import Engine, RunResult, UsageError, run_record, run_request, run_request_document
+from .run import RunResult, run_record, run_request, run_request_document
 
 LOCALISE_SCHEMA = "localise.schema.json"
 MANIFEST_NAME = "changes.json"
@@ -656,7 +657,8 @@ def same_manifest(path: Path, manifest: dict) -> bool:
         version = parse_document(data).get("contract_version")
     except Rejection:
         return False
-    return isinstance(version, str) and version in SCHEMA_FOLDERS and data == document_bytes({**manifest, "contract_version": version})
+    return (isinstance(version, str) and version in SCHEMA_FOLDERS
+            and data == document_bytes({**manifest, "contract_version": version}))
 
 
 def read_walk_folder(folder: Path | str, prepared: Prepared) -> WalkFolder:

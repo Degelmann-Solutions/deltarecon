@@ -3,11 +3,12 @@
 /*
  * Self-hosted typeface, copied from the company website (rsms/inter v4.1,
  * JetBrains/JetBrainsMono v2.304; licences in public/fonts/). The addresses
- * carry the base of the site (astro.config.mjs, `base`).
+ * are those of public/; the build puts the base of the site before them
+ * (astro.config.mjs, `base`).
  */
 @font-face {
   font-family: "Inter";
-  src: url("/deltarecon/docs/fonts/InterVariable.woff2") format("woff2");
+  src: url("/fonts/InterVariable.woff2") format("woff2");
   font-weight: 100 900;
   font-style: normal;
   font-display: swap;
@@ -15,7 +16,7 @@
 
 @font-face {
   font-family: "Inter";
-  src: url("/deltarecon/docs/fonts/InterVariable-Italic.woff2") format("woff2");
+  src: url("/fonts/InterVariable-Italic.woff2") format("woff2");
   font-weight: 100 900;
   font-style: italic;
   font-display: swap;
@@ -23,7 +24,7 @@
 
 @font-face {
   font-family: "JetBrains Mono";
-  src: url("/deltarecon/docs/fonts/JetBrainsMono-Regular.woff2") format("woff2");
+  src: url("/fonts/JetBrainsMono-Regular.woff2") format("woff2");
   font-weight: 400;
   font-style: normal;
   font-display: swap;
@@ -57,7 +58,9 @@
   --radius-full: 9999px;
 
   /* phone-breakpoint (600 px) and tree-breakpoint (1280 px). `tablet:` holds
-     from the phone breakpoint up, `tree:` from the tree breakpoint up. */
+     from the phone breakpoint up, `tree:` from the tree breakpoint up. The
+     two values and the widths of the `@media` rules below are those of
+     src/breakpoints.ts; scripts/check-site.mjs holds them against it. */
   --breakpoint-*: initial;
   --breakpoint-tablet: 37.5rem;
   --breakpoint-tree: 80rem;

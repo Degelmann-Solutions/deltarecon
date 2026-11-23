@@ -64,6 +64,8 @@ const stages = Object.fromEntries(
 />
 
 <script>
+  import { tablet } from '../breakpoints';
+
   interface Hit {
     data(): Promise<{ url: string; excerpt: string; meta: { title?: string } }>;
   }
@@ -76,7 +78,7 @@ const stages = Object.fromEntries(
   const base = import.meta.env.BASE_URL.replace(/\/?$/, '/');
   // The phone breakpoint of the stylesheet (`--breakpoint-tablet`): from it
   // up the field stands in the top bar.
-  const bar = window.matchMedia('(min-width: 37.5rem)');
+  const bar = window.matchMedia(`(min-width: ${tablet})`);
   // Words of an excerpt kept before its first matched word, so that the match
   // stands in the one line the list shows.
   const WORDS_BEFORE_MATCH = 3;

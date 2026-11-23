@@ -35,7 +35,10 @@
 //     search field at least 44 px, each language link at least 40 × 40 px.
 // Phone, JavaScript off, for every page:
 //   - the menu button is a link that jumps to the chapter tree at the end of
-//     the page; the language switch opens the counterpart without the anchor.
+//     the page; the language switch opens the counterpart without the anchor;
+//   - axe finds no violation on the page without the scripts of the site
+//     (axe needs JavaScript itself: the browser runs it, and every page
+//     arrives with the policy `script-src 'none'`).
 // The Glossary of each language, at desktop and phone width:
 //   - Tab reaches every letter of the letter index, each at least 32 × 32 px;
 //   - at an entry address, where the entry shows its linked state: axe, no
@@ -80,6 +83,7 @@ import {
   expectations,
   loadOtherPages,
   loadPages,
+  openPage,
   pageChecks,
   root,
   searchTexts,
@@ -113,16 +117,13 @@ const HELP = 'when-something-goes-wrong';
 // The sizes of the controls of the frame (DESIGN.md, Components, Page frame).
 const SIZES = { button: 36, menuLink: 44, fieldInMenu: 44, fieldInBar: 40, language: 40 };
 
-async function open(browser, origin, entry, viewport, { javaScript = true, anchor = '' } = {}) {
-  const context = await browser.newContext({ viewport, javaScriptEnabled: javaScript });
-  const page = await context.newPage();
-  await page.goto(`${origin}${entry.address}${anchor}`, { waitUntil: 'networkidle' });
-  if (javaScript) {
-    // The search field and the menu button are in the page.
-    await page.waitForSelector('[data-search] input', { state: 'attached' });
-    await page.waitForSelector('html[data-menu]');
-  }
-  return { context, page };
+/** Opens a page; with JavaScript the search field and the menu button are in it. */
+function open(browser, origin, entry, viewport, { javaScript = true, anchor = '' } = {}) {
+  return openPage(browser, `${origin}${entry.address}${anchor}`, {
+    viewport,
+    javaScript,
+    waitFor: ['[data-search] input', 'html[data-menu]'],
+  });
 }
 
 /**
@@ -1154,6 +1155,22 @@ async function checkEntry(browser, origin, entry) {
     );
     await page.goto(`${origin}${entry.address}${ANCHOR}`);
     await checkLanguageSwitch(page, name, entry, origin, '');
+    await context.close();
+  }
+
+  // Phone, the page without JavaScript, held by axe. Axe needs JavaScript
+  // itself, so the browser runs it and the site's scripts are blocked.
+  {
+    const name = at(PHONE.width, ', without the scripts of the site');
+    const { context, page } = await openPage(browser, `${origin}${entry.address}`, {
+      viewport: PHONE,
+      pageScripts: false,
+    });
+    expect(
+      (await page.getAttribute('html', 'data-menu')) === null,
+      `${name}: a script of the site has run (data-menu is set)`,
+    );
+    await checkAxe(page, name);
     await context.close();
   }
 
