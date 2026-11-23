@@ -85,6 +85,7 @@ import {
   loadPages,
   loadRegister,
   loadRelease,
+  openPage,
   pageChecks,
   root,
   startPreview,
@@ -207,16 +208,9 @@ const isLowering = (sum) => sum.startsWith('-');
 const { failures, expect, report } = expectations('check-steps');
 const { checkAxe, checkNoMotion, checkNoSidewaysScroll } = pageChecks({ failures, expect });
 
-async function open(browser, origin, entry, viewport, options = {}) {
-  const { javaScript = true, anchor = '', setup, permissions = [] } = options;
-  const context = await browser.newContext({ viewport, javaScriptEnabled: javaScript, permissions });
-  if (setup) await context.addInitScript(setup);
-  const page = await context.newPage();
-  const errors = [];
-  page.on('pageerror', (error) => errors.push(error.message));
-  await page.goto(`${origin}${entry.address}${anchor}`, { waitUntil: 'networkidle' });
-  if (javaScript) await page.waitForSelector('html[data-menu]');
-  return { context, page, errors };
+function open(browser, origin, entry, viewport, options = {}) {
+  const { anchor = '', ...rest } = options;
+  return openPage(browser, `${origin}${entry.address}${anchor}`, { viewport, ...rest });
 }
 
 /** The step list of the frontmatter: what `stepFaults` names. */

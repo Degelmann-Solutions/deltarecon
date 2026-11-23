@@ -2,9 +2,10 @@
 // the wide figure with the idea figure and its bars, the row list, the path
 // block. Run after the build: `npm run check`.
 //
-// A page of prose is a page that holds section headings. What a page must
-// show stands in `prosePages` below, so that a changed anchor fails here
-// until both places agree. A page of prose without an entry there fails.
+// A page of prose is a page that holds section headings or lists sections in
+// the chapter tree (frontmatter `sections`). What a page must show stands in
+// `prosePages` below, so that a changed anchor fails here until both places
+// agree. A page of prose without an entry there fails.
 //
 // First the reader of the facts of the example (src/example.ts), on the
 // capture files of the release: it gives the number of revisions, the number
@@ -131,6 +132,7 @@ import {
   loadPages,
   loadRegister,
   loadRelease,
+  openPage,
   pageChecks,
   root,
   startPreview,
@@ -540,12 +542,8 @@ async function checkTables(lang) {
   return shown;
 }
 
-async function open(browser, origin, entry, viewport, anchor = '') {
-  const context = await browser.newContext({ viewport });
-  const page = await context.newPage();
-  await page.goto(`${origin}${entry.address}${anchor}`, { waitUntil: 'networkidle' });
-  await page.waitForSelector('html[data-menu]');
-  return { context, page };
+function open(browser, origin, entry, viewport, anchor = '') {
+  return openPage(browser, `${origin}${entry.address}${anchor}`, { viewport });
 }
 
 /** The section headings: every level-2 heading of the content, in order. */
@@ -2047,14 +2045,16 @@ try {
   const origin = await reported;
   browser = await chromium.launch();
 
-  // Which pages are pages of prose: those that hold section headings.
+  // Which pages are pages of prose: those that hold section headings or list
+  // sections in the chapter tree (frontmatter `sections`).
   const found = [];
   {
     const context = await browser.newContext({ javaScriptEnabled: false });
     const page = await context.newPage();
     for (const entry of pages) {
       await page.goto(`${origin}${entry.address}`);
-      if ((await page.locator('main [data-section-heading]').count()) > 0) found.push(entry);
+      const marks = await page.locator('main [data-section-heading], #chapters [data-tree-sections]').count();
+      if (marks > 0) found.push(entry);
     }
     await context.close();
   }

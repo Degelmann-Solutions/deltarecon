@@ -414,19 +414,22 @@ def repositories_folder(repositories: Path | str | None) -> Path:
     if named:
         return Path(named)
     here = Path.cwd()
-    for folder in (here, *here.parents):
-        if (folder / REPOSITORIES_FOLDER / CLONE_NAME).is_dir():
-            return folder / REPOSITORIES_FOLDER
-    return here / REPOSITORIES_FOLDER
+    return _repositories_upward(here) or here / REPOSITORIES_FOLDER
 
 
 def nearest_from(folder: Path) -> Path | None:
     """The folder ``repositories/`` holding the clone that a command started in ``folder`` finds upward
     (from the resolved folder, as ``Path.cwd()`` gives it there), resolved; ``None`` when there is none."""
-    start = Path(folder).resolve()
-    for candidate in (start, *start.parents):
-        if (candidate / REPOSITORIES_FOLDER / CLONE_NAME).is_dir():
-            return (candidate / REPOSITORIES_FOLDER).resolve()
+    found = _repositories_upward(Path(folder).resolve())
+    return found.resolve() if found is not None else None
+
+
+def _repositories_upward(start: Path) -> Path | None:
+    """The folder ``repositories/`` that holds the clone folder, in ``start`` or the nearest of its
+    parents, as ``start`` gives it (not resolved); ``None`` when there is none."""
+    for folder in (start, *start.parents):
+        if (folder / REPOSITORIES_FOLDER / CLONE_NAME).is_dir():
+            return folder / REPOSITORIES_FOLDER
     return None
 
 

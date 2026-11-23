@@ -61,6 +61,14 @@ RECORD_NAME = "run-record.json"
 # one of them, as the tests write genuine earlier documents, names no domain reference.
 WITHOUT_DOMAIN_REFERENCE = ("1.0", "2.0", "3.0", "3.1")
 
+
+def check_supported_stage(stage: str, stages) -> None:
+    """Refuse a stage that is not among ``stages``, the stages an engine declares, with
+    ``unsupported_stage``."""
+    if stage not in stages:
+        raise Rejection("unsupported_stage", f"The stage {stage} is not supported.")
+
+
 def worker_outcome(call, *arguments) -> tuple[str, object]:
     """The outcome of ``call(*arguments)`` in a form a worker process returns: ``("ok", value)``, or
     ``("failed", message)`` when it raises :class:`ModelPointFailure`. Any other exception propagates."""
@@ -450,8 +458,8 @@ def write_request(engine: Engine, output: Path, *, stage: str | None, label: str
         if len(declared) != 1:
             raise UsageError(f"the engine declares the stages {', '.join(declared)}; name one with --stage")
         stage = declared[0]
-    elif stage not in engine.stages:
-        raise Rejection("unsupported_stage", f"The stage {stage} is not supported.")
+    else:
+        check_supported_stage(stage, engine.stages)
     # Called directly: a usage error and a rejection of the engine keep their meaning.
     described = engine.describe(stage, label, revision, options, repositories)
     release = {"label": label, "references": described["references"]}
@@ -514,8 +522,7 @@ def run_request(request_path: Path, engine: Engine, repositories: Path | str | N
     head = {"document": "run_response", "contract_version": CONTRACT_VERSION, **repeated}
     manifest_path, parameters, rows, values = None, [], None, None
     try:
-        if request["stage"] not in engine.stages:
-            raise Rejection("unsupported_stage", f"The stage {request['stage']} is not supported.")
+        check_supported_stage(request["stage"], engine.stages)
         _engine(engine.resolve, request["stage"], request["release"], repositories)
         enabled = []
         if request["changes"]["enabled"]:  # the empty set is always valid and needs no manifest

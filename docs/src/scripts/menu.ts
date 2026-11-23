@@ -10,6 +10,8 @@
 // focus to the menu button. The button in view says whether the menu is open:
 // the menu button while it is closed, the close button while it is open.
 
+import { tree as treeBreakpoint } from '../breakpoints';
+
 const root = document.documentElement;
 const link = document.querySelector<HTMLAnchorElement>('[data-menu-link]');
 const menuButton = document.querySelector<HTMLButtonElement>('[data-menu-button]');
@@ -18,7 +20,7 @@ const header = menuButton?.closest('header');
 const tree = document.getElementById('chapters');
 const behind = document.querySelectorAll<HTMLElement>('[data-behind-menu]');
 // The tree breakpoint of the stylesheet (`--breakpoint-tree`).
-const column = window.matchMedia('(min-width: 80rem)');
+const column = window.matchMedia(`(min-width: ${treeBreakpoint})`);
 
 if (link && menuButton && closeButton && header && tree) {
   let scrollPosition = 0;

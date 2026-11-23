@@ -54,8 +54,8 @@ from .documents import (CONTRACT_VERSION, RECORD_SCHEMA, RUN_SCHEMA, Rejection, 
                         key_order, read_document, schema_errors, strict_json_text, typed_key, write_document,
                         write_new)
 from .export import check_export, deviation_bytes, format_number, read_deviations
-from .protocol import LIABILITY_CASHFLOW
-from .run import UsageError, run_record
+from .protocol import LIABILITY_CASHFLOW, UsageError
+from .run import run_record
 from .signature import signature_table
 
 COMPARE_SCHEMA = "compare.schema.json"

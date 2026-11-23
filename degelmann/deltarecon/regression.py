@@ -31,8 +31,9 @@ from pathlib import Path
 
 from .compare import COMPARE_REQUEST, CompareResult, compare, compare_request_document, read_tolerance
 from .documents import artifact_reference, copy_files, document_bytes, write_document, write_new
+from .protocol import Engine, UsageError
 from .replay import RecordedRun, check_recorded_stage, read_recorded_run, refuse_target_only
-from .run import RECORD_NAME, Engine, RunResult, UsageError, run_request, run_request_document
+from .run import RECORD_NAME, RunResult, run_request, run_request_document
 
 RECORDED_FOLDER = "recorded"
 RUN_FOLDER = "run"

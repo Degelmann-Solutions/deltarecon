@@ -14,6 +14,9 @@
 // once, for the built stylesheets and the styles in the built pages: no
 // `prefers-color-scheme` (a dark mode), no `@media print` (a print design)
 // and no `scroll-behavior: smooth`;
+// once, for the stylesheet src/styles/global.css: `--breakpoint-tablet` and
+// `--breakpoint-tree` and every width a `@media` rule names are the widths
+// of src/breakpoints.ts, which the scripts of the pages read;
 // for the start page of each language, the search:
 //   - nothing is shown or said at the load of the page;
 //   - a word of its own language gives its hits and the number of matches;
@@ -39,6 +42,7 @@ import path from 'node:path';
 import { chromium } from 'playwright';
 import {
   expectations,
+  loadBreakpoints,
   loadOtherPages,
   loadPages,
   loadRelease,
@@ -267,6 +271,41 @@ async function checkStyles() {
         [...text.matchAll(/\sstyle="([^"]*)"/g)].map((match) => match[1]).join('\n');
     for (const [what, pattern] of leftOut) {
       expect(!pattern.test(styles), `dist/${file}: the styles hold ${what}`);
+    }
+  }
+}
+
+/**
+ * The breakpoints of the stylesheet against src/breakpoints.ts. A media query
+ * cannot read a custom property, so the stylesheet repeats the two widths;
+ * this holds each place against the one source.
+ */
+async function checkBreakpoints() {
+  const { tablet, tree } = await loadBreakpoints();
+  const file = 'src/styles/global.css';
+  // Without its comments, which may name a rule.
+  const css = (await readFile(path.join(root, file), 'utf8')).replace(/\/\*[\s\S]*?\*\//g, '');
+  for (const [name, width] of [['tablet', tablet], ['tree', tree]]) {
+    const declared = css.match(new RegExp(`--breakpoint-${name}\\s*:\\s*([^;]+);`))?.[1].trim();
+    expect(
+      declared === width,
+      `${file}: --breakpoint-${name} is ${declared ?? 'not set'}, src/breakpoints.ts says ${width}`,
+    );
+  }
+  const queries = [...css.matchAll(/@media\s([^{;]*)\{/g)].map((match) => match[1].trim());
+  expect(queries.length > 0, `${file}: no @media rule found`);
+  for (const query of queries) {
+    // `min-width: 37.5rem`, and the range form, `width >= 37.5rem` or `37.5rem < width`.
+    const widths = [
+      ...[...query.matchAll(/\b(?:min-|max-)?width\s*:\s*([^)\s]+)/g)].map((match) => match[1]),
+      ...[...query.matchAll(/(?<![\w-])width\s*(?:<=|>=|<|>|=)\s*([^)\s<>=]+)/g)].map((match) => match[1]),
+      ...[...query.matchAll(/([^(\s<>=]+)\s*(?:<=|>=|<|>|=)\s*width(?![\w-])/g)].map((match) => match[1]),
+    ];
+    for (const width of widths) {
+      expect(
+        [tablet, tree].includes(width),
+        `${file}: @media ${query} names the width ${width}, which is neither breakpoint of src/breakpoints.ts (${tablet}, ${tree})`,
+      );
     }
   }
 }
@@ -667,6 +706,7 @@ const { origin: reported, stop } = startPreview();
 let browser;
 try {
   await checkStyles();
+  await checkBreakpoints();
   const origin = await reported;
   browser = await chromium.launch();
   // An error on one page is a failure of that page; the others still run.
@@ -688,5 +728,5 @@ try {
 }
 
 report(
-  `all ${pages.length} pages, the ${notFound.length} page-not-found pages, the root page and the built styles pass (release ${version})`,
+  `all ${pages.length} pages, the ${notFound.length} page-not-found pages, the root page, the built styles and the breakpoints of the stylesheet pass (release ${version})`,
 );

@@ -1,12 +1,17 @@
-"""The imports of the package keep the core apart from the reference model: no module outside
-``engines/`` imports the reference model, in any form, and no module imports a private name (one
-that starts with ``_``, dunder names excepted) from a module of the package. ``quickstart`` does not
-import ``__main__``, so the two form no import cycle, and ``__main__`` imports ``quickstart`` at
-module level only.
+"""The imports of the package keep the core apart from the reference model: no module of
+``degelmann/deltarecon`` outside ``engines/`` imports the reference model in an ``import`` or
+``from ... import`` statement, and no such statement imports a private name (one that starts with
+``_``, dunder names excepted) from a module of the package. ``quickstart`` does not import
+``__main__``, so the two form no import cycle, and ``__main__`` imports ``quickstart`` at module
+level only.
 
-The check reads the source of every module with :mod:`ast`; it runs nothing. It is also run on
-synthetic sources, so that it is known to report both kinds of forbidden import and to find an
-import of ``__main__``, at module or function level.
+The check reads the source of every module with :mod:`ast`; it runs nothing. It sees static import
+statements only, at module or function level: not ``importlib.import_module``, not ``__import__``,
+and not a private name reached through an imported module (``from . import run`` and then
+``run._name``). It reads ``degelmann/deltarecon`` only; ``tools/`` lies outside it, and
+``tools/common.py`` imports the reference model on purpose, for the names of the clone. It is also
+run on synthetic sources, so that it is known to report both kinds of forbidden import and to find
+an import of ``__main__``, at module or function level.
 """
 from __future__ import annotations
 
