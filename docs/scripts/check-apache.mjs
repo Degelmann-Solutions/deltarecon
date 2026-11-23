@@ -20,11 +20,19 @@
 //     offers both languages;
 //   - an address under de/ or en/ is not redirected, whatever the browser
 //     asks for.
+// With `--site <folder>` (`npm run check:apache:site -- <folder>`) it serves
+// that folder as the server root instead: the output of the company
+// website's build, which holds the documentation under deltarecon/docs. It
+// then sets up no stand-in, mounts no dist/ and needs no build here. The
+// assertions are the same, but for the unknown address outside the
+// documentation: it must answer 404 with the page Apache serves at /404.html,
+// the website's own, and not with the title of a page-not-found page of the
+// documentation.
 // The container is stopped and removed in every outcome.
 // Exits non-zero and names every failed expectation.
 import { spawnSync } from 'node:child_process';
 import { rmSync } from 'node:fs';
-import { access, mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { access, mkdir, mkdtemp, rm, stat, writeFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import { chromium } from 'playwright';
@@ -57,10 +65,32 @@ function stopWith(message) {
   process.exit(1);
 }
 
+// `--site <folder>`: the server root to check, in place of the stand-in.
+const args = process.argv.slice(2);
+let given;
+if (args.length > 0) {
+  if (args[0] !== '--site' || args.length !== 2 || args[1].trim() === '') {
+    stopWith(`unknown arguments "${args.join(' ')}". Usage: check-apache.mjs [--site <folder>]`);
+  }
+  given = path.resolve(args[1]);
+}
+
 const dist = path.join(root, 'dist');
-await access(path.join(dist, 'index.html')).catch(() =>
-  stopWith('no build under dist/. Run `npm run check:apache`, which builds first.'),
-);
+if (given) {
+  for (const file of [path.join(BASE, 'index.html'), '404.html']) {
+    await access(path.join(given, file)).catch(() =>
+      stopWith(`${given} holds no ${file.replace(/^\//, '')}. Name the output of the website's build, built with the documentation.`),
+    );
+  }
+  // Apache runs as a user of its own in the container.
+  if (((await stat(given)).mode & 0o005) !== 0o005) {
+    stopWith(`${given} is not readable and searchable by other users, so the Apache in the container cannot serve it.`);
+  }
+} else {
+  await access(path.join(dist, 'index.html')).catch(() =>
+    stopWith('no build under dist/. Run `npm run check:apache`, which builds first.'),
+  );
+}
 const version = docker('version', '--format', '{{.Server.Version}}');
 if (version.error || version.status !== 0) {
   stopWith(
@@ -69,16 +99,18 @@ if (version.error || version.status !== 0) {
   );
 }
 
-// The stand-in for the company website and the server setting, in a folder
-// of their own outside the working tree.
+// The server setting and, unless a server root is given, the stand-in for
+// the company website, in a folder of their own outside the working tree.
 const work = await mkdtemp(path.join(os.tmpdir(), 'deltarecon-docs-apache-'));
-const site = path.join(work, 'htdocs');
-await mkdir(path.join(site, 'deltarecon', 'docs'), { recursive: true });
-await writeFile(path.join(site, '.htaccess'), 'ErrorDocument 404 /404.html\n');
-await writeFile(
-  path.join(site, '404.html'),
-  `<!doctype html><html lang="de"><head><meta charset="utf-8"><title>404</title></head><body><p>${STAND_IN}</p></body></html>\n`,
-);
+const site = given ?? path.join(work, 'htdocs');
+if (!given) {
+  await mkdir(path.join(site, 'deltarecon', 'docs'), { recursive: true });
+  await writeFile(path.join(site, '.htaccess'), 'ErrorDocument 404 /404.html\n');
+  await writeFile(
+    path.join(site, '404.html'),
+    `<!doctype html><html lang="de"><head><meta charset="utf-8"><title>404</title></head><body><p>${STAND_IN}</p></body></html>\n`,
+  );
+}
 await writeFile(
   path.join(work, 'check.conf'),
   `ServerName localhost\n<Directory "${HTDOCS}">\n    AllowOverride All\n</Directory>\n`,
@@ -110,8 +142,8 @@ async function startApache() {
     '127.0.0.1::80',
     '--volume',
     `${site}:${HTDOCS}:ro`,
-    '--volume',
-    `${dist}:${HTDOCS}${BASE.replace(/\/$/, '')}:ro`,
+    // A given server root holds the documentation already.
+    ...(given ? [] : ['--volume', `${dist}:${HTDOCS}${BASE.replace(/\/$/, '')}:ro`]),
     '--volume',
     `${path.join(work, 'check.conf')}:/usr/local/apache2/conf/extra/check.conf:ro`,
     IMAGE,
@@ -248,9 +280,22 @@ async function checkOutside(browser, origin, address) {
   const response = await page.goto(`${origin}${address}`);
   expect(response?.status() === 404, `${name}: status ${response?.status()}, expected 404`);
   const text = await page.innerText('body');
-  expect(text.includes(STAND_IN), `${name}: does not show the stand-in page of the website`);
+  const title = await page.title();
+  if (given) {
+    // The website's own page: what Apache serves at /404.html.
+    const own = await page.goto(`${origin}/404.html`);
+    expect(own?.status() === 200, `${name}: /404.html answers ${own?.status()}, expected 200`);
+    expect(
+      text.trim() !== '' && text === (await page.innerText('body')) && title === (await page.title()),
+      `${name}: does not show the page Apache serves at /404.html (title "${title}")`,
+    );
+  } else {
+    expect(text.includes(STAND_IN), `${name}: does not show the stand-in page of the website`);
+  }
+  // The stand-in holds none of the names. The website's own page may print
+  // the same words in its text, so a given server root is held to the titles.
   expect(
-    notFound.every((entry) => !text.includes(entry.name)),
+    notFound.every((entry) => title !== entry.title && (given || !text.includes(entry.name))),
     `${name}: shows a page-not-found page of the documentation`,
   );
   await context.close();
@@ -371,4 +416,6 @@ try {
   await rm(work, { recursive: true, force: true });
 }
 
-report('unknown addresses, the root address and the language pages pass on Apache (httpd:2.4)');
+report(
+  `unknown addresses, the root address and the language pages pass on Apache (httpd:2.4)${given ? `, served from ${given}` : ''}`,
+);
