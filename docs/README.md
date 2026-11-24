@@ -1035,6 +1035,14 @@ changes there, copy its paths here and into `public/favicon.svg`, the same
 mark on a navy disc. A page requests nothing from another
 origin.
 
+The logo in the head of the repository's `README.md`,
+`.github/assets/deltarecon-logo-light.svg` and
+`.github/assets/deltarecon-logo-dark.svg`, is a copy of
+`src/assets/deltarecon/logo-zeile.svg` of that repository without its last
+path, the slogan; `currentColor` is navy `#1E2547` in the light file and
+white in the dark one. The files lie outside `public/` and are not published
+with the documentation; when the logo changes there, renew both.
+
 ## Release number
 
 The release the documentation applies to stands in `src/release.json` and,
