@@ -157,8 +157,8 @@ it the engine looks the folder up itself (``Engine.repositories_folder``). The r
 the clone from ``delib-history`` in the folder ``--repositories DIR`` names, else in the
 folder the environment variable ``DELTARECON_REPOSITORIES`` names, else in the nearest folder
 ``repositories/`` that holds ``delib-history``, in the working directory or one of its parents, else
-in ``repositories/`` in the working directory, where a missing clone is reported. A relative folder is taken from the working
-directory. The run folders are
+in ``repositories/`` in the working directory, where a missing clone is reported. A relative folder
+is taken from the working directory. The run folders are
 where ``--output`` or the path of a request or record names them, relative to the working
 directory; neither the option nor the variable moves them.
 
@@ -193,8 +193,9 @@ from .engine_selection import DEFAULT_ENGINE, ENGINE_PATH_VARIABLE, ENGINE_VARIA
 from .search import TARGET_ONLY, search
 from .walk import walk
 from .regression import read_regression_input, regression
+from .protocol import UsageError
 from .replay import replay
-from .run import UsageError, run_request, write_request
+from .run import run_request, write_request
 from .signature import render_coverage, render_model_points, render_table
 from .workers import WORKERS_VARIABLE, whole_number
 
@@ -551,7 +552,8 @@ def command_quickstart(args) -> int:
 
 
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(prog="deltarecon", description="Run and compare releases through the stage contracts.")
+    parser = argparse.ArgumentParser(
+        prog="deltarecon", description="Run and compare releases through the stage contracts.")
     commands = parser.add_subparsers(dest="command", required=True)
 
     request = commands.add_parser("request", help="write a run request with the complete release identity")

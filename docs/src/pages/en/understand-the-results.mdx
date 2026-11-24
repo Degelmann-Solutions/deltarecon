@@ -1,0 +1,228 @@
+---
+layout: ../../layouts/Page.astro
+lang: en
+page: understand-the-results
+lead: "The guided demo of the quick start prints three tables. This page goes through them in the order of the demo and explains every column and every finding."
+description: "How to read the three tables of the DeltaRecon demo: where the results of two releases differ, what changed between them, and which changes cause the deviation."
+---
+import BarFigure from '../../components/BarFigure.astro';
+import Callout from '../../components/Callout.astro';
+import ChangeLine from '../../components/ChangeLine.astro';
+import DemoTable from '../../components/DemoTable.astro';
+import Prose from '../../components/Prose.astro';
+import ResultTable from '../../components/ResultTable.astro';
+import Row from '../../components/Row.astro';
+import RowList from '../../components/RowList.astro';
+import SectionHeading from '../../components/SectionHeading.astro';
+import SubHeading from '../../components/SubHeading.astro';
+import Term from '../../components/Term.astro';
+import WideFigure from '../../components/WideFigure.astro';
+import { changeOf, changeTable, example, notResolved, quantityOf, regressionTable, searchCounts, searchRowOf, searchTable, unresolved } from '../../captures';
+import { listOf } from '../../markup';
+import { findPage, pageAddress } from '../../site';
+
+export const facts = example('en');
+export const regression = regressionTable('en');
+export const changes = changeTable('en');
+export const search = searchTable('en');
+export const counts = searchCounts('en');
+export const found = listOf(facts.deviating.map((entry) => entry.number), 'en');
+export const [interval] = unresolved('en');
+export const quantity = (name) => quantityOf('en', name);
+export const change = (revision) => changeOf('en', revision);
+export const sum = (revision) => searchRowOf('en', revision).sum;
+export const howItWorks = findPage('how-deltarecon-works');
+export const enginePage = findPage('engine-requirements');
+export const typed = {
+  // Numbers the captures do not hold, from the owner conversation of
+  // 2026-11-15 (plan of ticket 6). A new release's captures: compare by hand.
+  newBusiness: '237',
+  singlePremiumInForce: '8',
+  singlePremiumDeviating: '6',
+  singlePremiumFinalYear: '2',
+  withoutPremium: '12',
+  withoutPremiumSingle: '8',
+  withoutPremiumPaidUp: '4',
+  singlePremium: '25',
+  earlyYears: '33',
+  inForceDeviating: '38',
+  sumOfFour: '+27,350.97',
+  whole: '+27,367.60',
+  remainder: '16.63',
+};
+
+<SectionHeading id="regression-table">Where the results differ</SectionHeading>
+
+<Prose>
+
+The demo <span data-no-term>runs</span> on the <Term id="reference-model">reference model</Term>. In its second step the <Term id="regression">regression</Term> computes the <Term id="state">state</Term> N+1 on the same <Term id="input-data">portfolio data</Term> and for the same <Term id="model-point">model points</Term> as <Term id="release">release</Term> N and compares the two results <Term id="value">value</Term> by value. Its table says where it found a <Term id="deviation">deviation</Term>: one row per <Term id="quantity">quantity</Term>, for example the <Term id="bruttobeitrag" />, the gross premium.
+
+</Prose>
+
+<DemoTable table="regression">Output of step 2 on the reference model:</DemoTable>
+
+<SubHeading>The columns</SubHeading>
+
+<RowList>
+  <Row name={regression.head[0]}>A result that the reference model writes for every model point and every <Term id="period">period</Term>. The names are German in both languages, as the program prints them.</Row>
+  <Row name={regression.head[1]}>In how many of the {facts.modelPoints} model points at least one value of the quantity differs.</Row>
+  <Row name={regression.head[2]}>How many values of the quantity differ. A value is one quantity of one model point in one period.</Row>
+  <Row name={regression.head[3]}>The first and the last period in which a value differs. A period is one projection month, counted from 0 at the valuation date.</Row>
+</RowList>
+
+<Prose>
+
+Every value is an expected value of the model point, weighted by the number of policies in force. The cash flows are gross and undiscounted.
+
+The reference model writes ten quantities. Two of them are not in the table, the guaranteed surrender value (<span lang="de">garantierter Rückkaufswert</span>) and the guaranteed maturity benefit (<span lang="de">garantierte Erlebensfallleistung</span>): they do not deviate.
+
+</Prose>
+
+<SubHeading>Why these model points deviate</SubHeading>
+
+<Prose>
+
+The number of model points differs from row to row, because each quantity reacts to other changes.
+
+<strong lang="de">Anzahl Verträge</strong>, the number of policies in force, {quantity('Anzahl Verträge').modelPoints} model points. All {typed.newBusiness} model points of new business deviate, because the lapse rate of policy year 1 was lowered. Of the {typed.singlePremiumInForce} single-premium model points already in force, {typed.singlePremiumDeviating} deviate, because single-premium policies got a lapse rate of their own (change <code translate="no">{change('54b4bca').revision}</code>); the other {typed.singlePremiumFinalYear} are in their final year. Period 0 does not deviate: the number stands before any decrement of the period.
+
+<strong lang="de">Bruttobeitrag</strong>, <strong lang="de">Zahlbeitrag</strong> and <strong lang="de">Provisionen</strong> (gross premium, premium billed, commissions), {quantity('Bruttobeitrag').modelPoints} model points. The {typed.withoutPremium} model points without a deviation are in force and pay no further premium: {typed.withoutPremiumSingle} with a single premium and {typed.withoutPremiumPaidUp} past their premium term. Only months in which a premium falls due carry a value. Hence {quantity('Bruttobeitrag').values} values for the <span lang="de">Bruttobeitrag</span> and {quantity('Provisionen').values} for the <span lang="de">Provisionen</span>, and not {quantity('Netto-Cashflow').values}.
+
+<strong lang="de">Beitragsverrechnung</strong>, the surplus share credited against the premium, {quantity('Beitragsverrechnung').modelPoints} model points. None of the {typed.singlePremium} single-premium model points deviates: they have no surplus of this form.
+
+<strong lang="de">garantierte Todesfallleistung</strong>, the guaranteed death benefit, {quantity('garantierte Todesfallleistung').modelPoints} model points. All model points of new business deviate. Of the {typed.inForceDeviating} model points in force that deviate, {typed.earlyYears} are in policy year 1 or 2. This fits the changes to the suicide exclusion and to the share of deaths by suicide.
+
+<strong lang="de">Kosten 2. Ordnung ohne Provisionen</strong> and <strong lang="de">Netto-Cashflow</strong> (second-order expenses without commissions, net cash flow), all {quantity('Netto-Cashflow').modelPoints} model points and all {quantity('Netto-Cashflow').values} result rows. Claim expense and expense inflation act on every model point in every month.
+
+</Prose>
+
+<SectionHeading id="change-table">What changed between the two releases</SectionHeading>
+
+<Prose>
+
+The third step reads the <Term id="history">history</Term> of the model between release N and the state N+1 and lists every change on its own, in the order in which it was made. Each change is one <Term id="revision">revision</Term> and gets a <Term id="class">class</Term>.
+
+</Prose>
+
+<DemoTable table="changes">Output of step 3 on the reference model:</DemoTable>
+
+<SubHeading>The columns</SubHeading>
+
+<RowList>
+  <Row name={changes.head[0]}>The place of the change in the history, counted from 1 after release N. Change {facts.revisions} is the state N+1.</Row>
+  <Row name={changes.head[1]}>The short name under which the history holds the change. It names exactly this change.</Row>
+  <Row name={changes.head[2]}>What the change touches. A change can have several classes.</Row>
+  <Row name={changes.head[3]}>The short note its author gave the change, shown as written. The notes of the reference model are English.</Row>
+</RowList>
+
+<SubHeading>The four classes</SubHeading>
+
+<RowList>
+  <Row name={change('2d05ecf').classes}>The portfolio. Change {change('2d05ecf').number}: “<span data-no-term>{change('2d05ecf').description}</span>”.</Row>
+  <Row name={change('936e50d').classes}>Tables such as lapse or cost rates. Change {change('936e50d').number}: “<span data-no-term>{change('936e50d').description}</span>”.</Row>
+  <Row name={change('76fc46c').classes}>The calculation rules. Change {change('76fc46c').number}: “<span data-no-term>{change('76fc46c').description}</span>”.</Row>
+  <Row name={change('205a880').classes}>None of these, for example documentation only. Change {change('205a880').number}: “<span data-no-term>{change('205a880').description}</span>”.</Row>
+</RowList>
+
+<SubHeading>How the classes are found</SubHeading>
+
+<Prose>
+
+DeltaRecon does not judge the content of a change, and it does not read the description: the description is what the author wrote, not a finding. It looks at the files. For every revision it takes the files that the revision adds, removes or alters against the revision before it; for a merge that is the state before the side branch came in. The revision gets the class of every one of these files. That is why a revision can have two classes, and why a revision that touches no such file has none.
+
+Which file has which class, DeltaRecon does not know by itself. The <Term id="adapter">adapter</Term> of the <Term id="engine">engine</Term> says it. The adapter also reads the history and names the files of each revision. For the reference model its adapter declares:
+
+</Prose>
+
+<RowList>
+  <Row name={change('2d05ecf').classes}>The table of the model points, <code translate="no">model_point_table.csv</code>.</Row>
+  <Row name={change('936e50d').classes}>Every other CSV file in the folder of the product, for example <code translate="no">lapse_table.csv</code>.</Row>
+  <Row name={change('76fc46c').classes}>Every file in the folder of the model, <code translate="no">RLV_DE_S</code>.</Row>
+  <Row name={change('205a880').classes}>Every other file, for example the description of the repository or its tests.</Row>
+</RowList>
+
+<Prose>
+
+The class therefore says where a change was made, not what it means. Change {change('76fc46c').number}, “<span data-no-term>{change('76fc46c').description}</span>”, alters a cost rate and is still code: in the reference model this rate stands in the calculation rules, not in a table.
+
+With an engine of your own, your adapter declares which files are data, parameters and code. <a href={pageAddress(enginePage, 'en')}>{enginePage.name.en}</a> describes what an adapter has to provide.
+
+</Prose>
+
+<SubHeading>A merge, a revert and a change with two classes</SubHeading>
+
+<Prose>
+
+Change {change('8f81933').number}, “<span data-no-term>{change('8f81933').description}</span>”, is a merge: it brings the work of a side branch into the <Term id="main-line">main line</Term>. The table lists it as one revision.
+
+Change {change('29c4a03').number} is a revert: it takes change {change('e23137a').number} back. Both stay in the list, each as a revision of its own.
+
+Change {change('54b4bca').number}, “<span data-no-term>{change('54b4bca').description}</span>”, has two classes, {change('54b4bca').classes}: it touches a table and the calculation rules.
+
+</Prose>
+
+<SectionHeading id="search-result">Which changes cause the deviation</SectionHeading>
+
+<Prose>
+
+The fourth step searches the {facts.revisions} changes for those that cause the deviation in the <span lang="de">Bruttobeitrag</span> in the first five projection years. Here a deviation is a change of the <span lang="de">Bruttobeitrag</span> by more than one cent per model point and month. Below the table the demo reports one part of the deviation as “<Term id="not-resolved">Not resolved</Term>”.
+
+</Prose>
+
+<ResultTable>Output of step 4 on the reference model:</ResultTable>
+
+<SubHeading>The columns</SubHeading>
+
+<RowList>
+  <Row name={search.head[0]}>A change that deviates on its own, under its short name from the table of the changes.</Row>
+  <Row name={search.head[1]}>Its description from the table of the changes.</Row>
+  <Row name={search.head[2]}>The signed sum of “state after the revision minus state before it” of the <span lang="de">Bruttobeitrag</span>, over all {facts.modelPoints} model points and the projection months 0 to 59 from the valuation date. Plus: the revision raises the expected <span lang="de">Bruttobeitrag</span>. Minus: it lowers it.</Row>
+</RowList>
+
+<Prose>
+
+An example: {sum('936e50d')} at <code translate="no">{change('936e50d').revision}</code> means that over all {facts.modelPoints} model points and the first 60 projection months the expected <span lang="de">Bruttobeitrag</span> after this revision is {sum('936e50d').slice(1)} EUR higher than before it.
+
+The line above the table says “{counts.computed} of {counts.states}”. {counts.states} is the number of states: release N and one state after each of the {facts.revisions} changes. {counts.computed} of them were computed.
+
+</Prose>
+
+<WideFigure label="Sum of the deviation in the Bruttobeitrag, by revision">
+  <ChangeLine
+    count={`${facts.revisions} changes, from release N at the left to the state N+1 at the right`}
+    found={`A revision of the table, with the number of its change: ${found}`}
+    unresolved={`Not resolved: changes ${interval[0].number} to ${interval.at(-1).number}`}
+    other="Every other change: the search attributes no deviation to it"
+  />
+  <BarFigure slot="second" numbered />
+  <p slot="caption">The {facts.revisions} changes in the order in which they were made, each as one square. The filled squares are the {facts.deviating.length} revisions of the table: changes {found}. The bracket marks changes {interval[0].number} to {interval.at(-1).number}, which the search reports as not resolved. Below the line the sums of the table as bars: a filled bar raises the <span lang="de">Bruttobeitrag</span>, an outlined bar lowers it.</p>
+</WideFigure>
+
+<SubHeading>The four revisions</SubHeading>
+
+<RowList>
+  <Row name="A lower lapse rate in policy year 1" code={change('936e50d').revision}>{sum('936e50d')}. The lapse rate of policy year 1 falls from 6 to 5 per cent. The premium per policy stays as it is; more policies stay in force, so more expected premium falls due.</Row>
+  <Row name="The instalment loadings, from a side branch" code={change('8f81933').revision}>{sum('8f81933')}. The merge changes the table of the instalment loadings, <code translate="no">freq_loading_table.csv</code>.</Row>
+  <Row name="The instalment loading of half-yearly payment" code={change('83f01cf').revision}>{sum('83f01cf')}. It changes the same table of the instalment loadings.</Row>
+  <Row name="A higher premium-related loading" code={change('7f1dc64').revision}>{sum('7f1dc64')}. It raises the premium-related loading in the premium equivalence.</Row>
+</RowList>
+
+<Prose>
+
+The four sums add up to {typed.sumOfFour}. The whole deviation of the <span lang="de">Bruttobeitrag</span> between N and N+1, over the same model points and months, is {typed.whole}. The <span data-no-term>remainder</span> of {typed.remainder} is what stays below the tolerance, the <Term id="interval">interval</Term> that is not resolved included.
+
+</Prose>
+
+<Callout tag="A finding in plain words" title="What “Not resolved” means here" quote={notResolved('en')}>
+
+The search halved the interval of the four changes <code translate="no">{interval[0].revision}</code> to <code translate="no">{interval.at(-1).revision}</code>. Each half stays below one cent per model point and month; both together exceed it. Of the four, only <code translate="no">{change('909eeec').revision}</code> and <code translate="no">{change('e13c628').revision}</code> touch the <span lang="de">Bruttobeitrag</span>: a fixed charge of 0.6 and then 1.2 cent a year. <code translate="no">{change('5f3d085').revision}</code> changes the renewal commission, and <code translate="no">{change('a9fbd53').revision}</code> changes only a text that describes a test, and no calculation. The search names the interval, not the cause inside it.
+
+</Callout>
+
+<SubHeading>Changes that cancel</SubHeading>
+
+<Prose>
+
+The demo also shows a limit. Changes {change('e23137a').number} and {change('29c4a03').number}, a change and its revert, cancel inside one interval, and so do changes {change('88cdde3').number} and {change('c82b72b').number}, a change and its setting back. The search therefore does not divide these intervals. <a href={pageAddress(howItWorks, 'en')}>{howItWorks.name.en}</a> describes the search and its limits.
+
+</Prose>

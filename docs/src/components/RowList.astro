@@ -1,0 +1,30 @@
+---
+// A row list of a page of prose: numbered rows of things of one kind, for
+// example what the reader gets or what has to be built. Not interactive.
+//
+//   <RowList>
+//     <Row name="Where the results differ">After the regression.</Row>
+//     <Row name="The engine selection" code="--engine" tag="optional">Second line.</Row>
+//   </RowList>
+//
+// `label` puts the kind of the rows above the list as a small label, where
+// one thing has rows of two kinds: the files a command reads and the files
+// it writes. The list then carries the label as its name.
+//
+// `plain` leaves the numbers out, for rows that name a number of their own
+// (the exit statuses): the list is then an unordered list.
+interface Props {
+  /** The kind of the rows, shown above the list. */
+  label?: string;
+  /** Rows without numbers. */
+  plain?: boolean;
+}
+
+const { label, plain } = Astro.props;
+const List = plain ? 'ul' : 'ol';
+---
+
+{label && <p class="list-label" data-row-list-label>{label}</p>}
+<List class:list={['row-list', plain && 'row-list-plain', label && 'row-list-labelled']} data-row-list data-plain={plain ? '' : undefined} aria-label={label}>
+  <slot />
+</List>

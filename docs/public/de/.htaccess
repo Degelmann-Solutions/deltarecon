@@ -1,0 +1,4 @@
+# An unknown address under de/ gets the German page-not-found page, with
+# status 404. The address is the one the page register (src/site.ts) gives
+# the page; scripts/check-head.mjs compares the two.
+ErrorDocument 404 /deltarecon/docs/de/seite-nicht-gefunden/

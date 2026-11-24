@@ -1,0 +1,5 @@
+command: Q=$(ls --directory runs/quickstart-* | tail -n 1)
+exit status: 0
+command: echo $Q
+runs/quickstart-20261117T202512Z
+exit status: 0

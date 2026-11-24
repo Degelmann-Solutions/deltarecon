@@ -4,8 +4,8 @@ DeltaRecon is an open-source project. Contributors and agents read and write Eng
 
 ## Language of generated artifacts
 
-- Write every artifact in English: specs, briefs, PRDs, architecture documents, epics and stories, sprint status, build records, reviews, retrospectives, research summaries, documentation, code, comments, docstrings, and commit messages.
-- This applies to all planning artifacts, to everything under `docs/`, and to the working tree.
+- Write every artifact in English: specs, briefs, PRDs, architecture documents, epics and stories, sprint status, build records, reviews, retrospectives, research summaries, documentation (with the exception below), code, comments, docstrings, and commit messages.
+- This applies to all planning artifacts and to the working tree. The one exception is the user documentation under `docs/`: everything a reader sees or hears on its pages, including headings, labels, figure text, text alternatives, descriptions and shown program output, is written in German and in English. Code, comments, and configuration under `docs/` stay English; the file name of a page, which is its address, may be German for a German page.
 - The conversation with the user may be in German. The language of the conversation never changes the language of the artifacts.
 - Source material under `.input/` is partly German and is not part of the public repository. Summarize it in English and do not copy it verbatim.
 
@@ -26,3 +26,4 @@ DeltaRecon is an open-source project. Contributors and agents read and write Eng
 - A commit made after a story's review, a fix from its walkthrough included, gets its own review before the merge.
 - A package check looks at the archive's content (no path of the build machine, no `.git/logs`) and runs as a user would: from a folder that is not a checkout, with the user's environment.
 - After publishing a release, add its `CHANGELOG.md` entry in the first commit after the publication, as part of the publish story: the commit, the `delib-history` commit and the archive SHA-256 from `dist/release-v<version>/`, the date from the publish record.
+- A new release renews the user documentation: `docs/src/release.json`, the code excerpts and the shown program output follow the release, the excerpt and command checks pass against its tag, and the documentation is built from that state and published again with the website.

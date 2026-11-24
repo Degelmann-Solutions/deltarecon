@@ -22,7 +22,7 @@ def artifacts(realisation: dict) -> list[dict]:
             if isinstance(value, dict) and set(value) == {"path", "sha256"}]
 
 
-# --- manifest rules 1 to 5, and the chain of a derived manifest ----------------------------------------------------------
+# --- manifest rules 1 to 5, and the chain of a derived manifest --------------------------
 
 
 def _invalid(message: str, change_ids=None) -> Rejection:

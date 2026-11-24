@@ -1,0 +1,12 @@
+command: .\deltarecon.cmd request --revision d61b1ed --label change-16 --run-id run-change-16 --output $Q\own\older\request.json
+request: runs\quickstart-20261117T201341Z\own\older\request.json
+exit status: 0
+command: .\deltarecon.cmd run $Q\own\older\request.json
+outcome: succeeded
+model points: 350
+export rows: 80580
+export sha256: 874b81d8b41a1319a5319b32f56adf2fb015cd6a6daa091625c24ee0d3687612
+response: runs\quickstart-20261117T201341Z\own\older\response.json
+export: runs\quickstart-20261117T201341Z\own\older\results.csv
+run record: runs\quickstart-20261117T201341Z\own\older\run-record.json
+exit status: 0

@@ -1,0 +1,62 @@
+---
+// The mark of DeltaRecon: a delta whose right side is five slices running
+// from teal-text to teal. It stands beside the product title in the top bar
+// and, below the tree breakpoint, beside the heading of the chapter tree,
+// where the menu shows it. Both are text, so the mark is decoration. Left side and base take the text colour, so they
+// follow a contrast theme.
+//
+// A copy of `src/assets/deltarecon/logo-signet.svg` of the company website
+// (README, "Typeface and logo"); `public/favicon.svg` holds the same paths
+// in white and teal on a navy disc.
+interface Props {
+  class?: string;
+}
+
+const { class: className } = Astro.props;
+---
+
+<svg
+  class={className}
+  xmlns="http://www.w3.org/2000/svg"
+  viewBox="10 10 180 164"
+  fill="none"
+  aria-hidden="true"
+  data-product-mark
+>
+  <path
+    d="M79 52.09 L14 170 L144 170 L136.28 156 L35.72 156 L86 64.79 Z"
+    fill="currentColor"
+    stroke="currentColor"
+    stroke-width="4"
+    stroke-linejoin="round"></path>
+  <path
+    d="M98.9 16 L101.1 16 L114.99 41.2 L85.01 41.2 Z"
+    fill="#177982"
+    stroke="#177982"
+    stroke-width="4"
+    stroke-linejoin="round"></path>
+  <path
+    d="M85.41 49.2 L119.41 49.2 L132.19 72.4 L98.19 72.4 Z"
+    fill="#2a8b94"
+    stroke="#2a8b94"
+    stroke-width="4"
+    stroke-linejoin="round"></path>
+  <path
+    d="M102.61 80.4 L136.61 80.4 L149.39 103.6 L115.39 103.6 Z"
+    fill="#3e9ea6"
+    stroke="#3e9ea6"
+    stroke-width="4"
+    stroke-linejoin="round"></path>
+  <path
+    d="M119.81 111.6 L153.81 111.6 L166.59 134.8 L132.59 134.8 Z"
+    fill="#52b0b9"
+    stroke="#52b0b9"
+    stroke-width="4"
+    stroke-linejoin="round"></path>
+  <path
+    d="M137.01 142.8 L171.01 142.8 L186 170 L152 170 Z"
+    fill="#65c2cb"
+    stroke="#65c2cb"
+    stroke-width="4"
+    stroke-linejoin="round"></path>
+</svg>

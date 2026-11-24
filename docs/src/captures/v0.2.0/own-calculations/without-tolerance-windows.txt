@@ -1,0 +1,22 @@
+command: .\deltarecon.cmd search $Q\release-n\run-record.json $Q\regression\run\run-record.json --quantity Bruttobeitrag --periods 0-59 --target-only --output $Q\search-bruttobeitrag-exact
+search: searched; 19 states run, 33 for a walk, 14 saved
+state 0 against the older record: reproduced
+state 32 against the newer record: reproduced
+target: Bruttobeitrag; periods 0 to 59
+inner states: run on the target only, without the model checks
+held: input_data; the effect on it of 1 revisions is not shown
+intervals judged: 35
+contribution from state 1 to 2: 936e50dee4f7a01bdd60ff9105b5e3f3c1ef0d0f
+  Bruttobeitrag: sum 24109.9966529, absolute sum 24109.9966529
+contribution from state 5 to 6: 8f81933700278ef7c4622aa9aaa7ddc3712968bf
+  Bruttobeitrag: sum -13503.6659252, absolute sum 13503.6659252
+contribution from state 11 to 12: 83f01cfdf69cf14be78df7c64637447f0335c73e
+  Bruttobeitrag: sum -4429.49049624, absolute sum 4429.49049624
+contribution from state 24 to 25: 909eeec61bb0ff7e89862986f2fad517ce7cca7d
+  Bruttobeitrag: sum 8.3146210738, absolute sum 8.3146210738
+contribution from state 26 to 27: e13c628782d077bed74f085bf636cb0dccfb5b36
+  Bruttobeitrag: sum 8.31462107383, absolute sum 8.31462107383
+contribution from state 29 to 30: 7f1dc645848ad55a18986435353290aafd94938d
+  Bruttobeitrag: sum 21174.1307983, absolute sum 21174.1307983
+search result: runs\quickstart-20261117T201341Z\search-bruttobeitrag-exact\search.result.json
+exit status: 0

@@ -1,0 +1,139 @@
+DeltaRecon guided quick start
+
+The demo compares two states of the reference model delib-history, a term life insurance with 350
+model points: release N and the state N+1, 32 revisions later. In four steps it shows how
+DeltaRecon finds a deviation between two releases and traces it back to the changes that cause it.
+The demo puts its files into a folder of its own, and every command runs there:
+  cd runs\quickstart-20261112T110833Z
+
+Step 1 of 4: compute release N
+
+First, request writes a run request to --output. It records which state is computed (--revision,
+the revision fa36857), which name this state carries (--label N) and under which identifier the
+request runs (--run-id run-n-full). Name and identifier are chosen freely and reappear in the later
+comparisons. Without --subset the request covers every model point of the portfolio, with --subset
+only the ones named. Then run computes this request and records the result together with its full
+origin: code, parameters and portfolio data. This result is the reference that every later step
+checks against.
+
+Commands:
+  deltarecon request --revision fa368575a66d97c94e96dffc62b273ec95511b12 --label N
+      --run-id run-n-full --output release-n\request.json
+  deltarecon run release-n\request.json
+
+Release N is computed: 350 model points, 80,580 result rows. Files in release-n: results.csv (the
+results), response.json and run-record.json (the record of what was computed with what).
+
+Step 2 of 4: regression against N+1
+
+regression takes the record of the run of release N from step 1 (release-n/run-record.json) and,
+with --revision, computes the newer state N+1, the revision 887b718. It computes on the same
+portfolio data and for the same model points as release N and compares the two results value by
+value. Without --tolerance it compares exactly: every deviation counts. It writes the run of N+1
+and the comparison into the folder --output, the run into its subfolder run. This shows whether and
+where the results of the two releases differ. A deviation is expected here; the command reports it
+with exit status 1.
+
+Command:
+  deltarecon regression release-n\run-record.json
+      --revision 887b7181d22550eda2fb52fa1a6bd77376d4eb2e --output regression
+
+The regression shows a deviation: 408,762 values in 350 model points differ. A value is one
+quantity of one model point in one period.
+
+  Quantity                            Model points  Values   Periods
+  Anzahl Verträge                              243  66,825  1 to 479
+  Bruttobeitrag                                338  29,018  0 to 479
+  Zahlbeitrag                                  338  29,018  0 to 479
+  Beitragsverrechnung                          278  26,524  0 to 479
+  garantierte Todesfallleistung                275  67,953  0 to 479
+  Kosten 2. Ordnung ohne Provisionen           350  80,580  0 to 479
+  Provisionen                                  338  28,264  0 to 479
+  Netto-Cashflow                               350  80,580  0 to 479
+
+The deviation is the expected outcome; the demo goes on. Files in regression: compare.result.json,
+compare.deviations.csv (every differing value), signature-table.json (the table above); the run of
+N+1 in regression/run.
+
+Step 3 of 4: the changes between N and N+1
+
+derive takes the record of release N from step 1 (release-n/run-record.json) and the record of N+1
+from step 2 (regression/run/run-record.json) and reads from them which two revisions were computed.
+Then it reads the revision history between these two states, lists every change on its own, in the
+order in which it was made, and writes this change manifest to --output. Each change is one
+revision and is classified: data (the portfolio), parameter (tables such as lapse or cost rates),
+code (the calculation rules), or none of these (for example documentation only).
+
+Command:
+  deltarecon derive release-n\run-record.json regression\run\run-record.json --output changes.json
+
+32 changes: 1 data, 6 parameter, 18 code, 8 without a class (a change can have several classes).
+
+  No.  Revision  Class            Description
+    1  b795d8a   no class         Tell release N apart from the present state in the provenance tests
+    2  936e50d   parameter        Lower the lapse rate of policy year 1 from 0.06 to 0.05
+    3  54b4bca   parameter, code  Give single-premium policies their own lapse rate
+    4  2d05ecf   data             Raise the largest sum-assured factor of the generated points from 2 to 2.5
+    5  205a880   no class         Describe the main line and what a commit on it stands for
+    6  8f81933   parameter        Merge branch 'instalment-loadings'
+    7  47f6a33   code             Inflate the claim expense with expense inflation
+    8  e500700   no class         Describe the commits that demonstrate the interval search
+    9  76fc46c   code             Raise the claim expense from 250 to 275 EUR per death
+   10  61c8fd7   code             Lower the renewal commission from 1 to 0.8 per cent of the premium
+   11  c5adfa8   code             Raise the expense inflation from 2 to 2.5 per cent a year
+   12  83f01cf   parameter        Lower the instalment loading of half-yearly payment from 2 to 1.5 per cent
+   13  c2c9f75   no class         Say in the test docstring which two states are told apart
+   14  919967d   code             Raise the premium-related maintenance charge from 3 to 3.5 per cent
+   15  1a218de   no class         Say in the runner docstring that it runs one product folder
+   16  d61b1ed   code             Raise the initial commission from 2 to 2.5 per cent of the premium sum
+   17  e23137a   code             Raise the sum-related gamma loading from 0.30 to 0.35 per mille
+   18  29c4a03   code             Revert "Raise the sum-related gamma loading from 0.30 to 0.35 per mille"
+   19  88cdde3   parameter        Raise the instalment loading of monthly payment from 4 to 4.5 per cent
+   20  c82b72b   parameter        Set the instalment loading of monthly payment to 4 per cent again
+   21  5208fe6   no class         Say in the README that the runner reads no network
+   22  2c122ae   code             Lower the share of deaths by suicide from 3 to 2.5 per cent
+   23  3deff14   code             Lower the claim expense from 275 to 260 EUR per death
+   24  6a117fc   code             Shorten the suicide exclusion from three to two policy years
+   25  909eeec   code             Add a fixed charge of 0.6 cent a year to the Bruttobeitrag
+   26  5f3d085   code             Raise the renewal commission from 0.8 to 0.9 per cent of the premium
+   27  e13c628   code             Raise the fixed charge of the Bruttobeitrag from 0.6 to 1.2 cent a year
+   28  a9fbd53   no class         Say in the test docstring that every commit keeps its pins
+   29  2310344   code             Lower the premium-related maintenance charge from 3.5 to 3.2 per cent
+   30  7f1dc64   code             Raise the premium-related beta loading from 5 to 5.5 per cent
+   31  2629a5c   no class         Say in the README that a commit may change the documentation only
+   32  887b718   code             Lower the expense inflation from 2.5 to 2.2 per cent a year
+
+File: changes.json (the change manifest).
+
+Step 4 of 4: find the cause in the Bruttobeitrag
+
+Which of the 32 changes cause the deviation in the Bruttobeitrag, the gross premium (--quantity
+Bruttobeitrag), in the first five projection years (--periods 0-59, one period per month)? search
+takes the same two records as step 3: release-n/run-record.json and regression/run/run-record.json.
+It does not compute every intermediate state; it halves the history until each deviation belongs to
+a single change. A deviation is a change of the Bruttobeitrag by more than one cent per model point
+and month; the tolerance profile sets this (--tolerance). With --target-only it computes the
+intermediate states only for the Bruttobeitrag in these periods and without the model checks; it
+computes the two end states in full. It writes the result into the folder --output. The portfolio
+data stay at release N.
+
+Command:
+  deltarecon search release-n\run-record.json regression\run\run-record.json
+      --quantity Bruttobeitrag --periods 0-59
+      --tolerance ..\..\profiles\tolerance-bruttobeitrag.json --target-only --output search
+
+4 revisions deviate in the Bruttobeitrag. 17 of 33 were computed (16 computations saved).
+
+  Revision  Description                                                                 Sum of the deviation
+  936e50d   Lower the lapse rate of policy year 1 from 0.06 to 0.05                               +24,110.00
+  8f81933   Merge branch 'instalment-loadings'                                                    -13,503.67
+  83f01cf   Lower the instalment loading of half-yearly payment from 2 to 1.5 per cent             -4,429.49
+  7f1dc64   Raise the premium-related beta loading from 5 to 5.5 per cent                         +21,174.13
+
+Not resolved: the changes 909eeec, 5f3d085, e13c628, a9fbd53 exceed the tolerance only together;
+each one alone stays below it. DeltaRecon therefore attributes this part of the deviation to none
+of them.
+Result: search/search.result.json.
+
+Done. Every file is in runs\quickstart-20261112T110833Z.
+Drücken Sie eine beliebige Taste . . . 

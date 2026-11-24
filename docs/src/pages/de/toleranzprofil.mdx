@@ -1,0 +1,135 @@
+---
+layout: ../../layouts/Page.astro
+lang: de
+page: tolerance-profile
+lead: "Ein Toleranzprofil legt je Größe fest, welche Differenz ein Vergleich nicht als Abweichung zählt. Diese Seite erklärt den Aufbau der Datei und die Regel dahinter und zeigt, wie Sie ein eigenes Profil schreiben und verwenden."
+description: "Wie Sie für DeltaRecon ein Toleranzprofil schreiben: der Aufbau der JSON-Datei, die Regel, nach der ein Wert abweicht, ein Beispiel zum Kopieren und was ein Befehl an einem Profil ablehnt."
+---
+import CodeBlock from '../../components/CodeBlock.astro';
+import PlatformSwitch from '../../components/PlatformSwitch.astro';
+import Prose from '../../components/Prose.astro';
+import Row from '../../components/Row.astro';
+import RowList from '../../components/RowList.astro';
+import SectionHeading from '../../components/SectionHeading.astro';
+import Term from '../../components/Term.astro';
+import { findPage, pageAddress } from '../../site';
+import { DERIVATION, example, packaged, quantities, search } from '../../toleranceProfile';
+
+export const own = findPage('own-calculations');
+export const single = findPage('single-commands');
+export const quickStart = findPage('quick-start');
+// Inline code of this page names members of the file, options, files and
+// messages of the program: none of it is to be translated.
+export const components = { code: (props) => <code translate="no" {...props} /> };
+// A command of the package, as a link to its section on "Single commands".
+export const command = (name) => (
+  <a href={`${pageAddress(single, 'de')}#${name}`}><code translate="no">{name}</code></a>
+);
+
+<SectionHeading id="what">Was ein Toleranzprofil festlegt</SectionHeading>
+
+<Prose>
+
+Ein <Term id="tolerance-profile">Toleranzprofil</Term> legt je <Term id="quantity">Größe</Term> fest, wie weit ein <Term id="value">Wert</Term> des neueren Ergebnisses über und unter dem Wert des älteren liegen darf, bevor die Differenz als <Term id="deviation">Abweichung</Term> zählt. Es ist eine Datei in JSON. Sie übergeben sie mit der Option `--tolerance` an einen der Befehle {command('replay')}, {command('regression')}, {command('walk')} und {command('search')}. {command('compare')} nimmt das Profil aus seiner <Term id="compare-request">Vergleichsanfrage</Term>, wo es unter `tolerance` steht.
+
+Es gibt keine allgemeine Toleranz und kein Profil, das von selbst gilt. Ohne `--tolerance` vergleicht jeder dieser Befehle exakt, und eine Größe, die im Profil keinen Eintrag hat, wird exakt verglichen.
+
+Eine Toleranz ist das, was ein Vergleich absichtlich nicht sieht. Deshalb gehört zu jeder Rundung und zu jeder Schranke über null eine Herleitung: ein Satz oder ein Verweis auf ein Dokument, der sagt, woher die Zahl kommt. Das Ergebnis eines Vergleichs enthält das Profil mit seinen Herleitungen; wer das Ergebnis liest, sieht also, womit verglichen wurde.
+
+</Prose>
+
+<SectionHeading id="file">Der Aufbau der Datei</SectionHeading>
+
+<Prose>
+
+Das Paket enthält ein Toleranzprofil im Ordner `profiles`, die Datei `tolerance-bruttobeitrag.json`. Die Suche des <a href={pageAddress(quickStart, 'de')}>{quickStart.name.de}</a> vergleicht damit. Es hat einen Eintrag, für den <Term id="bruttobeitrag" />; seine Herleitung ist auf Englisch geschrieben:
+
+</Prose>
+
+<CodeBlock lines={packaged} label="Toleranzprofil des Pakets" />
+
+<Prose>
+
+Die Teile der Datei:
+
+</Prose>
+
+<RowList>
+  <Row name="Die Größen" code="per_quantity">Ein Eintrag je Größe, für die eine Toleranz gilt, unter dem Namen der Größe. Die Liste darf leer sein; dann wird jede Größe exakt verglichen.</Row>
+  <Row name="Die obere Schranke" code="upper">Wie weit der neuere Wert über dem älteren liegen darf.</Row>
+  <Row name="Die untere Schranke" code="lower">Wie weit der neuere Wert unter dem älteren liegen darf.</Row>
+  <Row name="Der absolute Anteil einer Schranke" code="abs_tol">Eine Zahl in der Einheit der Größe, im Beispiel `0.01` für einen Cent.</Row>
+  <Row name="Der relative Anteil einer Schranke" code="rel_tol">Ein Anteil am größeren der beiden Beträge, die verglichen werden; `0.001` steht für ein Promille.</Row>
+  <Row name="Die Nachkommastellen" code="decimals" tag="optional">Eine ganze Zahl von 0 bis 15. Beide Werte werden auf so viele Nachkommastellen gerundet, bevor sie verglichen werden.</Row>
+  <Row name="Die Herleitung" code="derivation">Woher die Nachkommastellen und die Schranken kommen, als Text oder als Verweis auf ein Dokument. Sie ist Pflicht, sobald der Eintrag rundet oder ein Anteil einer Schranke über null liegt.</Row>
+</RowList>
+
+<Prose>
+
+Jeder Eintrag braucht beide Schranken und jede Schranke beide Anteile; ein Anteil, der nicht gelten soll, ist `0`. Kein Anteil ist negativ. Zahlen schreiben Sie mit einem Punkt als Dezimalzeichen.
+
+Der ältere Wert ist bei `replay` und `regression` der des aufgezeichneten <Term id="run">Laufs</Term>, der neuere der des Laufs, den der Befehl rechnet. `walk` und `search` vergleichen zwei <Term id="state">Stände</Term> der <Term id="history">Versionsgeschichte</Term>; der ältere ist der frühere Stand.
+
+</Prose>
+
+<SectionHeading id="rule">Wann ein Wert abweicht</SectionHeading>
+
+<Prose>
+
+Hat der Eintrag einer Größe `decimals`, werden beide Werte zuerst gerundet, kaufmännisch: Eine 5 rundet vom Nullpunkt weg. Dann bildet der Vergleich die Differenz „neuerer Wert minus älterer Wert“.
+
+Jede Schranke ist der größere ihrer beiden Anteile: der absolute Anteil oder der relative Anteil mal den größeren der beiden Beträge. Der Wert weicht ab, wenn die Differenz größer ist als die obere Schranke oder wenn sie weiter unter null liegt als die untere Schranke.
+
+</Prose>
+
+<RowList>
+  <Row name="Genau auf der Schranke ist keine Abweichung">Eine Differenz, die genau so groß ist wie ihre Schranke, zählt nicht. Mit einer oberen Schranke von `0.25` weicht 100,25 gegenüber 100 nicht ab.</Row>
+  <Row name="Die beiden Schranken gelten getrennt">Mit einer oberen Schranke von `0.25` und einer unteren von `0` weicht 100 gegenüber 100,25 ab: Der neuere Wert liegt unter dem älteren, und dafür gilt die untere Schranke. Ein Profil mit gleichen Schranken vergleicht in beide Richtungen gleich.</Row>
+  <Row name="Der relative Anteil wächst mit dem Wert">Mit einem relativen Anteil von `0.001` weicht 1201 gegenüber 1200 nicht ab: Die Schranke ist 0,001 mal 1201, also 1,201.</Row>
+  <Row name="Runden verdeckt keinen Rundungsschritt">Mit zwei Nachkommastellen ergeben 0,6972 und 0,6974 beide 0,70 und weichen nicht ab. 0,6949 und 0,6951 ergeben 0,69 und 0,70 und weichen ab, obwohl sie näher beieinanderliegen.</Row>
+  <Row name="Erst runden, dann exakt vergleichen">Für eine Größe mit festgelegten Nachkommastellen ist die erste Wahl, zu runden und exakt zu vergleichen: `decimals` mit beiden Schranken auf null. Eine Schranke über null ist für das, was danach bleibt.</Row>
+  <Row name="Je Größe, nicht feiner">Eine Toleranz gilt für jeden Wert ihrer Größe. Eine Toleranz je <Term id="model-point">Modellpunkt</Term>, je <Term id="period">Periode</Term> oder je Tarif gibt es nicht.</Row>
+</RowList>
+
+<SectionHeading id="write">Ein eigenes Profil schreiben</SectionHeading>
+
+<Prose>
+
+Legen Sie eine neue Textdatei an, zum Beispiel `mein-profil.json` im Ordner `profiles` des <Term id="package-folder">Paketordners</Term>. Ort und Name sind frei gewählt. Das Beispiel rundet die Provisionen auf zwei Nachkommastellen und vergleicht sie dann exakt:
+
+</Prose>
+
+<CodeBlock lines={example('de')} label="Toleranzprofil, Beispiel" />
+
+<Prose>
+
+Ersetzen Sie <code translate="no">{DERIVATION.de}</code> durch Ihre Herleitung; mit einer leeren Herleitung wird dieses Profil abgelehnt. Für jede weitere Größe fügen Sie einen weiteren Eintrag hinzu, durch ein Komma getrennt.
+
+Den Namen einer Größe schreiben Sie genau so, wie ihn die Ergebnisse nennen, in der ersten Zeile von `results.csv`. Die Größen des <Term id="reference-model">Referenzmodells</Term>: {quantities.map((name, index) => <>{index > 0 && ', '}<code data-quantity translate="no">{name}</code></>)}.
+
+Diese Suche ist die Suche nach den Provisionen aus <a href={`${pageAddress(own, 'de')}#other-quantity`}>{own.name.de}</a>, jetzt mit Ihrem Profil. Die Variable `Q` mit dem Ordner des Quick Starts setzen Sie dort in Schritt 1.
+
+</Prose>
+
+<PlatformSwitch place="search" windows={search.windows} linux={search.linux} />
+
+<Prose>
+
+Das Ergebnis `search.result.json` im neuen Ordner enthält Ihr Profil mit der Herleitung.
+
+</Prose>
+
+<SectionHeading id="faults">Wenn ein Profil abgelehnt wird</SectionHeading>
+
+<Prose>
+
+Ein Befehl prüft das Profil, bevor er rechnet. Findet er einen Fehler, endet er mit dem <Term id="exit-status">Exit-Status</Term> 2, nennt die Datei und den Fehler auf Englisch und schreibt nichts.
+
+</Prose>
+
+<RowList>
+  <Row name="Die Datei gibt es nicht">Die Meldung enthält <code lang="en" translate="no">no tolerance file at</code>. Prüfen Sie den Pfad nach `--tolerance`.</Row>
+  <Row name="Die Datei ist kein gültiges JSON">Die Meldung enthält <code lang="en" translate="no">is not JSON</code> und nennt Zeile und Spalte. Häufig fehlt ein Anführungszeichen oder ein Komma, oder ein Komma steht zu viel.</Row>
+  <Row name="Der Aufbau stimmt nicht">Die Meldung enthält <code lang="en" translate="no">violates its schema at</code> und nennt die Stelle: eine Schranke oder ein Anteil fehlt, ein Anteil ist negativ, oder die Herleitung fehlt, obwohl der Eintrag rundet oder ein Anteil über null liegt.</Row>
+  <Row name="Eine Größe ist unbekannt">Die Meldung nennt den Namen und endet mit <code lang="en" translate="no">which the run does not declare</code>. Vergleichen Sie den Namen mit der ersten Zeile von `results.csv`.</Row>
+</RowList>

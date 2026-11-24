@@ -1,0 +1,25 @@
+---
+// A link to another site than the company website: it opens in a new tab,
+// and visually hidden text after the link text says so in the page
+// language. Every link to GitHub is one (the release page, the licence and
+// the repository in the footer). Links to the company website are plain
+// links.
+//
+//   <OutsideLink href={releasePage} hreflang="en">{tag}</OutsideLink>
+//
+// The hidden text is kept out of the search index: it is no word of the
+// page. The element stands on one line, so that no space follows the link.
+import { texts } from '../site';
+import { pageLanguage } from '../markup';
+
+interface Props {
+  href: string;
+  hreflang?: string;
+  class?: string;
+}
+
+const { href, hreflang, class: className } = Astro.props;
+const lang = pageLanguage(Astro.url.pathname);
+---
+
+<a class={className} href={href} hreflang={hreflang} target="_blank" rel="noopener" data-outside-link><slot /><span class="sr-only" data-pagefind-ignore> ({texts[lang].newTab})</span></a>

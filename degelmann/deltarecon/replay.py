@@ -45,8 +45,8 @@ from .documents import (CHANGES_SCHEMA, CONTRACT_VERSION, RECORD_SCHEMA, RUN_REQ
                         Rejection, artifact_reference, check_artifact, copy_files, document_bytes,
                         parse_document, read_document, same_release, write_document)
 from .export import check_export
-from .run import (RECORD_NAME, WITHOUT_DOMAIN_REFERENCE, Engine, StageDeclaration, UsageError,
-                  run_record, run_request)
+from .protocol import Engine, StageDeclaration, UsageError
+from .run import RECORD_NAME, WITHOUT_DOMAIN_REFERENCE, check_supported_stage, run_record, run_request
 
 # The contract versions of the run records a replay repeats; a 1.0 record is not replayed.
 REPLAY_VERSIONS = ("2.0", "3.0", "3.1", "3.2", "3.3")
@@ -147,8 +147,7 @@ def check_recorded_stage(recorded: RecordedRun, stages) -> None:
     """:func:`check_compared_stage` of the response of a recorded run against the engine's declaration
     of its stage in ``stages``: before anything runs, for a replay, a regression, a walk, and a search."""
     stage = recorded.record["stage"]
-    if stage not in stages:
-        raise Rejection("unsupported_stage", f"The stage {stage} is not supported.")
+    check_supported_stage(stage, stages)
     check_compared_stage(recorded.response, stages[stage])
 
 
@@ -189,8 +188,7 @@ def read_recorded_run(record_path: Path, stages, allow_error: bool = False) -> R
         raise UsageError(f"no run record at {record_path}")
     record = read_document(record_path, RECORD_SCHEMA)
     stage = record["stage"]
-    if stage not in stages:
-        raise Rejection("unsupported_stage", f"The stage {stage} is not supported.")
+    check_supported_stage(stage, stages)
     outcomes = ("succeeded", "error") if allow_error else ("succeeded",)
     if record["procedure"]["type"] != "run" or record["outcome"] not in outcomes:
         taken = "a succeeded run or of one that ended with an error" if allow_error else "a succeeded run"

@@ -1,0 +1,48 @@
+---
+// Two text links, DE and EN. Each leads to the current page in its language.
+// A link is named by its code and the language in its own words; the active
+// one is marked as current. language-switch.ts adds the anchor of the address
+// to the link to the counterpart.
+import { languageNames, languages, pageAddress, texts, type Lang, type Page } from '../site';
+
+interface Props {
+  lang: Lang;
+  page: Page;
+}
+
+const { lang, page } = Astro.props;
+---
+
+<div
+  class="flex items-center gap-0.5 text-[0.875rem] font-medium"
+  role="group"
+  aria-label={texts[lang].language}
+>
+  {
+    languages.map((language, index) => (
+      <>
+        {index > 0 && (
+          <span class="text-text-secondary" aria-hidden="true">
+            |
+          </span>
+        )}
+        <a
+          class:list={[
+            'nav-link inline-flex min-h-10 min-w-10 items-center justify-center border-b-2',
+            language === lang
+              ? 'border-teal-text font-bold text-navy'
+              : 'border-transparent text-teal-text',
+          ]}
+          href={pageAddress(page, language)}
+          hreflang={language}
+          lang={language === lang ? undefined : language}
+          aria-current={language === lang ? 'true' : undefined}
+          data-counterpart={language === lang ? undefined : ''}
+        >
+          <span>{language.toUpperCase()}</span>
+          <span class="sr-only"> – {languageNames[language]}</span>
+        </a>
+      </>
+    ))
+  }
+</div>

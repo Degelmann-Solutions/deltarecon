@@ -1,0 +1,32 @@
+---
+// The glossary link: a page writes it at the first occurrence of a term.
+//
+//   <Term id="deviation" />                  prints the term of the entry
+//   <Term id="deviation">deviations</Term>   prints the given word form
+//
+// It leads to the entry on the Glossary of the page's language. The build
+// fails on an entry the glossary register (src/glossary.ts) does not hold.
+// The element stands on one line, so that no space follows the link.
+import { entryAddress, findEntry, glossaryPage, termLanguage } from '../glossary';
+import { findPage, languageOf, pageAddress } from '../site';
+
+interface Props {
+  id: string;
+}
+
+const { id } = Astro.props;
+const lang = languageOf(Astro.url.pathname);
+if (!lang) {
+  throw new Error(`${Astro.url.pathname}: a glossary link stands on a page of no language.`);
+}
+const entry = findEntry(id);
+if (!entry) {
+  throw new Error(
+    `${Astro.url.pathname}: no entry "${id}" in the glossary register (src/glossary.ts).`,
+  );
+}
+const address = entryAddress(pageAddress(findPage(glossaryPage), lang), entry);
+const termLang = termLanguage(entry, lang);
+---
+
+<a class="glossary-link" href={address} lang={termLang === lang ? undefined : termLang} data-term={entry.anchor}><slot>{entry[lang].term}</slot></a>

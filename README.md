@@ -1,4 +1,14 @@
-# DeltaRecon
+<h1>
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset=".github/assets/deltarecon-logo-dark.svg">
+    <source media="(prefers-color-scheme: light)" srcset=".github/assets/deltarecon-logo-light.svg">
+    <img alt="DeltaRecon" src=".github/assets/deltarecon-logo-light.svg" width="420">
+  </picture>
+</h1>
+
+DeltaRecon finds a deviation between two releases of a calculation program and traces it back to the changes that cause it: deterministic, per quantity, open source.
+
+**Documentation:** [Deutsch](https://degelmann-solutions.de/deltarecon/docs/de/) · [English](https://degelmann-solutions.de/deltarecon/docs/en/)
 
 Degelmann DeltaRecon is a deterministic method for release-deviation analysis of a Life valuation process chain. After a release, many simultaneous changes to data, parameters and code move results between version N and version N+1. DeltaRecon traces the difference back to its causes on an open reference model.
 

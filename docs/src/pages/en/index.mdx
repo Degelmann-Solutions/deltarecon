@@ -1,0 +1,91 @@
+---
+layout: ../../layouts/Page.astro
+lang: en
+page: overview
+lead: "After a release, many simultaneous changes to data, parameters and code move the results of a valuation program. Comparing the two states shows how large the difference is. DeltaRecon traces it back to the changes that cause it."
+description: "What DeltaRecon does and what you can do with it: it finds a deviation between two releases and traces it back to the changes that cause it."
+---
+import BarFigure from '../../components/BarFigure.astro';
+import IdeaFigure from '../../components/IdeaFigure.astro';
+import PathBlock from '../../components/PathBlock.astro';
+import Prose from '../../components/Prose.astro';
+import Row from '../../components/Row.astro';
+import RowList from '../../components/RowList.astro';
+import SectionHeading from '../../components/SectionHeading.astro';
+import Term from '../../components/Term.astro';
+import WideFigure from '../../components/WideFigure.astro';
+import { example } from '../../captures';
+import { listOf } from '../../markup';
+import { findPage, pageAddress } from '../../site';
+
+export const facts = example('en');
+export const deviating = facts.deviating.length;
+export const numbers = listOf(facts.deviating.map((entry) => entry.number), 'en');
+export const quickStart = findPage('quick-start');
+export const howItWorks = findPage('how-deltarecon-works');
+export const requirements = findPage('engine-requirements');
+
+<SectionHeading id="what-it-does">What DeltaRecon does</SectionHeading>
+
+<Prose>
+
+You know the analysis of change from the balance sheet and from Solvency II: a reconciliation from last year to the current <span data-no-term>state</span>, step by step. DeltaRecon takes as its steps the <Term id="revision">revisions</Term> of the versioned valuation program. Each revision is one change. Between <Term id="release">release</Term> N and the <Term id="state">state</Term> N+1 DeltaRecon computes states, compares them, and attributes the <Term id="deviation">deviation</Term> in a <Term id="quantity">quantity</Term> to the single revisions that cause it.
+
+Every result comes from computations and comparisons that give the same result each time. DeltaRecon uses no agents.
+
+The picture shows the example of the quick start on the <Term id="reference-model">reference model</Term>: the state N+1 lies {facts.revisions} revisions after release N, and {deviating} of them deviate in the <Term id="bruttobeitrag" />, the gross premium.
+
+</Prose>
+
+<WideFigure label="Sum of the deviation in the Bruttobeitrag, by revision">
+  <IdeaFigure
+    before={{ label: 'Release N', title: 'The reference model before the changes' }}
+    after={{ label: 'State N+1', title: 'The reference model after the changes' }}
+    revision="revision"
+    count={`${facts.revisions} revisions from release N to the state N+1`}
+    deviating={`${deviating} of them deviate in the Bruttobeitrag`}
+  />
+  <BarFigure slot="second" numbered />
+  <p slot="caption">The example of the quick start, on the reference model. Each square is one revision, in the order in which it was made. {deviating} revisions deviate in the <span lang="de">Bruttobeitrag</span> in the first five projection years: revisions {numbers}. A filled bar raises the <span lang="de">Bruttobeitrag</span>, an outlined bar lowers it.</p>
+</WideFigure>
+
+<SectionHeading id="what-you-need">What you need</SectionHeading>
+
+<Prose>
+
+A computer with Windows or Linux. You download one archive and unpack it. Nothing is installed: the package holds everything it needs, including the reference model, a term life insurance with {facts.modelPoints} <Term id="model-point">model points</Term>. The reference model demonstrates the mechanics and is not a valuation model; its portfolio is synthetic and holds no client data.
+
+</Prose>
+
+<SectionHeading id="what-you-get">What you get</SectionHeading>
+
+<Prose>
+
+The guided demo of the quick start <span data-no-term>runs</span> four steps and shows three tables. <Term id="run">Each run</Term> also leaves a <Term id="record">record</Term> of what was computed with what: code, parameters and <Term id="input-data">portfolio data</Term>.
+
+</Prose>
+
+<RowList>
+  <Row name="Where the results of the two releases differ">After the <Term id="regression">regression</Term>. Columns: Quantity, Model points, <Term id="value">Values</Term>, <Term id="period">Periods</Term>.</Row>
+  <Row name="What changed between the two releases">After the changes are listed. Columns: No., Revision, <Term id="class">Class</Term>, Description.</Row>
+  <Row name="Which changes cause the deviation">After the search. Columns: Revision, Description, Sum of the deviation.</Row>
+</RowList>
+
+<SectionHeading id="for-you">Is this for you?</SectionHeading>
+
+<Prose>
+
+You want to know what exactly DeltaRecon can do, and to try it without a technical background: start with the <a href={pageAddress(quickStart, 'en')}>{quickStart.name.en}</a>. It takes you from the download to the first result table.
+
+Regression testing costs your team much time, and you want to judge what connecting your own <Term id="engine">engine</Term> takes: read <a href={pageAddress(howItWorks, 'en')}>{howItWorks.name.en}</a>, then <a href={pageAddress(requirements, 'en')}>{requirements.name.en}</a>.
+
+</Prose>
+
+<SectionHeading id="next">Where to go next</SectionHeading>
+
+<PathBlock>
+  <span slot="stage-1">Download the package and see the first result on the reference model.</span>
+  <span slot="stage-2">What each result means, how DeltaRecon works and where its limits are.</span>
+  <span slot="stage-3">Try calculations of your own on the reference model.</span>
+  <span slot="stage-4">What your engine must provide, and how to build the connection.</span>
+</PathBlock>

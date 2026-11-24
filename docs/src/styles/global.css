@@ -1,0 +1,2640 @@
+@import "tailwindcss";
+
+/*
+ * Self-hosted typeface, copied from the company website (rsms/inter v4.1,
+ * JetBrains/JetBrainsMono v2.304; licences in public/fonts/). The addresses
+ * are those of public/; the build puts the base of the site before them
+ * (astro.config.mjs, `base`).
+ */
+@font-face {
+  font-family: "Inter";
+  src: url("/fonts/InterVariable.woff2") format("woff2");
+  font-weight: 100 900;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Inter";
+  src: url("/fonts/InterVariable-Italic.woff2") format("woff2");
+  font-weight: 100 900;
+  font-style: italic;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "JetBrains Mono";
+  src: url("/fonts/JetBrainsMono-Regular.woff2") format("woff2");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+/*
+ * The design tokens of DESIGN.md (frontmatter: colors, typography, rounded,
+ * spacing). Type sizes are in rem (16 px = 1 rem), so that the reader's
+ * browser setting applies. `static` keeps every token in the stylesheet as a
+ * custom property, also one that no utility class uses yet.
+ */
+@theme static {
+  --color-*: initial;
+  --color-navy: #1e2547;
+  --color-teal: #65c2cb;
+  --color-teal-text: #177982;
+  --color-text-secondary: #3a4060;
+  --color-bg: #ffffff;
+  --color-bg-subtle: #f5f7fa;
+  --color-border: #e5e8ed;
+  --color-text-on-dark: #ffffff;
+  --color-error: #b3261e;
+
+  --font-*: initial;
+  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, monospace;
+
+  --radius-*: initial;
+  --radius-none: 0px;
+  --radius-sm: 2px;
+  --radius-full: 9999px;
+
+  /* phone-breakpoint (600 px) and tree-breakpoint (1280 px). `tablet:` holds
+     from the phone breakpoint up, `tree:` from the tree breakpoint up. The
+     two values and the widths of the `@media` rules below are those of
+     src/breakpoints.ts; scripts/check-site.mjs holds them against it. */
+  --breakpoint-*: initial;
+  --breakpoint-tablet: 37.5rem;
+  --breakpoint-tree: 80rem;
+
+  --text-*: initial;
+  --text-page-title: 2.125rem;
+  --text-page-title--line-height: 1.2;
+  --text-page-title--font-weight: 700;
+  --text-page-title--letter-spacing: -0.02em;
+  --text-page-title-phone: 1.75rem;
+  --text-page-title-phone--line-height: 1.2;
+  --text-page-title-phone--font-weight: 700;
+  --text-page-title-phone--letter-spacing: -0.02em;
+  --text-lead: 1.125rem;
+  --text-lead--line-height: 1.55;
+  --text-lead-phone: 1.0625rem;
+  --text-lead-phone--line-height: 1.55;
+  --text-section-heading: 1.5rem;
+  --text-section-heading--line-height: 1.3;
+  --text-section-heading--font-weight: 600;
+  --text-section-heading-phone: 1.375rem;
+  --text-section-heading-phone--line-height: 1.3;
+  --text-section-heading-phone--font-weight: 600;
+  --text-sub-heading: 1.125rem;
+  --text-sub-heading--line-height: 1.4;
+  --text-sub-heading--font-weight: 600;
+  --text-step-title: 1.375rem;
+  --text-step-title--line-height: 1.35;
+  --text-step-title--font-weight: 600;
+  --text-step-title-phone: 1.25rem;
+  --text-step-title-phone--line-height: 1.35;
+  --text-step-title-phone--font-weight: 600;
+  --text-callout-title: 1rem;
+  --text-callout-title--line-height: 1.4;
+  --text-callout-title--font-weight: 600;
+  --text-body: 1rem;
+  --text-body--line-height: 1.55;
+  --text-body-small: 0.9375rem;
+  --text-body-small--line-height: 1.55;
+  --text-nav: 0.875rem;
+  --text-nav--line-height: 1.4;
+  --text-nav-stage: 0.8125rem;
+  --text-nav-stage--line-height: 1.35;
+  --text-nav-stage--font-weight: 600;
+  --text-table: 0.875rem;
+  --text-table--line-height: 1.45;
+  --text-caption: 0.8125rem;
+  --text-caption--line-height: 1.5;
+  --text-label: 0.75rem;
+  --text-label--letter-spacing: 0.025em;
+  --text-label-small: 0.6875rem;
+  --text-label-small--letter-spacing: 0.025em;
+  --text-code: 0.8125rem;
+  --text-code--line-height: 1.6;
+  --text-code-phone: 0.75rem;
+  --text-code-phone--line-height: 1.6;
+  --text-code-inline: 0.875em;
+
+  --spacing-topbar-height: 56px;
+  --spacing-tree-width: 288px;
+  --spacing-content-max: 992px;
+  --spacing-text-max: 720px;
+  --spacing-content-pad-x: 48px;
+  --spacing-content-pad-top: 36px;
+  --spacing-content-pad-bottom: 72px;
+  --spacing-content-pad-x-phone: 12px;
+  --spacing-content-pad-top-phone: 24px;
+  --spacing-content-pad-bottom-phone: 48px;
+  --spacing-step-indent: 64px;
+  --spacing-step-indent-phone: 38px;
+  --spacing-step-gap: 32px;
+  --spacing-step-gap-phone: 24px;
+  --spacing-step-pad: 40px;
+  --spacing-step-pad-phone: 26px;
+  --spacing-card-pad-x: 28px;
+  --spacing-card-pad-x-phone: 14px;
+  --spacing-card-columns-gap: 36px;
+  --spacing-card-columns-gap-phone: 20px;
+  --spacing-figure-column: 264px;
+  --spacing-figure-pad: 16px;
+  --spacing-callout-pad-y: 20px;
+  --spacing-callout-pad-x: 24px;
+  --spacing-callout-pad-phone: 16px;
+  --spacing-section-gap: 56px;
+  --spacing-section-gap-phone: 40px;
+  --spacing-block-max: 820px;
+  --spacing-search-field-width: 240px;
+  --spacing-search-list-width: 360px;
+  --spacing-card-pad-top: 24px;
+  --spacing-card-pad-bottom: 28px;
+  --spacing-card-pad-top-phone: 16px;
+  --spacing-card-pad-bottom-phone: 20px;
+  --spacing-path-end-marker: 14px;
+  --spacing-trace-width: 1.75px;
+}
+
+/*
+ * The states of the menu. menu.ts sets `data-menu` on <html> once it runs:
+ * "closed" or "open". Without JavaScript the attribute is absent, and the
+ * chapter tree stands at the end of the page.
+ */
+@custom-variant menu-closed (html[data-menu="closed"] &);
+@custom-variant menu-open (html[data-menu="open"] &);
+
+@layer base {
+  html {
+    -webkit-text-size-adjust: 100%;
+  }
+
+  body {
+    background: var(--color-bg);
+    color: var(--color-navy);
+    font-family: var(--font-sans);
+    font-size: var(--text-body);
+    line-height: var(--text-body--line-height);
+    -webkit-font-smoothing: antialiased;
+  }
+
+  /* Focus ring on light grounds. Never removed without a replacement. */
+  :focus-visible {
+    outline: 2px solid var(--color-teal-text);
+    outline-offset: 2px;
+  }
+
+  /* Inline code: breaks anywhere when a line is too short for it. */
+  :not(pre) > code {
+    font-family: var(--font-mono);
+    font-size: var(--text-code-inline);
+    font-variant-ligatures: none;
+    background: var(--color-bg-subtle);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-sm);
+    padding: 1px 5px;
+    overflow-wrap: anywhere;
+  }
+}
+
+@layer components {
+  /* Inline link: every link that stands beside other text. A visited link
+     looks like an unvisited one; hover and pressed look alike. */
+  .inline-link,
+  .prose-links a {
+    color: var(--color-teal-text);
+    text-decoration-line: underline;
+    text-decoration-thickness: 1px;
+    text-underline-offset: 3px;
+  }
+
+  .inline-link:hover,
+  .inline-link:active,
+  .prose-links a:hover,
+  .prose-links a:active {
+    color: var(--color-navy);
+  }
+
+  /* Glossary link: the text colour of its surroundings and a dotted
+     underline; quieter than an inline link. On hover and pressed the
+     underline is solid and the colour stays. */
+  .glossary-link,
+  .prose-links a.glossary-link {
+    color: inherit;
+    text-decoration-line: underline;
+    text-decoration-style: dotted;
+    text-decoration-thickness: 1px;
+    text-decoration-color: var(--color-text-secondary);
+    text-underline-offset: 3px;
+  }
+
+  .glossary-link:hover,
+  .glossary-link:active,
+  .prose-links a.glossary-link:hover,
+  .prose-links a.glossary-link:active {
+    color: inherit;
+    text-decoration-style: solid;
+  }
+
+  /* Glossary entry: a hairline above and a bar at the left edge that shows
+     only in the linked state. */
+  .glossary-entry {
+    padding: 16px;
+    border-top: 1px solid var(--color-border);
+    border-left: 2px solid transparent;
+  }
+
+  /* The counterpart of a term in the other language: on the phone on a line
+     of its own, from the phone breakpoint up after the term. */
+  .glossary-counterpart {
+    display: block;
+    margin-top: 2px;
+    color: var(--color-text-secondary);
+    font-size: 0.875rem;
+    font-weight: 400;
+
+    @variant tablet {
+      display: inline;
+      margin-top: 0;
+      margin-left: 10px;
+      white-space: nowrap;
+    }
+  }
+
+  /* The tag above the term, in the page only for the linked state. */
+  .glossary-linked {
+    display: none;
+    margin-bottom: 4px;
+    color: var(--color-teal-text);
+    font-family: var(--font-mono);
+    font-size: var(--text-label-small);
+    font-weight: 400;
+    letter-spacing: var(--text-label-small--letter-spacing);
+    text-transform: uppercase;
+  }
+
+  /* Linked state: the address points at the entry. Three cues: the ground,
+     the bar, the tag. `:target` needs no script and ends when the address
+     changes. */
+  .glossary-entry:target {
+    background: var(--color-bg-subtle);
+    border-left-color: var(--color-teal-text);
+  }
+
+  .glossary-entry:target .glossary-linked {
+    display: block;
+  }
+
+  /* A link without underline (chapter tree, page links, language switch,
+     product-page link) gets the underline of the inline link on hover.
+     `.nav-link-text` marks the part of a boxed link that gets it. */
+  .nav-link:hover,
+  .nav-link:active,
+  .nav-link-box:hover .nav-link-text,
+  .nav-link-box:active .nav-link-text {
+    text-decoration-line: underline;
+    text-decoration-thickness: 1px;
+    text-underline-offset: 3px;
+  }
+
+  /* Menu button and close button. */
+  .frame-button:hover,
+  .frame-button:active {
+    background: var(--color-bg-subtle);
+  }
+
+  /* Skip link: in the page before the top bar, visible only with focus. */
+  .skip-link {
+    position: absolute;
+    left: 8px;
+    top: 8px;
+    z-index: 50;
+    padding: 8px 12px;
+    background: var(--color-bg);
+    color: var(--color-navy);
+    border: 1px solid var(--color-navy);
+    border-radius: var(--radius-sm);
+    font-size: var(--text-nav);
+    line-height: var(--text-nav--line-height);
+  }
+
+  /* The search result list (Search.astro): a white box with the border of
+     the field, directly under it; the gap leaves room for the focus ring of
+     the field. Below the phone breakpoint, in the menu, it stands in the flow
+     at full width; from it up, in the top bar, it hangs from the field and
+     lies over the page, `search-list-width` wide. */
+  .search-panel {
+    margin-top: 4px;
+    background: var(--color-bg);
+    border: 1px solid var(--color-navy);
+    border-radius: var(--radius-sm);
+    color: var(--color-navy);
+  }
+
+  @media (min-width: 37.5rem) {
+    .search-panel {
+      position: absolute;
+      top: 100%;
+      left: 0;
+      z-index: 10;
+      width: var(--spacing-search-list-width);
+    }
+  }
+
+  .search-status {
+    padding: 8px 12px;
+    font-size: var(--text-caption);
+    line-height: var(--text-caption--line-height);
+    color: var(--color-text-secondary);
+  }
+
+  /* One hit per page, a hairline above each. */
+  .search-hits > li {
+    padding: 8px 12px 10px;
+    border-top: 1px solid var(--color-border);
+  }
+
+  /* The page name is the link: 16 px in the menu, 14 px in the top bar. */
+  .search-hit-name {
+    display: inline-flex;
+    align-items: center;
+    min-height: 24px;
+    font-size: 1rem;
+    line-height: 1.4;
+    font-weight: 600;
+    color: var(--color-navy);
+  }
+
+  @media (min-width: 37.5rem) {
+    .search-hit-name {
+      font-size: var(--text-nav);
+    }
+  }
+
+  .search-hit-stage {
+    font-size: var(--text-caption);
+    line-height: var(--text-caption--line-height);
+    color: var(--color-text-secondary);
+  }
+
+  /* One line, cut off with an ellipsis; the matched words in bold. */
+  .search-hit-excerpt {
+    margin-top: 2px;
+    overflow: hidden;
+    font-size: var(--text-caption);
+    line-height: var(--text-caption--line-height);
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .search-hit-excerpt mark {
+    background: none;
+    color: inherit;
+    font-weight: 700;
+  }
+
+  /* A link in running text is at least 24 px high as a target: the padding
+     enlarges its box and leaves the lines where they are. */
+  .prose-links a,
+  .glossary-link {
+    padding-block: 5px;
+  }
+
+  /* ---- Step page (DESIGN.md, Components: Step page) ---- */
+
+  /* The step path: steps indented, a trace down the indent through the
+     centre of each pad. The trace is a border, so it survives a contrast
+     theme. It starts at the centre of the first pad. */
+  .steps {
+    margin-top: 36px;
+  }
+
+  .step {
+    position: relative;
+    padding: 0 0 var(--spacing-step-gap-phone) var(--spacing-step-indent-phone);
+  }
+
+  .step::before {
+    content: "";
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    left: calc(var(--spacing-step-pad-phone) / 2 - var(--spacing-trace-width) / 2);
+    border-left: var(--spacing-trace-width) solid var(--color-teal-text);
+  }
+
+  .step:first-child::before {
+    top: calc(var(--spacing-step-pad-phone) / 2);
+  }
+
+  .step-pad {
+    position: absolute;
+    z-index: 1;
+    top: 0;
+    left: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: var(--spacing-step-pad-phone);
+    height: var(--spacing-step-pad-phone);
+    border: 1.75px solid var(--color-navy);
+    border-radius: var(--radius-full);
+    background: var(--color-bg);
+    font-size: 0.8125rem;
+    font-weight: 600;
+    line-height: 1;
+  }
+
+  .step-card {
+    min-width: 0;
+    padding: var(--spacing-card-pad-top-phone) var(--spacing-card-pad-x-phone)
+      var(--spacing-card-pad-bottom-phone);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-sm);
+    background: var(--color-bg);
+  }
+
+  .step-counter {
+    color: var(--color-text-secondary);
+    font-family: var(--font-mono);
+    font-size: var(--text-label);
+    letter-spacing: var(--text-label--letter-spacing);
+    text-transform: uppercase;
+  }
+
+  /* A tag: "optional" beside the step counter. */
+  .tag {
+    margin-left: 8px;
+    padding: 1px 6px;
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-sm);
+    color: var(--color-text-secondary);
+    font-family: var(--font-mono);
+    font-size: var(--text-label-small);
+    letter-spacing: var(--text-label-small--letter-spacing);
+    text-transform: uppercase;
+  }
+
+  /* The step title is a link to its step and looks like a heading. */
+  .step-title {
+    margin-top: 4px;
+    font-size: var(--text-step-title-phone);
+    font-weight: var(--text-step-title-phone--font-weight);
+    line-height: var(--text-step-title-phone--line-height);
+  }
+
+  .step-title a {
+    display: inline-block;
+    color: inherit;
+  }
+
+  .step-title a:hover,
+  .step-title a:active {
+    text-decoration-line: underline;
+    text-decoration-thickness: 1px;
+    text-underline-offset: 3px;
+  }
+
+  /* Text and figure: one column, the figure below the text; two columns
+     where the content column has its full width. */
+  .step-columns {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: var(--spacing-card-columns-gap-phone);
+    align-items: start;
+    margin-top: 12px;
+  }
+
+  .step-text > * + *,
+  .step-after > * + *,
+  .step-after > div > * + *,
+  .platform-part[data-platform-only] > * + * {
+    margin-top: 12px;
+  }
+
+  .step-text > .platform-switch {
+    margin-top: 16px;
+  }
+
+  /* What the reader sees after a command. */
+  .step-after {
+    margin-top: 12px;
+    color: var(--color-text-secondary);
+  }
+
+  .step-wide {
+    min-width: 0;
+    margin-top: 8px;
+  }
+
+  .step-wide > * + * {
+    margin-top: 12px;
+  }
+
+  /* Several blocks in the wide part of a card (row list, code excerpt,
+     callout, text, code block), one below the other. */
+  .step-wide > .step-parts > * + * {
+    margin-top: 16px;
+  }
+
+  /* The path end: a square on the trace axis, the closing line. */
+  .path-end {
+    position: relative;
+    padding-left: var(--spacing-step-indent-phone);
+  }
+
+  .path-end::before {
+    content: "";
+    position: absolute;
+    top: 0;
+    left: calc(var(--spacing-step-pad-phone) / 2 - var(--spacing-trace-width) / 2);
+    height: 6px;
+    border-left: var(--spacing-trace-width) solid var(--color-teal-text);
+  }
+
+  .path-end-marker {
+    position: absolute;
+    top: 6px;
+    left: calc(var(--spacing-step-pad-phone) / 2 - var(--spacing-path-end-marker) / 2);
+    width: 0;
+    height: 0;
+    border: calc(var(--spacing-path-end-marker) / 2) solid var(--color-teal-text);
+  }
+
+  .path-end-line {
+    font-size: 1.0625rem;
+    font-weight: 600;
+  }
+
+  /* ---- Platform switch ---- */
+
+  /* The label of a part: what stands for the tab without JavaScript, in the
+     type of the inactive tab. */
+  .platform-label {
+    color: var(--color-text-secondary);
+    font-size: 0.8125rem;
+    font-weight: 500;
+    line-height: 1.4;
+  }
+
+  .platform-switch .platform-label {
+    padding: 8px 0;
+  }
+
+  .platform-switch .platform-part + .platform-part {
+    margin-top: 12px;
+  }
+
+  .platform-label small,
+  .platform-tab small {
+    margin-left: 6px;
+    color: var(--color-text-secondary);
+    font-family: var(--font-mono);
+    font-size: 0.6875rem;
+    font-weight: 400;
+  }
+
+  /* The tab row (scripts/platform.ts): the tabs, then the copy button at
+     its right end. */
+  .platform-tabs {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-end;
+    border-bottom: 1px solid var(--color-border);
+  }
+
+  .platform-tablist {
+    display: flex;
+  }
+
+  .platform-tab {
+    min-height: 40px;
+    margin-bottom: -1px;
+    padding: 8px 14px;
+    border: 1px solid transparent;
+    border-bottom: 0;
+    border-radius: var(--radius-sm) var(--radius-sm) 0 0;
+    color: var(--color-text-secondary);
+    font-size: 0.8125rem;
+    font-weight: 500;
+    line-height: 1.4;
+  }
+
+  /* Hover and pressed look alike: the ground of the active tab. */
+  .platform-tab:hover,
+  .platform-tab:active {
+    background: var(--color-bg-subtle);
+  }
+
+  .platform-tab[aria-selected="true"] {
+    border-color: var(--color-border);
+    border-top: 2px solid var(--color-teal-text);
+    background: var(--color-bg-subtle);
+    color: var(--color-navy);
+    font-weight: 600;
+  }
+
+  /* A switch without a command: the hairline under the tab row closes the
+     active tab, and the sentences of the platform follow. */
+  .platform-switch[data-plain] .platform-tab {
+    margin-bottom: 0;
+  }
+
+  .platform-text {
+    margin-top: 12px;
+  }
+
+  .platform-text > div > * + * {
+    margin-top: 12px;
+  }
+
+  .platform-switch[data-plain] .platform-label {
+    padding-bottom: 0;
+  }
+
+  .platform-switch[data-plain]:not([data-tabs]) .platform-label + .platform-text {
+    margin-top: 4px;
+  }
+
+  /* On a page of prose a switch is a block of its own between prose and
+     row lists. */
+  main > .platform-switch {
+    max-width: var(--spacing-block-max);
+    margin-top: 16px;
+  }
+
+  /* ---- Code block and copy button ---- */
+
+  .code {
+    margin: 0;
+    padding: 14px 16px;
+    overflow-x: auto;
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-sm);
+    background: var(--color-bg-subtle);
+    color: var(--color-navy);
+    font-family: var(--font-mono);
+    font-size: var(--text-code-phone);
+    font-variant-ligatures: none;
+    line-height: var(--text-code-phone--line-height);
+    white-space: pre;
+    /* A block that takes focus at the edge of the window is scrolled fully
+       into it, with its border and its focus ring. */
+    scroll-margin-block: 8px;
+  }
+
+  /* Under its tabs the block joins the active tab. */
+  .platform-switch[data-tabs] .code,
+  .code-block[data-copy-button] .code {
+    border-top: 0;
+    border-radius: 0 0 var(--radius-sm) var(--radius-sm);
+  }
+
+  /* A document to copy may be long (the skeleton of an adapter): it keeps to
+     a height that fits a window and scrolls inside its box. */
+  .code-block[data-document] .code {
+    max-height: 26rem;
+    overflow-y: auto;
+  }
+
+  /* A code block that stands alone: the copy button in a row above it. */
+  .code-head {
+    display: flex;
+    justify-content: flex-end;
+    padding: 4px 12px 0;
+    border: 1px solid var(--color-border);
+    border-bottom: 0;
+    border-radius: var(--radius-sm) var(--radius-sm) 0 0;
+    background: var(--color-bg-subtle);
+  }
+
+  .copy {
+    display: flex;
+    align-items: center;
+    align-self: center;
+    margin-left: auto;
+  }
+
+  .copy-button {
+    min-height: 40px;
+    padding: 0 4px;
+    color: var(--color-teal-text);
+    font-family: var(--font-mono);
+    font-size: var(--text-label);
+    letter-spacing: var(--text-label--letter-spacing);
+    text-align: right;
+    text-transform: uppercase;
+  }
+
+  .copy-button:hover,
+  .copy-button:active {
+    text-decoration-line: underline;
+    text-decoration-thickness: 1px;
+    text-underline-offset: 3px;
+  }
+
+  .copy-button[data-state] {
+    color: var(--color-navy);
+  }
+
+  /* ---- Terminal block: the one dark ground ---- */
+
+  .terminal {
+    min-width: 0;
+    margin-top: 16px;
+    border-radius: var(--radius-sm);
+    background: var(--color-navy);
+    color: var(--color-text-on-dark);
+  }
+
+  .terminal-bar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0 12px;
+    padding: 4px 16px;
+    border-bottom: 1px solid rgb(255 255 255 / 0.18);
+    color: rgb(255 255 255 / 0.75);
+    font-family: var(--font-mono);
+    font-size: var(--text-label);
+    letter-spacing: var(--text-label--letter-spacing);
+    line-height: 2;
+    text-transform: uppercase;
+  }
+
+  .terminal-place {
+    margin-left: auto;
+  }
+
+  .terminal-bar .copy {
+    margin-left: 0;
+  }
+
+  .terminal pre {
+    margin: 0;
+    padding: 16px;
+    overflow-x: auto;
+    color: rgb(255 255 255 / 0.82);
+    font-family: var(--font-mono);
+    font-size: var(--text-code-phone);
+    font-variant-ligatures: none;
+    line-height: var(--text-code-phone--line-height);
+    white-space: pre;
+  }
+
+  .terminal-prompt {
+    color: var(--color-teal);
+  }
+
+  .terminal-command,
+  .terminal-heading {
+    color: var(--color-text-on-dark);
+  }
+
+  /* The mark of a cut: text of the page in the place of lines of output that
+     are left out. The typeface of the text and a dashed rule above and below
+     set it apart from the output; it stands on a line of its own. */
+  .terminal-cut {
+    display: inline-block;
+    margin: 6px 0;
+    padding: 3px 0;
+    border-block: 1px dashed rgb(255 255 255 / 0.75);
+    color: var(--color-text-on-dark);
+    font-family: var(--font-sans);
+  }
+
+  .terminal .copy-button {
+    color: var(--color-teal);
+  }
+
+  .terminal .copy-button[data-state] {
+    color: var(--color-text-on-dark);
+  }
+
+  /* The focus ring on navy: teal. The block itself shows it inside. */
+  .terminal pre:focus-visible {
+    outline: 2px solid var(--color-teal);
+    outline-offset: -4px;
+  }
+
+  .terminal .copy-button:focus-visible {
+    outline: 2px solid var(--color-teal);
+    outline-offset: 2px;
+  }
+
+  /* ---- Result table ---- */
+
+  .result-wrap {
+    min-width: 0;
+    margin-top: 16px;
+  }
+
+  .result-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.8125rem;
+    line-height: var(--text-table--line-height);
+  }
+
+  .result-table caption {
+    caption-side: bottom;
+    padding-top: 10px;
+    color: var(--color-text-secondary);
+    font-size: var(--text-caption);
+    line-height: var(--text-caption--line-height);
+    text-align: left;
+  }
+
+  .result-table thead th {
+    color: var(--color-text-secondary);
+    font-family: var(--font-mono);
+    font-size: var(--text-label);
+    font-weight: 400;
+    letter-spacing: var(--text-label--letter-spacing);
+    text-align: left;
+    text-transform: uppercase;
+  }
+
+  .result-table tbody th {
+    font-family: var(--font-mono);
+    font-size: 0.8125rem;
+    font-weight: 400;
+    text-align: left;
+    white-space: nowrap;
+  }
+
+  .result-table .result-num {
+    font-variant-numeric: tabular-nums;
+    text-align: right;
+    white-space: nowrap;
+  }
+
+  .result-table tbody .result-num {
+    font-weight: 600;
+  }
+
+  /* Below the phone breakpoint each row is a record: revision and sum on one
+     line, the description below; the head row stays. The roles of the table
+     are written out in the markup, so it keeps its meaning. */
+  @media not (min-width: 37.5rem) {
+    .result-table {
+      display: flex;
+      flex-direction: column;
+    }
+
+    .result-table thead,
+    .result-table tbody,
+    .result-table caption {
+      display: block;
+    }
+
+    .result-table caption {
+      order: 9;
+    }
+
+    .result-table tr {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      column-gap: 12px;
+      padding: 10px 0;
+      border-bottom: 1px solid var(--color-border);
+    }
+
+    .result-table thead tr {
+      padding: 0 0 8px;
+      border-bottom: 1.5px solid var(--color-navy);
+    }
+
+    .result-table th,
+    .result-table td {
+      display: block;
+    }
+
+    .result-table .result-rev {
+      grid-area: 1 / 1;
+    }
+
+    .result-table .result-num {
+      grid-area: 1 / 2;
+    }
+
+    .result-table .result-desc {
+      grid-area: 2 / 1 / 3 / 3;
+      margin-top: 2px;
+    }
+  }
+
+  @media (min-width: 37.5rem) {
+    .result-wrap {
+      overflow-x: auto;
+    }
+
+    .result-table {
+      font-size: var(--text-table);
+    }
+
+    .result-table th,
+    .result-table td {
+      padding: 10px 12px;
+      border-bottom: 1px solid var(--color-border);
+      vertical-align: top;
+    }
+
+    .result-table thead th {
+      border-bottom: 1.5px solid var(--color-navy);
+      vertical-align: bottom;
+    }
+
+    .result-table th:first-child,
+    .result-table td:first-child {
+      padding-left: 0;
+    }
+
+    .result-table th:last-child,
+    .result-table td:last-child {
+      padding-right: 0;
+    }
+
+    .result-table tbody .result-num {
+      font-weight: 500;
+    }
+  }
+
+  /* The two four-column tables of the demo (DemoTable.astro): the table of
+     the regression and the table of the changes. They share the looks
+     above. A quantity name is text, not a hash; the number of a change
+     stands right-aligned before its revision. */
+  .result-table tbody .result-key {
+    font-family: var(--font-sans);
+    font-size: inherit;
+    font-weight: 500;
+    white-space: normal;
+  }
+
+  .result-table .result-no {
+    color: var(--color-text-secondary);
+    font-variant-numeric: tabular-nums;
+  }
+
+  .result-table .result-class {
+    white-space: nowrap;
+  }
+
+  /* A table that stands in a page of prose, outside a step card. */
+  main > .result-wrap {
+    max-width: var(--spacing-block-max);
+    margin-top: 24px;
+  }
+
+  /* Below the phone breakpoint a row of a four-column table is a record of
+     two lines, and the head row has the same two lines, so that each column
+     name stands above its values. Regression: the quantity, then model
+     points, values and periods side by side. Changes: number, revision and
+     class side by side, then the description. */
+  @media not (min-width: 37.5rem) {
+    .result-table-regression tr {
+      grid-template-columns: minmax(0, 4fr) minmax(0, 3fr) minmax(0, 3fr);
+    }
+
+    .result-table-regression .result-key {
+      grid-area: 1 / 1 / 2 / 4;
+    }
+
+    .result-table-regression .result-num {
+      margin-top: 2px;
+      text-align: left;
+    }
+
+    .result-table-regression tbody .result-num {
+      font-weight: 400;
+    }
+
+    .result-table-regression .result-points {
+      grid-area: 2 / 1;
+    }
+
+    .result-table-regression .result-values {
+      grid-area: 2 / 2;
+    }
+
+    .result-table-regression .result-periods {
+      grid-area: 2 / 3;
+    }
+
+    .result-table-changes tr {
+      grid-template-columns: 2.25rem 5rem minmax(0, 1fr);
+    }
+
+    .result-table-changes .result-no {
+      grid-area: 1 / 1;
+    }
+
+    .result-table-changes .result-rev {
+      grid-area: 1 / 2;
+    }
+
+    .result-table-changes .result-class {
+      grid-area: 1 / 3;
+    }
+
+    .result-table-changes .result-desc {
+      grid-area: 2 / 1 / 3 / 4;
+    }
+
+    .result-table-regression thead th,
+    .result-table-changes thead th {
+      overflow-wrap: anywhere;
+    }
+  }
+
+  @media (min-width: 37.5rem) {
+    .result-table .result-no {
+      width: 1%;
+      text-align: right;
+    }
+  }
+
+  /* ---- Callout ---- */
+
+  .callout {
+    min-width: 0;
+    margin-top: 24px;
+    padding: var(--spacing-callout-pad-phone);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-sm);
+    background: var(--color-bg-subtle);
+  }
+
+  .callout-tag {
+    color: var(--color-teal-text);
+    font-family: var(--font-mono);
+    font-size: var(--text-label);
+    letter-spacing: var(--text-label--letter-spacing);
+    text-transform: uppercase;
+  }
+
+  .callout-title {
+    margin-top: 4px;
+    font-size: var(--text-callout-title);
+    font-weight: var(--text-callout-title--font-weight);
+    line-height: var(--text-callout-title--line-height);
+  }
+
+  .callout-text,
+  .callout-quote {
+    margin-top: 8px;
+  }
+
+  .callout-text {
+    font-size: var(--text-body-small);
+    line-height: var(--text-body-small--line-height);
+  }
+
+  .callout-text > * + * {
+    margin-top: 8px;
+  }
+
+  /* Inline code in a callout stands on the ground of the callout. */
+  .callout-text code {
+    background: var(--color-bg);
+  }
+
+  /* A quoted message of the program. */
+  .callout-quote {
+    padding: 10px 12px;
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-sm);
+    background: var(--color-bg);
+    font-family: var(--font-mono);
+    font-size: 0.78125rem;
+    font-variant-ligatures: none;
+    line-height: 1.6;
+  }
+
+  /* ---- Step figure and its kinds ---- */
+
+  .step-figure {
+    min-width: 0;
+    margin: 0;
+    padding: var(--spacing-figure-pad);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-sm);
+    background: var(--color-bg);
+  }
+
+  .step-figure-caption,
+  .flow-caption {
+    color: var(--color-text-secondary);
+    line-height: var(--text-caption--line-height);
+  }
+
+  .step-figure-caption {
+    margin-top: 10px;
+    font-size: 0.78125rem;
+  }
+
+  /* File list. */
+  .file-list {
+    font-family: var(--font-mono);
+    font-size: var(--text-label);
+    line-height: 1.5;
+  }
+
+  .file-list li {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    gap: 0 10px;
+    padding: 6px 0;
+    border-bottom: 1px solid var(--color-border);
+  }
+
+  .file-list li:last-child {
+    border-bottom: 0;
+  }
+
+  .file-name {
+    overflow-wrap: anywhere;
+    font-variant-ligatures: none;
+  }
+
+  .file-note {
+    margin-left: auto;
+    color: var(--color-text-secondary);
+    font-family: var(--font-sans);
+    text-align: right;
+  }
+
+  /* Key cap: the key, and one sentence beside it. */
+  .key-cap {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+  }
+
+  .key-cap kbd {
+    display: flex;
+    flex: none;
+    align-items: flex-end;
+    justify-content: flex-end;
+    width: 72px;
+    height: 56px;
+    padding: 6px 8px;
+    border: 1.5px solid var(--color-navy);
+    border-radius: var(--radius-sm);
+    font-family: var(--font-mono);
+    font-size: var(--text-label);
+    line-height: 1.2;
+  }
+
+  .key-cap figcaption {
+    color: var(--color-text-secondary);
+    font-size: var(--text-caption);
+    line-height: var(--text-caption--line-height);
+  }
+
+  /* Bar figure: signed sums as bars around a centre zero line. Bars and
+     zero line are borders. A filled bar is filled by its own border. */
+  .bars {
+    display: grid;
+    gap: 10px;
+  }
+
+  .bar-row {
+    display: grid;
+    grid-template-columns: 62px minmax(0, 1fr) 84px;
+    gap: 10px;
+    align-items: center;
+    font-size: var(--text-caption);
+  }
+
+  .bar-revision {
+    font-family: var(--font-mono);
+    font-size: var(--text-label);
+  }
+
+  .bar-value {
+    font-variant-numeric: tabular-nums;
+    text-align: right;
+    white-space: nowrap;
+  }
+
+  .bar-track {
+    position: relative;
+    height: 18px;
+  }
+
+  .bar-track::before {
+    content: "";
+    position: absolute;
+    top: -5px;
+    bottom: -5px;
+    left: calc(50% - 0.5px);
+    border-left: 1px solid var(--color-text-secondary);
+  }
+
+  /* A raising bar stands right of the zero line, a lowering bar left of
+     it. The width is set per bar: its share of the longest, which fills its
+     half of the track. */
+  .bar {
+    position: absolute;
+    top: 2px;
+    height: 14px;
+    border: 1.5px solid var(--color-navy);
+  }
+
+  .bar-raises {
+    left: 50%;
+    border-top-width: 7px;
+    border-bottom-width: 7px;
+  }
+
+  .bar-lowers {
+    right: 50%;
+    min-width: 8px;
+  }
+
+  /* With the number of the revision before its hash ("30 · 7f1dc64"), as
+     the wide figure of the idea shows the bars, the label needs more room. */
+  .bars-numbered .bar-row {
+    grid-template-columns: 92px minmax(0, 1fr) 80px;
+    gap: 6px;
+  }
+
+  @media (min-width: 37.5rem) {
+    .bars-numbered .bar-row {
+      grid-template-columns: 104px minmax(0, 1fr) 84px;
+      gap: 10px;
+    }
+  }
+
+  /* ---- Flow diagram, style "Leiterbahn" ---- */
+
+  /* As a wide figure of a page of prose (FlowDiagram with `wide`) the
+     figure also carries `wide-figure`, whose rules stand further down and so
+     set its margin, frame and caption; the boxes and the trace are these. */
+
+  .flow {
+    margin: 20px 0 0;
+  }
+
+  .flow-row {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .flow-boxes {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    row-gap: 18px;
+    width: 100%;
+    padding-bottom: 18px;
+    counter-reset: flow;
+  }
+
+  .flow-box {
+    position: relative;
+    padding: 9px 12px;
+    border: 1.5px solid var(--color-navy);
+    border-radius: var(--radius-sm);
+    background: var(--color-bg);
+  }
+
+  li.flow-box {
+    counter-increment: flow;
+  }
+
+  /* The number of the box, a small mono line above its title. */
+  li.flow-box::before {
+    content: counter(flow);
+    display: block;
+    color: var(--color-text-secondary);
+    font-family: var(--font-mono);
+    font-size: var(--text-label-small);
+    line-height: 1.5;
+  }
+
+  .flow-title {
+    margin-top: 2px;
+    font-size: var(--text-caption);
+    font-weight: 600;
+    line-height: 1.35;
+  }
+
+  .flow-sub {
+    margin-top: 6px;
+    color: var(--color-text-secondary);
+    font-family: var(--font-mono);
+    font-size: var(--text-label-small);
+    font-variant-ligatures: none;
+    line-height: 1.5;
+    overflow-wrap: anywhere;
+  }
+
+  /* The trace from a box to the next: vertical in the stack. It ends in a
+     7 px square; the last one runs into the end pad. */
+  li.flow-box::after {
+    content: "";
+    position: absolute;
+    top: calc(100% + 1.5px);
+    left: 24px;
+    height: 18px;
+    border-left: var(--spacing-trace-width) solid var(--color-teal-text);
+  }
+
+  li.flow-box:not(:last-child) > .flow-title::after {
+    content: "";
+    position: absolute;
+    top: calc(100% + 12.5px);
+    left: calc(24px + var(--spacing-trace-width) / 2 - 3.5px);
+    border: 3.5px solid var(--color-teal-text);
+  }
+
+  .flow-end {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-left: 15px;
+    color: var(--color-teal-text);
+    font-family: var(--font-mono);
+    font-size: var(--text-label-small);
+    line-height: 1.4;
+  }
+
+  /* The end pad: a ring with a filled centre, both borders. */
+  .flow-pad {
+    position: relative;
+    flex: none;
+    width: 20px;
+    height: 20px;
+    border: 1.75px solid var(--color-teal-text);
+    border-radius: var(--radius-full);
+  }
+
+  .flow-pad::after {
+    content: "";
+    position: absolute;
+    top: calc(50% - 3.5px);
+    left: calc(50% - 3.5px);
+    border: 3.5px solid var(--color-teal-text);
+    border-radius: var(--radius-full);
+  }
+
+  .flow-caption {
+    margin-top: 12px;
+    font-size: var(--text-caption);
+  }
+
+  /* The small diagram of the archive check: two boxes, a trace from each
+     that meets in one pad. */
+  .check-boxes {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px;
+  }
+
+  .check-boxes .flow-box {
+    padding: 9px 10px;
+  }
+
+  .check-boxes .flow-title {
+    margin-top: 0;
+    font-size: var(--text-label);
+    overflow-wrap: anywhere;
+  }
+
+  .check-trace {
+    position: relative;
+    height: 30px;
+    margin: 0 calc(25% - 3px);
+    border: var(--spacing-trace-width) solid var(--color-teal-text);
+    border-top: 0;
+  }
+
+  .check-trace .flow-pad {
+    position: absolute;
+    bottom: -11px;
+    left: calc(50% - 10px);
+    background: var(--color-bg);
+  }
+
+  .check-equal {
+    margin-top: 16px;
+    color: var(--color-text-secondary);
+    font-family: var(--font-mono);
+    font-size: var(--text-label-small);
+    line-height: 1.5;
+    text-align: center;
+  }
+
+  /* ---- Summary list ---- */
+
+  .summary-list {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    margin-top: 20px;
+    counter-reset: summary;
+  }
+
+  .summary-list li {
+    position: relative;
+    padding: 10px 0 10px 28px;
+    border-top: 1px solid var(--color-border);
+    font-size: var(--text-body-small);
+    line-height: var(--text-body-small--line-height);
+    counter-increment: summary;
+  }
+
+  .summary-list li::before {
+    content: counter(summary);
+    position: absolute;
+    top: 12px;
+    left: 0;
+    color: var(--color-text-secondary);
+    font-family: var(--font-mono);
+    font-size: var(--text-label);
+  }
+
+  .summary-list code {
+    margin-left: 6px;
+  }
+
+  .summary-line {
+    display: block;
+    color: var(--color-text-secondary);
+  }
+
+  /* From the phone breakpoint up: the desktop step path. */
+  @media (min-width: 37.5rem) {
+    .step {
+      padding: 0 0 var(--spacing-step-gap) var(--spacing-step-indent);
+    }
+
+    .step::before {
+      left: calc(var(--spacing-step-pad) / 2 - var(--spacing-trace-width) / 2);
+    }
+
+    .step:first-child::before {
+      top: calc(var(--spacing-step-pad) / 2);
+    }
+
+    .step-pad {
+      width: var(--spacing-step-pad);
+      height: var(--spacing-step-pad);
+      font-size: 0.9375rem;
+    }
+
+    .step-card {
+      padding: var(--spacing-card-pad-top) var(--spacing-card-pad-x) var(--spacing-card-pad-bottom);
+    }
+
+    .step-title {
+      font-size: var(--text-step-title);
+      font-weight: var(--text-step-title--font-weight);
+      line-height: var(--text-step-title--line-height);
+    }
+
+    .path-end {
+      padding-left: var(--spacing-step-indent);
+    }
+
+    .path-end::before {
+      left: calc(var(--spacing-step-pad) / 2 - var(--spacing-trace-width) / 2);
+    }
+
+    .path-end-marker {
+      left: calc(var(--spacing-step-pad) / 2 - var(--spacing-path-end-marker) / 2);
+    }
+
+    .platform-tab {
+      min-height: 0;
+    }
+
+    .copy-button {
+      min-height: 24px;
+    }
+
+    .code,
+    .terminal pre {
+      font-size: var(--text-code);
+      line-height: var(--text-code--line-height);
+    }
+
+    .terminal-bar {
+      padding: 8px 16px;
+      line-height: 1.5;
+    }
+
+    .callout {
+      padding: var(--spacing-callout-pad-y) var(--spacing-callout-pad-x);
+    }
+  }
+
+  /* From the tree breakpoint up the content column has its full width: a
+     card has two columns, a flow diagram is horizontal. */
+  @media (min-width: 80rem) {
+    .step-columns-figure {
+      grid-template-columns: minmax(0, 1fr) var(--spacing-figure-column);
+      gap: var(--spacing-card-columns-gap);
+    }
+
+    .flow-row {
+      flex-direction: row;
+      align-items: center;
+    }
+
+    .flow-boxes {
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      column-gap: 28px;
+      width: auto;
+      flex: 1;
+      padding: 0 28px 0 0;
+    }
+
+    .flow-box {
+      padding: 12px 14px;
+    }
+
+    li.flow-box::after {
+      top: calc(50% - var(--spacing-trace-width) / 2);
+      left: calc(100% + 1.5px);
+      width: 28px;
+      height: 0;
+      border-top: var(--spacing-trace-width) solid var(--color-teal-text);
+      border-left: 0;
+    }
+
+    li.flow-box:not(:last-child) > .flow-title::after {
+      top: calc(50% - 3.5px);
+      left: calc(100% + 22.5px);
+    }
+
+    .flow-end {
+      margin-left: 0;
+    }
+
+    .summary-list {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      column-gap: 36px;
+    }
+  }
+
+  /* ---- Section heading ---- */
+
+  /* A level-2 heading of a page of prose. It is a link to itself and looks
+     like a heading; on hover it gets the underline, as a step title does. */
+  .section-heading {
+    max-width: var(--spacing-text-max);
+    margin-top: var(--spacing-section-gap-phone);
+    font-size: var(--text-section-heading-phone);
+    font-weight: var(--text-section-heading-phone--font-weight);
+    line-height: var(--text-section-heading-phone--line-height);
+  }
+
+  .section-heading a {
+    display: inline-block;
+    color: inherit;
+  }
+
+  .section-heading a:hover,
+  .section-heading a:active {
+    text-decoration-line: underline;
+    text-decoration-thickness: 1px;
+    text-underline-offset: 3px;
+  }
+
+  @media (min-width: 37.5rem) {
+    .section-heading {
+      margin-top: var(--spacing-section-gap);
+      font-size: var(--text-section-heading);
+      font-weight: var(--text-section-heading--font-weight);
+      line-height: var(--text-section-heading--line-height);
+    }
+  }
+
+  /* ---- Sub-heading ---- */
+
+  .sub-heading {
+    max-width: var(--spacing-text-max);
+    margin-top: 32px;
+    font-size: var(--text-sub-heading);
+    font-weight: var(--text-sub-heading--font-weight);
+    line-height: var(--text-sub-heading--line-height);
+  }
+
+  /* ---- Prose ---- */
+
+  .prose {
+    max-width: var(--spacing-text-max);
+  }
+
+  .prose > * {
+    margin-top: 16px;
+  }
+
+  /* ---- Wide figure ---- */
+
+  /* A figure over the full content width, its caption inside. It is a
+     container, so that a drawing in it can ask how much room it has. */
+  .wide-figure {
+    container-type: inline-size;
+    margin: 28px 0 0;
+    padding: 16px;
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-sm);
+    background: var(--color-bg);
+  }
+
+  /* The second part, below a hairline, under a small label. */
+  .wide-figure-second {
+    max-width: 560px;
+    margin-top: 28px;
+    padding-top: 20px;
+    border-top: 1px solid var(--color-border);
+  }
+
+  .wide-figure-label {
+    margin-bottom: 12px;
+    color: var(--color-text-secondary);
+    font-family: var(--font-mono);
+    font-size: var(--text-label-small);
+    letter-spacing: var(--text-label-small--letter-spacing);
+    text-transform: uppercase;
+  }
+
+  .wide-figure-caption {
+    max-width: var(--spacing-text-max);
+    margin-top: 16px;
+    color: var(--color-text-secondary);
+    font-size: var(--text-caption);
+    line-height: var(--text-caption--line-height);
+  }
+
+  @media (min-width: 37.5rem) {
+    .wide-figure {
+      padding: 24px;
+    }
+  }
+
+  /* ---- Idea figure ---- */
+
+  /* Two outlined boxes and between them the revisions on a trace. As a
+     stack: box, trace with its two lines of text, box, joined by short
+     vertical traces. Trace and squares are borders, so they survive a
+     contrast theme; the squares keep their size at every width. */
+  .idea {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .idea-end .flow-box {
+    padding: 14px 16px;
+  }
+
+  .idea-label {
+    color: var(--color-text-secondary);
+    font-family: var(--font-mono);
+    font-size: var(--text-label-small);
+    line-height: 1.5;
+  }
+
+  .idea-revisions {
+    position: relative;
+    padding: 14px 0;
+  }
+
+  .idea-revisions::before,
+  .idea-revisions::after {
+    content: "";
+    position: absolute;
+    left: 24px;
+    height: 14px;
+    border-left: var(--spacing-trace-width) solid var(--color-teal-text);
+  }
+
+  .idea-revisions::before {
+    top: 0;
+  }
+
+  .idea-revisions::after {
+    bottom: 0;
+  }
+
+  .idea-count {
+    margin: 8px 0 12px;
+    color: var(--color-text-secondary);
+    font-family: var(--font-mono);
+    font-size: var(--text-label-small);
+    line-height: 1.4;
+    text-align: center;
+  }
+
+  .idea-count-deviating {
+    margin: 26px 0 8px;
+    color: var(--color-teal-text);
+  }
+
+  .idea-track {
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    height: 12px;
+    padding: 0 6px;
+  }
+
+  .idea-track::before {
+    content: "";
+    position: absolute;
+    top: calc(50% - var(--spacing-trace-width) / 2);
+    right: 0;
+    left: 0;
+    border-top: var(--spacing-trace-width) solid var(--color-teal-text);
+  }
+
+  /* One square per revision: 7 px, outlined. */
+  .idea-square {
+    position: relative;
+    flex: none;
+    width: 7px;
+    height: 7px;
+    border: 1.5px solid var(--color-navy);
+    background: var(--color-bg);
+  }
+
+  /* A revision of the search table: 11 px, filled by its own border, with
+     its number below. The border widths are whole pixels, 6 and 5, since a
+     browser draws half a pixel of border as none. */
+  .idea-square-deviating {
+    width: 0;
+    height: 0;
+    border: solid var(--color-teal-text);
+    border-width: 6px 5px 5px 6px;
+  }
+
+  .idea-square-deviating span {
+    position: absolute;
+    top: 9px;
+    left: -0.5px;
+    transform: translateX(-50%);
+    color: var(--color-navy);
+    font-family: var(--font-mono);
+    font-size: var(--text-label-small);
+    line-height: 1;
+  }
+
+  /* Where the wide figure has room for both boxes and the whole trace, the
+     boxes stand left and right of it. Below that, also between the phone
+     breakpoint and this width, the figure stays a stack. */
+  @container (min-width: 640px) {
+    .idea {
+      grid-template-columns: 184px minmax(0, 1fr) 184px;
+      align-items: center;
+    }
+
+    .idea-revisions {
+      padding: 0;
+    }
+
+    .idea-revisions::before,
+    .idea-revisions::after {
+      display: none;
+    }
+
+    .idea-count {
+      margin: 0 0 12px;
+    }
+
+    .idea-count-deviating {
+      margin: 26px 0 0;
+    }
+
+    .idea-track {
+      padding: 0 10px;
+    }
+  }
+
+  /* ---- Line of the changes ---- */
+
+  /* The trace of the revisions with the intervals that are not resolved
+     marked (RevisionTrack.astro with `marked`). The squares stand as on the
+     trace of the idea figure, each in a column of its own, so that a
+     bracket can span the columns of its interval. It is a border, open
+     below, with the numbers of its first and last change above it. */
+  .idea-track-marked {
+    display: grid;
+    grid-template-columns: repeat(var(--revisions), auto);
+    justify-items: start;
+    margin-top: 28px;
+  }
+
+  .idea-interval {
+    position: absolute;
+    top: -9px;
+    right: -2px;
+    left: -2px;
+    height: 6px;
+    border: 1.5px solid var(--color-navy);
+    border-bottom: 0;
+  }
+
+  .idea-interval span {
+    position: absolute;
+    bottom: 9px;
+    left: 50%;
+    transform: translateX(-50%);
+    color: var(--color-navy);
+    font-family: var(--font-mono);
+    font-size: var(--text-label-small);
+    line-height: 1;
+    white-space: nowrap;
+  }
+
+  /* The line of the changes: the trace, and a key that says in words what
+     each shape stands for. As a stack: the trace, then the key. */
+  .change-line {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    row-gap: 20px;
+  }
+
+  /* Room below the trace for the numbers of the filled squares. */
+  .change-line-trace {
+    padding-bottom: 22px;
+  }
+
+  .change-key {
+    display: grid;
+    gap: 8px;
+    font-size: var(--text-caption);
+    line-height: var(--text-caption--line-height);
+  }
+
+  .change-key li {
+    display: grid;
+    grid-template-columns: 30px minmax(0, 1fr);
+    column-gap: 8px;
+    align-items: start;
+  }
+
+  /* The shape a key names, drawn as on the trace. */
+  .change-key-mark {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 1.5em;
+  }
+
+  .change-key-mark .idea-interval {
+    position: static;
+    width: 26px;
+  }
+
+  /* Where the wide figure has room, the key stands right of the trace. */
+  @container (min-width: 640px) {
+    .change-line {
+      grid-template-columns: minmax(0, 1fr) 264px;
+      column-gap: 36px;
+      align-items: center;
+    }
+  }
+
+  /* ---- Row list ---- */
+
+  /* Numbered rows with a hairline above each and below the list. The
+     number comes from the list. */
+  .row-list {
+    max-width: var(--spacing-block-max);
+    margin-top: 16px;
+    border-bottom: 1px solid var(--color-border);
+    counter-reset: row;
+  }
+
+  .row {
+    display: grid;
+    grid-template-columns: 24px minmax(0, 1fr);
+    column-gap: 8px;
+    align-items: start;
+    padding: 12px 0;
+    border-top: 1px solid var(--color-border);
+    counter-increment: row;
+  }
+
+  .row::before {
+    content: counter(row);
+    padding-top: 3px;
+    color: var(--color-text-secondary);
+    font-family: var(--font-mono);
+    font-size: var(--text-label);
+  }
+
+  /* Rows without numbers: the name of a row carries a number of its own. */
+  .row-list-plain > .row {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .row-list-plain > .row::before {
+    content: none;
+  }
+
+  /* On the phone the tag of such a row stands below its text, in the one
+     column the row has. */
+  .row-list-plain > .row > .row-tag {
+    grid-column: 1;
+  }
+
+  /* The kind of the rows of a list, or the name of a synopsis: a small
+     label above the block it names. */
+  .list-label {
+    max-width: var(--spacing-block-max);
+    margin-top: 20px;
+    color: var(--color-text-secondary);
+    font-family: var(--font-mono);
+    font-size: var(--text-label-small);
+    letter-spacing: var(--text-label-small--letter-spacing);
+    text-transform: uppercase;
+  }
+
+  .row-list-labelled {
+    margin-top: 6px;
+  }
+
+  /* ---- Member card, its parts, fold ---- */
+
+  /* One member of the protocol: a hairline above, the heading with the name
+     in the code, the signature, the content. */
+  .member {
+    padding-top: 20px;
+    border-top: 1px solid var(--color-border);
+  }
+
+  .step-wide > .step-parts > .member + .member,
+  .step-wide > .step-parts > * + .member {
+    margin-top: 28px;
+  }
+
+  .member-title {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 4px 8px;
+    font-size: var(--text-sub-heading);
+    font-weight: var(--text-sub-heading--font-weight);
+    line-height: var(--text-sub-heading--line-height);
+  }
+
+  .member-title code {
+    font-weight: 400;
+  }
+
+  .member-title .tag {
+    margin-left: 0;
+  }
+
+  .member-signature {
+    margin-top: 10px;
+  }
+
+  .member-body > * {
+    margin-top: 12px;
+  }
+
+  .member-part .list-label {
+    margin-top: 0;
+  }
+
+  .member-part-text {
+    margin-top: 4px;
+  }
+
+  .member-part-text > * + *,
+  .fold-body > * + * {
+    margin-top: 10px;
+  }
+
+  .member-part-text ul {
+    padding-left: 20px;
+    list-style: disc;
+  }
+
+  .member-part-text li + li {
+    margin-top: 4px;
+  }
+
+  /* The fold: a line that opens it, with a mark that turns; what it holds
+     stands on a hairline at its left. */
+  .fold {
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-sm);
+  }
+
+  .fold-summary {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-height: 44px;
+    padding: 8px 14px;
+    color: var(--color-teal-text);
+    font-weight: 600;
+    cursor: pointer;
+    list-style: none;
+  }
+
+  .fold-summary::-webkit-details-marker {
+    display: none;
+  }
+
+  .fold-summary::before {
+    content: '+';
+    flex: none;
+    width: 14px;
+    font-family: var(--font-mono);
+    text-align: center;
+  }
+
+  .fold[open] > .fold-summary::before {
+    content: '−';
+  }
+
+  .fold[open] > .fold-summary {
+    border-bottom: 1px solid var(--color-border);
+  }
+
+  .fold-body {
+    padding: 14px;
+  }
+
+  .fold-body > :first-child,
+  .fold-body > .code-excerpt:first-child {
+    margin-top: 0;
+  }
+
+  /* ---- Synopsis ---- */
+
+  .synopsis {
+    max-width: var(--spacing-block-max);
+    margin-top: 16px;
+  }
+
+  .synopsis .list-label {
+    margin-top: 0;
+  }
+
+  .synopsis .code {
+    margin-top: 6px;
+  }
+
+  .row-name {
+    font-size: var(--text-callout-title);
+    font-weight: var(--text-callout-title--font-weight);
+    line-height: 1.45;
+  }
+
+  .row-name code {
+    margin-left: 4px;
+    font-weight: 400;
+  }
+
+  .row-line {
+    margin-top: 2px;
+    color: var(--color-text-secondary);
+    font-size: var(--text-body-small);
+    line-height: var(--text-body-small--line-height);
+  }
+
+  /* The tag: on the phone below the text, from the phone breakpoint up at
+     the right end of the row. */
+  .row-tag {
+    grid-column: 2;
+    justify-self: start;
+    margin: 6px 0 0;
+  }
+
+  @media (min-width: 37.5rem) {
+    .row {
+      grid-template-columns: 28px minmax(0, 1fr) auto;
+    }
+
+    .row-list-plain > .row {
+      grid-template-columns: minmax(0, 1fr) auto;
+    }
+
+    .row-list-plain > .row > .row-tag {
+      grid-column: auto;
+    }
+
+    .row-tag {
+      grid-column: auto;
+      margin-top: 3px;
+    }
+  }
+
+  /* ---- Connection figure ---- */
+
+  /* Three outlined boxes on one trace, inside the frame of a wide figure
+     (the figure also carries `wide-figure`). Title and lower line of a box
+     are those of a flow box. As a stack the trace runs down from a box to
+     the next and its label stands beside it. */
+  .connection-boxes {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    row-gap: 30px;
+  }
+
+  .connection-box {
+    position: relative;
+    padding: 14px 16px;
+    border: 1.5px solid var(--color-navy);
+    border-radius: var(--radius-sm);
+    background: var(--color-bg);
+  }
+
+  /* The box the reader builds: dashed, a cue beside the words of the box. */
+  .connection-built {
+    border-style: dashed;
+  }
+
+  .connection-state {
+    color: var(--color-text-secondary);
+    font-family: var(--font-mono);
+    font-size: var(--text-label-small);
+    line-height: 1.5;
+  }
+
+  /* The trace to the next box, and the 7 px square it ends in. */
+  .connection-box:not(:last-child)::after {
+    content: "";
+    position: absolute;
+    top: calc(100% + 1.5px);
+    left: 24px;
+    height: 30px;
+    border-left: var(--spacing-trace-width) solid var(--color-teal-text);
+  }
+
+  .connection-box:not(:last-child)::before {
+    content: "";
+    position: absolute;
+    top: calc(100% + 24.5px);
+    left: calc(24px + var(--spacing-trace-width) / 2 - 3.5px);
+    border: 3.5px solid var(--color-teal-text);
+  }
+
+  /* The label of the first trace. */
+  .connection-label {
+    position: absolute;
+    top: calc(100% + 8.5px);
+    left: 38px;
+    color: var(--color-teal-text);
+    font-family: var(--font-mono);
+    font-size: var(--text-label-small);
+    line-height: 1.4;
+  }
+
+  /* From the tree breakpoint up the boxes stand side by side; the first
+     trace is the longer one and carries its label above it. */
+  @media (min-width: 80rem) {
+    .connection-boxes {
+      grid-template-columns: minmax(0, 1fr) 128px minmax(0, 1fr) 56px minmax(0, 1fr);
+      row-gap: 0;
+    }
+
+    .connection-box:nth-child(1) {
+      --connection-trace: 128px;
+      grid-column: 1;
+    }
+
+    .connection-box:nth-child(2) {
+      --connection-trace: 56px;
+      grid-column: 3;
+    }
+
+    .connection-box:nth-child(3) {
+      grid-column: 5;
+    }
+
+    .connection-box:not(:last-child)::after {
+      top: calc(50% - var(--spacing-trace-width) / 2);
+      left: calc(100% + 1.5px);
+      width: var(--connection-trace);
+      height: 0;
+      border-top: var(--spacing-trace-width) solid var(--color-teal-text);
+      border-left: 0;
+    }
+
+    .connection-box:not(:last-child)::before {
+      top: calc(50% - 3.5px);
+      left: calc(100% + var(--connection-trace) - 5.5px);
+    }
+
+    .connection-label {
+      top: calc(50% - 22px);
+      left: calc(100% + 1.5px);
+      width: 128px;
+      text-align: center;
+    }
+  }
+
+  /* ---- Yardstick box ---- */
+
+  /* The size of the connection of the reference model. Its navy border
+     marks it as the box that carries the main fact of its page. */
+  .yardstick {
+    max-width: var(--spacing-block-max);
+    margin-top: 20px;
+    padding: 16px;
+    border: 1px solid var(--color-navy);
+    border-radius: var(--radius-sm);
+  }
+
+  .yardstick-tag {
+    color: var(--color-teal-text);
+    font-family: var(--font-mono);
+    font-size: var(--text-label);
+    letter-spacing: var(--text-label--letter-spacing);
+    text-transform: uppercase;
+  }
+
+  .yardstick-size {
+    margin-top: 4px;
+    font-size: 1.375rem;
+    font-weight: 600;
+    line-height: 1.35;
+  }
+
+  .yardstick-text {
+    font-size: var(--text-body-small);
+    line-height: var(--text-body-small--line-height);
+  }
+
+  .yardstick-text > * {
+    margin-top: 8px;
+  }
+
+  @media (min-width: 37.5rem) {
+    .yardstick {
+      padding: 20px 24px;
+    }
+  }
+
+  /* ---- Code excerpt ---- */
+
+  /* A head row with the origin, the code below it without a top border, a
+     caption below. The code is a code block: uncoloured, it scrolls
+     sideways inside its box. */
+  .code-excerpt {
+    max-width: var(--spacing-block-max);
+    margin: 20px 0 0;
+  }
+
+  .code-excerpt-head {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    gap: 4px 16px;
+    padding: 8px 16px;
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-sm) var(--radius-sm) 0 0;
+    background: var(--color-bg-subtle);
+    color: var(--color-text-secondary);
+    font-family: var(--font-mono);
+    font-size: var(--text-label);
+    font-variant-ligatures: none;
+    overflow-wrap: anywhere;
+  }
+
+  /* In a step card the excerpt takes the full card width. */
+  .step-wide .code-excerpt {
+    max-width: none;
+  }
+
+  .code-excerpt .code {
+    border-top: 0;
+    border-radius: 0 0 var(--radius-sm) var(--radius-sm);
+  }
+
+  .code-excerpt-caption {
+    margin-top: 10px;
+    color: var(--color-text-secondary);
+    font-size: var(--text-caption);
+    line-height: var(--text-caption--line-height);
+  }
+
+  /* ---- Path block ---- */
+
+  /* The four stages as in the chapter tree: a trace with square pads, both
+     borders. The trace is decoration; the list carries the order. */
+  .path-block {
+    max-width: var(--spacing-text-max);
+    margin-top: 20px;
+  }
+
+  .path-block > li {
+    position: relative;
+    padding: 0 0 22px 24px;
+  }
+
+  .path-block > li::before {
+    content: "";
+    position: absolute;
+    top: 8px;
+    bottom: -8px;
+    left: 3.25px;
+    border-left: 1.5px solid var(--color-navy);
+    opacity: 0.4;
+  }
+
+  .path-block > li:last-child {
+    padding-bottom: 0;
+  }
+
+  .path-block > li:last-child::before {
+    display: none;
+  }
+
+  .path-block > li::after {
+    content: "";
+    position: absolute;
+    top: 7px;
+    left: 0;
+    border: 4px solid var(--color-navy);
+  }
+
+  .path-stage {
+    color: var(--color-text-secondary);
+    font-family: var(--font-mono);
+    font-size: var(--text-label-small);
+    letter-spacing: var(--text-label-small--letter-spacing);
+    text-transform: uppercase;
+  }
+
+  .path-name {
+    font-size: 1rem;
+    font-weight: 600;
+  }
+
+  .path-text {
+    margin-top: 2px;
+    color: var(--color-text-secondary);
+    font-size: var(--text-body-small);
+    line-height: var(--text-body-small--line-height);
+  }
+
+  .skip-link:not(:focus) {
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    border: 0;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+
+  /* ---- Help (DESIGN.md, Components: Help) ---- */
+
+  /* The hint list of "When something goes wrong": groups of hints, one per
+     step or section. The group label names page and step and stands outside
+     the heading; the group title is a section heading in its smaller size. */
+  .hint-group-label {
+    margin-top: 48px;
+    color: var(--color-text-secondary);
+    font-family: var(--font-mono);
+    font-size: var(--text-label);
+    letter-spacing: var(--text-label--letter-spacing);
+    text-transform: uppercase;
+  }
+
+  .hint-group-label + .section-heading {
+    margin-top: 4px;
+    font-size: 1.25rem;
+  }
+
+  .hint-list {
+    max-width: 900px;
+    margin-top: 16px;
+    border-bottom: 1px solid var(--color-border);
+  }
+
+  /* One hint: what the reader sees, then what it means. One column on the
+     phone, two from the phone breakpoint. */
+  .hint {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    row-gap: 6px;
+    padding: 16px 0;
+    border-top: 1px solid var(--color-border);
+  }
+
+  .hint-title {
+    font-size: var(--text-callout-title);
+    font-weight: var(--text-callout-title--font-weight);
+    line-height: 1.45;
+  }
+
+  .hint-title code {
+    font-weight: 400;
+  }
+
+  .hint-text {
+    min-width: 0;
+  }
+
+  .hint-text > * + * {
+    margin-top: 10px;
+  }
+
+  /* A quoted message of the program: the white mono box of the callout. */
+  .hint-text > .callout-quote {
+    padding: 8px 12px;
+    overflow-wrap: anywhere;
+  }
+
+  .hint-text > .callout-quote:first-child {
+    margin-top: 0;
+  }
+
+  /* The link of a group to its step or section. */
+  .hint-back {
+    max-width: 900px;
+    margin-top: 12px;
+    color: var(--color-text-secondary);
+    font-size: var(--text-body-small);
+    line-height: var(--text-body-small--line-height);
+  }
+
+  /* The hint link of a step or a section, which leads to its group. */
+  .hint-link {
+    max-width: var(--spacing-block-max);
+    margin-top: 16px;
+    font-size: var(--text-body-small);
+    line-height: var(--text-body-small--line-height);
+  }
+
+  @media (min-width: 37.5rem) {
+    .hint-group-label + .section-heading {
+      font-size: 1.375rem;
+    }
+
+    .hint {
+      grid-template-columns: 260px minmax(0, 1fr);
+      column-gap: 36px;
+    }
+  }
+
+  /* The contact block. Its navy border marks it as the box that carries the
+     main fact of its page. On the phone each label stands above its value. */
+  .contact-block {
+    max-width: var(--spacing-text-max);
+    margin-top: 20px;
+    padding: 16px;
+    border: 1px solid var(--color-navy);
+    border-radius: var(--radius-sm);
+  }
+
+  .contact-tag {
+    color: var(--color-teal-text);
+    font-family: var(--font-mono);
+    font-size: var(--text-label);
+    letter-spacing: var(--text-label--letter-spacing);
+    text-transform: uppercase;
+  }
+
+  .contact-title {
+    margin-top: 4px;
+    font-size: var(--text-sub-heading);
+    font-weight: var(--text-sub-heading--font-weight);
+    line-height: var(--text-sub-heading--line-height);
+  }
+
+  .contact-list {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 2px;
+    align-items: baseline;
+    margin-top: 16px;
+  }
+
+  .contact-list dt {
+    color: var(--color-text-secondary);
+    font-family: var(--font-mono);
+    font-size: var(--text-label-small);
+    letter-spacing: var(--text-label-small--letter-spacing);
+    text-transform: uppercase;
+  }
+
+  .contact-list dd {
+    margin: 0 0 10px;
+    font-family: var(--font-mono);
+    font-size: 1rem;
+    font-variant-ligatures: none;
+    overflow-wrap: anywhere;
+  }
+
+  .contact-list dd.contact-address {
+    color: var(--color-text-secondary);
+    font-family: var(--font-sans);
+    font-size: 0.875rem;
+  }
+
+  /* The padding makes the link at least 24 px high as a target. */
+  .contact-list a {
+    padding-block: 5px;
+    color: var(--color-teal-text);
+    text-decoration-line: underline;
+    text-decoration-thickness: 1px;
+    text-underline-offset: 3px;
+  }
+
+  .contact-list a:hover,
+  .contact-list a:active {
+    color: var(--color-navy);
+  }
+
+  /* What to tell: a short list below a hairline. */
+  .contact-tell {
+    margin-top: 10px;
+    padding-top: 16px;
+    border-top: 1px solid var(--color-border);
+    font-size: var(--text-body-small);
+    line-height: var(--text-body-small--line-height);
+  }
+
+  .contact-tell > * + * {
+    margin-top: 6px;
+  }
+
+  .hint-text ul,
+  .contact-tell ul {
+    padding-left: 20px;
+    list-style: disc;
+  }
+
+  @media (min-width: 37.5rem) {
+    .contact-block {
+      padding: 24px;
+    }
+
+    .contact-list {
+      grid-template-columns: auto minmax(0, 1fr);
+      gap: 8px 20px;
+    }
+
+    .contact-list dd {
+      margin-bottom: 0;
+      font-size: 1.125rem;
+    }
+
+    .contact-tell {
+      margin-top: 20px;
+    }
+  }
+}
+
+/* The look of the search result list stands in the components layer above.
+   `data-empty` marks the box while it has nothing to
+   show or is closed (Search.astro). It is then clipped, not removed, so its
+   status is announced when the text arrives. The rule stands outside the
+   layers, so it wins over every other rule of the box. */
+.search-panel[data-empty] {
+  position: absolute;
+  width: 1px;
+  min-width: 0;
+  height: 1px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+}
+
+/* The platform the reader chose: `data-platform` on <html>, set before the
+   page is first shown (layouts/Page.astro) and by the platform switch
+   (scripts/platform.ts). The parts of the other platform are out of the
+   page. Without JavaScript the attribute is absent and both are visible,
+   each under its label. The rules stand outside the layers, so they win. */
+html[data-platform="windows"] [data-platform-part="linux"],
+html[data-platform="linux"] [data-platform-part="windows"] {
+  display: none;
+}
+
+/* The labels stand for the tabs: out of the page once the tabs are there,
+   and, for a part outside a switch, once a platform is chosen. What names
+   the platform in a file list goes with them. */
+[data-platform-switch][data-tabs] > .platform-part > .platform-label,
+html[data-platform] [data-platform-only] > .platform-label,
+html[data-platform] .platform-note {
+  display: none;
+}
+
+/* The page links of a step page stand in the path end, on the step indent. */
+main[data-step-page] > [data-page-links] {
+  margin-top: 16px;
+  margin-left: var(--spacing-step-indent-phone);
+}
+
+@media (min-width: 37.5rem) {
+  main[data-step-page] > [data-page-links] {
+    margin-left: var(--spacing-step-indent);
+  }
+}

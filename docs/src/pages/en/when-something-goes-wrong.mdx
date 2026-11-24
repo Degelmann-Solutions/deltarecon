@@ -1,0 +1,298 @@
+---
+layout: ../../layouts/Page.astro
+lang: en
+page: when-something-goes-wrong
+lead: "Most of what looks like an error is expected. This page lists such cases by page and step, in the order of your path through the documentation. If your case is not among them, write to us or call."
+description: "Hints, ordered by step, for what looks like an error, and the contact details for everything else."
+---
+import ContactBlock from '../../components/ContactBlock.astro';
+import Hint from '../../components/Hint.astro';
+import HintGroup from '../../components/HintGroup.astro';
+import OutsideLink from '../../components/OutsideLink.astro';
+import SectionHeading from '../../components/SectionHeading.astro';
+import Term from '../../components/Term.astro';
+import { notResolved } from '../../captures';
+import { contactAnchor } from '../../hints';
+import { refusal, statusOf } from '../../ownCalculations';
+import { tag } from '../../release';
+import { outside } from '../../site';
+// The README of the release, which describes the way without a package.
+export const readme = `${outside.repository}/blob/${tag}/README.md#quick-start`;
+// The word "class" of Python, which is not the term of the Glossary.
+export const cls = <span data-no-term>class</span>;
+// Inline code of this page names files, commands, options and outcomes:
+// none of it is to be translated.
+export const components = { code: (props) => <code translate="no" {...props} /> };
+
+<HintGroup id="quick-start-download">
+
+<Hint title="The browser or Windows warns about the download">
+
+Expected. The Windows package is not signed, so the browser or SmartScreen may warn when you download it. With step 2 of the quick start you make sure that your archive is the published one.
+
+</Hint>
+
+<Hint title="You work on macOS">
+
+There is no package for macOS. On macOS, use a checkout of the repository; the <OutsideLink href={readme} hreflang="en">README of the release</OutsideLink> describes this way.
+
+</Hint>
+
+</HintGroup>
+
+<HintGroup id="quick-start-check">
+
+<Hint title="PowerShell prints the SHA-256 in capital letters">
+
+Expected. Apart from upper and lower case, it must equal the SHA-256 in the line of your archive in `SHA256SUMS`.
+
+</Hint>
+
+<Hint>
+<span slot="title"><code translate="no">SHA256SUMS</code> names two archives, and you downloaded one</span>
+
+Expected. The file holds one line per archive. On Linux, `--ignore-missing` in the command of the step lets the check pass over the archive that is not there; the command must report `OK` for yours. On Windows you compare with the line of your archive.
+
+</Hint>
+
+</HintGroup>
+
+<HintGroup id="quick-start-unpack">
+
+<Hint>
+<span slot="title">You cannot find <code translate="no">quickstart.cmd</code></span>
+
+“Extract All” in Explorer adds a folder named after the zip, which then holds the <Term id="package-folder">package folder</Term>. The package folder is the one that holds `quickstart.cmd` and `deltarecon.cmd`.
+
+</Hint>
+
+<Hint title="The path of the package folder is long">
+
+Windows limits the length of a path. Unpack the archive into a folder with a short path, for example `C:\deltarecon`. The folder that “Extract All” adds makes the path longer.
+
+</Hint>
+
+</HintGroup>
+
+<HintGroup id="quick-start-start">
+
+<Hint title="SmartScreen warns when you start the demo">
+
+Expected for this package: it is not signed. With step 2 you make sure that your archive is the published one.
+
+</Hint>
+
+<Hint title="The demo speaks the wrong language">
+
+It speaks the language of your system. Start it with `--lang de` or `--lang en` to choose German or English.
+
+</Hint>
+
+<Hint title="The window closes at the end">
+
+Expected. A window that a double click opened stays open at the end until you press a key. Nothing is lost when it closes: the demo wrote its files to a new folder `runs\quickstart-<UTC time>` in the package folder and named that folder at the start and at the end.
+
+</Hint>
+
+<Hint title="The demo ends at once and says that its folder exists already">
+
+The demo writes into a new folder that is named after the time of its start, to the second, and it overwrites nothing. When that folder exists already, it ends with <Term id="exit-status">exit status</Term> 2. Start the demo again.
+
+</Hint>
+
+</HintGroup>
+
+<HintGroup id="quick-start-demo">
+
+<Hint title="Step 2 of the demo ends with exit status 1">
+
+Expected. `regression` reports 0 when the two results agree and 1 when they differ. <Term id="release">Release</Term> N and N+1 differ on purpose, so 1 is the correct outcome here and not an error: it reports the <Term id="deviation">deviation</Term> between the two <Term id="revision">revisions</Term>. The demo goes on.
+
+</Hint>
+
+<Hint>
+<span slot="title">The demo ends early and says that it was stopped</span>
+
+The demo was stopped with Ctrl+C. It ends with exit status 130.
+
+</Hint>
+
+</HintGroup>
+
+<HintGroup id="quick-start-result">
+
+<Hint title="A block “Not resolved” follows the table" quote={notResolved('en')}>
+<p slot="before">This is a result and not an error. The Glossary explains the term: <Term id="not-resolved">Not resolved</Term>.</p>
+
+Some changes are so small that each one alone moves the <Term id="bruttobeitrag" /> by less than the tolerance of one cent per <Term id="model-point">model point</Term> and month. Together they exceed it. DeltaRecon does not guess which of them is the cause: it names the group and leaves this part of the deviation unattributed.
+
+</Hint>
+
+</HintGroup>
+
+<HintGroup id="own-calculations-folder">
+
+<Hint>
+<span slot="title">A command of the page does not run in the command prompt <code translate="no">cmd</code></span>
+
+The commands of that page are written for PowerShell; they do not <span data-no-term>run</span> in `cmd`. Open PowerShell in the package folder and type them there.
+
+</Hint>
+
+<Hint title="You closed the window and opened a new one">
+
+The variable `Q` holds as long as the window stays open. In a new window, type the two lines of step 1 again; every later command of the page uses the variable.
+
+</Hint>
+
+<Hint title="Your folder has another name than the one the page shows">
+
+Expected. The folder carries the time at which your demo started.
+
+</Hint>
+
+</HintGroup>
+
+<HintGroup id="own-calculations-other-quantity">
+
+<Hint title="The command prints nothing for a while">
+
+Expected. It computes for a while and prints nothing until it is done.
+
+</Hint>
+
+<Hint title="The output is English and shows more digits">
+
+Expected. The single commands print English only, and they print numbers with more digits than the tables of the demo.
+
+</Hint>
+
+<Hint title="The command ends at once and says that its folder exists already" quote={[refusal('repeat')]}>
+
+You started a command a second time. It ends at once with exit status {statusOf('repeat')} and this message; “…” stands for the full path of the folder. No command overwrites a file. To <span data-no-term>run</span> a calculation again, give it a name after `--output` that does not exist yet, for example `search-provisionen-2` in place of `search-provisionen`.
+
+</Hint>
+
+</HintGroup>
+
+<HintGroup id="own-calculations-newer-revision">
+
+<Hint title={`The command ends with exit status ${statusOf('newer-revision')}`}>
+
+Expected, and not an error: the two <Term id="state">states</Term> differ, and the status says so. The next command <span data-no-term>runs</span> all the same.
+
+</Hint>
+
+</HintGroup>
+
+<HintGroup id="own-calculations-search">
+
+<Hint title="The name of the quantity holds a space">
+
+A <Term id="quantity">quantity</Term> name with a space stands in quotation marks, as in the command of the step: `--quantity "garantierte Todesfallleistung"`.
+
+</Hint>
+
+</HintGroup>
+
+<HintGroup id="single-commands-start">
+<span slot="title">Start a single command</span>
+
+<Hint title="A command does not start because its output exists already">
+
+No command overwrites an existing file. A command whose output exists already does not start; it ends with exit status 2. To repeat a calculation, give it an output that does not exist yet.
+
+</Hint>
+
+<Hint title="A command ends with exit status 1">
+
+There is something to look at, or the command refused: <Term id="run">a run</Term> that failed, was rejected or ended with an error; a replay that is not reproduced; a comparison or a <Term id="regression">regression</Term> with a deviation; a <Term id="change-manifest">change manifest</Term> that cannot be derived; a walk or a search that is refused or stops.
+
+For the regression of the quick start, status 1 is expected: it reports the deviation between the two revisions, and the next commands <span data-no-term>run</span> all the same.
+
+</Hint>
+
+<Hint title="A command ends with exit status 2">
+
+The command could not start. For example: an output exists already, the selected <Term id="engine">engine</Term> cannot be loaded, the file of a tolerance or the <Term id="target">target</Term> of a search is faulty, or a <Term id="record">record</Term> is not that of a run that succeeded.
+
+</Hint>
+
+</HintGroup>
+
+<HintGroup id="single-commands-run">
+<span slot="title"><code translate="no">run</code>: compute a request</span>
+
+<Hint>
+<span slot="title">A run ends with <code translate="no">failed</code>, <code translate="no">error</code> or <code translate="no">rejected</code></span>
+
+Then there are no results. `failed`: a model point raised an error, a check is false, or a result is not a finite number. `error`: the request was accepted, but the engine could not restore or read the state. `rejected`: the request broke a rule, and nothing ran.
+
+The record is written for every outcome, except for a file that cannot be read as a <Term id="run-request">run request</Term>.
+
+</Hint>
+
+</HintGroup>
+
+<HintGroup id="single-commands-quickstart">
+<span slot="title"><code translate="no">quickstart</code>: the guided demo</span>
+
+<Hint title="The demo ends with an exit status other than 0">
+
+Status 1: a step ended with another status than the demo expects. Status 2: the folder of the demo exists already or cannot be created, or an error of the operating system ends a step. Status 130: you stopped the demo with Ctrl+C.
+
+</Hint>
+
+</HintGroup>
+
+<HintGroup id="build-an-adapter-select">
+
+<Hint title="The command says in one line what is wrong and ends with exit status 2">
+
+The selection of your engine cannot be loaded, and the command writes nothing. This holds for a folder that is no folder, a selection that is not of the form `<module>:<class>`, a module that is not found, a name in the module that is no {cls}, and a {cls} that does not take the number of worker processes as its argument.
+
+</Hint>
+
+<Hint title="The command ends with a traceback of Python">
+
+In this release DeltaRecon answers four faults of a connection with a traceback of Python and exit status 1, not with a message of its own. That is a limit of this release, not an error in how you call the command. The last line of the traceback names the cause.
+
+- The module of your connection raises another error than a failed import while it is loaded, for example a syntax error.
+- Your {cls} raises an error of its own when it is called with the number of worker processes.
+- Your {cls} lacks a member of the <Term id="protocol">protocol</Term>.
+- The <Term id="history">history</Term> that your connection gives breaks the protocol.
+
+If the last line does not tell you what to change, send us the last lines of the traceback. The contact details stand at the end of this page.
+
+</Hint>
+
+</HintGroup>
+
+<HintGroup id="build-an-adapter-first-run">
+
+<Hint title="A command of the first run ends with a traceback">
+
+Look at the known limits in step 6 of that page; the hint above this group names them.
+
+</Hint>
+
+<Hint title="Your engine does not find the folder of its histories by itself">
+
+Add `--repositories` with that folder to both commands.
+
+</Hint>
+
+</HintGroup>
+
+<SectionHeading id={contactAnchor}>If none of this helps</SectionHeading>
+
+<ContactBlock tag="Contact" title="Write to us or call">
+
+So that we can help, please tell us:
+
+- the release, for example {tag}
+- Windows or Linux
+- the step at which it stopped
+- the last lines the window shows
+
+</ContactBlock>

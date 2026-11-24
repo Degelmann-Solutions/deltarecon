@@ -1,0 +1,59 @@
+---
+// The page-not-found page of one language. Apache delivers it at every
+// unknown address under the documentation (public/.htaccess for the English
+// page, public/de/.htaccess for the German one), so every address on it
+// carries the base of the site.
+//
+// It holds two blocks: its own language first, then the other language, which
+// carries `lang`. The frame is in the page's language; the language switch
+// leads to the page-not-found page of the other language.
+import Page from './Page.astro';
+import { notFoundPage, otherLanguage, pageAddress, pages, type Lang } from '../site';
+
+interface Props {
+  lang: Lang;
+}
+
+const blocks = {
+  en: {
+    text: 'There is no page at this address. It may have been renamed, or the address has a typing error.',
+    link: 'To the Overview',
+    description: 'The address that was opened names no page of the DeltaRecon documentation.',
+  },
+  de: {
+    text: 'Unter dieser Adresse gibt es keine Seite. Vielleicht wurde sie umbenannt, oder die Adresse enthält einen Tippfehler.',
+    link: 'Zum Überblick',
+    description: 'Die aufgerufene Adresse führt zu keiner Seite der DeltaRecon-Dokumentation.',
+  },
+} as const;
+
+const { lang } = Astro.props;
+const other = otherLanguage(lang);
+const link = 'inline-link inline-flex min-h-6 items-center';
+---
+
+<Page
+  frontmatter={{
+    lang,
+    page: notFoundPage.id,
+    lead: blocks[lang].text,
+    description: blocks[lang].description,
+  }}
+>
+  <p class="mt-4" data-not-found-block>
+    <a class={link} href={pageAddress(pages[0], lang)}>{blocks[lang].link}</a>
+  </p>
+  <section
+    class="mt-section-gap-phone max-w-text-max border-t border-border pt-8 tablet:mt-section-gap"
+    lang={other}
+    data-not-found-block
+  >
+    <h2 class="text-section-heading-phone tablet:text-section-heading">
+      {notFoundPage.name[other]}
+    </h2>
+    <p class="mt-3.5 text-lead-phone text-text-secondary tablet:text-lead">{blocks[other].text}</p>
+    <p class="mt-4">
+      <a class={link} href={pageAddress(pages[0], other)} hreflang={other}>{blocks[other].link}</a>
+    </p>
+  </section>
+</Page>

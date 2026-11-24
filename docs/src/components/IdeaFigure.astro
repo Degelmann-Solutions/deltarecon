@@ -1,0 +1,77 @@
+---
+// The idea figure: what DeltaRecon does in one picture, inside a wide
+// figure. Two outlined boxes stand for the two states that are compared;
+// between them a trace with one square per revision in order. A revision of
+// the search table is a larger, filled square with its number below.
+//
+//   <IdeaFigure
+//     before={{ label: 'Release N', title: 'The reference model before the changes' }}
+//     after={{ label: 'State N+1', title: 'The reference model after the changes' }}
+//     revision="revision"
+//     count="32 revisions from release N to the state N+1"
+//     deviating="4 of them deviate in the Bruttobeitrag"
+//   />
+//
+// The two short hashes are read from the capture of the example
+// (src/captures.ts), and the trace with its squares and numbers is
+// RevisionTrack.astro; the page gives the words. The squares are
+// decoration: the two lines of text count the revisions, and the caption of
+// the wide figure names those of the search table. The boxes stand beside
+// the trace where it fits and as a stack otherwise; the trace is never
+// scaled.
+import { example } from '../captures';
+import { outputHtml, pageLanguage } from '../markup';
+import RevisionTrack from './RevisionTrack.astro';
+
+interface Box {
+  /** The small line above the title: which state the box is. */
+  label: string;
+  title: string;
+}
+
+interface Props {
+  before: Box;
+  after: Box;
+  /** The word before a short hash: "revision". */
+  revision: string;
+  /** The line above the trace: how many revisions there are. */
+  count: string;
+  /** The line below the trace: how many of them are in the search table. */
+  deviating: string;
+}
+
+const { before, after, revision, count, deviating } = Astro.props;
+const lang = pageLanguage(Astro.url.pathname);
+const facts = example(lang);
+const ends = [
+  { key: 'before', box: before, hash: facts.releaseN },
+  { key: 'after', box: after, hash: facts.stateN1 },
+];
+const [first, last] = ends;
+---
+
+<ol class="idea" data-idea>
+  <li class="idea-end" data-idea-box={first.key}>
+    <div class="flow-box">
+      <p class="idea-label" set:html={outputHtml(first.box.label, lang)} />
+      <p class="flow-title" set:html={outputHtml(first.box.title, lang)} />
+      <p class="flow-sub">{revision} <span translate="no">{first.hash}</span></p>
+    </div>
+  </li>
+  <li class="idea-revisions" data-idea-revisions>
+    <p class="idea-count" data-idea-count set:html={outputHtml(count, lang)} />
+    <RevisionTrack />
+    <p
+      class="idea-count idea-count-deviating"
+      data-idea-deviating
+      set:html={outputHtml(deviating, lang)}
+    />
+  </li>
+  <li class="idea-end" data-idea-box={last.key}>
+    <div class="flow-box">
+      <p class="idea-label" set:html={outputHtml(last.box.label, lang)} />
+      <p class="flow-title" set:html={outputHtml(last.box.title, lang)} />
+      <p class="flow-sub">{revision} <span translate="no">{last.hash}</span></p>
+    </div>
+  </li>
+</ol>

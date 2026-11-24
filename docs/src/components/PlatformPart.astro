@@ -1,0 +1,23 @@
+---
+// Content that holds for one platform only and stands outside a platform
+// switch: a sentence, a callout, a terminal block. It follows the choice of
+// the page like the parts of a switch. Without JavaScript both platforms'
+// parts are visible, each under the name of its platform.
+//
+//   <PlatformPart os="windows">Unpack the zip with "Extract All".</PlatformPart>
+import { texts } from '../site';
+import { pageLanguage } from '../markup';
+import type { Platform } from '../release';
+
+interface Props {
+  os: Platform;
+}
+
+const { os } = Astro.props;
+const lang = pageLanguage(Astro.url.pathname);
+---
+
+<div class="platform-part" data-platform-part={os} data-platform-only>
+  <p class="platform-label" data-platform-label>{texts[lang][os]}</p>
+  <slot />
+</div>

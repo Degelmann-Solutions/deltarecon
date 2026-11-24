@@ -1,0 +1,53 @@
+---
+// The path block: the four stages of the chapter tree in the content, each
+// with one sentence and links to its pages, for the reader who decides where
+// to go next. Stage names, page names and addresses come from the page
+// register (src/site.ts); the page gives one sentence per stage, in the slot
+// `stage-<number>`. The page the block stands on is not linked.
+//
+//   <PathBlock>
+//     <span slot="stage-1">Download the package and see the first result.</span>
+//     <span slot="stage-2">…</span>
+//   </PathBlock>
+//
+// The build fails on a stage without its sentence.
+import { pageAddress, pagesOf, stages, texts } from '../site';
+import { escapeHtml, pageLanguage } from '../markup';
+
+const lang = pageLanguage(Astro.url.pathname);
+const here = Astro.url.pathname.replace(/\/?$/, '/');
+const rows = await Promise.all(
+  stages.map(async (stage) => {
+    const slot = `stage-${stage.number}`;
+    if (!Astro.slots.has(slot)) {
+      throw new Error(
+        `${Astro.url.pathname}: the path block has no sentence for stage ${stage.number} (slot "${slot}").`,
+      );
+    }
+    return {
+      stage,
+      sentence: await Astro.slots.render(slot),
+      // The links as one piece of markup, so that no space stands before a comma.
+      links: pagesOf(stage)
+        .map((page) => ({ name: page.name[lang], address: pageAddress(page, lang) }))
+        .filter((link) => link.address !== here)
+        .map((link) => `<a href="${escapeHtml(link.address)}">${escapeHtml(link.name)}</a>`)
+        .join(', '),
+    };
+  }),
+);
+---
+
+<ol class="path-block" data-path-block>
+  {
+    rows.map(({ stage, sentence, links }) => (
+      <li data-path-stage={stage.number}>
+        <p class="path-stage">
+          {texts[lang].stage} {stage.number}
+        </p>
+        <p class="path-name">{stage.name[lang]}</p>
+        <p class="path-text prose-links" set:html={`${sentence.trim()} ${links}`} />
+      </li>
+    ))
+  }
+</ol>

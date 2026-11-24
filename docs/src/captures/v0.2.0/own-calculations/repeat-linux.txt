@@ -1,0 +1,3 @@
+command: ./deltarecon search $Q/release-n/run-record.json $Q/regression/run/run-record.json --quantity Provisionen --periods 0-59 --target-only --output $Q/search-provisionen
+error: /tmp/deltarecon-docs-capture/own-20261117T202507Z/deltarecon-0.2.0-x86_64-unknown-linux-gnu/runs/quickstart-20261117T202512Z/search-provisionen exists already; a search overwrites no file
+exit status: 2

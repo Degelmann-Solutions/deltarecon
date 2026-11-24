@@ -1,0 +1,96 @@
+---
+// A terminal block: a session with its output, read-only. The bar names the
+// shell and where the session runs; below it the prompt, the command and
+// the output, which a page takes from a capture (src/captures.ts). The block
+// scrolls sideways inside itself and is a named region. The copy button,
+// put in by scripts/copy.ts, copies the command without the prompt.
+//
+//   <TerminalBlock platform="windows" prompt="PS C:\…>" command=".\quickstart.cmd --lang en"
+//     lines={session('windows', 'en')} />
+//
+// With `entries` it is a session of single commands, each with the prompt,
+// the command and what it printed (src/ownCalculations.ts); the copy button
+// copies every command of the session, one per line. The single commands
+// print English only, so the output carries `lang="en"` on a page of another
+// language. A line of an entry may be the mark of a cut: text of the page in
+// the place of lines that are left out. Such a block names its step.
+//
+//   <TerminalBlock platform="linux" prompt="$" entries={sessionOf('search', 'linux', commands)} />
+import { stepPlace, texts } from '../site';
+import { commandOutputHtml, escapeHtml, outputHtml, pageLanguage, STEP_MARK } from '../markup';
+import type { SessionLine } from '../captures';
+import type { TerminalEntry } from '../ownCalculations';
+import type { Platform } from '../release';
+
+interface Props {
+  platform: Platform;
+  prompt: string;
+  command?: string;
+  lines?: SessionLine[];
+  entries?: TerminalEntry[];
+}
+
+const { platform, prompt, command, lines, entries } = Astro.props;
+if (entries ? command !== undefined || lines !== undefined : command === undefined || lines === undefined) {
+  throw new Error(
+    `${Astro.url.pathname}: a terminal block needs "command" and "lines", or "entries", not both.`,
+  );
+}
+const lang = pageLanguage(Astro.url.pathname);
+const t = texts[lang];
+const shell = platform === 'windows' ? t.windowsShell : t.linuxShell;
+const shellName = platform === 'windows' ? t.windowsShell : t.linux;
+const name = entries
+  ? `${t.terminalSession}, ${stepPlace(STEP_MARK, lang)}, ${shellName}`
+  : `${t.terminalSession}, ${shellName}`;
+const typed = (text: string): string =>
+  `<span class="terminal-prompt" translate="no">${escapeHtml(prompt)}</span> ` +
+  `<span class="terminal-command" translate="no" data-terminal-command>${escapeHtml(text)}</span>`;
+
+let session: string;
+let copy: string;
+if (entries) {
+  // The output is English; the mark of a cut is text of the page, so it
+  // may be translated inside the block, which is not.
+  const foreign = lang === 'en' ? '' : ' lang="en"';
+  const own = lang === 'en' ? '' : ` lang="${lang}"`;
+  session = entries
+    .map((entry) => {
+      const printed = entry.lines
+        .map((line) =>
+          'cut' in line
+            ? `<span class="terminal-cut" data-cut="${line.left}" translate="yes"${own}>${escapeHtml(line.cut)}</span>`
+            : commandOutputHtml(line.text),
+        )
+        .join('\n');
+      return entry.lines.length > 0
+        ? `${typed(entry.command)}\n<span data-capture="command-output"${foreign}>${printed}</span>`
+        : typed(entry.command);
+    })
+    .join('\n');
+  copy = entries.map((entry) => entry.command).join('\n');
+} else {
+  const output = (lines ?? [])
+    .map((line) =>
+      line.heading
+        ? `<span class="terminal-heading">${outputHtml(line.text, lang)}</span>`
+        : outputHtml(line.text, lang),
+    )
+    .join('\n');
+  session = `${typed(command ?? '')}\n\n<span data-capture="session">${output}</span>`;
+  copy = command ?? '';
+}
+---
+
+<div
+  class="terminal"
+  data-terminal
+  data-copy={copy}
+  data-copy-label={`${t.copyCommand}, ${stepPlace(STEP_MARK, lang, platform)}`}
+>
+  <div class="terminal-bar">
+    <span>{shell}</span>
+    <span class="terminal-place">{t.packageFolder}</span>
+  </div>
+  <pre tabindex="0" role="region" aria-label={name} translate="no" set:html={session} />
+</div>

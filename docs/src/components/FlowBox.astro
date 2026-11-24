@@ -1,0 +1,23 @@
+---
+// One box of a flow diagram: its number (from the list), its title (the
+// content), and a mono line that names the commands and what they write.
+// A box that stands for a part of an explanation and for no command leaves
+// both out and has no mono line.
+interface Props {
+  /** The commands of the box, as the page writes them. */
+  code?: string;
+  /** The file or folder the box writes. */
+  writes?: string;
+}
+
+const { code, writes } = Astro.props;
+---
+
+<li class="flow-box" data-flow-box>
+  <p class="flow-title"><slot /></p>
+  {
+    (code || writes) && (
+      <p class="flow-sub" translate="no" data-no-term>{code}{code && writes && <br />}{writes && <Fragment><span aria-hidden="true">→ </span>{writes}</Fragment>}</p>
+    )
+  }
+</li>

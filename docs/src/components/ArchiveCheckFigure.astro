@@ -1,0 +1,34 @@
+---
+// The small diagram of the step that checks the archive: the archive and
+// its line in SHA256SUMS, joined by a trace that ends in one pad. It is
+// built in HTML, so its words are text at every width. Used inside a
+// StepFigure, whose caption carries the statement of the diagram.
+//
+//   <ArchiveCheckFigure archive="Archive" sums="SHA256SUMS" sumsNote="one line each"
+//     equal="SHA-256 equal">your download</ArchiveCheckFigure>
+//
+// The content is the mono line of the archive box.
+interface Props {
+  archive: string;
+  sums: string;
+  sumsNote: string;
+  equal: string;
+}
+
+const { archive, sums, sumsNote, equal } = Astro.props;
+---
+
+<div class="check-figure">
+  <div class="check-boxes">
+    <div class="flow-box">
+      <p class="flow-title">{archive}</p>
+      <p class="flow-sub"><slot /></p>
+    </div>
+    <div class="flow-box">
+      <p class="flow-title" translate="no">{sums}</p>
+      <p class="flow-sub">{sumsNote}</p>
+    </div>
+  </div>
+  <div class="check-trace" aria-hidden="true"><span class="flow-pad"></span></div>
+  <p class="check-equal">{equal}</p>
+</div>

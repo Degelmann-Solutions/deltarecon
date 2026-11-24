@@ -1,0 +1,12 @@
+---
+// The path end of a step page: a square marker on the trace axis under the
+// last step and a closing line, a paragraph, that says what the reader has
+// reached. The page links follow it (layouts/Page.astro).
+//
+//   <PathEnd>With the table of step 6 on your screen, stage 1 is complete.</PathEnd>
+---
+
+<div class="path-end" data-path-end>
+  <span class="path-end-marker" aria-hidden="true"></span>
+  <p class="path-end-line"><slot /></p>
+</div>

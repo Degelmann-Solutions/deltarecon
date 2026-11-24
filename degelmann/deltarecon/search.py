@@ -10,9 +10,9 @@ and periods asked about, by default every coordinate.
   coordinates only: both runs are aligned on projection periods, as every comparison is, each
   model point counted from its own valuation date in that run, then restricted to the target
   periods and to the target quantities, and the tolerance profile to the entries of those
-  quantities, so a quantity outside the target cannot change the judgement. It differs for a quantity when a coordinate of it deviates
-  under the tolerance rule or a coordinate is added or removed; a comparison without the
-  outcome ``compared`` differs for every quantity it judges.
+  quantities, so a quantity outside the target cannot change the judgement. It differs for a quantity
+  when a coordinate of it deviates under the tolerance rule or a coordinate is added or removed; a
+  comparison without the outcome ``compared`` differs for every quantity it judges.
 - An interval whose ends agree for a quantity is not divided further for it. An interval
   ``(a, b)`` with ``b - a > 1`` is split at ``m = (a + b) // 2``, and both halves are
   judged for the quantities on which it differs, depth first, the earlier half first. A
@@ -54,9 +54,9 @@ from .compare import CheckedRun, align, target_window
 from .documents import (CONTRACT_VERSION, RUN_SCHEMA, Rejection, artifact_reference, copy_files, read_document,
                         write_document, write_new)
 from .export import write_export
+from .protocol import Engine, UsageError
 from .replay import check_response
-from .run import (EXPORT_NAME, RECORD_NAME as STATE_RECORD_NAME, RESPONSE_NAME, Engine, RunResult, UsageError,
-                  written_values)
+from .run import EXPORT_NAME, RECORD_NAME as STATE_RECORD_NAME, RESPONSE_NAME, RunResult, written_values
 from .walk import (LOCALISE_SCHEMA, MANIFEST_NAME, NEWER, OLDER, REQUEST_NAME, RESULT_NAME as WALK_RESULT_NAME,
                    Prepared, States, WalkFolder, as_checked, compare_in_memory, flags, new_folder, prepare,
                    read_walk_folder)
