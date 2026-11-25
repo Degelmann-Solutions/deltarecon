@@ -125,6 +125,8 @@ const stages = Object.fromEntries(
   }
 
   let fieldCount = 0;
+  const moving = new WeakSet<HTMLElement>();
+  const focusedControl = new WeakMap<HTMLElement, HTMLElement>();
 
   function setUp(container: HTMLElement): void {
     const id = `search-field-${++fieldCount}`;
@@ -291,9 +293,16 @@ const stages = Object.fromEntries(
     // In the top bar the list lies over the page. When focus leaves the
     // search, the list closes, so that it never covers the focused element.
     // In the menu it stands in the flow and covers nothing.
+    container.addEventListener('focusin', (event) => {
+      if (event.target instanceof HTMLElement) focusedControl.set(container, event.target);
+    });
     container.addEventListener('focusout', (event) => {
       const next = event.relatedTarget;
-      if (!bar.matches || (next instanceof Node && container.contains(next))) return;
+      if (moving.has(container) || (next instanceof Node && container.contains(next))) return;
+      // Layout can hide the old home before matchMedia's listener runs.
+      // Retain that control until move() can hand focus to a visible one.
+      if (next !== null || container.getClientRects().length > 0) focusedControl.delete(container);
+      if (!bar.matches) return;
       close();
     });
     // The same when the field moves from the menu into the top bar.
@@ -310,8 +319,24 @@ const stages = Object.fromEntries(
     const after = container.nextElementSibling;
     if (!slot || !home) return;
     const move = (): void => {
+      const active = document.activeElement;
+      const lost = !(active instanceof HTMLElement) || active === document.body || active.getClientRects().length === 0;
+      const focused = active instanceof HTMLElement && container.contains(active)
+        ? active : lost ? focusedControl.get(container) : undefined;
+      moving.add(container);
       if (bar.matches) home.insertBefore(container, after);
       else slot.append(container);
+      // Reparenting takes focus away in some browsers. A closed phone menu
+      // hides the search; focus then moves to the visible menu control.
+      if (focused) {
+        if (container.getClientRects().length > 0) focused.focus({ preventScroll: true });
+        else {
+          const control = document.documentElement.dataset.menu === 'open' ? '[data-menu-close]' : '[data-menu-button]';
+          document.querySelector<HTMLElement>(control)?.focus({ preventScroll: true });
+        }
+      }
+      moving.delete(container);
+      if (!container.contains(document.activeElement)) focusedControl.delete(container);
     };
     bar.addEventListener('change', move);
     move();

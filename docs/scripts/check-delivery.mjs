@@ -11,14 +11,17 @@
 //   - every address it lists is a built page.
 // The delivery record, dist/delivery.json:
 //   - `commit` is the commit `git rev-parse HEAD` names;
-//   - `changed` is a boolean;
+//   - `changed` is a boolean; the actual writer also runs in clean, tracked-
+//     dirty and untracked Git fixtures, including hidden-untracked config.
+//     Hardcoded-false and dropped-option mutations must fail these checks;
 //   - `pages` is the page register, in its order: language, absolute address
 //     and page name; each description is the one the head of the built page
 //     holds, which Chromium reads from the built file.
 // It starts no server: it reads the files under dist/.
 // Exits non-zero and names every failed expectation.
 import { execFileSync } from 'node:child_process';
-import { access, readFile } from 'node:fs/promises';
+import { access, copyFile, mkdir, mkdtemp, readFile, rm, symlink, writeFile } from 'node:fs/promises';
+import os from 'node:os';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { chromium } from 'playwright';
@@ -146,8 +149,78 @@ function checkRecord(record, descriptions) {
   });
 }
 
+/** Exercise the actual producer in isolated repositories. */
+async function checkProducer() {
+  const temporary = await mkdtemp(path.join(os.tmpdir(), 'deltarecon-delivery-'));
+  const fixture = path.join(temporary, 'docs');
+  // User signing, hooks and ignore settings must not alter the fixtures.
+  const env = { ...process.env, GIT_CONFIG_NOSYSTEM: '1', GIT_CONFIG_GLOBAL: os.devNull };
+  const git = (...args) => execFileSync('git', args, { cwd: temporary, encoding: 'utf8', env }).trim();
+  try {
+    await mkdir(path.join(fixture, 'scripts'), { recursive: true });
+    await mkdir(path.join(fixture, 'src'));
+    for (const file of ['scripts/write-delivery.mjs', 'scripts/harness.mjs', 'astro.config.mjs', 'src/site.ts']) {
+      await copyFile(path.join(root, file), path.join(fixture, file));
+    }
+    await symlink(path.join(root, 'node_modules'), path.join(fixture, 'node_modules'),
+      process.platform === 'win32' ? 'junction' : 'dir');
+    await writeFile(path.join(temporary, '.gitignore'), 'docs/node_modules/\ndocs/dist/\n');
+    await writeFile(path.join(temporary, 'tracked.txt'), 'original\n');
+    for (const entry of pages) {
+      const folder = path.join(fixture, 'dist', entry.address.slice(BASE.length));
+      await mkdir(folder, { recursive: true });
+      await writeFile(path.join(folder, 'index.html'), '<meta name="description" content="Fixture description">');
+    }
+    git('init', '--quiet');
+    git('add', '.');
+    git('-c', 'user.name=Delivery fixture', '-c', 'user.email=fixture@example.invalid', 'commit', '--quiet', '-m', 'Fixture');
+    const original = await readFile(path.join(fixture, 'scripts/write-delivery.mjs'), 'utf8');
+    const writer = path.join(fixture, 'scripts/write-delivery.mjs');
+    async function states(source) {
+      await writeFile(writer, source);
+      // Commit each writer so its mutation cannot dirty its own test.
+      git('add', 'docs/scripts/write-delivery.mjs');
+      git('-c', 'user.name=Delivery fixture', '-c', 'user.email=fixture@example.invalid', 'commit', '--quiet', '--allow-empty', '-m', 'Writer under test');
+      const revision = git('rev-parse', 'HEAD');
+      const faults = [];
+      async function check(expected, state) {
+        execFileSync(process.execPath, [writer], { cwd: fixture, stdio: 'pipe', env });
+        const record = JSON.parse(await readFile(path.join(fixture, 'dist/delivery.json'), 'utf8'));
+        if (record.commit !== revision) faults.push(`${state}: wrong commit`);
+        if (record.changed !== expected) faults.push(`${state}: changed is ${record.changed}, expected ${expected}`);
+      }
+      await check(false, 'clean');
+      await writeFile(path.join(temporary, 'tracked.txt'), 'changed\n');
+      await check(true, 'tracked-dirty');
+      git('checkout', '--', 'tracked.txt');
+      await writeFile(path.join(temporary, 'untracked.txt'), 'untracked\n');
+      await check(true, 'untracked');
+      git('config', 'status.showUntrackedFiles', 'no');
+      await check(true, 'untracked hidden by config');
+      git('config', '--unset', 'status.showUntrackedFiles');
+      await rm(path.join(temporary, 'untracked.txt'));
+      return faults;
+    }
+    const faults = await states(original);
+    expect(faults.length === 0, `delivery producer: ${faults.join('; ')}`);
+    const expression = "git('status', '--porcelain', '--untracked-files=normal').trim() !== ''";
+    for (const [name, source, expectedFault] of [
+      ['hardcoded false', original.replace(expression, 'false'), 'tracked-dirty'],
+      ['dropped untracked option', original.replace(", '--untracked-files=normal'", ''), 'untracked hidden by config'],
+    ]) {
+      expect(source !== original, `delivery producer: ${name} mutation was not applied`);
+      const found = await states(source);
+      expect(found.some((fault) => fault.startsWith(`${expectedFault}:`)), `delivery producer: ${name} mutation escaped the ${expectedFault} assertion`);
+      console.log(`check-delivery: ${name} mutation detected: ${found.join('; ')}`);
+    }
+  } finally {
+    await rm(temporary, { recursive: true, force: true });
+  }
+}
+
 let browser;
 try {
+  await checkProducer();
   browser = await chromium.launch();
   const context = await browser.newContext({ javaScriptEnabled: false });
   const page = await context.newPage();
