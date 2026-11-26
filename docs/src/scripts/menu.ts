@@ -100,12 +100,15 @@ if (link && menuButton && closeButton && header && tree) {
 
   // From the tree breakpoint up the tree is a column; an open menu ends.
   // Both buttons leave the page there, so focus that was in the menu's top
-  // bar or tree moves to the current page of the tree.
+  // bar or tree moves to the current page of the tree, or the first chapter
+  // link on a page outside the path (which has no current page).
   column.addEventListener('change', () => {
     if (!column.matches || !isOpen()) return;
     close(false);
     if (focusLost()) {
-      tree.querySelector<HTMLElement>('a[aria-current="page"]')?.focus({ preventScroll: true });
+      const destination = tree.querySelector<HTMLElement>('a[aria-current="page"]') ??
+        tree.querySelector<HTMLElement>('a[href]');
+      destination?.focus({ preventScroll: true });
     }
   });
 
